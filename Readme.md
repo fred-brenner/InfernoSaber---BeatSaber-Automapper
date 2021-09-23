@@ -27,7 +27,7 @@ tools/config/paths.py
 Create them on a disk of your choice and link the main folder in the paths.py file,
 the program can't create them currently.
 
-## starting oder for extraction of beatsaber data:
+## starting order for extraction of beatsaber data:
 01/preprocessing/shift.py (whole preprocessing)
 
 prediction may be coming later
