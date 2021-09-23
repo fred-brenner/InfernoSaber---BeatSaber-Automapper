@@ -4,6 +4,9 @@ including notes, obstacles and show effects.
 Map versions with custom modded data (values out of normal boundaries) are excluded,
 so the data is as smooth as possible. 
 
+### If you are looking for a working automapper, search for BeatSage.
+As of now this upload is made for easy analyzation of the custom maps.
+
 ### Author: Frederic Brenner
 frederic.brenner@tum.de
 
