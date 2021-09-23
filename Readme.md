@@ -5,7 +5,7 @@ Map versions with custom modded data (values out of normal boundaries) are exclu
 so the data is as smooth as possible. 
 
 ### If you are looking for a working automapper, search for BeatSage.
-As of now this upload is made for easy analyzation of the custom maps.
+As of now this code is made for data creation to set up a machine learning framework.
 
 ### Author: Frederic Brenner
 frederic.brenner@tum.de
