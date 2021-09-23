@@ -1,0 +1,22 @@
+currently only numpy and progressbar2 needed
+
+
+
+
+# machine learning
+-tensorflow  pip install tensorflow=2.4
+-            CUDA v11.0 (for gpu/tf=2.4)
+-            cudnn v8.0 (for gpu/tf=2.4)
+
+# data science
+-matplotlib
+-scipy
+numpy
+-pillow  conda install pillow
+
+# music
+-aubio   conda install -c conda-forge aubio
+-pydub   conda install -c conda-forge pydub
+
+# utils
+progressbar2    conda install progressbar2
