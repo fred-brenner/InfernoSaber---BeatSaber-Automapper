@@ -2,15 +2,15 @@
 # config file for all paths used in project
 ##########################################
 # edit directory paths (C:/...) for each PC
-#!!! Only use "/" and not "\" 
-#!!! Always end with "/"
+# !!! Only use "/" and not "\"
+# !!! Always end with "/"
 ##########################################
 
 import os
 
 ################################# (change this for your pc)
 # setup folder for input data
-dir_path = "C:/Users/frede/Desktop/Automapper_data/"
+dir_path = "C:/Users/frede/Desktop/BS_Automapper/Data/"
 
 bs_song_path = "B:/SteamLibrary/steamapps/common/Beat Saber/Beat Saber_Data/CustomLevels/"
 
@@ -44,7 +44,7 @@ copy_path_song = train_path + "songs_egg/"
 copy_path_map = train_path + "maps/"
 
 dict_all_path = train_path + "maps_dict_all/"
-pic_path = train_path + "songs_pic/"
+# pic_path = train_path + "songs_pic/"
 
 songs_pred = pred_path + "songs_predict/"
 # pic_path_pred = pred_path + "songs_pic_predict/"
@@ -54,7 +54,7 @@ pred_input_path = pred_path + "input/"
 new_map_path = pred_path + "new_map/"
 
 keras_path = model_path + "keras_model/"
-keras_path_sec = model_path + "keras_model_sec/"
+# keras_path_sec = model_path + "keras_model_sec/"
 
 fail_path = train_path + "fail_list/"
 diff_path = train_path + "songs_diff/"
