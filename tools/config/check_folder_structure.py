@@ -60,7 +60,8 @@ check_exists(paths.fail_path)
 check_exists(paths.diff_path)
 check_exists(paths.song_data)
 
-check_exists(paths.class_maps)
+# check_exists(paths.class_maps)
+check_exists(paths.ml_input_path)
 
 print("Finished folder setup.")
 
