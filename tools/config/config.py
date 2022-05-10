@@ -17,7 +17,7 @@ min_pause_sec = 0.03    # min pause allowed between beats
 max_velocity = 25       # max speed for cutting notes for expert+, others are lower (still depending on max velocity), 30 means ca max 10 notes (with low distance) per sec per hand!
 
 # Training configuration
-batch_size = 8    # batch_size for ML models
+batch_size = 32    # batch_size for ML models
 learning_rate = 0.01
 model_name = 'model'
 

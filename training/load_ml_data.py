@@ -19,6 +19,8 @@ def load_ml_arrays():
         zero_ar = np.zeros((len_diff, 1))
         beat_ar = np.concatenate((beat_ar, zero_ar), axis=0)
 
+        beat_ar = beat_ar.reshape(-1)
+
         return song_ar, beat_ar
 
 
