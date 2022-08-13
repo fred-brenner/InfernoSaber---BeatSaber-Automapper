@@ -2,20 +2,11 @@
 Training script
 """
 
-import numpy as np
-from datetime import datetime
-from tensorflow.keras import layers, Input
-from tensorflow.keras import Model, losses, optimizers
-from tensorflow.keras import models
-from tensorflow.keras.utils import plot_model
 from tensorflow.python.client import device_lib
 from sklearn.preprocessing import OneHotEncoder
-from sklearn.model_selection import KFold
-import pickle
-import matplotlib.pyplot as plt
 
-from training.load_ml_data import load_ml_arrays
-from training.build_model import build_model
+from old.load_ml_data import load_ml_arrays
+from old.build_model import build_model
 from tools.config import config
 
 

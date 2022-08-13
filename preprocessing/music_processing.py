@@ -1,6 +1,6 @@
 import numpy as np
 import aubio
-from tools.utils.load_and_save import load_npy, save_npy, filter_max_bps
+from tools.utils.load_and_save import save_npy
 from tools.config import paths, config
 
 import matplotlib.pyplot as plt
