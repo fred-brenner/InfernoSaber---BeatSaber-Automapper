@@ -12,7 +12,7 @@ import os
 # setup folder for input data
 dir_path = "C:/Users/frede/Desktop/BS_Automapper/Data/"
 
-bs_song_path = "B:/SteamLibrary/steamapps/common/Beat Saber/Beat Saber_Data/CustomLevels/"
+bs_song_path = "E:/SteamLibrary/steamapps/common/Beat Saber/Beat Saber_Data/CustomLevels/"
 
 ############################# (no need to change)
 # main workspace path

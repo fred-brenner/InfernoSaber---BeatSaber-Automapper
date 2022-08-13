@@ -55,15 +55,6 @@ def delete_fails():
 
 
 if __name__ == '__main__':
-    # q = input("Append fail song? (y or n)")
-    # if q == "y":
-    #     name = input("Name (without ending): ")
-    #     append_fail(name)
-    #
-    # q = input("Delete failed songs? (y or n)")
-    # if q == "y":
-    #     delete_fails()
-
     q = input("Reset black list? [y or n]")
     if q == 'y':
         os.remove(paths.black_list_file)

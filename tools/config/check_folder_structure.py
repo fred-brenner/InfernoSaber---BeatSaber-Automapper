@@ -1,6 +1,6 @@
 """
 This script checks the folder structure.
-Missing folders are created.
+Missing folders can be automatically created.
 """
 
 import os
@@ -54,7 +54,7 @@ check_exists(paths.songs_pred)
 check_exists(paths.pred_input_path)
 check_exists(paths.new_map_path)
 
-check_exists(paths.keras_path)
+# check_exists(paths.keras_path)
 
 check_exists(paths.fail_path)
 check_exists(paths.diff_path)

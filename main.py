@@ -1,5 +1,6 @@
-#######################################################
-# This file is needed for finding the working directory
-#######################################################
+###################################################
+# This file is needed to find the working directory
+###################################################
 
-# empty as of now
+# run shift.py
+#

@@ -55,7 +55,7 @@ def shift_bs_songs(allow_diff2=False):
 
     bar = ProgressBar(max_value=num_all)
 
-    # walk trough bs directory
+    # walk through bs directory
     for root, dirs, files in os.walk(paths.bs_song_path):
         both = False
         excl_true = str_compare(str=os.path.basename(root), str_list=exclusion.exclusion, return_str=False,

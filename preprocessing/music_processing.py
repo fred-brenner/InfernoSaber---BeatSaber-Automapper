@@ -1,10 +1,11 @@
 import numpy as np
 import aubio
 from tools.utils.load_and_save import load_npy, save_npy, filter_max_bps
-import tools.config.paths as paths
-import tools.config.config as config
+from tools.config import paths, config
 
 import matplotlib.pyplot as plt
+from scipy import signal
+from PIL import Image, ImageFilter
 
 
 def load_song(data_path: str) -> np.array:
@@ -19,37 +20,78 @@ def load_song(data_path: str) -> np.array:
             break
     samples_ar = np.asarray(samples_list)
 
-    return samples_ar
+    # resample song into window size
+    window_size = int(config.window * config.samplerate_music)
+    windows_counts = int(len(samples_ar) / window_size)
+    samples_ar_split = samples_ar[:int(windows_counts * window_size)]
+    samples_ar_split = samples_ar_split.reshape((windows_counts, window_size))
+    # x=time slot, y=window size
+
+    return samples_ar_split
+
+
+def log_specgram(audio, sample_rate, window_size,
+                 step_size=1, eps=1e-10):
+    nperseg = int(round(window_size * sample_rate / 1e3))
+    noverlap = int(round(step_size * sample_rate / 1e3))
+    freqs, _, spec = signal.spectrogram(audio,
+                                        fs=sample_rate,
+                                        window='hann',
+                                        nperseg=nperseg,
+                                        noverlap=noverlap,
+                                        detrend=False)
+    return freqs, np.log(spec.T.astype(np.float32) + eps)
 
 
 def process_song(song_ar: np.array) -> np.array:
+    # use absolut values
     song_ar = np.abs(song_ar)
+    # amplify signal
+    song_ar *= 100
 
-    # plt.figure()
-    # plt.plot(song_ar)
-    # plt.show()
+    # convert into spectrogram
+    window_size = 100
+    sample_rate = int(config.samplerate_music / 1)
 
-    return song_ar
+    spectrogram_ar = []
+    n_x = None
+    for n in range(song_ar.shape[0]):
+        _, spectrogram = log_specgram(song_ar[n], sample_rate, window_size)
+        # shift spectrogram to 0+
+        spectrogram -= spectrogram.min()
+
+        # plt.imshow(spectrogram.T, aspect='auto', origin='lower')
+        # plt.show()
+
+        # resize and filter spectrogram
+        im = Image.fromarray(spectrogram)
+        # im = im.filter(ImageFilter.MaxFilter(config.max_filter_size))
+        if n_x is None:
+            n_x = spectrogram.shape[0]
+        im = im.resize((config.specgram_res, n_x))
+
+        # transpose and save spectrogram
+        im = np.asarray(im).T
+        spectrogram_ar.append(im)
+
+        # plt.imshow(im, aspect='auto', origin='lower')
+        # plt.show()
+    return spectrogram_ar
 
 
-def main():
-    # load song difficulty
-    diff_ar = load_npy(paths.diff_ar_file)
-    name_ar = load_npy(paths.name_ar_file)
-
-    # filter by max song diff
-    names = filter_max_bps(diff_ar, name_ar)
-
+def run_music_preprocessing(names_ar: list, save_file=True, song_combined=True):
     # load song notes
     ending = ".egg"
-    for n in names:
+    song_ar = []
+    for n in names_ar:
         song = load_song(paths.copy_path_song + n + ending)
         ml_input_song = process_song(song)
-        break
+        if song_combined:
+            song_ar.extend(ml_input_song)
+        else:
+            song_ar.append(ml_input_song)
 
-    save_npy(ml_input_song, paths.ml_input_song_file)
-
-
-if __name__ == '__main__':
-    main()
-    print("Finished")
+    if save_file:
+        save_npy(song_ar, paths.ml_input_song_file)
+    else:
+        return song_ar
