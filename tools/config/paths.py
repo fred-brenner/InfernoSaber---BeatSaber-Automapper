@@ -53,9 +53,6 @@ songs_pred = pred_path + "songs_predict/"
 pred_input_path = pred_path + "input/"
 new_map_path = pred_path + "new_map/"
 
-keras_path = model_path + "keras_model/"
-# keras_path_sec = model_path + "keras_model_sec/"
-
 fail_path = train_path + "fail_list/"
 diff_path = train_path + "songs_diff/"
 song_data = train_path + "song_data/"
@@ -84,4 +81,6 @@ pred_ml_output_file = pred_input_path + "ml_output.pkl"
 pred_title_file = pred_input_path + "title_list.pkl"
 
 black_list_file = fail_path + "black_list.txt"
+
+model_autoenc_music_file = model_path + "autoenc_music"
 ############################

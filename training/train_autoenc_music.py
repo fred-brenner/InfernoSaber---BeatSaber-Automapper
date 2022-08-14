@@ -1,22 +1,26 @@
 import numpy as np
 import torch
+import matplotlib.pyplot as plt
 from torch import nn
 from torch.utils.data import DataLoader
+from pytorch_models import ConvAutoencoder
+from torchviz import make_dot
+
 from helpers import *
 from preprocessing.music_processing import run_music_preprocessing
-from pytorch_models import ConvAutoencoder
-import matplotlib.pyplot as plt
+from tools.config import config, paths
+
 
 check_cuda_device()
 
 # Setup configuration
 #####################
 min_bps_limit = 5
-max_bps_limit = 5.1
+max_bps_limit = 5.2
 learning_rate = 0.005
-n_epochs = 60
-batch_size = 4
-test_samples = 5
+n_epochs = 20
+batch_size = 8
+test_samples = 6
 np.random.seed(3)
 
 # Data Preprocessing
@@ -54,13 +58,26 @@ device = "cuda" if torch.cuda.is_available() else "cpu"
 print(f"Building model on device <{torch.cuda.get_device_name(0)}>")
 # input_shape = song_ar.shape[1] * song_ar.shape[2]
 model = ConvAutoencoder().to(device)
+
+# print model details
 print(model)
 
+# visualize model details
+img_batch = next(iter(train_loader)).to(device)
+# yhat = model(img_batch)
+# make_dot(yhat, params=dict(list(model.named_parameters()))).render("autoencoder_music", format="png")
+input_names = [f'Image Input (batch_size={batch_size})']
+output_names = ['Image Output']
+save_path = paths.model_autoenc_music_file + '.onnx'
+torch.onnx.export(model, img_batch, save_path, input_names=input_names, output_names=output_names)
+
 # Loss function
-criterion = nn.MSELoss()
+# criterion = nn.MSELoss()
+criterion = nn.BCELoss()
 
 # Optimizer
 optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
+
 
 # Model Training
 ################
@@ -91,18 +108,21 @@ for epoch in range(1, n_epochs + 1):
         val_images = val_images.to(device)
         val_output = model(val_images)
         loss = criterion(val_output, val_images)
-        val_loss = loss.item() * val_images.size(0)
+        val_loss += loss.item() * val_images.size(0)
 
     val_loss = val_loss / len(val_loader)
     print(f'Epoch {epoch} \t\t Training Loss: {train_loss} \t\t Validation Loss: {val_loss}')
     if min_val_loss > val_loss:
-        print(f'Validation Loss Decreased({min_val_loss:.8f}--->{val_loss:.8f}) \t Saving The Model')
+        print(f'Validation Loss Decreased({min_val_loss:.8f}->{val_loss:.8f}) \t Saving The Model')
         min_val_loss = val_loss
         # Saving State Dict
-        # torch.save(model.state_dict(), 'saved_model.pth')
+        save_path = paths.model_autoenc_music_file + 'saved_model.pth'
+        torch.save(model.state_dict(), save_path)
+
 
 # Model Evaluation
 ##################
+model.eval()
 # Batch of test images
 dataiter = iter(test_loader)
 images = dataiter.next()
@@ -110,21 +130,13 @@ images = images.to(device)
 
 # Sample outputs
 output = model(images)
+repr_out = model.encoder(images)
 images = images.cpu().numpy()
-
-# output = output.view(batch_size, 3, 32, 32)
 output = output.cpu().detach().numpy()
+repr_out = repr_out.cpu().detach().numpy()
 
-# Original Images
-print("Original Images vs. Reconstruction")
-fig, axes = plt.subplots(nrows=2, ncols=test_samples, sharex=True, sharey=True, figsize=(12, 4))
-for idx in np.arange(test_samples):
-    ax = fig.add_subplot(2, test_samples, idx + 1, xticks=[], yticks=[])
-    plt.imshow(np.transpose(images[idx], (1, 2, 0)))
-for idx in np.arange(test_samples):
-    ax = fig.add_subplot(2, test_samples, idx + test_samples + 1, xticks=[], yticks=[])
-    plt.imshow(np.transpose(output[idx], (1, 2, 0)))
-plt.show()
+plot_autoenc_results(images, repr_out, output, test_samples)
+
 
 # Model Saving
 ##############
