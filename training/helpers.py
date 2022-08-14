@@ -2,6 +2,7 @@ import numpy as np
 import torch
 from tools.utils.load_and_save import load_npy
 from tools.config import paths, config
+import matplotlib.pyplot as plt
 
 
 def filter_by_bps(min_limit=None, max_limit=None):
@@ -26,3 +27,8 @@ def check_cuda_device():
         print("No Cuda device detected. Continue?")
         input("Enter")
     return None
+
+
+def imshow(img):
+    img = img / 2 + 0.5
+    plt.imshow(np.transpose(img, (1, 2, 0)))
