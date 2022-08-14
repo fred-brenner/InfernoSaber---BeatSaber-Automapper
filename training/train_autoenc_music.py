@@ -13,9 +13,11 @@ check_cuda_device()
 #####################
 min_bps_limit = 5
 max_bps_limit = 5.1
-learning_rate = 0.008
-n_epochs = 100
-batch_size = 8
+learning_rate = 0.005
+n_epochs = 60
+batch_size = 4
+test_samples = 5
+np.random.seed(3)
 
 # Data Preprocessing
 ####################
@@ -34,9 +36,15 @@ song_ar /= song_ar.max()
 song_ar = song_ar.reshape((song_ar.shape[0], 1, song_ar.shape[1], song_ar.shape[2]))
 
 # sample into train/val/test
-test_loader = DataLoader(song_ar, batch_size=5)
-split = int(song_ar.shape[0] * 0.8)
-train_loader = DataLoader(song_ar[5:split], batch_size=batch_size)
+test_loader = DataLoader(song_ar[:test_samples], batch_size=test_samples)
+song_ar = song_ar[test_samples:]
+
+# shuffle and split
+np.random.shuffle(song_ar)
+split = int(song_ar.shape[0] * 0.85)
+
+# setup data loaders
+train_loader = DataLoader(song_ar[:split], batch_size=batch_size)
 val_loader = DataLoader(song_ar[split:], batch_size=batch_size)
 
 
@@ -88,7 +96,7 @@ for epoch in range(1, n_epochs + 1):
     val_loss = val_loss / len(val_loader)
     print(f'Epoch {epoch} \t\t Training Loss: {train_loss} \t\t Validation Loss: {val_loss}')
     if min_val_loss > val_loss:
-        print(f'Validation Loss Decreased({min_val_loss:.5f}--->{val_loss:.5f}) \t Saving The Model')
+        print(f'Validation Loss Decreased({min_val_loss:.8f}--->{val_loss:.8f}) \t Saving The Model')
         min_val_loss = val_loss
         # Saving State Dict
         # torch.save(model.state_dict(), 'saved_model.pth')
@@ -109,12 +117,12 @@ output = output.cpu().detach().numpy()
 
 # Original Images
 print("Original Images vs. Reconstruction")
-fig, axes = plt.subplots(nrows=2, ncols=5, sharex=True, sharey=True, figsize=(12, 4))
-for idx in np.arange(5):
-    ax = fig.add_subplot(2, 5, idx + 1, xticks=[], yticks=[])
+fig, axes = plt.subplots(nrows=2, ncols=test_samples, sharex=True, sharey=True, figsize=(12, 4))
+for idx in np.arange(test_samples):
+    ax = fig.add_subplot(2, test_samples, idx + 1, xticks=[], yticks=[])
     plt.imshow(np.transpose(images[idx], (1, 2, 0)))
-for idx in np.arange(5):
-    ax = fig.add_subplot(2, 5, idx + 6, xticks=[], yticks=[])
+for idx in np.arange(test_samples):
+    ax = fig.add_subplot(2, test_samples, idx + test_samples + 1, xticks=[], yticks=[])
     plt.imshow(np.transpose(output[idx], (1, 2, 0)))
 plt.show()
 
