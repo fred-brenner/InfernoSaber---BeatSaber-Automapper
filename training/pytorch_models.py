@@ -29,12 +29,14 @@ class ConvAutoencoder(nn.Module):
             # cnn layers
             nn.Conv2d(1, 32, 3, padding=1),  # 32: 5.28600556
             nn.ReLU(),
+            nn.Dropout2d(0.2),
             nn.MaxPool2d(2, 2),
             nn.Conv2d(32, 16, 3, padding=1),
             nn.ReLU(),
             nn.MaxPool2d(2, 2),  # float32[8,16,5,4]
             # linear layers
             nn.Flatten(start_dim=1),
+            nn.Dropout(0.1),
             nn.Linear(480, 128),
             nn.ReLU(),
             nn.Linear(128, 32),

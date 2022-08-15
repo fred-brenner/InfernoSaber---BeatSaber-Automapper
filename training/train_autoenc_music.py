@@ -18,8 +18,8 @@ check_cuda_device()
 min_bps_limit = 5
 max_bps_limit = 6
 learning_rate = 0.004
-n_epochs = 30
-batch_size = 8
+n_epochs = 120
+batch_size = 64
 test_samples = 5
 np.random.seed(3)
 
@@ -104,15 +104,7 @@ for epoch in range(1, n_epochs + 1):
     # print('Epoch: {} \tTraining Loss: {:.6f}'.format(epoch, train_loss))
 
     # Validation
-    val_loss = 0.0
-    model.eval()
-    for val_images in val_loader:
-        val_images = val_images.to(device)
-        val_output = model(val_images)
-        loss = criterion(val_output, val_images)
-        val_loss += loss.item() * val_images.size(0)
-
-    val_loss = val_loss / len(val_loader)
+    val_loss = calculate_loss_score(model, device, val_loader, criterion)
     print(f'Epoch {epoch} \t\t Training Loss: {train_loss} \t\t Validation Loss: {val_loss}')
     if min_val_loss > val_loss:
         print(f'Validation Loss Decreased({min_val_loss:.8f}->{val_loss:.8f}) \t Saving The Model')
@@ -124,21 +116,7 @@ for epoch in range(1, n_epochs + 1):
 
 # Model Evaluation
 ##################
-model.eval()
-# Batch of test images
-dataiter = iter(test_loader)
-images = dataiter.next()
-images = images.to(device)
-
-# Sample outputs
-output = model(images)
-repr_out = model.encoder(images)
-images = images.cpu().numpy()
-output = output.cpu().detach().numpy()
-repr_out = repr_out.cpu().detach().numpy()
-
-plot_autoenc_results(images, repr_out, output, test_samples)
+run_plot_autoenc(model, device, test_loader, test_samples)
 
 
-# Model Saving
-##############
+print("Finished Training")

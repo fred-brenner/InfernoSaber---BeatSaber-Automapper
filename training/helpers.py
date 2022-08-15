@@ -58,3 +58,32 @@ def plot_autoenc_results(img_in, img_repr, img_out, n_samples, scale_repr=True):
 
     plt.axis('off')
     plt.show()
+
+
+def run_plot_autoenc(model, device, data_loader, n_samples):
+    # Plot first batch of test images
+    model.eval()
+    dataiter = iter(data_loader)
+    images = dataiter.next()
+    images = images.to(device)
+
+    # Sample outputs
+    output = model(images)
+    repr_out = model.encoder(images)
+    images = images.cpu().numpy()
+    output = output.cpu().detach().numpy()
+    repr_out = repr_out.cpu().detach().numpy()
+
+    plot_autoenc_results(images, repr_out, output, n_samples)
+
+
+def calculate_loss_score(model, device, data_loader, criterion):
+    model.eval()
+    loss = 0.0
+    for images in data_loader:
+        images = images.to(device)
+        output = model(images)
+        loss_each = criterion(output, images)
+        loss += loss_each.item() * images.size(0)
+    loss = loss / len(data_loader)
+    return loss

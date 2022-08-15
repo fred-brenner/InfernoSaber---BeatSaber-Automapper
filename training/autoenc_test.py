@@ -63,35 +63,12 @@ val_loader = DataLoader(song_ar[split:], batch_size=batch_size)
 model.eval()
 
 # Calculate validation score
-val_loss = 0.0
-for val_images in val_loader:
-    val_images = val_images.to(device)
-    val_output = model(val_images)
-    loss = criterion(val_output, val_images)
-    val_loss += loss.item() * val_images.size(0)
-val_loss = val_loss / len(val_loader)
+val_loss = calculate_loss_score(model, device, val_loader, criterion)
 print(f"Validation loss: {val_loss:.6f}")
 
 # Calculate test score
-test_loss = 0.0
-for test_images in test_loader:
-    test_images = test_images.to(device)
-    test_output = model(test_images)
-    loss = criterion(test_output, test_images)
-    test_loss += loss.item() * test_images.size(0)
-test_loss = test_loss / len(test_loader)
+test_loss = calculate_loss_score(model, device, test_loader, criterion)
 print(f"Test loss: {test_loss:.6f}")
 
-
 # Plot first batch of test images
-dataiter = iter(test_loader)
-images = dataiter.next()
-images = images.to(device)
-
-output = model(images)
-repr_out = model.encoder(images)
-images = images.cpu().numpy()
-output = output.cpu().detach().numpy()
-repr_out = repr_out.cpu().detach().numpy()
-
-plot_autoenc_results(images, repr_out, output, test_samples)
+run_plot_autoenc(model, device, test_loader, test_samples)
