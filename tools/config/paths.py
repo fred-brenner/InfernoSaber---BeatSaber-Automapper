@@ -83,4 +83,5 @@ pred_title_file = pred_input_path + "title_list.pkl"
 black_list_file = fail_path + "black_list.txt"
 
 model_autoenc_music_file = model_path + "autoenc_music"
+notes_classify_dict_file = pred_path + "notes_class_dict.pkl"
 ############################

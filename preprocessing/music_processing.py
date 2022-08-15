@@ -91,6 +91,11 @@ def run_music_preprocessing(names_ar: list, save_file=True, song_combined=True):
         else:
             song_ar.append(ml_input_song)
 
+    # scale song to 0-1
+    song_ar = np.asarray(song_ar)
+    song_ar = song_ar.clip(min=0)
+    song_ar /= song_ar.max()
+
     if save_file:
         save_npy(song_ar, paths.ml_input_song_file)
     else:

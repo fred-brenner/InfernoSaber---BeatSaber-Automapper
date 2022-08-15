@@ -15,12 +15,12 @@ check_cuda_device()
 
 # Setup configuration
 #####################
-min_bps_limit = 5
-max_bps_limit = 6
-learning_rate = 0.004
-n_epochs = 120
-batch_size = 64
-test_samples = 5
+min_bps_limit = config.min_bps_limit
+max_bps_limit = config.max_bps_limit
+learning_rate = config.learning_rate
+n_epochs = config.n_epochs
+batch_size = config.batch_size
+test_samples = config.test_samples
 np.random.seed(3)
 
 # Data Preprocessing
@@ -31,11 +31,6 @@ print(f"Importing {len(name_ar)} songs")
 
 # load song input
 song_ar = run_music_preprocessing(name_ar, save_file=False, song_combined=True)
-
-# scale song to 0-1
-song_ar = np.asarray(song_ar)
-song_ar = song_ar.clip(min=0)
-song_ar /= song_ar.max()
 
 # reshape image into 3D tensor
 song_ar = song_ar.reshape((song_ar.shape[0], 1, song_ar.shape[1], song_ar.shape[2]))
