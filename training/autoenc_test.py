@@ -15,13 +15,13 @@ max_bps_limit = 5.2
 learning_rate = 0.005
 n_epochs = 50
 batch_size = 4
-test_samples = 6
+test_samples = 5
 np.random.seed(3)
 
 
 # Load model
 device = "cuda" if torch.cuda.is_available() else "cpu"
-save_path = paths.model_autoenc_music_file + 'saved_model.pth'
+save_path = paths.model_autoenc_music_file + '_saved_model.pth'
 
 model = ConvAutoencoder()
 model.load_state_dict(torch.load(save_path))

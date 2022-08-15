@@ -16,17 +16,18 @@ check_cuda_device()
 # Setup configuration
 #####################
 min_bps_limit = 5
-max_bps_limit = 5.2
-learning_rate = 0.005
-n_epochs = 20
+max_bps_limit = 6
+learning_rate = 0.004
+n_epochs = 30
 batch_size = 8
-test_samples = 6
+test_samples = 5
 np.random.seed(3)
 
 # Data Preprocessing
 ####################
 # get name array
 name_ar, diff_ar = filter_by_bps(min_bps_limit, max_bps_limit)
+print(f"Importing {len(name_ar)} songs")
 
 # load song input
 song_ar = run_music_preprocessing(name_ar, save_file=False, song_combined=True)
@@ -59,8 +60,9 @@ print(f"Building model on device <{torch.cuda.get_device_name(0)}>")
 # input_shape = song_ar.shape[1] * song_ar.shape[2]
 model = ConvAutoencoder().to(device)
 
-# print model details
-print(model)
+if True:
+    # print model details
+    print(model)
 
 # visualize model details
 img_batch = next(iter(train_loader)).to(device)
@@ -72,8 +74,8 @@ save_path = paths.model_autoenc_music_file + '.onnx'
 torch.onnx.export(model, img_batch, save_path, input_names=input_names, output_names=output_names)
 
 # Loss function
-# criterion = nn.MSELoss()
-criterion = nn.BCELoss()
+criterion = nn.MSELoss()
+# criterion = nn.BCELoss()
 
 # Optimizer
 optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
@@ -116,7 +118,7 @@ for epoch in range(1, n_epochs + 1):
         print(f'Validation Loss Decreased({min_val_loss:.8f}->{val_loss:.8f}) \t Saving The Model')
         min_val_loss = val_loss
         # Saving State Dict
-        save_path = paths.model_autoenc_music_file + 'saved_model.pth'
+        save_path = paths.model_autoenc_music_file + '_saved_model.pth'
         torch.save(model.state_dict(), save_path)
 
 

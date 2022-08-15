@@ -29,29 +29,32 @@ def check_cuda_device():
     return None
 
 
-def plot_autoenc_results(img_in, img_repr, img_out, n_samples):
+def plot_autoenc_results(img_in, img_repr, img_out, n_samples, scale_repr=True):
     bneck_reduction = len(img_repr.flatten()) / len(img_in.flatten()) * 100
-    print(f"Bottleneck shape: {img_repr.shape}. Reduction to {bneck_reduction}%")
+    print(f"Bottleneck shape: {img_repr.shape}. Reduction to {bneck_reduction:.1f}%")
     print("Plot original images vs. reconstruction")
-    fig, axes = plt.subplots(nrows=3, ncols=n_samples, figsize=(12, 4))
+    fig, axes = plt.subplots(nrows=3, ncols=n_samples, figsize=(12, 8))
 
-    # if scale_repr:
-    #     img_repr -= img_repr.min()
-    #     img_repr /= img_repr.max()
+    if scale_repr:
+        img_repr -= img_repr.min()
+        img_repr /= img_repr.max()
 
     # plot original image
     for idx in np.arange(n_samples):
-        ax = fig.add_subplot(3, n_samples, idx + 1)
-        plt.imshow(np.transpose(img_in[idx], (1, 2, 0)))
+        fig.add_subplot(3, n_samples, idx + 1)
+        plt.imshow(np.transpose(img_in[idx], (1, 2, 0)), cmap='hot')
 
     # plot bottleneck distribution
+    if len(img_repr.shape) < 4:
+        img_repr = img_repr.reshape((img_repr.shape[0]), 1, -1, int(img_repr.shape[1]/4))
     for idx in np.arange(n_samples):
-        ax = fig.add_subplot(3, n_samples, idx + n_samples + 1)
-        plt.imshow(np.transpose(img_repr[idx][:3], (1, 2, 0)))
+        fig.add_subplot(3, n_samples, idx + n_samples + 1)
+        plt.imshow(np.transpose(img_repr[idx], (1, 2, 0)), cmap='hot')
 
     # plot output image
     for idx in np.arange(n_samples):
-        ax = fig.add_subplot(3, n_samples, idx + 2*n_samples + 1)
-        plt.imshow(np.transpose(img_out[idx], (1, 2, 0)))
+        fig.add_subplot(3, n_samples, idx + 2*n_samples + 1)
+        plt.imshow(np.transpose(img_out[idx], (1, 2, 0)), cmap='hot')
 
+    plt.axis('off')
     plt.show()
