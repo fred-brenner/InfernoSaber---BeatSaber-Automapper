@@ -17,6 +17,7 @@ n_epochs = 50
 batch_size = 4
 test_samples = 5
 np.random.seed(3)
+criterion = nn.MSELoss()
 
 
 # Load model
@@ -59,12 +60,34 @@ val_loader = DataLoader(song_ar[split:], batch_size=batch_size)
 
 # Model Evaluation
 ##################
-# Batch of test images
+model.eval()
+
+# Calculate validation score
+val_loss = 0.0
+for val_images in val_loader:
+    val_images = val_images.to(device)
+    val_output = model(val_images)
+    loss = criterion(val_output, val_images)
+    val_loss += loss.item() * val_images.size(0)
+val_loss = val_loss / len(val_loader)
+print(f"Validation loss: {val_loss:.6f}")
+
+# Calculate test score
+test_loss = 0.0
+for test_images in test_loader:
+    test_images = test_images.to(device)
+    test_output = model(test_images)
+    loss = criterion(test_output, test_images)
+    test_loss += loss.item() * test_images.size(0)
+test_loss = test_loss / len(test_loader)
+print(f"Test loss: {test_loss:.6f}")
+
+
+# Plot first batch of test images
 dataiter = iter(test_loader)
 images = dataiter.next()
 images = images.to(device)
 
-# Sample outputs
 output = model(images)
 repr_out = model.encoder(images)
 images = images.cpu().numpy()
