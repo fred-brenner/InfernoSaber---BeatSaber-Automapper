@@ -1,8 +1,7 @@
 import torch
 from torch import nn
 
-
-# import torch.nn.functional as F
+from tools.config import config
 
 
 class View(nn.Module):
@@ -39,14 +38,14 @@ class ConvAutoencoder(nn.Module):
             nn.Dropout(0.1),
             nn.Linear(480, 128),
             nn.ReLU(),
-            nn.Linear(128, 32),
+            nn.Linear(128, config.bottleneck_len),
             nn.ReLU()
         )
 
         # Decoder
         self.decoder = nn.Sequential(
             # linear layers
-            nn.Linear(32, 128),
+            nn.Linear(config.bottleneck_len, 128),
             nn.ReLU(),
             nn.Linear(128, 480),
             nn.ReLU(),

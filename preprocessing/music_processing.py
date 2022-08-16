@@ -8,7 +8,7 @@ from scipy import signal
 from PIL import Image, ImageFilter
 
 
-def load_song(data_path: str) -> np.array:
+def load_song(data_path: str, time_ar: list) -> np.array:
     total_read = 0
     samples_list = []
     src = aubio.source(data_path, channels=1, samplerate=config.samplerate_music)
@@ -20,14 +20,36 @@ def load_song(data_path: str) -> np.array:
             break
     samples_ar = np.asarray(samples_list)
 
-    # resample song into window size
-    window_size = int(config.window * config.samplerate_music)
-    windows_counts = int(len(samples_ar) / window_size)
-    samples_ar_split = samples_ar[:int(windows_counts * window_size)]
-    samples_ar_split = samples_ar_split.reshape((windows_counts, window_size))
     # x=time slot, y=window size
+    if time_ar is None:
+        # resample song into window size
+        window_size = int(config.window * config.samplerate_music)
+        windows_counts = int(len(samples_ar) / window_size)
+        samples_ar_split = samples_ar[:int(windows_counts * window_size)]
+        samples_ar_split = samples_ar_split.reshape((windows_counts, window_size))
+        remove_idx = []
+    else:
+        window_size = int(config.window * config.samplerate_music)
+        time_ar = np.asarray(time_ar) * config.samplerate_music
+        time_ar = np.around(time_ar).astype('int')
+        samples_ar_split = []
+        remove_idx = []
+        max_time = len(samples_ar)
+        for idx, sample in enumerate(time_ar):
+            # sanity check
+            start_idx = sample - int(window_size/2)
+            if start_idx < 0:
+                remove_idx.append(idx)
+                continue
+            end_idx = sample + int(window_size/2)
+            if end_idx >= max_time:
+                remove_idx.append(idx)
+                continue
+            # add time window
+            samples_ar_split.append(samples_ar[start_idx:end_idx])
+        samples_ar_split = np.asarray(samples_ar_split)
 
-    return samples_ar_split
+    return samples_ar_split, remove_idx
 
 
 def log_specgram(audio, sample_rate, window_size,
@@ -76,15 +98,22 @@ def process_song(song_ar: np.array) -> np.array:
 
         # plt.imshow(im, aspect='auto', origin='lower')
         # plt.show()
-    return spectrogram_ar
+    return np.asarray(spectrogram_ar)
 
 
-def run_music_preprocessing(names_ar: list, save_file=True, song_combined=True):
+def run_music_preprocessing(names_ar: list, time_ar=None, save_file=True, song_combined=True):
     # load song notes
     ending = ".egg"
     song_ar = []
-    for n in names_ar:
-        song = load_song(paths.copy_path_song + n + ending)
+    rm_index_ar = []
+    for idx, n in enumerate(names_ar):
+        if time_ar is None:
+            time = None
+        else:
+            time = time_ar[idx]
+        song, remove_idx = load_song(paths.copy_path_song + n + ending, time_ar=time)
+        rm_index_ar.append(remove_idx)
+
         ml_input_song = process_song(song)
         if song_combined:
             song_ar.extend(ml_input_song)
@@ -92,11 +121,18 @@ def run_music_preprocessing(names_ar: list, save_file=True, song_combined=True):
             song_ar.append(ml_input_song)
 
     # scale song to 0-1
-    song_ar = np.asarray(song_ar)
-    song_ar = song_ar.clip(min=0)
-    song_ar /= song_ar.max()
+    if len(np.asarray(song_ar).shape) > 1:
+        song_ar = np.asarray(song_ar)
+        song_ar = song_ar.clip(min=0)
+        song_ar /= song_ar.max()
+        song_ar = song_ar.reshape((song_ar.shape[0], 1, song_ar.shape[1], song_ar.shape[2]))
+    else:
+        for idx, song in enumerate(song_ar):
+            song = song.clip(min=0)
+            song /= song.max()
+            song_ar[idx] = song.reshape((song.shape[0], 1, song.shape[1], song.shape[2]))
 
     if save_file:
         save_npy(song_ar, paths.ml_input_song_file)
     else:
-        return song_ar
+        return song_ar, rm_index_ar

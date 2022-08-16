@@ -29,9 +29,6 @@ def get_song_repr(name_ar):
     # load song input
     song_ar = run_music_preprocessing(name_ar, save_file=False, song_combined=True)
 
-    # reshape image into 3D tensor
-    song_ar = song_ar.reshape((song_ar.shape[0], 1, song_ar.shape[1], song_ar.shape[2]))
-
     # set up data loader
     data_loader = DataLoader(song_ar, batch_size=512)
 
