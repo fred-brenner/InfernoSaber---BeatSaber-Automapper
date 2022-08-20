@@ -30,7 +30,7 @@ name_ar, diff_ar = filter_by_bps(min_bps_limit, max_bps_limit)
 print(f"Importing {len(name_ar)} songs")
 
 # load song input
-song_ar = run_music_preprocessing(name_ar, save_file=False, song_combined=True)
+song_ar, _ = run_music_preprocessing(name_ar, save_file=False, song_combined=True)
 
 # sample into train/val/test
 test_loader = DataLoader(song_ar[:test_samples], batch_size=test_samples)

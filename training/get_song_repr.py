@@ -27,7 +27,7 @@ def get_song_repr(name_ar):
     ####################
 
     # load song input
-    song_ar = run_music_preprocessing(name_ar, save_file=False, song_combined=True)
+    song_ar, _ = run_music_preprocessing(name_ar, save_file=False, song_combined=True)
 
     # set up data loader
     data_loader = DataLoader(song_ar, batch_size=512)

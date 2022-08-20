@@ -17,11 +17,11 @@ min_bps_limit = 5           # minimum beats_per_second value for training
 max_bps_limit = 5.1         # maximum beats_per_second value for training
 
 # Pytorch model configuration
-learning_rate = 0.004       # model learning rate
-n_epochs = 10               # number of epochs
+learning_rate = 0.003       # model learning rate
+n_epochs = 150               # number of epochs
 batch_size = 64             # batch size
 test_samples = 5            # number of test files to plot (excluded from training)
-bottleneck_len = 32         # size of bottleneck distribution (1D array)
+bottleneck_len = 16         # size of bottleneck distribution (1D array)
 
 
 # # Postprocesing configuration
