@@ -84,4 +84,5 @@ black_list_file = fail_path + "black_list.txt"
 
 model_autoenc_music_file = model_path + "autoenc_music"
 notes_classify_dict_file = pred_path + "notes_class_dict.pkl"
+beats_classify_encoder_file = pred_path + "onehot_encoder.pkl"
 ############################

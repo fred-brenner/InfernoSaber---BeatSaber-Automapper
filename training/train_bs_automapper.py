@@ -30,7 +30,7 @@ auto_model = auto_model.to(device)
 ####################
 
 ml_input, ml_output = load_ml_data()
-dataset = TensorDataset(ml_input, ml_output)
+dataset = TensorDataset(ml_input, ml_output.reshape((-1, 1)))
 
 # sample into train/val/test
 test_loader = DataLoader(dataset[:test_samples], batch_size=test_samples)

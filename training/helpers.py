@@ -46,7 +46,8 @@ def plot_autoenc_results(img_in, img_repr, img_out, n_samples, scale_repr=True):
 
     # plot bottleneck distribution
     if len(img_repr.shape) < 4:
-        img_repr = img_repr.reshape((img_repr.shape[0]), 1, -1, int(img_repr.shape[1]/4))
+        square_bottleneck = int(img_repr.shape[1]/4) if int(img_repr.shape[1]/4) > 0 else 1
+        img_repr = img_repr.reshape((img_repr.shape[0]), 1, -1, square_bottleneck)
     for idx in np.arange(n_samples):
         fig.add_subplot(3, n_samples, idx + n_samples + 1)
         plt.imshow(np.transpose(img_repr[idx], (1, 2, 0)), cmap='hot')

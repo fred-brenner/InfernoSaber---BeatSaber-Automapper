@@ -91,21 +91,24 @@ def cluster_notes_in_classes(notes_ar):
     notes_flattened = [item for sublist in notes_ar for item in sublist]
     # create classify dictionary
     class_key = []
-    # idx = 0
+    idx = -1
     # get class ID for each unique value
     new_song_ar = []
     for song in notes_ar:
         new_class_ar = []
         for beat in song:
+            if idx == 345:
+                print("")
             beat = encode_beat_ar(beat)
             if beat not in class_key:
                 # unknown pattern
                 class_key.append(beat)
-            else:
-                print("")
+                idx += 1
             # known pattern
             key_idx = class_key.index(beat)
             new_class_ar.append(key_idx)
+            if key_idx != idx:
+                print("")
         new_song_ar.append(new_class_ar)
 
     # save classify dictionary

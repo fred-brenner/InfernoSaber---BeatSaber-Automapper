@@ -1,4 +1,6 @@
 import numpy as np
+from sklearn.preprocessing import OneHotEncoder
+import pickle
 
 from preprocessing.beat_data_helper import *
 from tools.config import paths, config
@@ -52,7 +54,23 @@ def load_ml_data():
         ml_input = np.vstack((ml_input, song_ar[idx]))
         ml_output = np.hstack((ml_output, np.asarray(beat_ar[idx])))
 
+    # onehot encode output
+    ml_output = ml_output.reshape(-1, 1)
+    ml_output = onehot_encode(ml_output)
+
     return ml_input, ml_output
+
+
+def onehot_encode(ml_output):
+    encoder = OneHotEncoder(dtype=int)
+    encoder.fit(ml_output)
+    ml_output = encoder.transform(ml_output)
+
+    # save onehot encoder
+    with open(paths.beats_classify_encoder_file, "wb") as enc_file:
+        pickle.dump(encoder, enc_file)
+    # return ml data
+    return ml_output
 
 
 if __name__ == '__main__':
