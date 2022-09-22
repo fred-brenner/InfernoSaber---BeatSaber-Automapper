@@ -57,6 +57,7 @@ def load_ml_data():
     # onehot encode output
     ml_output = ml_output.reshape(-1, 1)
     ml_output = onehot_encode(ml_output)
+    ml_output = ml_output.toarray()
 
     return ml_input, ml_output
 

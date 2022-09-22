@@ -30,14 +30,14 @@ auto_model = auto_model.to(device)
 ####################
 
 ml_input, ml_output = load_ml_data()
-dataset = TensorDataset(ml_input, ml_output.reshape((-1, 1)))
+tds_test = TensorDataset(torch.tensor(ml_input[:test_samples]), torch.tensor(ml_output[:test_samples]))
+tds_train = TensorDataset(torch.tensor(ml_input[test_samples:]), torch.tensor(ml_output[test_samples:]))
 
 # sample into train/val/test
-test_loader = DataLoader(dataset[:test_samples], batch_size=test_samples)
-dataset = dataset[test_samples:]
+test_loader = DataLoader(tds_test, batch_size=test_samples)
+train_loader = DataLoader(tds_train, batch_size=batch_size)
 
 # shuffle and split
-np.random.shuffle(song_ar)
 split = int(song_ar.shape[0] * 0.85)
 
 # setup data loaders
