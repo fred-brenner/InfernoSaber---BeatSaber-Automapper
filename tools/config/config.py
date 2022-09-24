@@ -23,6 +23,7 @@ batch_size = 64             # batch size
 test_samples = 10            # number of test files to plot (excluded from training)
 bottleneck_len = 64         # size of bottleneck distribution (1D array)
 
+lstm_len = 8
 
 # # Postprocesing configuration
 # # cutout_window = 0.1       # window in seconds for cutout

@@ -4,7 +4,7 @@ from torch.utils.data import DataLoader, TensorDataset
 from pytorch_models import ConvAutoencoder
 
 from helpers import *
-from preprocessing.bs_mapper_pre import load_ml_data
+from preprocessing.bs_mapper_pre import load_ml_data, lstm_shift
 from tools.config import config, paths
 
 
@@ -23,6 +23,7 @@ device = "cuda" if torch.cuda.is_available() else "cpu"
 save_path = paths.model_autoenc_music_file + '_saved_model.pth'
 
 auto_model = ConvAutoencoder()
+print(f"Loading pretrained autoencoder model with bottleneck len: {config.bottleneck_len}")
 auto_model.load_state_dict(torch.load(save_path))
 auto_model = auto_model.to(device)
 
@@ -30,6 +31,8 @@ auto_model = auto_model.to(device)
 ####################
 
 ml_input, ml_output = load_ml_data()
+ml_input, ml_output = lstm_shift(ml_input[0], ml_input[1], ml_output)
+
 tds_test = TensorDataset(torch.tensor(ml_input[:test_samples]), torch.tensor(ml_output[:test_samples]))
 tds_train = TensorDataset(torch.tensor(ml_input[test_samples:]), torch.tensor(ml_output[test_samples:]))
 

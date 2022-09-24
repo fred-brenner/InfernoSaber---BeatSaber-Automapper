@@ -15,6 +15,29 @@ min_bps_limit = config.min_bps_limit
 max_bps_limit = config.max_bps_limit
 
 
+def lstm_shift(song_in, time_in, ml_out):
+    n_samples = len(time_in)
+    lstm_len = config.lstm_len
+    start = lstm_len + 1
+
+    # ml_out
+    l_ml_out = ml_out[start:]
+    l_out_in = []
+    # time in
+    l_time_in = []
+
+    for idx in range(start, n_samples):
+        l_out_in.append(ml_out[idx-start:idx-1])
+        l_time_in.append(time_in[idx-start:idx-1])
+
+    l_time_in, l_out_in = np.asarray(l_time_in), np.asarray(l_out_in)
+
+    # song_in
+    song_in = song_in[start:]
+
+    return [song_in, l_time_in, l_out_in], l_ml_out
+
+
 def load_beat_data(name_ar):
     print("Loading maps input data")
     map_dict_notes, _, _ = load_raw_beat_data(name_ar)
@@ -43,15 +66,23 @@ def load_ml_data():
         if len(rm_idx) > 0:
             # remove invalid songs
             name_ar.pop(idx)
+            diff_ar.pop(idx)
             beat_ar.pop(idx)
             song_ar.pop(idx)
             time_ar.pop(idx)
         else:
             idx += 1
 
-    ml_input, ml_output = song_ar[0], np.asarray(beat_ar[0])
+    # calculate time between
+    timing_ar = calc_time_between_beats(time_ar)
+
+    song_input = song_ar[0]
+    time_input = np.asarray(timing_ar[0], dtype='float16')
+    ml_output = np.asarray(beat_ar[0])
+
     for idx in range(1, len(song_ar)):
-        ml_input = np.vstack((ml_input, song_ar[idx]))
+        song_input = np.vstack((song_input, song_ar[idx]))
+        time_input = np.hstack((time_input, np.asarray(timing_ar[idx], dtype='float16')))
         ml_output = np.hstack((ml_output, np.asarray(beat_ar[idx])))
 
     # onehot encode output
@@ -59,7 +90,7 @@ def load_ml_data():
     ml_output = onehot_encode(ml_output)
     ml_output = ml_output.toarray()
 
-    return ml_input, ml_output
+    return [song_input, time_input], ml_output
 
 
 def onehot_encode(ml_output):
@@ -72,6 +103,23 @@ def onehot_encode(ml_output):
         pickle.dump(encoder, enc_file)
     # return ml data
     return ml_output
+
+
+def calc_time_between_beats(time_ar):
+    # default time for start
+    dft_time = 1
+    timing_input = []
+
+    for song in time_ar:
+        temp = []
+        for idx in range(len(song)):
+            if idx == 0:
+                timing = dft_time
+            else:
+                timing = song[idx] - song[idx-1]
+            temp.append(timing)
+        timing_input.append(temp)
+    return timing_input
 
 
 if __name__ == '__main__':
