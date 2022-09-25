@@ -1,7 +1,7 @@
 import torch
 from torch import nn
 from torch.utils.data import DataLoader, TensorDataset
-from pytorch_models import ConvAutoencoder
+from pytorch_models import ConvAutoencoder, AutoMapper
 
 from helpers import *
 from preprocessing.bs_mapper_pre import load_ml_data, lstm_shift
@@ -18,35 +18,50 @@ test_samples = config.test_samples
 np.random.seed(3)
 criterion = nn.MSELoss()
 
-# Load model
+# Load pretrained model
 device = "cuda" if torch.cuda.is_available() else "cpu"
 save_path = paths.model_autoenc_music_file + '_saved_model.pth'
 
-auto_model = ConvAutoencoder()
+pre_model = ConvAutoencoder()
 print(f"Loading pretrained autoencoder model with bottleneck len: {config.bottleneck_len}")
-auto_model.load_state_dict(torch.load(save_path))
-auto_model = auto_model.to(device)
+pre_model.load_state_dict(torch.load(save_path))
+pre_model = pre_model.to(device)
 
 # Data Preprocessing
 ####################
 
 ml_input, ml_output = load_ml_data()
 ml_input, ml_output = lstm_shift(ml_input[0], ml_input[1], ml_output)
+[in_song, in_time_l, in_class_l] = ml_input
 
-tds_test = TensorDataset(torch.tensor(ml_input[:test_samples]), torch.tensor(ml_output[:test_samples]))
-tds_train = TensorDataset(torch.tensor(ml_input[test_samples:]), torch.tensor(ml_output[test_samples:]))
+# apply autoencoder to input
+dl_song = DataLoader(in_song)
+pre_model.eval()
+in_song_l = []
+for images in dl_song:
+    images = images.to(device)
+    output = pre_model.encoder(images).cpu().detach().numpy()
+    in_song_l.append(output.reshape(-1))
+in_song_l = np.asarray(in_song_l)
 
 # sample into train/val/test
+tds_test = TensorDataset(torch.tensor(in_song_l[:test_samples]),
+                         torch.tensor(in_time_l[:test_samples]),
+                         torch.tensor(in_class_l[:test_samples]),
+                         torch.tensor(ml_output[:test_samples]))
+tds_train = TensorDataset(torch.tensor(in_song_l[test_samples:]),
+                          torch.tensor(in_time_l[test_samples:]),
+                          torch.tensor(in_class_l[test_samples:]),
+                          torch.tensor(ml_output[test_samples:]))
+
 test_loader = DataLoader(tds_test, batch_size=test_samples)
 train_loader = DataLoader(tds_train, batch_size=batch_size)
 
-# shuffle and split
-split = int(song_ar.shape[0] * 0.85)
-
-# setup data loaders
-train_loader = DataLoader(song_ar[:split], batch_size=batch_size, num_workers=8, pin_memory=True)
-val_loader = DataLoader(song_ar[split:], batch_size=batch_size, num_workers=8, pin_memory=True)
-
+# setup complete model
+save_path = paths.model_automap_file + '_saved_model.pth'
+auto_model = AutoMapper()
+auto_model = auto_model.to(device)
+torch.save(auto_model.state_dict(), save_path)
 
 
 # # Model Evaluation
