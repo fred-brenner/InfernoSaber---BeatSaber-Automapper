@@ -1,17 +1,27 @@
 import numpy as np
-import torch
 import matplotlib.pyplot as plt
-from torch import nn
-from torch.utils.data import DataLoader
-from pytorch_models import ConvAutoencoder
-from torchviz import make_dot
+import tensorflow as tf
+
+from keras.models import Model
+from keras.layers import Dense, Input, LSTM, CuDNNLSTM, Flatten, Dropout, MaxPooling2D, Conv2D, BatchNormalization, SpatialDropout2D, concatenate
+from keras import optimizers
+from keras.callbacks import ReduceLROnPlateau
+from keras.models import load_model
+import os
+import h5py
+import glob
+import pickle
+import keras.backend as K
+from keras.utils import to_categorical
 
 from helpers import *
 from preprocessing.music_processing import run_music_preprocessing
 from tools.config import config, paths
 
 
-check_cuda_device()
+# Check Cuda compatible GPU
+if not test_gpu_tf():
+    exit()
 
 # Setup configuration
 #####################
@@ -33,7 +43,7 @@ print(f"Importing {len(name_ar)} songs")
 song_ar, _ = run_music_preprocessing(name_ar, save_file=False, song_combined=True)
 
 # sample into train/val/test
-test_loader = DataLoader(song_ar[:test_samples], batch_size=test_samples)
+ds_test = song_ar[:test_samples]
 song_ar = song_ar[test_samples:]
 
 # shuffle and split
@@ -41,20 +51,21 @@ np.random.shuffle(song_ar)
 split = int(song_ar.shape[0] * 0.85)
 
 # setup data loaders
-train_loader = DataLoader(song_ar[:split], batch_size=batch_size)
-val_loader = DataLoader(song_ar[split:], batch_size=batch_size)
+ds_train = song_ar[:split]
+ds_val = song_ar[split:]
 
 
 # Model Building
 ################
-device = "cuda" if torch.cuda.is_available() else "cpu"
-print(f"Building model on device <{torch.cuda.get_device_name(0)}>")
-# input_shape = song_ar.shape[1] * song_ar.shape[2]
-model = ConvAutoencoder().to(device)
+# create timestamp
+dateTimeObj = datetime.now()
+timestamp = 'm_' + str(dateTimeObj.month) + '_d_' + str(dateTimeObj.day) + '_h_' + str(dateTimeObj.hour) + '_min_' + str(dateTimeObj.minute)
+save_model_name = 'keras_model_ep_' + timestamp + ".h5"
 
-if True:
-    # print model details
-    print(model)
+
+# input_shape = song_ar.shape[1] * song_ar.shape[2]
+
+
 
 # visualize model details
 img_batch = next(iter(train_loader)).to(device)
