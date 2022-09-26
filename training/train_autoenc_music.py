@@ -61,28 +61,13 @@ ds_val = song_ar[split:]
 dateTimeObj = datetime.now()
 timestamp = 'm_' + str(dateTimeObj.month) + '_d_' + str(dateTimeObj.day) + '_h_' + str(dateTimeObj.hour) + '_min_' + str(dateTimeObj.minute)
 save_model_name = 'keras_model_ep_' + timestamp + ".h5"
+# save_model_name = "old"
 
-
-# input_shape = song_ar.shape[1] * song_ar.shape[2]
-
-
-
-# visualize model details
-img_batch = next(iter(train_loader)).to(device)
-# yhat = model(img_batch)
-# make_dot(yhat, params=dict(list(model.named_parameters()))).render("autoencoder_music", format="png")
-input_names = [f'Image Input (batch_size={batch_size})']
-output_names = ['Image Output']
-save_path = paths.model_autoenc_music_file + '.onnx'
-torch.onnx.export(model, img_batch, save_path, input_names=input_names, output_names=output_names)
-
-# Loss function
-criterion = nn.MSELoss()
-# criterion = nn.BCELoss()
-
-# Optimizer
-optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
-
+# load model
+model, save_model_name = load_keras_model(save_model_name)
+# create model
+if model is None:
+    model = create_keras_model('lstm1')
 
 # Model Training
 ################

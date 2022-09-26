@@ -1,8 +1,13 @@
 import numpy as np
-import torch
+import tensorflow as tf
+import matplotlib.pyplot as plt
+import glob
+import os
+from keras.models import load_model
+from keras import backend as K
+
 from tools.utils.load_and_save import load_npy
 from tools.config import paths, config
-import matplotlib.pyplot as plt
 
 
 def filter_by_bps(min_limit=None, max_limit=None):
@@ -20,13 +25,6 @@ def filter_by_bps(min_limit=None, max_limit=None):
         diff_ar = diff_ar[selection]
 
     return list(name_ar), list(diff_ar)
-
-
-def check_cuda_device():
-    if not torch.cuda.is_available():
-        print("No Cuda device detected. Continue?")
-        input("Enter")
-    return None
 
 
 def plot_autoenc_results(img_in, img_repr, img_out, n_samples, scale_repr=True):
@@ -88,3 +86,38 @@ def calculate_loss_score(model, device, data_loader, criterion):
         loss += loss_each.item() * images.size(0)
     loss = loss / len(data_loader)
     return loss
+
+
+def test_gpu_tf():
+    if tf.test.gpu_device_name():
+        print('Default GPU Device: {}'.format(tf.test.gpu_device_name()))
+        return True
+    else:
+        print('No GPU found')
+    return False
+
+
+def load_keras_model(save_model_name, lr=None):
+    model = None
+    print("Load keras model from disk")
+    if save_model_name == "old":
+        keras_models = glob.glob(paths.keras_path_sec + "*.h5")
+        latest_file = max(keras_models, key=os.path.getctime)
+    else:
+        latest_file = paths.keras_path_sec + save_model_name
+        if not latest_file.endswith('.h5'):
+            latest_file += '.h5'
+            save_model_name = latest_file
+            model = load_model(latest_file)
+            latest_file = os.path.basename(latest_file)
+            print("Keras model loaded: " + latest_file)
+
+        if not os.path.isfile(latest_file):
+            print(f"Could not find model on disk: {latest_file}")
+            print("Creating new model...")
+
+    # # print(K.get_value(model.optimizer.lr))
+    # if lr is not None:
+    #     K.set_value(model.optimizer.lr, lr)
+    #     print("Set learning rate to: " + str(K.get_value(model.optimizer.lr)))
+    return model, save_model_name
