@@ -4,7 +4,7 @@ import matplotlib.pyplot as plt
 import glob
 import os
 from keras.models import load_model
-from keras import backend as K
+# from keras import backend as K
 
 from tools.utils.load_and_save import load_npy
 from tools.config import paths, config
@@ -40,7 +40,8 @@ def plot_autoenc_results(img_in, img_repr, img_out, n_samples, scale_repr=True):
     # plot original image
     for idx in np.arange(n_samples):
         fig.add_subplot(3, n_samples, idx + 1)
-        plt.imshow(np.transpose(img_in[idx], (1, 2, 0)), cmap='hot')
+        plt.imshow(np.transpose(img_in[idx], (0, 1, 2)), cmap='hot')
+        # plt.imshow(np.transpose(img_in[idx], (1, 2, 0)), cmap='hot')
 
     # plot bottleneck distribution
     if len(img_repr.shape) < 4:
@@ -53,39 +54,18 @@ def plot_autoenc_results(img_in, img_repr, img_out, n_samples, scale_repr=True):
     # plot output image
     for idx in np.arange(n_samples):
         fig.add_subplot(3, n_samples, idx + 2*n_samples + 1)
-        plt.imshow(np.transpose(img_out[idx], (1, 2, 0)), cmap='hot')
+        plt.imshow(np.transpose(img_out[idx], (0, 1, 2)), cmap='hot')
 
     plt.axis('off')
     plt.show()
 
 
-def run_plot_autoenc(model, device, data_loader, n_samples):
+def run_plot_autoenc(enc_model, auto_model, ds_test):
     # Plot first batch of test images
-    model.eval()
-    dataiter = iter(data_loader)
-    images = dataiter.next()
-    images = images.to(device)
+    output = auto_model.predict(ds_test)
+    repr_out = enc_model.predict(ds_test)
 
-    # Sample outputs
-    output = model(images)
-    repr_out = model.encoder(images)
-    images = images.cpu().numpy()
-    output = output.cpu().detach().numpy()
-    repr_out = repr_out.cpu().detach().numpy()
-
-    plot_autoenc_results(images, repr_out, output, n_samples)
-
-
-def calculate_loss_score(model, device, data_loader, criterion):
-    model.eval()
-    loss = 0.0
-    for images in data_loader:
-        images = images.to(device)
-        output = model(images)
-        loss_each = criterion(output, images)
-        loss += loss_each.item() * images.size(0)
-    loss = loss / len(data_loader)
-    return loss
+    plot_autoenc_results(ds_test, repr_out, output, len(ds_test))
 
 
 def test_gpu_tf():
@@ -101,23 +81,24 @@ def load_keras_model(save_model_name, lr=None):
     model = None
     print("Load keras model from disk")
     if save_model_name == "old":
-        keras_models = glob.glob(paths.keras_path_sec + "*.h5")
+        keras_models = glob.glob(paths.model_path + "*.h5")
         latest_file = max(keras_models, key=os.path.getctime)
     else:
-        latest_file = paths.keras_path_sec + save_model_name
+        latest_file = paths.model_path + save_model_name
         if not latest_file.endswith('.h5'):
             latest_file += '.h5'
-            save_model_name = latest_file
-            model = load_model(latest_file)
-            latest_file = os.path.basename(latest_file)
-            print("Keras model loaded: " + latest_file)
 
-        if not os.path.isfile(latest_file):
-            print(f"Could not find model on disk: {latest_file}")
-            print("Creating new model...")
+    if os.path.isfile(latest_file):
+        model = load_model(latest_file)
+        latest_file = os.path.basename(latest_file)
+        print("Keras model loaded: " + latest_file)
+    else:
+        print(f"Could not find model on disk: {latest_file}")
+        print("Creating new model...")
+        return None, save_model_name
 
     # # print(K.get_value(model.optimizer.lr))
     # if lr is not None:
     #     K.set_value(model.optimizer.lr, lr)
     #     print("Set learning rate to: " + str(K.get_value(model.optimizer.lr)))
-    return model, save_model_name
+    return model, latest_file

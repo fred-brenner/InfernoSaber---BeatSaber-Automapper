@@ -101,7 +101,7 @@ def process_song(song_ar: np.array) -> np.array:
     return np.asarray(spectrogram_ar)
 
 
-def run_music_preprocessing(names_ar: list, time_ar=None, save_file=True, song_combined=True):
+def run_music_preprocessing(names_ar: list, time_ar=None, save_file=True, song_combined=True, channels_last=True):
     # load song notes
     ending = ".egg"
     song_ar = []
@@ -131,6 +131,9 @@ def run_music_preprocessing(names_ar: list, time_ar=None, save_file=True, song_c
             song = song.clip(min=0)
             song /= song.max()
             song_ar[idx] = song.reshape((song.shape[0], 1, song.shape[1], song.shape[2]))
+
+    if channels_last:
+        song_ar = song_ar.reshape(song_ar.shape[0], song_ar.shape[2], song_ar.shape[3], 1)
 
     if save_file:
         save_npy(song_ar, paths.ml_input_song_file)

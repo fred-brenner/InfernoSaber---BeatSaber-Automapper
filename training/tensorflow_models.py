@@ -1,14 +1,16 @@
-from keras.layers import Dense, Input, LSTM, CuDNNLSTM, Flatten, Dropout, MaxPooling2D,\
-    Conv2D, BatchNormalization, SpatialDropout2D, concatenate, Reshape, Conv2DTranspose
+from keras.layers import Dense, Input, LSTM, CuDNNLSTM, Flatten, Dropout,\
+    MaxPooling2D, Conv2D, BatchNormalization, SpatialDropout2D, concatenate,\
+    Reshape, Conv2DTranspose, UpSampling2D
 from keras import optimizers
 from keras.models import Model
+from keras.optimizers import adam_v2
 import numpy as np
 from keras.callbacks import ReduceLROnPlateau
 
 from tools.config import config
 
 
-def create_keras_model(model_type, lr, ds_in, ds_out):
+def create_keras_model(model_type, lr, ds_in=None, ds_out=None):
     if model_type == 'lstm1':
         print("Setup keras model")
         input_a = Input(shape=(ds_in[0].shape[1], ds_in[0].shape[2]),
@@ -42,8 +44,9 @@ def create_keras_model(model_type, lr, ds_in, ds_out):
         model.compile(loss='mean_squared_error', optimizer=adam, metrics=['accuracy'])
         return model
 
+    # autoencoder
     if model_type == 'enc1':
-        input_img = Input(shape=(28, 28, 1))
+        input_img = Input(shape=(24, 20, 1))
         # Conv2d(1, 32, 3, padding=1) with Relu
         x = Conv2D(32, (3, 3), activation='relu', padding='same')(input_img)
         # Dropout2d(0.2)
@@ -66,6 +69,8 @@ def create_keras_model(model_type, lr, ds_in, ds_out):
         x = Dense(config.bottleneck_len, activation='relu')(x)
 
         model = Model(input_img, x)
+        # adam = adam_v2.Adam()
+        # model.compile(loss='mean_squared_error', optimizer=adam, metrics=['accuracy'])
         return model
 
     if model_type == 'dec1':
@@ -73,13 +78,21 @@ def create_keras_model(model_type, lr, ds_in, ds_out):
         # Relu(in=config.bottleneck_len, out=128)
         x = Dense(128, activation='relu')(input_img)
         # Relu(in=128, out=480)
-        x = Dense(480, activation='relu')(x)
+        x = Dense(640, activation='relu')(x)
         # Unflatten(1, (16, 6, 5))
-        x = Reshape(target_shape=(16, 6, 5))(x)
+        x = Reshape(target_shape=(10, 8, 8))(x)
+        # input shape (batch_size, rows, cols, channels)
 
-        # ConvTranspose2d(16, 32, 2, stride=2) with Relu
-        x = Conv2DTranspose(32, kernel_size=2, strides=2, activation='relu')(x)
+        # x = Conv2D(32, kernel_size=2, activation='relu')(x)
+        # x = UpSampling2D((2, 2))(x)
+        # x = Conv2D(1, kernel_size=2, activation='sigmoid')(x)
+        # x = UpSampling2D((2, 2))(x)
+
+        # # ConvTranspose2d(16, 32, 2, stride=2) with Relu
+        x = Conv2DTranspose(32, kernel_size=5, strides=2, activation='relu')(x)
         # ConvTranspose2d(32, 1, 2, stride=2) with Sigmoid
-        x = Conv2DTranspose(1, kernel_size=2, strides=2, activation='sigmoid')(x)
+        x = Conv2DTranspose(1, kernel_size=2, strides=1, activation='sigmoid')(x)
         # output shape (batch_size, new_rows, new_cols, filters)
+
+        model = Model(input_img, x)
         return model
