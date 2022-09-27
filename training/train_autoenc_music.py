@@ -97,7 +97,7 @@ print("\nEvaluating test data...")
 eval = auto_encoder.evaluate(ds_test, ds_test)
 # print(f"Test loss: {eval[0]:.4f}, test accuracy: {eval[1]:.4f}")
 
-run_plot_autoenc(encoder, auto_encoder, ds_test)
+run_plot_autoenc(encoder, auto_encoder, ds_test, save=True)
 
 # Save Model
 ############

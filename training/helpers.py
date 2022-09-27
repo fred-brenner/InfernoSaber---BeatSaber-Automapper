@@ -27,12 +27,12 @@ def filter_by_bps(min_limit=None, max_limit=None):
     return list(name_ar), list(diff_ar)
 
 
-def plot_autoenc_results(img_in, img_repr, img_out, n_samples, scale_repr=True):
+def plot_autoenc_results(img_in, img_repr, img_out, n_samples, scale_repr=True, save=False):
     bneck_reduction = len(img_repr.flatten()) / len(img_in.flatten()) * 100
     print(f"Bottleneck shape: {img_repr.shape}. Reduction to {bneck_reduction:.1f}%")
     print("Plot original images vs. reconstruction")
     fig, axes = plt.subplots(nrows=3, ncols=n_samples, figsize=(12, 8))
-
+    fig.suptitle(f"Reduction to {bneck_reduction:.1f}%")
     if scale_repr:
         img_repr -= img_repr.min()
         img_repr /= img_repr.max()
@@ -57,15 +57,19 @@ def plot_autoenc_results(img_in, img_repr, img_out, n_samples, scale_repr=True):
         plt.imshow(np.transpose(img_out[idx], (0, 1, 2)), cmap='hot')
 
     plt.axis('off')
+    if save:
+        save_path = f"{paths.model_path}bneck{config.bottleneck_len}_encoder_decoder_example.png"
+        fig.savefig(save_path)
+
     plt.show()
 
 
-def run_plot_autoenc(enc_model, auto_model, ds_test):
+def run_plot_autoenc(enc_model, auto_model, ds_test, save=False):
     # Plot first batch of test images
     output = auto_model.predict(ds_test)
     repr_out = enc_model.predict(ds_test)
 
-    plot_autoenc_results(ds_test, repr_out, output, len(ds_test))
+    plot_autoenc_results(ds_test, repr_out, output, len(ds_test), save=save)
 
 
 def test_gpu_tf():
