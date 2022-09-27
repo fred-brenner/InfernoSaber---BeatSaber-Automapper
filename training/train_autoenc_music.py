@@ -62,8 +62,8 @@ ds_val = song_ar[split:]
 # create timestamp
 dateTimeObj = datetime.now()
 timestamp = f"{dateTimeObj.month}_{dateTimeObj.day}__{dateTimeObj.hour}_{dateTimeObj.minute}"
-save_model_name = 'tf_model_autoenc_' + timestamp + ".h5"
-save_enc_name = 'tf_model_enc_' + timestamp + ".h5"
+save_model_name = f"tf_model_autoenc_{config.bottleneck_len}bneck_{timestamp}.h5"
+save_enc_name = f"tf_model_enc_{config.bottleneck_len}bneck_{timestamp}.h5"
 # save_model_name = "old"
 
 # load model

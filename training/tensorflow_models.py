@@ -50,7 +50,7 @@ def create_keras_model(model_type, lr, ds_in=None, ds_out=None):
         # Conv2d(1, 32, 3, padding=1) with Relu
         x = Conv2D(32, (3, 3), activation='relu', padding='same')(input_img)
         # Dropout2d(0.2)
-        x = SpatialDropout2D(0.1)(x)
+        # x = SpatialDropout2D(0.05)(x)
         # MaxPool2d(2, 2)
         x = MaxPooling2D((2, 2), padding='same')(x)
 
@@ -62,7 +62,7 @@ def create_keras_model(model_type, lr, ds_in=None, ds_out=None):
         # Flatten(start_dim=1)
         x = Flatten('channels_last')(x)
         # Dropout(0.1)
-        x = Dropout(0.1)(x)
+        x = Dropout(0.05)(x)
         # Relu(in=480, out=128)
         x = Dense(128, activation='relu')(x)
         # Relu(in=128, out=config.bottleneck_len)
