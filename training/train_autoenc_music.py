@@ -63,6 +63,7 @@ ds_val = song_ar[split:]
 dateTimeObj = datetime.now()
 timestamp = f"{dateTimeObj.month}_{dateTimeObj.day}__{dateTimeObj.hour}_{dateTimeObj.minute}"
 save_model_name = 'tf_model_autoenc_' + timestamp + ".h5"
+save_enc_name = 'tf_model_enc_' + timestamp + ".h5"
 # save_model_name = "old"
 
 # load model
@@ -78,6 +79,7 @@ if auto_encoder is None:
 
     adam = adam_v2.Adam(learning_rate=learning_rate, decay=learning_rate/n_epochs)
     auto_encoder.compile(loss='mean_squared_error', optimizer=adam, metrics=['accuracy'])
+    encoder.compile(loss='mean_squared_error', optimizer=adam, metrics=['accuracy'])
 
 # Model Training
 ################
@@ -91,7 +93,16 @@ training = auto_encoder.fit(x=ds_train, y=ds_train, validation_data=(ds_val, ds_
 
 # Model Evaluation
 ##################
+print("\nEvaluating test data...")
+eval = auto_encoder.evaluate(ds_test, ds_test)
+# print(f"Test loss: {eval[0]:.4f}, test accuracy: {eval[1]:.4f}")
+
 run_plot_autoenc(encoder, auto_encoder, ds_test)
 
+# Save Model
+############
+print(f"Saving model at: {paths.model_path}")
+auto_encoder.save(paths.model_path + save_model_name)
+encoder.save(paths.model_path + save_enc_name)
 
-print("Finished Training")
+print("\nFinished Training")
