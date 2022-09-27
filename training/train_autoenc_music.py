@@ -15,6 +15,7 @@ import keras.backend as K
 from keras.utils import to_categorical
 
 from helpers import *
+from tensorflow_models import *
 from preprocessing.music_processing import run_music_preprocessing
 from tools.config import config, paths
 
@@ -67,7 +68,14 @@ save_model_name = 'keras_model_ep_' + timestamp + ".h5"
 model, save_model_name = load_keras_model(save_model_name)
 # create model
 if model is None:
-    model = create_keras_model('lstm1')
+    encoder = create_keras_model('enc1', learning_rate,
+                                 ds_in=None, ds_out=None)
+    decoder = create_keras_model('dec1', learning_rate,
+                                 ds_in=None, ds_out=None)
+    auto_input = Input(shape=(28, 28, 1))
+    encoded = encoder(auto_input)
+    decoded = decoder(encoded)
+    auto_encoder = Model(auto_input, decoded)
 
 # Model Training
 ################
