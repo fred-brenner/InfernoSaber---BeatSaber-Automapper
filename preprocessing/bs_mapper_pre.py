@@ -5,7 +5,6 @@ import pickle
 from preprocessing.beat_data_helper import *
 from tools.config import paths, config
 from training.helpers import filter_by_bps
-from training.get_song_repr import get_song_repr
 from preprocessing.music_processing import run_music_preprocessing
 
 
@@ -30,8 +29,9 @@ def lstm_shift(song_in, time_in, ml_out):
         l_out_in.append(ml_out[idx-start:idx-1])
         l_time_in.append(time_in[idx-start:idx-1])
 
-    l_time_in, l_out_in = np.asarray(l_time_in), np.asarray(l_out_in)
-
+    l_time_in = np.asarray(l_time_in).reshape((-1, lstm_len, 1))
+    l_out_in = np.asarray(l_out_in)
+    # l_out_in = l_out_in.reshape(l_out_in.shape[0], 1, lstm_len, -1)
     # song_in
     song_in = song_in[start:]
 
@@ -53,9 +53,6 @@ def load_ml_data():
 
     # load beats (output)
     beat_ar, time_ar = load_beat_data(name_ar)
-
-    # # load song (input)
-    # song_ar = get_song_repr(name_ar)
 
     # load song (input)
     song_ar, rm_index = run_music_preprocessing(name_ar, time_ar, save_file=False, song_combined=False)

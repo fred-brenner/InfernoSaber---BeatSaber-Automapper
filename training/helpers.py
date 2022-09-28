@@ -106,3 +106,9 @@ def load_keras_model(save_model_name, lr=None):
     #     K.set_value(model.optimizer.lr, lr)
     #     print("Set learning rate to: " + str(K.get_value(model.optimizer.lr)))
     return model, latest_file
+
+
+def categorical_to_class(cat_ar):
+    cat_num = np.argmax(cat_ar, axis=-1)
+    # cat_num = np.asarray(cat_num)
+    return cat_num

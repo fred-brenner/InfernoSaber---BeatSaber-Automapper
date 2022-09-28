@@ -16,7 +16,7 @@ specgram_res = 24           # y resolution of the spectrogram (frequency subdivi
 min_bps_limit = 5           # minimum beats_per_second value for training
 max_bps_limit = 5.1         # maximum beats_per_second value for training
 
-# Pytorch model configuration
+# Autoencoder model configuration
 learning_rate = 0.004       # model learning rate
 n_epochs = 300              # number of total epochs
 epochs_per_input = 5        # number of stacked epochs
@@ -24,6 +24,11 @@ batch_size = 128             # batch size
 test_samples = 10           # number of test files to plot (excluded from training)
 bottleneck_len = 16         # size of bottleneck distribution (1D array)
 
+# Mapper model configuration
+map_learning_rate = 0.005       # model learning rate
+map_n_epochs = 300              # number of total epochs
+map_batch_size = 128             # batch size
+map_test_samples = 20           # number of test files to plot (excluded from training)
 lstm_len = 8
 enc_version = 'tf_model_enc_16bneck_9_27__14_33.h5'
 
