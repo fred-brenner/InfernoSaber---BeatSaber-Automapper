@@ -1,0 +1,24 @@
+import numpy as np
+import matplotlib.pyplot as plt
+
+from preprocessing.bs_mapper_pre import load_beat_data
+from find_beats import find_beats
+
+
+def plot_beat_vs_real(beat_pred, beat_real):
+    plt.figure()
+    plt.vlines(beat_pred, 0, 1, colors='k', linestyles='solid', linewidth=0.2)
+    plt.scatter(beat_real, [0.5] * len(real_beats[idx]))
+    plt.show()
+
+
+if __name__ == '__main__':
+    pitch_list = find_beats()
+
+    name_ar = ['Born This Way', 'Dizzy']
+    _, real_beats = load_beat_data(name_ar)
+
+    idx = 0
+    plot_beat_vs_real(pitch_list[idx], real_beats[idx])
+
+    print("")

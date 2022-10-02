@@ -47,7 +47,7 @@ def load_beat_data(name_ar):
     return beat_class, time_ar
 
 
-def load_ml_data():
+def load_ml_data(train=True):
     # get name array
     name_ar, diff_ar = filter_by_bps(min_bps_limit, max_bps_limit)
 

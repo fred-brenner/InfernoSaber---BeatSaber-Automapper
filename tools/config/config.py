@@ -31,6 +31,13 @@ map_batch_size = 128             # batch size
 map_test_samples = 20           # number of test files to plot (excluded from training)
 lstm_len = 8
 enc_version = 'tf_model_enc_16bneck_9_27__14_33.h5'
+mapper_version = 'tf_model_mapper_9_28__15_48.h5'
+
+# Pitch model thresholds
+pitch_thresh_low = 1000
+pitch_thresh_mid = 5000
+pitch_thresh_high = 15000
+
 
 # # Postprocesing configuration
 # # cutout_window = 0.1       # window in seconds for cutout

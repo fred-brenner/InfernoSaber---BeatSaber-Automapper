@@ -8,7 +8,7 @@ from scipy import signal
 from PIL import Image, ImageFilter
 
 
-def load_song(data_path: str, time_ar: list) -> np.array:
+def load_song(data_path: str, time_ar: list, return_raw=False) -> np.array:
     total_read = 0
     samples_list = []
     src = aubio.source(data_path, channels=1, samplerate=config.samplerate_music)
@@ -19,6 +19,8 @@ def load_song(data_path: str, time_ar: list) -> np.array:
         if read < src.hop_size:
             break
     samples_ar = np.asarray(samples_list)
+    if return_raw:
+        return samples_ar
 
     # x=time slot, y=window size
     if time_ar is None:
@@ -111,7 +113,9 @@ def run_music_preprocessing(names_ar: list, time_ar=None, save_file=True, song_c
             time = None
         else:
             time = time_ar[idx]
-        song, remove_idx = load_song(paths.copy_path_song + n + ending, time_ar=time)
+        if not n.endswith(ending):
+            n += ending
+        song, remove_idx = load_song(paths.copy_path_song + n, time_ar=time)
         rm_index_ar.append(remove_idx)
 
         ml_input_song = process_song(song)
@@ -121,7 +125,7 @@ def run_music_preprocessing(names_ar: list, time_ar=None, save_file=True, song_c
         else:
             song_ar.append(ml_input_song)
 
-    # scale song to 0-1
+    # scale song to 0-1     # TODO: Does not work for a single music file?
     if len(np.asarray(song_ar).shape) > 1:
         song_ar = np.asarray(song_ar)
         song_ar = song_ar.clip(min=0)
