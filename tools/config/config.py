@@ -9,6 +9,7 @@ random_seed = 3
 min_time_diff = 0.01        # minimum time between cuts, otherwise synchronized
 
 samplerate_music = 14800    # samplerate for the music import
+hop_size = 512
 window = 2.0                # window in seconds for each song to spectrum picture (from wav_to_pic)
 # max_filter_size = 3       # maxpool filter for spectrogram preprocessing
 specgram_res = 24           # y resolution of the spectrogram (frequency subdivisions)
