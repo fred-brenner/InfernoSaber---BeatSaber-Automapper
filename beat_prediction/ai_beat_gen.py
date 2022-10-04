@@ -51,6 +51,6 @@ beat_resampled = samplerate_beats(real_beats, pitch_times)
 
 # setup ML model
 ################
-
+create_music_model('tcn', len(real_beats))
 
 print("")

@@ -82,3 +82,11 @@ def create_keras_model(model_type, dim_in=[], dim_out=None):
 
         model = Model(input_img, x)
         return model
+
+
+def create_music_model(model_type, dim_in):
+    print("Setup music model")
+    if model_type == 'dec1':
+        input_a = Input(shape=(dim_in[0]), name='input_song_img')
+        input_b = Input(shape=(dim_in[1]), name='input_pitch')
+        # https://github.com/giusenso/seld-tcn/blob/master/keras_model.py
