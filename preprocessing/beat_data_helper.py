@@ -97,8 +97,8 @@ def cluster_notes_in_classes(notes_ar):
     for song in notes_ar:
         new_class_ar = []
         for beat in song:
-            if idx == 345:
-                print("")
+            # if idx == 345:
+            #     print("")
             beat = encode_beat_ar(beat)
             if beat not in class_key:
                 # unknown pattern
@@ -107,8 +107,8 @@ def cluster_notes_in_classes(notes_ar):
             # known pattern
             key_idx = class_key.index(beat)
             new_class_ar.append(key_idx)
-            if key_idx != idx:
-                print("")
+            # if key_idx != idx:
+            #     print("")
         new_song_ar.append(new_class_ar)
 
     # save classify dictionary

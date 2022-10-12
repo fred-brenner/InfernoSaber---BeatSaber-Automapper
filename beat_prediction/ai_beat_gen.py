@@ -2,8 +2,9 @@ import numpy as np
 import os
 from datetime import datetime
 from tensorflow import keras
-from keras.optimizers import adam_v2
-from tabulate import tabulate
+# from keras.optimizers import adam_v2
+from keras.optimizers import Adam
+# from tabulate import tabulate
 from PIL import Image
 import matplotlib.pyplot as plt
 
@@ -51,6 +52,13 @@ beat_resampled = samplerate_beats(real_beats, pitch_times)
 
 # setup ML model
 ################
-create_music_model('tcn', len(real_beats))
+model = create_music_model('tcn', song_input[0].shape[0])
+adam = Adam(learning_rate=config.learning_rate, decay=config.learning_rate * 2 / config.epochs)
+model.compile(loss='mean_squared_error', optimizer=adam, metrics=['accuracy'])
+
+print(model.summary())
+
+model.fit(x=song_input[0], y=beat_resampled[0], epochs=config.n_epochs, shuffle=False,
+                     batch_size=config.batch_size, verbose=1)
 
 print("")
