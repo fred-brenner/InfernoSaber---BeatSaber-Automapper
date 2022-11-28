@@ -2,8 +2,8 @@ import numpy as np
 import os
 from datetime import datetime
 from tensorflow import keras
-# from keras.optimizers import adam_v2
-from keras.optimizers import Adam
+from keras.optimizers import adam_v2
+# from keras.optimizers import Adam
 # from tabulate import tabulate
 from PIL import Image
 import matplotlib.pyplot as plt
@@ -13,9 +13,9 @@ from find_beats import *
 from preprocessing.bs_mapper_pre import load_beat_data
 
 from training.tensorflow_models import *
+from beat_prediction.beat_to_lstm import beat_to_lstm
 from preprocessing.bs_mapper_pre import load_ml_data, lstm_shift
 from tools.config import config, paths
-
 
 # Setup configuration
 #####################
@@ -52,13 +52,16 @@ beat_resampled = samplerate_beats(real_beats, pitch_times)
 
 # setup ML model
 ################
-model = create_music_model('tcn', song_input[0].shape[0])
-adam = Adam(learning_rate=config.learning_rate, decay=config.learning_rate * 2 / config.epochs)
+model = create_music_model('tcn', song_input[0].shape[0], config.tcn_len)
+adam = adam_v2.Adam(learning_rate=config.learning_rate, decay=config.learning_rate * 2 / config.n_epochs)
 model.compile(loss='mean_squared_error', optimizer=adam, metrics=['accuracy'])
 
 print(model.summary())
 
-model.fit(x=song_input[0], y=beat_resampled[0], epochs=config.n_epochs, shuffle=False,
-                     batch_size=config.batch_size, verbose=1)
+x, y = beat_to_lstm(song_input, beat_resampled)
+cw = calc_class_weight(y)
+
+model.fit(x=x, y=y, epochs=config.n_epochs, shuffle=False,
+          batch_size=config.batch_size, verbose=1, class_weight=cw)
 
 print("")

@@ -1,7 +1,7 @@
-from keras.layers import Dense, Input, LSTM, Flatten, Dropout,\
-    MaxPooling2D, Conv2D, BatchNormalization, SpatialDropout2D, concatenate,\
-    Reshape, Conv2DTranspose, UpSampling2D
-from tcn import TCN     # pip install keras-tcn
+from keras.layers import Dense, Input, LSTM, Flatten, Dropout, \
+    MaxPooling2D, Conv2D, BatchNormalization, SpatialDropout2D, concatenate, \
+    Reshape, Conv2DTranspose, UpSampling2D, CuDNNLSTM
+from tcn import TCN  # pip install keras-tcn
 from keras.models import Model
 import numpy as np
 
@@ -84,32 +84,30 @@ def create_keras_model(model_type, dim_in=[], dim_out=None):
         return model
 
 
-def create_music_model(model_type, dim_in):
+def create_music_model(model_type, dim_in, tcn_len):
     # https://github.com/giusenso/seld-tcn/blob/master/keras_model.py
     # https://github.com/philipperemy/keras-tcn
     print("Setup music model")
     # input song 264.X  (frequency x sample)
     # output beats 1.X  (beat IO x sample)
     if model_type == 'tcn':
-        input_a = Input(shape=(dim_in,), name='input_song_img')
+        input_a = Input(shape=(dim_in, tcn_len,), name='input_song_img')
 
-        TCN(nb_filters=64,
-            kernel_size=2,
-            nb_stacks=1,
-            dilations=(1, 2, 4, 8, 16, 32),
-            dropout_rate=0.0,
-            use_skip_connections=True,
-            use_batch_norm=False,
-            use_weight_norm=False,
-            use_layer_norm=False,
-            return_state=False,
-            return_sequences=False,
-            activation='relu'
-            )(input_a)
+        x = TCN(nb_filters=64,
+                kernel_size=2,
+                nb_stacks=1,
+                dilations=(1, 2, 4, 8, 16, 32),
+                dropout_rate=0.0,
+                use_skip_connections=True,
+                use_batch_norm=False,
+                use_weight_norm=False,
+                use_layer_norm=False,
+                return_state=False,
+                return_sequences=False,
+                activation='relu'
+                )(input_a)
 
         out = Dense(1, activation='sigmoid')(x)
 
         model = Model(inputs=input_a, outputs=out)
         return model
-
-

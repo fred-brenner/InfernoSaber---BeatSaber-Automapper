@@ -20,7 +20,7 @@ max_bps_limit = 5.1         # maximum beats_per_second value for training
 # Autoencoder model configuration
 learning_rate = 0.004       # model learning rate
 n_epochs = 300              # number of total epochs
-epochs_per_input = 5        # number of stacked epochs
+# epochs_per_input = 5        # number of stacked epochs
 batch_size = 128             # batch size
 test_samples = 10           # number of test files to plot (excluded from training)
 bottleneck_len = 16         # size of bottleneck distribution (1D array)
@@ -33,6 +33,10 @@ map_test_samples = 20           # number of test files to plot (excluded from tr
 lstm_len = 8
 enc_version = 'tf_model_enc_16bneck_9_27__14_33.h5'
 mapper_version = 'tf_model_mapper_9_28__15_48.h5'
+
+# Beat prediction model configuration
+tcn_len = 50
+# tcn_skip = 10
 
 # Pitch model thresholds
 pitch_thresh_low = 1000

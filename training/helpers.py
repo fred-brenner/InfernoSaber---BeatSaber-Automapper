@@ -112,3 +112,14 @@ def categorical_to_class(cat_ar):
     cat_num = np.argmax(cat_ar, axis=-1)
     # cat_num = np.asarray(cat_num)
     return cat_num
+
+
+def calc_class_weight(np_ar):
+    classes, counts = np.unique(np_ar, return_counts=True)
+
+    counts = counts.max() / counts
+    class_weight = {}
+    for i, cls in enumerate(classes):
+        class_weight[cls] = counts[i]
+
+    return class_weight
