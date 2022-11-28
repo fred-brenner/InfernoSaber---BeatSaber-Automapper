@@ -64,4 +64,12 @@ cw = calc_class_weight(y)
 model.fit(x=x, y=y, epochs=config.n_epochs, shuffle=False,
           batch_size=config.batch_size, verbose=1, class_weight=cw)
 
+y_pred = model.predict(x)
+
+fig = plt.figure()
+plt.plot(y, label='original')
+plt.plot(y_pred, label='prediction')
+plt.legend()
+plt.show()
+
 print("")
