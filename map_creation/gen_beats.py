@@ -6,6 +6,7 @@ from tcn import TCN  # pip install keras-tcn
 from training.helpers import *
 from beat_prediction.find_beats import find_beats, get_pitch_times
 from map_creation.sanity_check import *
+from map_creation.class_helpers import *
 from preprocessing.music_processing import run_music_preprocessing
 from preprocessing.bs_mapper_pre import calc_time_between_beats
 
@@ -68,9 +69,23 @@ y_beat = sanity_check_beat(y_beat)
 #####################
 # map class generator
 #####################
+# get beat times
+timing_ar = y_beat * np.arange(0, len(y_beat), 1)
+timing_ar /= config.beat_spacing
+timing_ar = timing_ar[timing_ar > 0]
+time_input = [timing_ar]
+
+# calculate time between beats
+timing_diff_ar = calc_time_between_beats(time_input)
+
 # load song data
-song_ar, rm_index = run_music_preprocessing(name_ar, time_ar=None, save_file=False,
+song_ar, rm_index = run_music_preprocessing(name_ar, time_ar=time_input, save_file=False,
                                             song_combined=False)
+
+# apply lstm shift
+ml_input, _ = lstm_shift(song_ar[0], timing_diff_ar[0], None)
+[in_song, in_time_l, _] = ml_input
+
 # filter invalid indices
 idx = 0
 for rm_idx in rm_index:
@@ -89,34 +104,40 @@ enc_model = load_model(model_path)
 
 # apply encoder model
 #####################
-in_song_l = enc_model.predict(song_ar)
+in_song_l = enc_model.predict(in_song)
 
 # load pretrained automapper model
 model_path = paths.model_path + config.mapper_version
 mapper_model = load_model(model_path)
 
-# combine data for automapper
-timing_ar = y_beat * np.arange(0, len(y_beat), 1)
-timing_ar /= config.beat_spacing
-timing_ar = timing_ar[timing_ar > 0]
+# song_input = None
+# # time_input = None
+# for idx in range(len(song_ar)):
+#     song_input = numpy_shorts.np_append(song_input, song_ar[idx])
+#     # time_input = numpy_shorts.np_append(time_input, np.asarray(timing_ar[idx], dtype='float16'))
 
-time_input = [timing_ar]
-song_input = None
-# time_input = None
-for idx in range(len(song_ar)):
-    song_input = numpy_shorts.np_append(song_input, song_ar[idx])
-    # time_input = numpy_shorts.np_append(time_input, np.asarray(timing_ar[idx], dtype='float16'))
-
-# calculate time between beats
-timing_ar = calc_time_between_beats(time_input)
-
-# apply lstm shift
-ml_input, _ = lstm_shift(ml_input[0], ml_input[1], None)
-[in_song, in_time_l, in_class_l] = ml_input
 # apply automapper
 ##################
-#             normal         lstm          lstm
-ds_train = [in_song_l, in_time_train, in_class_train]
-y_class = mapper_model.predict(x=ds_train)
+y_class = None
+y_class_map = []
+for idx in range(len(in_song_l)):
 
+    class_size = get_class_size()
+    if y_class is None:
+        in_class_l = np.zeros((len(in_song_l), config.lstm_len, class_size))
 
+    in_class_l = update_out_class(in_class_l, y_class, idx)
+
+    #             normal      lstm       lstm
+    ds_train = [in_song_l[idx:idx+1], in_time_l[idx:idx+1], in_class_l[idx:idx+1]]
+    y_class = mapper_model.predict(x=ds_train)
+
+    y_class = cast_y_class(y_class)
+    y_class_map.append(y_class)
+
+############
+# create map
+############
+decode_onehot_class(y_class_map)
+
+print("Finished")

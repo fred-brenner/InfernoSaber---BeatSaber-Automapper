@@ -19,6 +19,6 @@ def sanity_check_beat(beat):
 
     # print result
     print(f"Got {beat.sum()} beats after sanity check"
-          f"(removed {beat_counts-beat.sum()})")
+          f" (removed {beat_counts-beat.sum()})")
 
     return beat

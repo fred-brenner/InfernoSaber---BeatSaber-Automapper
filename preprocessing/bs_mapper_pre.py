@@ -21,16 +21,21 @@ def lstm_shift(song_in, time_in, ml_out):
     start = lstm_len + 1
 
     # ml_out
-    l_ml_out = ml_out[start:]
+    if ml_out is None:
+        l_ml_out = None
+    else:
+        l_ml_out = ml_out[start:]
     l_out_in = []
     # time in
     l_time_in = []
 
     for idx in range(start, n_samples):
-        l_out_in.append(ml_out[idx-start:idx-1])
+        if ml_out is not None:
+            l_out_in.append(ml_out[idx-start:idx-1])
         l_time_in.append(time_in[idx-start:idx-1])
 
     l_time_in = np.asarray(l_time_in).reshape((-1, lstm_len, 1))
+
     l_out_in = np.asarray(l_out_in)
     # l_out_in = l_out_in.reshape(l_out_in.shape[0], 1, lstm_len, -1)
     # song_in
