@@ -88,7 +88,7 @@ fig = plt.figure()
 y_count = np.arange(0, len(y), 1)
 y_count = y * y_count
 
-plt.vlines(y_count, ymin=0, ymax=1, colors='k', label='original', linewidth=2)
+plt.vlines(y_count, ymin=-0.1, ymax=1.1, colors='k', label='original', linewidth=2)
 plt.plot(y_pred, 'b-', label='prediction', linewidth=1)
 plt.legend()
 plt.show()
