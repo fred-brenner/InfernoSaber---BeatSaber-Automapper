@@ -117,9 +117,12 @@ def categorical_to_class(cat_ar):
 def calc_class_weight(np_ar):
     classes, counts = np.unique(np_ar, return_counts=True)
 
-    counts = counts.max() / counts
+    counts = counts.min() / counts
+    # counts -= 0.1
     class_weight = {}
     for i, cls in enumerate(classes):
         class_weight[cls] = counts[i]
+
+    print(f"Weight matrix: {class_weight}")
 
     return class_weight
