@@ -140,6 +140,6 @@ for idx in range(len(in_song_l)):
 # create map
 ############
 y_class_num = decode_onehot_class(y_class_map)
-create_map(y_class_num, timing_ar[config.lstm_len+1:])
+create_map(y_class_num, timing_ar[config.lstm_len+1:], name_ar[0])
 
 print("Finished")
