@@ -31,19 +31,21 @@ map_n_epochs = 300              # number of total epochs
 map_batch_size = 128             # batch size
 map_test_samples = 20           # number of test files to plot (excluded from training)
 lstm_len = 8
+
 enc_version = 'tf_model_enc_16bneck_9_27__14_33.h5'
 mapper_version = 'tf_model_mapper_9_28__15_48.h5'
+beat_gen_version = 'tf_beat_gen_5_5.1_11_29__12_15.h5'
 
 # Beat prediction model configuration
-beat_n_epochs = 2
+beat_n_epochs = 10
 tcn_len = 100
 tcn_test_samples = 1000
 # tcn_skip = 10
 
-# Pitch model thresholds
-pitch_thresh_low = 1000
-pitch_thresh_mid = 5000
-pitch_thresh_high = 15000
+# Map creation model configuration
+thresh_beat = 0.6
+min_beat_time = 0.04        # in seconds (first sanity check)
+beat_spacing = 28.505102       # 5587/196s = 28.5051 steps/s
 
 
 # # Postprocesing configuration

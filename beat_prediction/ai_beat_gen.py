@@ -16,7 +16,6 @@ from preprocessing.bs_mapper_pre import load_beat_data
 from training.tensorflow_models import *
 from beat_prediction.beat_to_lstm import *
 from beat_prediction.beat_prop import get_beat_prop
-from preprocessing.bs_mapper_pre import load_ml_data, lstm_shift
 from tools.config import config, paths
 from tools.utils import numpy_shorts
 
@@ -29,6 +28,15 @@ from tools.utils import numpy_shorts
 # # Load pretrained model
 # encoder_path = paths.model_path + config.enc_version
 # encoder_model = keras.models.load_model(encoder_path)
+
+
+# model name setup
+##################
+# create timestamp
+dateTimeObj = datetime.now()
+timestamp = f"{dateTimeObj.month}_{dateTimeObj.day}__{dateTimeObj.hour}_{dateTimeObj.minute}"
+save_model_name = f"tf_beat_gen_{config.min_bps_limit}_{config.max_bps_limit}_{timestamp}.h5"
+
 
 # gather input
 ##############
@@ -50,7 +58,7 @@ for idx in range(len(pitch_input)):
     # plt.imshow(song_input[idx])
     # plt.show()
 
-#
+# get beat proposals
 [x_volume, x_onset] = get_beat_prop(song_input)
 
 # load real beats
@@ -75,10 +83,16 @@ model.compile(loss='binary_crossentropy', optimizer=adam,
 print(model.summary())
 # x_input = [x_song]
 x_input = [x_song, x_volume, x_onset]
-model.fit(x=x_input, y=y, epochs=config.beat_n_epochs, shuffle=False,
+model.fit(x=x_input, y=y, epochs=config.beat_n_epochs, shuffle=True,
           batch_size=config.batch_size, verbose=1, class_weight=cw)
 
+# save model
+############
+print(f"Saving model at: {paths.model_path}")
+model.save(paths.model_path + save_model_name, )
 
+# plot test result
+##################
 if True:
     test_len = config.tcn_test_samples
     x_part = [x_song[:test_len], x_volume[:test_len], x_onset[:test_len]]

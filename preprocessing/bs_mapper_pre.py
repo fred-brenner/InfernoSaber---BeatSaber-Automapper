@@ -6,6 +6,7 @@ from preprocessing.beat_data_helper import *
 from tools.config import paths, config
 from training.helpers import filter_by_bps
 from preprocessing.music_processing import run_music_preprocessing
+from tools.utils import numpy_shorts
 
 
 # Setup configuration
@@ -47,7 +48,8 @@ def load_beat_data(name_ar):
     return beat_class, time_ar
 
 
-def load_ml_data(train=True):
+def load_ml_data(train=True, name_ar=None):
+
     # get name array
     name_ar, diff_ar = filter_by_bps(min_bps_limit, max_bps_limit)
 
@@ -55,7 +57,8 @@ def load_ml_data(train=True):
     beat_ar, time_ar = load_beat_data(name_ar)
 
     # load song (input)
-    song_ar, rm_index = run_music_preprocessing(name_ar, time_ar, save_file=False, song_combined=False)
+    song_ar, rm_index = run_music_preprocessing(name_ar, time_ar, save_file=False,
+                                                song_combined=False)
 
     # filter invalid indices
     idx = 0
