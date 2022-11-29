@@ -35,8 +35,9 @@ enc_version = 'tf_model_enc_16bneck_9_27__14_33.h5'
 mapper_version = 'tf_model_mapper_9_28__15_48.h5'
 
 # Beat prediction model configuration
-beat_n_epochs = 20
+beat_n_epochs = 2
 tcn_len = 100
+tcn_test_samples = 1000
 # tcn_skip = 10
 
 # Pitch model thresholds

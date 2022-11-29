@@ -18,6 +18,7 @@ from beat_prediction.beat_to_lstm import *
 from beat_prediction.beat_prop import get_beat_prop
 from preprocessing.bs_mapper_pre import load_ml_data, lstm_shift
 from tools.config import config, paths
+from tools.utils import numpy_shorts
 
 # Setup configuration
 #####################
@@ -50,7 +51,7 @@ for idx in range(len(pitch_input)):
     # plt.show()
 
 #
-[x_beat_prop, x_onset] = get_beat_prop(song_input[0])
+[x_volume, x_onset] = get_beat_prop(song_input)
 
 # load real beats
 _, real_beats = load_beat_data(name_ar)
@@ -59,7 +60,7 @@ beat_resampled = samplerate_beats(real_beats, pitch_times)
 
 x_song, y = beat_to_lstm(song_input, beat_resampled)
 
-x_song = minmax_3d(x_song)
+x_song = numpy_shorts.minmax_3d(x_song)
 cw = calc_class_weight(y)
 
 x_last_beats = last_beats_to_lstm(y)
@@ -73,24 +74,29 @@ model.compile(loss='binary_crossentropy', optimizer=adam,
 
 print(model.summary())
 # x_input = [x_song]
-x_input = [x_song, x_beat_prop, x_onset]
+x_input = [x_song, x_volume, x_onset]
 model.fit(x=x_input, y=y, epochs=config.beat_n_epochs, shuffle=False,
           batch_size=config.batch_size, verbose=1, class_weight=cw)
 
-y_pred = model.predict(x_input)
-# bound prediction to 0 or 1
-thresh = 0.6
-y_pred[y_pred > thresh] = 1
-y_pred[y_pred <= thresh] = 0
 
-fig = plt.figure()
-# plt.plot(y, 'b-', label='original')
-y_count = np.arange(0, len(y), 1)
-y_count = y * y_count
+if True:
+    test_len = config.tcn_test_samples
+    x_part = [x_song[:test_len], x_volume[:test_len], x_onset[:test_len]]
+    y_part = y[:test_len]
+    y_pred = model.predict(x_part)
+    # bound prediction to 0 or 1
+    thresh = 0.6
+    y_pred[y_pred > thresh] = 1
+    y_pred[y_pred <= thresh] = 0
 
-plt.vlines(y_count, ymin=-0.1, ymax=1.1, colors='k', label='original', linewidth=2)
-plt.plot(y_pred, 'b-', label='prediction', linewidth=1)
-plt.legend()
-plt.show()
+    fig = plt.figure()
+    # plt.plot(y, 'b-', label='original')
+    y_count = np.arange(0, len(y_part), 1)
+    y_count = y_part * y_count
+
+    plt.vlines(y_count, ymin=-0.1, ymax=1.1, colors='k', label='original', linewidth=2)
+    plt.plot(y_pred, 'b-', label='prediction', linewidth=1)
+    plt.legend()
+    plt.show()
 
 print("")
