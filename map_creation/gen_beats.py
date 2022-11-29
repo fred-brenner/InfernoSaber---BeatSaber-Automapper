@@ -7,6 +7,7 @@ from training.helpers import *
 from beat_prediction.find_beats import find_beats, get_pitch_times
 from map_creation.sanity_check import *
 from map_creation.class_helpers import *
+from map_creation.map_creator import create_map
 from preprocessing.music_processing import run_music_preprocessing
 from preprocessing.bs_mapper_pre import calc_time_between_beats
 
@@ -138,6 +139,7 @@ for idx in range(len(in_song_l)):
 ############
 # create map
 ############
-decode_onehot_class(y_class_map)
+y_class_num = decode_onehot_class(y_class_map)
+create_map(y_class_num, timing_ar[config.lstm_len+1:])
 
 print("Finished")
