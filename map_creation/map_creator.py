@@ -46,7 +46,7 @@ def create_map(y_class_num, timings, name, bpm):
     shutil.copy(src, new_map_folder)
     src = f"{paths.pred_input_path}{name}.egg"
     shutil.copy(src, new_map_folder)
-    print("Finished")
+    print(f"Finished song: {name}")
 
 
 def decode_beats(y_class_num, class_keys):

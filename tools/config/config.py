@@ -43,9 +43,10 @@ tcn_test_samples = 1000
 # tcn_skip = 10
 
 # Map creation model configuration
-thresh_beat = 0.6
+thresh_beat = 0.4
 min_beat_time = 0.04        # in seconds (first sanity check)
-beat_spacing = 28.505102       # 5587/196s = 28.5051 steps/s
+beat_spacing = 28.505102    # 5587/196s = 28.5051 steps/s
+max_speed = 20.0            # set around 10-20
 
 
 # # Postprocesing configuration

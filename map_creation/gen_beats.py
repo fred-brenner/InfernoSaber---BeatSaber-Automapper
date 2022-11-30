@@ -154,4 +154,4 @@ map_times = map_times[map_times > 0]
 
 create_map(y_class_num, map_times, name_ar[0], bpm)
 
-print("Finished")
+print("Finished map generator")
