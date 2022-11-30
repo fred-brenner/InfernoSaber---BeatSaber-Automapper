@@ -5,18 +5,21 @@ import aubio
 import os
 import shutil
 
+from map_creation.sanity_check import sanity_check_notes
 from tools.config import config, paths
 
 
-def create_map(y_class_num, timings, name):
+def create_map(y_class_num, timings, name, bpm):
     # load notes classify keys
     with open(paths.notes_classify_dict_file, 'rb') as f:
         class_keys = pickle.load(f)
 
     notes = decode_beats(y_class_num, class_keys)
 
-    # calculate bps
-    bpm = 180
+    # sanity check notes
+    notes = sanity_check_notes(notes, timings)
+
+    # compensate bps
     timings = timings * bpm / 60
 
     ###########

@@ -8,6 +8,7 @@ from beat_prediction.find_beats import find_beats, get_pitch_times
 from map_creation.sanity_check import *
 from map_creation.class_helpers import *
 from map_creation.map_creator import create_map
+from map_creation.find_bpm import get_file_bpm
 from preprocessing.music_processing import run_music_preprocessing
 from preprocessing.bs_mapper_pre import calc_time_between_beats
 
@@ -65,6 +66,7 @@ y_beat = beat_model.predict(x_input)
 y_beat[y_beat > config.thresh_beat] = 1
 y_beat[y_beat <= config.thresh_beat] = 0
 
+# apply beat sanity check (min time diff)
 y_beat = sanity_check_beat(y_beat)
 
 #####################
@@ -136,10 +138,20 @@ for idx in range(len(in_song_l)):
     y_class = cast_y_class(y_class)
     y_class_map.append(y_class)
 
+# calculate bpm
+file = paths.pred_input_path + name_ar[0] + '.egg'
+bpm, song_duration = get_file_bpm(file)
+
+# sanity check timings
+map_times = sanity_check_timing(name_ar[0], timing_ar[config.lstm_len+1:], song_duration)
+
 ############
 # create map
 ############
 y_class_num = decode_onehot_class(y_class_map)
-create_map(y_class_num, timing_ar[config.lstm_len+1:], name_ar[0])
+y_class_num = y_class_num[map_times > 0]
+map_times = map_times[map_times > 0]
+
+create_map(y_class_num, map_times, name_ar[0], bpm)
 
 print("Finished")
