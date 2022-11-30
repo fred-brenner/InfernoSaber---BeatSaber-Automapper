@@ -74,9 +74,9 @@ def notes_to_json(notes, timings):
         for n in range(int(len(notes[idx])/4)):
             note_json += '{'
             note_json += f'"_time":{timings[idx]},' \
-                         f'"_lineIndex":{notes[idx][0 + 4*n]}' \
-                         f'"_lineLayer":{notes[idx][1 + 4*n]}' \
-                         f'"_type":{notes[idx][2 + 4*n]}' \
+                         f'"_lineIndex":{notes[idx][0 + 4*n]},' \
+                         f'"_lineLayer":{notes[idx][1 + 4*n]},' \
+                         f'"_type":{notes[idx][2 + 4*n]},' \
                          f'"_cutDirection":{notes[idx][3 + 4*n]}'
             note_json += '},'
 
