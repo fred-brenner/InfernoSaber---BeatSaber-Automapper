@@ -103,6 +103,10 @@ def sanity_check_notes(notes, timings):
     [notes_r, notes_l, notes_b] = split_notes_rl(notes)
     # test = unpslit_notes(notes_r, notes_l, notes_b)
 
+    # TODO: correct cut direction
+    # notes_r = correct_cut_dir(notes_r, timings)
+    # notes_l = correct_cut_dir(notes_l, timings)
+
     print("Right notes:", end=' ')
     notes_r = correct_notes(notes_r, timings)
     print("Left notes: ", end=' ')
@@ -117,6 +121,20 @@ def sanity_check_notes(notes, timings):
     return new_notes
 
 
+# def correct_cut_dir(notes, timings):
+#     last_cut = None
+#     for idx in range(len(notes)):
+#         new_cut = notes[idx][3]
+#
+#         if last_cut is None:
+#             last_cut = new_cut
+#
+#         else:
+#             last_cut
+#
+#     return notes
+
+
 def correct_notes(notes, timings):
     nl_last = None
     last_time = 0
@@ -126,8 +144,11 @@ def correct_notes(notes, timings):
             continue
         # elif len(notes[idx]) == 4:
         elif len(notes[idx]) >= 4:
-            # check movement up and down
+            # check cut direction movement
             notes[idx] = check_note_movement(nl_last, notes[idx])
+
+            # TODO: check notes direction vs position with probabilistic factor (single)
+            # TODO: apply reversed movement to next note (e.g. last[2, 1, 1, 2];new[1, 0, 1, 1])
 
             # calculate movement speed
             new_time = timings[idx]
@@ -191,10 +212,12 @@ def check_note_movement(notes_last, notes_new):
     dist_x = int(np.abs(cut_x_last - cut_x_new))
     dist_y = int(np.abs(cut_y_last - cut_y_new))
 
+    # TODO: check
     if dist_x != 2 and dist_y != 2:
         if dist_x == dist_y == 1:
             return notes_new
 
+        # change cut direction
         new_cut = reverse_cut_dir_xy(notes_last[3])
         notes_new[3] = new_cut
 

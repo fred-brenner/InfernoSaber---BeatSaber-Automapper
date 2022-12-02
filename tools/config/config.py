@@ -32,7 +32,8 @@ map_batch_size = 128             # batch size
 map_test_samples = 20           # number of test files to plot (excluded from training)
 lstm_len = 8
 
-enc_version = 'tf_model_enc_16bneck_9_27__14_33.h5'
+enc_version = 'tf_model_enc_16bneck_12_3__0_26.h5'
+autoenc_version = 'tf_model_autoenc_16bneck_12_3__0_26.h5'
 mapper_version = 'tf_model_mapper_9_28__15_48.h5'
 beat_gen_version = 'tf_beat_gen_5_5.1_11_29__12_15.h5'
 
