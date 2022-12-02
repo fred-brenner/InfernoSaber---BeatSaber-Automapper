@@ -45,7 +45,10 @@ def add_favor_factor_next_class(y_class, y_class_last):
         return y_class
 
     next_class = np.argmax(y_class_last) + 1
+
+    # check that next class does not exceed array length
     if next_class < y_class_last.shape[-1]:
-        y_class[:, next_class] += config.favor_last_class
+        flc = config.favor_last_class * (np.random.random() + 0.5) / 1.5
+        y_class[:, next_class] += flc
 
     return y_class

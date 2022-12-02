@@ -105,8 +105,10 @@ def sanity_check_notes(notes, timings):
 
     print("Right notes:", end=' ')
     notes_r = correct_notes(notes_r, timings)
-    print("Left notes:", end=' ')
+    print("Left notes: ", end=' ')
     notes_l = correct_notes(notes_l, timings)
+
+    # TODO: emphasize important beats with double notes
 
     # TODO: correct both notes together
 
@@ -149,6 +151,7 @@ def correct_notes(notes, timings):
                                             time_diff=0.05, cdf=0.5)
                     if speed > config.max_double_note_speed:
                         rm_temp[n+4:n+8] = 1
+                # TODO: try to turn instead!
                 # remove second notes
                 if rm_temp.sum() > 0:
                     rm_counter += int(rm_temp.sum() / 4)
