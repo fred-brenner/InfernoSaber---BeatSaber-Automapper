@@ -123,6 +123,7 @@ mapper_model = load_model(model_path)
 ##################
 y_class = None
 y_class_map = []
+y_class_last = None
 for idx in range(len(in_song_l)):
 
     class_size = get_class_size()
@@ -135,7 +136,13 @@ for idx in range(len(in_song_l)):
     ds_train = [in_song_l[idx:idx+1], in_time_l[idx:idx+1], in_class_l[idx:idx+1]]
     y_class = mapper_model.predict(x=ds_train)
 
+    # add factor to NEXT class
+    y_class = add_favor_factor_next_class(y_class, y_class_last)
+
+    # find class winner
     y_class = cast_y_class(y_class)
+
+    y_class_last = y_class.copy()
     y_class_map.append(y_class)
 
 # calculate bpm

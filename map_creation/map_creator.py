@@ -18,6 +18,7 @@ def create_map(y_class_num, timings, name, bpm):
 
     # sanity check notes
     notes = sanity_check_notes(notes, timings)
+    notes
 
     # compensate bps
     timings = timings * bpm / 60

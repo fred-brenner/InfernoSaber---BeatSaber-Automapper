@@ -43,10 +43,12 @@ tcn_test_samples = 1000
 # tcn_skip = 10
 
 # Map creation model configuration
-thresh_beat = 0.4
+thresh_beat = 0.4           # minimum beat response required to trigger generator
+cdf = 0.55                  # cut director factor (to calculate speed)
 min_beat_time = 0.04        # in seconds (first sanity check)
 beat_spacing = 28.505102    # 5587/196s = 28.5051 steps/s
-max_speed = 20.0            # set around 10-20
+max_speed = 15.0            # set around 5-15 (normal-expert+)
+favor_last_class = 0.05     # set factor to favor the next beat class (0.0-0.1)
 
 
 # # Postprocesing configuration

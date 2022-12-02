@@ -38,3 +38,14 @@ def decode_onehot_class(y_class_map):
     y_class_num = enc.inverse_transform(y)
 
     return y_class_num
+
+
+def add_favor_factor_next_class(y_class, y_class_last):
+    if y_class_last is None:
+        return y_class
+
+    next_class = np.argmax(y_class_last) + 1
+    if next_class < y_class_last.shape[-1]:
+        y_class[:, next_class] += config.favor_last_class
+
+    return y_class

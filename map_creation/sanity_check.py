@@ -104,8 +104,10 @@ def sanity_check_notes(notes, timings):
     [notes_r, notes_l, notes_b] = split_notes_rl(notes)
     # test = unpslit_notes(notes_r, notes_l, notes_b)
 
-    notes_r = correct_notes(notes_r, timings)
+    notes_r = correct_notes(notes_r, timings)   # TODO: allow double notes
     notes_l = correct_notes(notes_l, timings)
+
+    # TODO: correct both notes together
 
     # rebuild notes
     new_notes = unpslit_notes(notes_r, notes_l, notes_b)
@@ -115,10 +117,12 @@ def sanity_check_notes(notes, timings):
 def correct_notes(notes, timings):
     nl_last = None
     last_time = 0
+    rm_counter = 0
     for idx in range(len(notes)):
         if len(notes[idx]) == 0:
             continue
-        elif len(notes[idx]) == 4:
+        # elif len(notes[idx]) == 4:
+        elif len(notes[idx]) >= 4:
             # check movement up and down
             notes[idx] = check_note_movement(nl_last, notes[idx])
 
@@ -130,13 +134,15 @@ def correct_notes(notes, timings):
 
             # remove too fast elements
             if speed > config.max_speed:
+                rm_counter += int(len(notes[idx]) / 4)
                 notes[idx] = []
                 continue
 
-        else:
-            notes[idx] = []
-            print("Found multiple notes in one beat at sanity_check. Skipping.")
-            continue
+        # else:
+        #     notes[idx] = []
+        #     print("Found multiple notes in one beat at sanity_check. Skipping.")
+        #     continue
+    print(f"Sanity check note speed removed {rm_counter} elements")
     return notes
 
 
@@ -164,7 +170,7 @@ def calc_note_speed(notes_last, notes_new, time_diff):
         return 0
 
     # cut director factor
-    cdf = 0.75
+    cdf = config.cdf
 
     dist = 0
     cut_x_last, cut_y_last = get_cut_dir_xy(notes_last[3])
