@@ -146,13 +146,28 @@ def correct_notes(notes, timings):
             if len(notes[idx]) > 4:
                 rm_temp = np.zeros_like(notes[idx])
                 for n in range(int(len(notes[idx]) / 4) - 1):
-                    speed = calc_note_speed(notes[idx][n:n+4],
-                                            notes[idx][n+4:n+8],
+                    speed = calc_note_speed(notes[idx][n:n + 4],
+                                            notes[idx][n + 4:n + 8],
                                             time_diff=0.05, cdf=0.5)
                     if speed > config.max_double_note_speed:
-                        rm_temp[n+4:n+8] = 1
-                # TODO: try to turn instead!
-                # remove second notes
+                        # try to fix second notes
+                        try_notes = notes[idx][n + 4:n + 8]
+                        try_notes[3] = notes[idx][n:n + 4][3]
+                        speed1 = calc_note_speed(notes[idx][n:n + 4],
+                                                 try_notes,
+                                                 time_diff=0.05, cdf=0.65)
+                        speed2 = calc_note_speed(try_notes,
+                                                 notes[idx][n:n + 4],
+                                                 time_diff=0.05, cdf=0.65)
+                        speed = np.min([speed1, speed2])
+                        if speed > config.max_double_note_speed:
+                            # remove sec notes
+                            rm_temp[n + 4:n + 8] = 1
+                        else:
+                            # include try notes
+                            notes[idx][n + 4:n + 8] = try_notes
+
+                # remove unsuited notes
                 if rm_temp.sum() > 0:
                     rm_counter += int(rm_temp.sum() / 4)
                     for rm in range(len(rm_temp))[::-1]:
