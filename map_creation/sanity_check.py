@@ -21,7 +21,7 @@ def sanity_check_beat(beat):
                 beat[idx] = 0
 
     # print result
-    print(f"Got {beat.sum()} beats after sanity check"
+    print(f"Got {beat.sum()} beats after sanity check beat"
           f" (removed {beat_counts - beat.sum()})")
 
     return beat
@@ -100,11 +100,12 @@ def sanity_check_timing(name, timings, song_duration):
 
 
 def sanity_check_notes(notes, timings):
-    # TODO: print counter for removing notes
     [notes_r, notes_l, notes_b] = split_notes_rl(notes)
     # test = unpslit_notes(notes_r, notes_l, notes_b)
 
-    notes_r = correct_notes(notes_r, timings)   # TODO: allow double notes
+    print("Right notes:", end=' ')
+    notes_r = correct_notes(notes_r, timings)
+    print("Left notes:", end=' ')
     notes_l = correct_notes(notes_l, timings)
 
     # TODO: correct both notes together
@@ -128,7 +129,8 @@ def correct_notes(notes, timings):
 
             # calculate movement speed
             new_time = timings[idx]
-            speed = calc_note_speed(nl_last, notes[idx], new_time - last_time)
+            speed = calc_note_speed(nl_last, notes[idx], new_time - last_time,
+                                    config.cdf)
             last_time = new_time
             nl_last = notes[idx]
 
@@ -137,6 +139,22 @@ def correct_notes(notes, timings):
                 rm_counter += int(len(notes[idx]) / 4)
                 notes[idx] = []
                 continue
+
+            # check double notes
+            if len(notes[idx]) > 4:
+                rm_temp = np.zeros_like(notes[idx])
+                for n in range(int(len(notes[idx]) / 4) - 1):
+                    speed = calc_note_speed(notes[idx][n:n+4],
+                                            notes[idx][n+4:n+8],
+                                            time_diff=0.05, cdf=0.5)
+                    if speed > config.max_double_note_speed:
+                        rm_temp[n+4:n+8] = 1
+                # remove second notes
+                if rm_temp.sum() > 0:
+                    rm_counter += int(rm_temp.sum() / 4)
+                    for rm in range(len(rm_temp))[::-1]:
+                        if rm_temp[rm]:
+                            notes[idx].pop(rm)
 
         # else:
         #     notes[idx] = []
@@ -165,12 +183,12 @@ def check_note_movement(notes_last, notes_new):
     return notes_new
 
 
-def calc_note_speed(notes_last, notes_new, time_diff):
+def calc_note_speed(notes_last, notes_new, time_diff, cdf):
     if notes_last is None:
         return 0
 
     # cut director factor
-    cdf = config.cdf
+    # cdf = config.cdf
 
     dist = 0
     cut_x_last, cut_y_last = get_cut_dir_xy(notes_last[3])
