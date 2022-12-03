@@ -113,33 +113,40 @@ def sanity_check_notes(notes: list, timings):
 
     # TODO: (emphasize important beats with double notes)
 
-    notes_r, notes_l, notes_b = correct_notes_all(notes_r, notes_l, notes_b)
-    # TODO: dynamic bomb removal
+    time_diffs = np.concatenate((np.ones(1), np.diff(timings)), axis=0)
+    notes_r, notes_l, notes_b = correct_notes_all(notes_r, notes_l, notes_b, time_diffs)
 
     # rebuild notes
     new_notes = unpslit_notes(notes_r, notes_l, notes_b)
     return new_notes
 
 
-def correct_notes_all(notes_r, notes_l, notes_b):
+def correct_notes_all(notes_r, notes_l, notes_b, time_diff):
+    pos_r_last = []
+    pos_l_last = []
+    pos_b_last = []
+    last_bomb_idx = 0
     rm_counter = 0
     for idx in range(len(notes_r)):
         nb = notes_b[idx]
         nr = notes_r[idx]
         nl = notes_l[idx]
 
-        def calc_note_pos(n, add_cut=True):
+        def calc_note_pos(n, add_cut=True, inv=False):
             position = []
             for i in range(int(len(n) / 4)):
-                pos = n[0+i*4:2+i*4]
+                pos = n[0 + i * 4:2 + i * 4]
                 position.append(pos)
 
                 if add_cut:
-                    cut_x, cut_y = get_cut_dir_xy(n[3+i*4])
+                    cut_x, cut_y = get_cut_dir_xy(n[3 + i * 4])
                     if cut_x == cut_y == 0:
-                        cut_pos = [pos[0]-int(cut_x), pos[1] - int(cut_y)]
-                        if 0 <= cut_pos[0] < 4:         # x axis
-                            if 0 <= cut_pos[1] < 3:     # y axis
+                        if not inv:
+                            cut_pos = [pos[0] - int(cut_x), pos[1] - int(cut_y)]
+                        else:
+                            cut_pos = [pos[0] + int(cut_x), pos[1] + int(cut_y)]
+                        if 0 <= cut_pos[0] < 4:  # x axis
+                            if 0 <= cut_pos[1] < 3:  # y axis
                                 position.append(cut_pos)
             return position
 
@@ -147,16 +154,28 @@ def correct_notes_all(notes_r, notes_l, notes_b):
         pos_l = calc_note_pos(nl)
         pos_b = calc_note_pos(nb, add_cut=False)
 
-        # check bombs   # TODO: add bombs +-1 to timeline
+        # check bombs
         if len(pos_b) > 0:
+            # calculate next beat for notes
+            if idx < len(notes_r):
+                pos_r_next = calc_note_pos(notes_r[idx + 1], inv=True)
+                pos_l_next = calc_note_pos(notes_l[idx + 1], inv=True)
+            else:
+                pos_r_next = []
+                pos_l_next = []
+            # compare bombs and notes
             rm_b = []
             for i in range(len(pos_b)):
-                if pos_b[i] in pos_l or pos_b[i] in pos_r:
+                if pos_b[i] in pos_l or pos_b[i] in pos_r or \
+                        pos_b[i] in pos_l_last or pos_b[i] in pos_r_last or \
+                        pos_b[i] in pos_l_next or pos_b[i] in pos_r_next:
                     # remove bomb
-                    rm_b.extend(list(range(i*4, (i+1)*4)))
+                    rm_b.extend(list(range(i * 4, (i + 1) * 4)))
             rm_b = rm_b[::-1]
             for i in rm_b:
                 notes_b[idx].pop(i)
+        pos_r_last = pos_r
+        pos_l_last = pos_l
 
         # check left notes
         if len(pos_l) > 0:
