@@ -139,7 +139,7 @@ def run_music_preprocessing(names_ar: list, time_ar=None, save_file=True, song_c
     # else:
     for idx, song in enumerate(song_ar):
         song = numpy_shorts.minmax_3d(song)
-        if channels_last:   # TODO: check shape
+        if channels_last:
             song_ar[idx] = song.reshape((song.shape[0], song.shape[1], song.shape[2], 1))
         else:
             song_ar[idx] = song.reshape((song.shape[0], 1, song.shape[1], song.shape[2]))

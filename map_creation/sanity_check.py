@@ -99,7 +99,7 @@ def sanity_check_timing(name, timings, song_duration):
     return timings
 
 
-def sanity_check_notes(notes, timings):
+def sanity_check_notes(notes: list, timings):
     [notes_r, notes_l, notes_b] = split_notes_rl(notes)
     # test = unpslit_notes(notes_r, notes_l, notes_b)
 
@@ -108,7 +108,7 @@ def sanity_check_notes(notes, timings):
     # notes_l = correct_cut_dir(notes_l, timings)
 
     print("Right notes:", end=' ')
-    notes_r = correct_notes(notes_r, timings)
+    notes_r = correct_notes(notes_r, timings)   # TODO: check Nr~16-17 (double down)
     print("Left notes: ", end=' ')
     notes_l = correct_notes(notes_l, timings)
 
@@ -144,24 +144,27 @@ def correct_notes(notes, timings):
             continue
         # elif len(notes[idx]) == 4:
         elif len(notes[idx]) >= 4:
-            # check cut direction movement
+            # check cut direction movement (of first element)
             notes[idx] = check_note_movement(nl_last, notes[idx])
 
+            # TODO: change dot notes to cut notes
             # TODO: check notes direction vs position with probabilistic factor (single)
             # TODO: apply reversed movement to next note (e.g. last[2, 1, 1, 2];new[1, 0, 1, 1])
 
-            # calculate movement speed
+            # calculate movement speed (of first element)
             new_time = timings[idx]
             speed = calc_note_speed(nl_last, notes[idx], new_time - last_time,
                                     config.cdf)
-            last_time = new_time
-            nl_last = notes[idx]
 
             # remove too fast elements
             if speed > config.max_speed:
                 rm_counter += int(len(notes[idx]) / 4)
                 notes[idx] = []
                 continue
+            # update last correct note
+            else:
+                last_time = new_time
+                nl_last = notes[idx]
 
             # check double notes
             if len(notes[idx]) > 4:
@@ -217,7 +220,7 @@ def check_note_movement(notes_last, notes_new):
         if dist_x == dist_y == 1:
             return notes_new
 
-        # change cut direction
+        # change cut direction      # TODO: check if new cut direction needs more speed
         new_cut = reverse_cut_dir_xy(notes_last[3])
         notes_new[3] = new_cut
 
@@ -314,26 +317,9 @@ def reverse_cut_dir_xy(old_cut):
 
 
 if __name__ == '__main__':
-    timings = [16.9970068, 17.38013605, 17.77487528, 18.21605442, 18.77333333, 19.40027211, 19.80662132, 20.20136054,
-               20.61931973, 21.06049887, 21.43201814, 21.74548753, 22.01251701, 22.2214966, 22.67428571, 23.05741497,
-               23.46376417, 23.8585034, 24.06748299, 24.26485261, 24.4738322]
-    notes = [[0, 0, 0, 6, 3, 2, 1, 5], [2, 2, 0, 5, 3, 1, 1, 5], [0, 0, 0, 6, 3, 2, 1, 5], [1, 0, 1, 1, 2, 0, 0, 1],
-             [1, 0, 1, 1], [2, 0, 1, 0], [2, 0, 1, 1], [2, 0, 1, 1], [2, 0, 1, 0], [1, 0, 0, 1], [2, 0, 1, 0],
-             [1, 0, 0, 1, 2, 0, 1, 1], [1, 0, 0, 3, 2, 1, 1, 2], [1, 0, 0, 1], [0, 0, 0, 0, 1, 0, 1, 1], [3, 1, 0, 5],
-             [2, 0, 1, 2], [0, 0, 0, 6], [1, 0, 1, 1], [1, 0, 1, 0], [3, 0, 1, 1], [0, 0, 1, 0],
-             [0, 0, 0, 1, 1, 0, 1, 1], [2, 0, 0, 7], [1, 0, 0, 0, 3, 0, 1, 1], [2, 0, 0, 7], [3, 1, 1, 0], [0, 1, 0, 0],
-             [0, 0, 0, 1], [1, 0, 1, 6], [1, 1, 0, 7], [2, 0, 0, 1], [0, 0, 0, 6, 2, 0, 1, 6], [2, 0, 0, 7],
-             [2, 0, 0, 1], [2, 0, 0, 1], [3, 1, 1, 7], [1, 1, 1, 0], [0, 1, 0, 2, 3, 1, 1, 3], [0, 1, 0, 4],
-             [2, 0, 0, 1], [2, 0, 0, 1], [0, 1, 0, 0], [1, 0, 0, 1], [3, 1, 1, 0], [2, 0, 0, 0], [2, 0, 0, 1],
-             [2, 0, 1, 1], [2, 0, 1, 0], [2, 0, 0, 0], [0, 0, 0, 1], [2, 0, 0, 0], [1, 0, 1, 0], [2, 0, 1, 1],
-             [2, 0, 1, 0], [0, 1, 0, 3], [1, 0, 0, 1], [1, 0, 1, 0], [3, 2, 1, 8], [3, 1, 1, 0], [0, 2, 0, 3],
-             [1, 2, 0, 0], [2, 0, 0, 1], [2, 0, 1, 1], [1, 0, 0, 1], [0, 0, 0, 0], [1, 0, 1, 1], [3, 1, 1, 0],
-             [1, 0, 1, 1], [3, 0, 1, 0], [1, 0, 1, 1], [2, 0, 1, 0], [2, 0, 1, 1], [2, 0, 1, 0], [3, 0, 1, 1],
-             [1, 0, 1, 0], [1, 0, 0, 1], [3, 1, 1, 4], [3, 0, 1, 7], [2, 0, 0, 1], [2, 0, 0, 0],
-             [2, 2, 0, 0, 3, 2, 1, 0], [2, 2, 0, 5, 3, 1, 1, 5], [0, 1, 0, 2, 3, 1, 1, 5], [1, 2, 1, 5, 3, 0, 0, 6],
-             [1, 0, 0, 1, 2, 2, 1, 0], [0, 1, 0, 4, 3, 1, 1, 7], [0, 1, 0, 2, 3, 1, 1, 3], [0, 1, 0, 0, 1, 0, 1, 1],
-             [1, 0, 0, 1], [0, 1, 0, 4], [3, 0, 1, 1], [2, 0, 0, 1], [1, 0, 0, 0], [3, 2, 1, 5], [2, 0, 1, 7],
-             [1, 0, 0, 0], [1, 0, 0, 1], [3, 0, 1, 1]]
-    # name = 'Bodied'
-    # sanity_check_timing(name, timings)
+
+    notes = np.load(paths.temp_path + 'notes.npy', allow_pickle=True)
+    timings = np.load(paths.temp_path + 'timings.npy', allow_pickle=True)
+    notes = list(notes)
+
     sanity_check_notes(notes, timings)

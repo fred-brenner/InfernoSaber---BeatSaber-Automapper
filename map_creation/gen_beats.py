@@ -147,7 +147,8 @@ for idx in range(len(in_song_l)):
 
 # calculate bpm
 file = paths.pred_input_path + name_ar[0] + '.egg'
-bpm, song_duration = get_file_bpm(file)
+bpm, song_duration = get_file_bpm(file)     # TODO: round bpm
+bpm = int(bpm)
 
 # sanity check timings
 map_times = sanity_check_timing(name_ar[0], timing_ar[config.lstm_len+1:], song_duration)
