@@ -114,6 +114,7 @@ def sanity_check_notes(notes: list, timings):
     # TODO: (emphasize important beats with double notes)
 
     notes_r, notes_l, notes_b = correct_notes_all(notes_r, notes_l, notes_b)
+    # TODO: dynamic bomb removal
 
     # rebuild notes
     new_notes = unpslit_notes(notes_r, notes_l, notes_b)
@@ -146,7 +147,7 @@ def correct_notes_all(notes_r, notes_l, notes_b):
         pos_l = calc_note_pos(nl)
         pos_b = calc_note_pos(nb, add_cut=False)
 
-        # check bombs
+        # check bombs   # TODO: add bombs +-1 to timeline
         if len(pos_b) > 0:
             rm_b = []
             for i in range(len(pos_b)):
@@ -165,7 +166,7 @@ def correct_notes_all(notes_r, notes_l, notes_b):
                     rm_counter += len(pos_l)
                     notes_l[idx] = []
                     break
-    print(f"Static sanity check both notes removed {rm_counter} notes.")
+    print(f"Static sanity check removed {rm_counter} notes.")
 
     return notes_r, notes_l, notes_b
 
@@ -254,7 +255,10 @@ def check_note_movement(notes_last, notes_new):
         if dist_x == dist_y == 1:
             return notes_new
 
-        # change cut direction      # TODO: maybe (check if new cut direction needs more speed)
+        # change cut direction
+        # TODO: check if new cut direction needs more speed
+        #       only if timing < 0.5
+
         new_cut = reverse_cut_dir_xy(notes_last[3])
         notes_new[3] = new_cut
 

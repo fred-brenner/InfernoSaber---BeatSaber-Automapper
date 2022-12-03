@@ -75,7 +75,8 @@ y_beat = sanity_check_beat(y_beat)
 # get beat times
 timing_ar = y_beat * np.arange(0, len(y_beat), 1)
 timing_ar /= config.beat_spacing
-timing_ar = timing_ar[timing_ar > 0]
+# timing_ar = timing_ar[timing_ar > 0]
+timing_ar = timing_ar[timing_ar > config.window]
 time_input = [timing_ar]
 
 # calculate time between beats
@@ -85,21 +86,19 @@ timing_diff_ar = calc_time_between_beats(time_input)
 song_ar, rm_index = run_music_preprocessing(name_ar, time_ar=time_input, save_file=False,
                                             song_combined=False)
 
+# filter invalid indices
+for rm_idx in rm_index[::-1]:
+    if len(rm_idx) > 0:
+        print(f"Unknown problem with song: {name_ar[rm_idx]}. "
+              f"Check config or remove song!")
+        exit()
+        # remove invalid timings
+        # name_ar.pop(idx)
+        # song_ar.pop(idx)
+
 # apply lstm shift
 ml_input, _ = lstm_shift(song_ar[0], timing_diff_ar[0], None)
 [in_song, in_time_l, _] = ml_input
-
-# filter invalid indices
-idx = 0
-for rm_idx in rm_index:
-    if len(rm_idx) > 0:
-        print(f"Unknown problem with song: {name_ar[rm_idx]}. Remove song!")
-        exit()
-        # # remove invalid songs
-        # name_ar.pop(idx)
-        # song_ar.pop(idx)
-    else:
-        idx += 1
 
 # Load pretrained encoder model
 model_path = paths.model_path + config.enc_version
@@ -147,7 +146,7 @@ for idx in range(len(in_song_l)):
 
 # calculate bpm
 file = paths.pred_input_path + name_ar[0] + '.egg'
-bpm, song_duration = get_file_bpm(file)     # TODO: round bpm
+bpm, song_duration = get_file_bpm(file)
 bpm = int(bpm)
 
 # sanity check timings
