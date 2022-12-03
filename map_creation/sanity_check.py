@@ -103,36 +103,71 @@ def sanity_check_notes(notes: list, timings):
     [notes_r, notes_l, notes_b] = split_notes_rl(notes)
     # test = unpslit_notes(notes_r, notes_l, notes_b)
 
-    # TODO: correct cut direction
     # notes_r = correct_cut_dir(notes_r, timings)
     # notes_l = correct_cut_dir(notes_l, timings)
 
     print("Right notes:", end=' ')
-    notes_r = correct_notes(notes_r, timings)   # TODO: check Nr~16-17 (double down)
+    notes_r = correct_notes(notes_r, timings)
     print("Left notes: ", end=' ')
     notes_l = correct_notes(notes_l, timings)
 
-    # TODO: emphasize important beats with double notes
+    # TODO: (emphasize important beats with double notes)
 
-    # TODO: correct both notes together
+    notes_r, notes_l, notes_b = correct_notes_all(notes_r, notes_l, notes_b)
 
     # rebuild notes
     new_notes = unpslit_notes(notes_r, notes_l, notes_b)
     return new_notes
 
 
-# def correct_cut_dir(notes, timings):
-#     last_cut = None
-#     for idx in range(len(notes)):
-#         new_cut = notes[idx][3]
-#
-#         if last_cut is None:
-#             last_cut = new_cut
-#
-#         else:
-#             last_cut
-#
-#     return notes
+def correct_notes_all(notes_r, notes_l, notes_b):
+    rm_counter = 0
+    for idx in range(len(notes_r)):
+        nb = notes_b[idx]
+        nr = notes_r[idx]
+        nl = notes_l[idx]
+
+        def calc_note_pos(n, add_cut=True):
+            position = []
+            for i in range(int(len(n) / 4)):
+                pos = n[0+i*4:2+i*4]
+                position.append(pos)
+
+                if add_cut:
+                    cut_x, cut_y = get_cut_dir_xy(n[3+i*4])
+                    if cut_x == cut_y == 0:
+                        cut_pos = [pos[0]-int(cut_x), pos[1] - int(cut_y)]
+                        if 0 <= cut_pos[0] < 4:         # x axis
+                            if 0 <= cut_pos[1] < 3:     # y axis
+                                position.append(cut_pos)
+            return position
+
+        pos_r = calc_note_pos(nr)
+        pos_l = calc_note_pos(nl)
+        pos_b = calc_note_pos(nb, add_cut=False)
+
+        # check bombs
+        if len(pos_b) > 0:
+            rm_b = []
+            for i in range(len(pos_b)):
+                if pos_b[i] in pos_l or pos_b[i] in pos_r:
+                    # remove bomb
+                    rm_b.extend(list(range(i*4, (i+1)*4)))
+            rm_b = rm_b[::-1]
+            for i in rm_b:
+                notes_b[idx].pop(i)
+
+        # check left notes
+        if len(pos_l) > 0:
+            for pl in pos_l:
+                if pl in pos_r:
+                    # remove left note(s)
+                    rm_counter += len(pos_l)
+                    notes_l[idx] = []
+                    break
+    print(f"Static sanity check both notes removed {rm_counter} notes.")
+
+    return notes_r, notes_l, notes_b
 
 
 def correct_notes(notes, timings):
@@ -147,7 +182,7 @@ def correct_notes(notes, timings):
             # check cut direction movement (of first element)
             notes[idx] = check_note_movement(nl_last, notes[idx])
 
-            # TODO: change dot notes to cut notes
+            # TODO: (change dot notes to cut notes) - schlupfloch aktuell
             # TODO: check notes direction vs position with probabilistic factor (single)
             # TODO: apply reversed movement to next note (e.g. last[2, 1, 1, 2];new[1, 0, 1, 1])
 
@@ -215,12 +250,11 @@ def check_note_movement(notes_last, notes_new):
     dist_x = int(np.abs(cut_x_last - cut_x_new))
     dist_y = int(np.abs(cut_y_last - cut_y_new))
 
-    # TODO: check
     if dist_x != 2 and dist_y != 2:
         if dist_x == dist_y == 1:
             return notes_new
 
-        # change cut direction      # TODO: check if new cut direction needs more speed
+        # change cut direction      # TODO: maybe (check if new cut direction needs more speed)
         new_cut = reverse_cut_dir_xy(notes_last[3])
         notes_new[3] = new_cut
 
@@ -317,7 +351,6 @@ def reverse_cut_dir_xy(old_cut):
 
 
 if __name__ == '__main__':
-
     notes = np.load(paths.temp_path + 'notes.npy', allow_pickle=True)
     timings = np.load(paths.temp_path + 'timings.npy', allow_pickle=True)
     notes = list(notes)
