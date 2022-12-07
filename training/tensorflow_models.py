@@ -144,3 +144,28 @@ def create_music_model(model_type, dim_in, tcn_len):
     #
     #     model = Model(inputs=[input_a, input_b], outputs=out)
     #     return model
+
+
+def create_post_model(model_type, lstm_len: int, dim_out=2):
+    print("Setup keras model")
+    if model_type == 'lstm1':
+        # in_song (lin), in_time (rec), in_class (rec)
+        input_a = Input(shape=(lstm_len, 5), name='input_type_cut_timeDiff_lastNotes_lstm')
+        # input_b = Input(shape=(dim_in[1]), name='input_note_cut_lstm')
+        # input_c = Input(shape=(dim_in[2]), name='input_time_diff_lstm')
+
+        lstm_a = CuDNNLSTM(256, return_sequences=True)(input_a)
+        # lstm_c = CuDNNLSTM(128, return_sequences=True)(input_c)
+
+        # lstm_in = concatenate([lstm_b, lstm_c])
+        lstm_out = CuDNNLSTM(128, return_sequences=False)(lstm_a)
+
+        # x = concatenate([input_a, lstm_out])
+        x = Dense(512, activation='relu')(lstm_out)
+        x = Dropout(0.05)(x)
+        x = Dense(256, activation='relu')(x)
+
+        out = Dense(dim_out, activation='relu', name='output')(x)
+
+        model = Model(inputs=[input_a], outputs=out)
+        return model

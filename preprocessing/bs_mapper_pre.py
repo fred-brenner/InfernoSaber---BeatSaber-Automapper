@@ -44,12 +44,13 @@ def lstm_shift(song_in, time_in, ml_out):
     return [song_in, l_time_in, l_out_in], l_ml_out
 
 
-def load_beat_data(name_ar):
+def load_beat_data(name_ar: list, return_notes=False):
     print("Loading maps input data")
     map_dict_notes, _, _ = load_raw_beat_data(name_ar)
     notes_ar, time_ar = sort_beats_by_time(map_dict_notes)
+    if return_notes:
+        return notes_ar, time_ar
     beat_class = cluster_notes_in_classes(notes_ar)
-
     return beat_class, time_ar
 
 

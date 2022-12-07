@@ -202,9 +202,14 @@ def correct_notes(notes, timings):
             # check cut direction movement (of first element)
             notes[idx] = check_note_movement(nl_last, notes[idx])
 
+            # # notes[idx] = optimize_note_movement(nl_last, notes[idx])
+            # notes[idx] = check_border_notes(notes, timings, idx)
+
             # TODO: (change dot notes to cut notes) - schlupfloch aktuell
             # TODO: check notes direction vs position with probabilistic factor (single)
+            #       alle am rand richtig drehen, zwischendrinnen löschen...
             # TODO: apply reversed movement to next note (e.g. last[2, 1, 1, 2];new[1, 0, 1, 1])
+            #       not really possible without changing the whole track?
 
             # calculate movement speed (of first element)
             new_time = timings[idx]
@@ -253,12 +258,39 @@ def correct_notes(notes, timings):
                         if rm_temp[rm]:
                             notes[idx].pop(rm)
 
-        # else:
-        #     notes[idx] = []
-        #     print("Found multiple notes in one beat at sanity_check. Skipping.")
-        #     continue
     print(f"Sanity check note speed removed {rm_counter} elements")
     return notes
+
+
+# def optimize_note_movement(notes_last, notes_new):
+#     if notes_last is None:
+#         return notes_new
+#
+#     def calc_pos_allowed(notes_last):
+#         cx, cy = get_cut_dir_xy(notes_last[3])
+#
+#         if cx == cy == 0:
+#             return None
+#
+#         x = list(notes_last[0] - np.arange(1, 3)*cx)
+#         x.extend(list(notes_last[0] + np.arange(0, 3)*cx))
+#         y = list(notes_last[1] - np.arange(1, 3)*cy)
+#         y.extend(list(notes_last[1] + np.arange(0, 3)*cy))
+#
+#         return np.asarray([x, y]).T
+#
+#     pos_allowed = calc_pos_allowed(notes_last)
+#     if pos_allowed is None:
+#         return notes_new
+#     if list(pos_allowed[0]) == notes_new[0:2] or list(pos_allowed[1]) == notes_new[0:2]:
+#         return notes_new
+#     random_ar = np.arange(5, 0, -1) * np.random.rand(5)
+#     random_idx = np.argsort(random_ar)[::-1]
+#     for idx in range(5):
+#         x, y = list(pos_allowed[random_idx][idx])
+#         if 0 <= x < 4 and 0 <= y < 3:
+#             notes_new[0:2] = [x, y]
+#             return notes_new
 
 
 def check_note_movement(notes_last, notes_new):
@@ -275,8 +307,8 @@ def check_note_movement(notes_last, notes_new):
             return notes_new
 
         # change cut direction
-        # TODO: check if new cut direction needs more speed
-        #       only if timing < 0.5
+        # TODO: (check if new cut direction needs more speed
+        #       only if timing < 0.5)
 
         new_cut = reverse_cut_dir_xy(notes_last[3])
         notes_new[3] = new_cut
@@ -291,7 +323,7 @@ def calc_note_speed(notes_last, notes_new, time_diff, cdf):
     # cut director factor
     # cdf = config.cdf
 
-    dist = 0.5
+    dist = 0.5      # reaction time
     cut_x_last, cut_y_last = get_cut_dir_xy(notes_last[3])
     cut_x_new, cut_y_new = get_cut_dir_xy(notes_new[3])
     # x direction

@@ -44,7 +44,7 @@ tcn_test_samples = 1000
 # tcn_skip = 10
 
 # Map creation model configuration
-thresh_beat = 0.2           # minimum beat response required to trigger generator
+thresh_beat = 0.3           # minimum beat response required to trigger generator
 cdf = 0.55                  # cut director factor (to calculate speed)
 min_beat_time = 0.04        # in seconds (first sanity check)
 beat_spacing = 28.505102    # 5587/196s = 28.5051 steps/s
@@ -52,7 +52,11 @@ max_speed = 6.0            # set around 3-15 (normal-expert+)
 favor_last_class = 0.2      # set factor to favor the next beat class (0.0-0.3)
 max_double_note_speed = 15  # set maximum speed difference between double notes (10 or 15 or 20)
 
-# # Postprocesing configuration
+# Postprocessing model configuration
+lstm_len_post = 10
+n_epochs_post = 10
+
+
 # # cutout_window = 0.1       # window in seconds for cutout
 # # limit_mem = 10            # in GigaByte (free ram | needs about double memory for FAST saving at the end)
 # # rec_t = 64                # recurrent timesteps for lstm deep learning model
