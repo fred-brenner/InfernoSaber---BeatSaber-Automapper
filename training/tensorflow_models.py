@@ -17,15 +17,15 @@ def create_keras_model(model_type, dim_in=[], dim_out=None):
         input_c = Input(shape=(dim_in[2]), name='input_class_lstm')
 
         lstm_b = CuDNNLSTM(32, return_sequences=True)(input_b)
-        lstm_c = CuDNNLSTM(128, return_sequences=True)(input_c)
+        lstm_c = CuDNNLSTM(256, return_sequences=True)(input_c)
 
         lstm_in = concatenate([lstm_b, lstm_c])
-        lstm_out = CuDNNLSTM(128, return_sequences=False)(lstm_in)
+        lstm_out = CuDNNLSTM(64, return_sequences=False)(lstm_in)
 
         x = concatenate([input_a, lstm_out])
-        x = Dense(500, activation='relu')(x)
+        x = Dense(256, activation='relu')(x)
         x = Dropout(0.05)(x)
-        x = Dense(400, activation='sigmoid')(x)
+        x = Dense(512, activation='sigmoid')(x)
 
         out = Dense(dim_out, activation='softmax', name='output')(x)
 

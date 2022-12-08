@@ -14,25 +14,25 @@ window = 2.0                # window in seconds for each song to spectrum pictur
 # max_filter_size = 3       # maxpool filter for spectrogram preprocessing
 specgram_res = 24           # y resolution of the spectrogram (frequency subdivisions)
 
-min_bps_limit = 5           # minimum beats_per_second value for training
-max_bps_limit = 10          # maximum beats_per_second value for training
+min_bps_limit = 5.0         # minimum beats_per_second value for training
+max_bps_limit = 6         # maximum beats_per_second value for training
 
 # Autoencoder model configuration
-learning_rate = 0.001       # model learning rate
-n_epochs = 100              # number of total epochs
-batch_size = 256            # batch size
+learning_rate = 0.0005       # model learning rate
+n_epochs = 50               # number of total epochs
+batch_size = 128            # batch size
 test_samples = 10           # number of test files to plot (excluded from training)
 bottleneck_len = 16         # size of bottleneck distribution (1D array)
 
 # Mapper model configuration
 map_learning_rate = 0.005       # model learning rate
-map_n_epochs = 300              # number of total epochs
-map_batch_size = 128             # batch size
+map_n_epochs = 200              # number of total epochs
+map_batch_size = 128            # batch size
 map_test_samples = 20           # number of test files to plot (excluded from training)
 lstm_len = 8
 
-enc_version = 'tf_model_enc_16bneck_12_3__0_26.h5'
-autoenc_version = 'tf_model_autoenc_16bneck_12_3__0_26.h5'
+enc_version = 'tf_model_enc_16bneck_12_8__16_48.h5'
+autoenc_version = 'tf_model_autoenc_16bneck_12_8__16_48.h5'
 mapper_version = 'tf_model_mapper_9_28__15_48.h5'
 beat_gen_version = 'tf_beat_gen_5_5.1_11_29__12_15.h5'
 

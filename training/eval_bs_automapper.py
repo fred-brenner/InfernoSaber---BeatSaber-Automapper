@@ -82,10 +82,7 @@ del(ml_output)
 
 # Create model
 ##############
-# create timestamp
-dateTimeObj = datetime.now()
-timestamp = f"{dateTimeObj.month}_{dateTimeObj.day}__{dateTimeObj.hour}_{dateTimeObj.minute}"
-save_model_name = f"tf_model_mapper_{min_bps_limit}-{max_bps_limit}_{timestamp}.h5"
+save_model_name = config.mapper_version
 # load model
 mapper_model, save_model_name = load_keras_model(save_model_name)
 # create model
@@ -95,11 +92,6 @@ if mapper_model is None:
     # mapper_model.compile(loss='mean_squared_error', optimizer=adam, metrics=['accuracy'])
     mapper_model.compile(loss='categorical_crossentropy', optimizer=adam, metrics=['accuracy'])
 
-# Model training
-################
-training = mapper_model.fit(x=ds_train, y=out_class_train,
-                            epochs=n_epochs, batch_size=batch_size,
-                            shuffle=True, verbose=1)
 
 # Evaluate model
 ################
@@ -131,10 +123,3 @@ if test_samples % command_len == 0:
 
 print(tabulate([['Pred', pred_class], ['Real', real_class]],
                headers=['Type', 'Result (train data)']))
-
-# Save Model
-############
-print(f"Saving model at: {paths.model_path}")
-mapper_model.save(paths.model_path + save_model_name)
-
-print("Finished Training")
