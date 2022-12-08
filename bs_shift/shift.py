@@ -4,7 +4,7 @@ import shutil
 import sys
 from progressbar import ProgressBar
 
-sys.path.insert(1, os.path.join(sys.path[0], '..'))
+# sys.path.insert(1, os.path.join(sys.path[0], '..'))
 from tools.utils.str_compare import str_compare
 from tools.fail_list.black_list import append_fail, delete_fails
 from tools.utils.index_find_str import return_find_str
@@ -157,9 +157,9 @@ if __name__ == '__main__':
     shift_bs_songs(allow_diff2=False)
 
     # Start casting to dictionary (notes, events, etc)
-    map_to_dict_all(paths)
+    map_to_dict_all()
 
     # Calculate notes per sec for each song
-    bps_find_songs(paths)
+    bps_find_songs()
 
     print("Finished shifting")

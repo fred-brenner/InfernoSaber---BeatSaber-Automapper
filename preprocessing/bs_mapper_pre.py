@@ -62,7 +62,7 @@ def load_ml_data(train=True, name_ar=None):
     # load beats (output)
     beat_ar, time_ar = load_beat_data(name_ar)
 
-    # load song (input) # TODO: check if still working
+    # load song (input)
     song_ar, rm_index = run_music_preprocessing(name_ar, time_ar, save_file=False,
                                                 song_combined=False)
 

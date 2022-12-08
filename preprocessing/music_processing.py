@@ -1,24 +1,28 @@
 import numpy as np
 import aubio
-from tools.utils.load_and_save import save_npy
-from tools.utils import numpy_shorts
-from tools.config import paths, config
-
+from progressbar import ProgressBar
 import matplotlib.pyplot as plt
 from scipy import signal
 from PIL import Image, ImageFilter
+
+from tools.utils.load_and_save import save_npy
+from tools.utils import numpy_shorts
+from tools.config import paths, config
+from tools.fail_list.black_list import append_fail, delete_fails
 
 
 def load_song(data_path: str, time_ar: list, return_raw=False) -> np.array:
     total_read = 0
     samples_list = []
     src = aubio.source(data_path, channels=1, samplerate=config.samplerate_music)
+
     while True:
         samples, read = src()
         samples_list.extend(samples)
         total_read += read
         if read < src.hop_size:
             break
+
     samples_ar = np.asarray(samples_list)
     if return_raw:
         return samples_ar
@@ -109,14 +113,24 @@ def run_music_preprocessing(names_ar: list, time_ar=None, save_file=True, song_c
     ending = ".egg"
     song_ar = []
     rm_index_ar = []
+
+    bar = ProgressBar(max_value=len(names_ar))
+
+    print(f"Importing {len(names_ar)} songs")
     for idx, n in enumerate(names_ar):
+        bar.update(idx+1)
         if time_ar is None:
             time = None
         else:
             time = time_ar[idx]
         if not n.endswith(ending):
             n += ending
-        song, remove_idx = load_song(paths.copy_path_song + n, time_ar=time)
+        try:
+            song, remove_idx = load_song(paths.copy_path_song + n, time_ar=time)
+        except:
+            print(f"Problem with song: {n}")
+            append_fail(n[:-4])
+            raise
         rm_index_ar.append(remove_idx)
 
         ml_input_song = process_song(song)

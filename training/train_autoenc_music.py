@@ -4,19 +4,16 @@ import matplotlib.pyplot as plt
 import tensorflow as tf
 from keras.models import Model
 from keras.optimizers import adam_v2
-# from keras.callbacks import ReduceLROnPlateau
-# from keras.models import load_model
-# import os
-# import h5py
-# import glob
-# import pickle
-from datetime import datetime
 
+from datetime import datetime
+import time
+
+from bs_shift.bps_find_songs import bps_find_songs
 from helpers import *
 from tensorflow_models import *
 from preprocessing.music_processing import run_music_preprocessing
 from tools.config import config, paths
-
+from tools.fail_list.black_list import delete_fails
 
 # Check Cuda compatible GPU
 if not test_gpu_tf():
@@ -38,11 +35,24 @@ np.random.seed(3)
 ####################
 # get name array
 name_ar, diff_ar = filter_by_bps(min_bps_limit, max_bps_limit)
-print(f"Importing {len(name_ar)} songs")
+# print(f"Importing {len(name_ar)} songs")
 
 # load song input
-song_ar, _ = run_music_preprocessing(name_ar, save_file=False,
-                                     song_combined=True, channels_last=True)
+i = 0
+while i == 0:
+    try:
+        i += 1
+        song_ar, _ = run_music_preprocessing(name_ar, save_file=False,
+                                             song_combined=True, channels_last=True)
+    except:
+        print("Need to restart due to problem with one song.")
+        delete_fails()
+        time.sleep(0.1)
+        bps_find_songs(info_flag=False)
+        time.sleep(0.1)
+        name_ar, diff_ar = filter_by_bps(min_bps_limit, max_bps_limit)
+        time.sleep(0.1)
+        i -= 1
 
 # sample into train/val/test
 ds_test = song_ar[:test_samples]
@@ -55,7 +65,6 @@ split = int(song_ar.shape[0] * 0.85)
 # setup data loaders
 ds_train = song_ar[:split]
 ds_val = song_ar[split:]
-
 
 # Model Building
 ################
@@ -77,7 +86,7 @@ if auto_encoder is None:
     decoded = decoder(encoded)
     auto_encoder = Model(auto_input, decoded)
 
-    adam = adam_v2.Adam(learning_rate=learning_rate, decay=learning_rate/n_epochs)
+    adam = adam_v2.Adam(learning_rate=learning_rate, decay=learning_rate / n_epochs)
     auto_encoder.compile(loss='mean_squared_error', optimizer=adam, metrics=['accuracy'])
     encoder.compile(loss='mean_squared_error', optimizer=adam, metrics=['accuracy'])
 

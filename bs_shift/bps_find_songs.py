@@ -4,7 +4,7 @@ import numpy as np
 import tools.config.paths as paths
 
 
-def bps_find_songs(paths) -> None:
+def bps_find_songs(info_flag=True) -> None:
     diff_array = []
     name_array = []
 
@@ -25,7 +25,8 @@ def bps_find_songs(paths) -> None:
             diff_array.append(bps)
             name_array.append(i[:-10])
 
-    print("\nInfo: Max avg song cut_per_second found: " + str(max(diff_array)))
+    if info_flag:
+        print("\nInfo: Max avg song cut_per_second found: " + str(max(diff_array)))
 
     # save arrays
     diff_array = np.asarray(diff_array)

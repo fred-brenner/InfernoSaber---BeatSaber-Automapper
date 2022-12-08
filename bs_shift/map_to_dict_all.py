@@ -4,11 +4,10 @@
 ######################################################
 
 import os
-import sys
 import numpy as np
 from progressbar import ProgressBar
 
-sys.path.insert(1, os.path.join(sys.path[0], '..'))
+from tools.config import paths
 from tools.utils.index_find_str import return_find_str
 from tools.fail_list.black_list import append_fail, delete_fails
 
@@ -56,7 +55,7 @@ def check_map_valid(check_type, i_s):
     return valid
 
 
-def map_to_dict_all(paths):
+def map_to_dict_all():
     # delete old map data
     print("\nDelete old dictionary data")
     for de in os.listdir(paths.dict_all_path):
