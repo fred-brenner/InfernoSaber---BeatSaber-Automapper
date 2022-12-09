@@ -167,6 +167,19 @@ def cut_dir_values(notes):
     return cut_values
 
 
+def offset_notes(notes_l, idx, offset, rm_counter):
+    for i in range(int(len(notes_l[idx]) / 4)):
+        if i > 1:
+            print("")
+        pos_before = np.asarray(notes_l[idx][i*4:i*4+2])
+        new_pos = list(pos_before - [offset, 0])
+        if 0 <= new_pos[0] < 4 and 0 <= new_pos[1] < 3:
+            notes_l[idx][i*4:i*4+2] = new_pos
+        else:
+            rm_counter += 1
+        return notes_l, rm_counter
+
+
 def correct_notes_all(notes_r, notes_l, notes_b, time_diff):
     pos_r_last = []
     pos_l_last = []
@@ -181,7 +194,7 @@ def correct_notes_all(notes_r, notes_l, notes_b, time_diff):
         pos_r = calc_note_pos(nr)
         pos_l = calc_note_pos(nl)
         pos_b = calc_note_pos(nb, add_cut=False)
-        cut_r = cut_dir_values(nr)
+        # cut_r = cut_dir_values(nr)
 
         # calculate next beat for notes
         if idx < len(notes_r) - 1:
@@ -207,20 +220,31 @@ def correct_notes_all(notes_r, notes_l, notes_b, time_diff):
 
         # check left notes
         if len(pos_l) > 0:
+            pos_r_check = pos_r_last.copy()
+            pos_r_check.extend(pos_r)
+            pos_r_check.extend(pos_r_next)
             for pl in pos_l:
-                if pl in pos_r or pl in pos_r_next or pl in pos_r_last:
+                if pl in pos_r_check:
                     # try to re-arrange left note
-                    print("")
-
-
-                    # remove left note(s)
-                    rm_counter += len(pos_l)
-                    notes_l[idx] = []
+                    offset = [2, 3, 1, -1, -2]
+                    for offs in offset:
+                        pl_opt = list(np.asarray(pl) - [offs, 0])
+                        if 0 <= pl_opt[0] < 4 and 0 <= pl_opt[1] < 3:
+                            if pl_opt not in pos_r_check:
+                                notes_l, rm_counter = offset_notes(notes_l, idx, offs, rm_counter)
+                                pos_l = calc_note_pos(notes_l[idx])
+                                break
+                    for pl_test in pos_l:
+                        if pl_test in pos_r_check:
+                            # remove left note(s)
+                            rm_counter += len(pos_l)
+                            notes_l[idx] = []
+                            break
                     break
 
         pos_r_last = pos_r
         pos_l_last = pos_l
-        cut_r_last = cut_r
+        # cut_r_last = cut_r
     print(f"Static sanity check removed {rm_counter} notes.")
 
     return notes_r, notes_l, notes_b
