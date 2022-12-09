@@ -1,4 +1,6 @@
 import numpy as np
+from progressbar import ProgressBar
+
 from tools.config import config
 from tools.utils import numpy_shorts
 
@@ -6,13 +8,13 @@ from tools.utils import numpy_shorts
 def beat_to_lstm(song_input, beat_resampled):
     tcn_len = config.tcn_len
 
-    # # beta: use first sample only
-    # x = song_input[0]
-    # y = beat_resampled[0]
     x_tcn_all = None
     y_tcn_all = None
 
+    bar = ProgressBar(max_value=len(song_input))
+
     for i_song in range(len(song_input)):
+        bar.update(i_song+1)
         x = song_input[i_song]
         if beat_resampled is not None:
             y = beat_resampled[i_song]

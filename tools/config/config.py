@@ -5,20 +5,23 @@
 
 # Data Processing configuration
 random_seed = 3
-
 min_time_diff = 0.01        # minimum time between cuts, otherwise synchronized
-
 samplerate_music = 14800    # samplerate for the music import
 hop_size = 512
 window = 2.0                # window in seconds for each song to spectrum picture (from wav_to_pic)
-# max_filter_size = 3       # maxpool filter for spectrogram preprocessing
 specgram_res = 24           # y resolution of the spectrogram (frequency subdivisions)
 
-min_bps_limit = 5.0         # minimum beats_per_second value for training
-max_bps_limit = 6         # maximum beats_per_second value for training
+min_bps_limit = 6           # minimum beats_per_second value for training
+max_bps_limit = 10          # maximum beats_per_second value for training
+
+# Model versions
+enc_version = 'tf_model_enc_16bneck_12_8__16_48.h5'
+autoenc_version = 'tf_model_autoenc_16bneck_12_8__16_48.h5'
+mapper_version = 'tf_model_mapper_8-10_12_9__0_0.h5'
+beat_gen_version = 'tf_beat_gen_5_5.1_11_29__12_15.h5'
 
 # Autoencoder model configuration
-learning_rate = 0.0005       # model learning rate
+learning_rate = 0.0003      # model learning rate
 n_epochs = 50               # number of total epochs
 batch_size = 128            # batch size
 test_samples = 10           # number of test files to plot (excluded from training)
@@ -26,18 +29,14 @@ bottleneck_len = 16         # size of bottleneck distribution (1D array)
 
 # Mapper model configuration
 map_learning_rate = 0.005       # model learning rate
-map_n_epochs = 200              # number of total epochs
+map_n_epochs = 120              # number of total epochs
 map_batch_size = 128            # batch size
 map_test_samples = 20           # number of test files to plot (excluded from training)
 lstm_len = 8
 
-enc_version = 'tf_model_enc_16bneck_12_8__16_48.h5'
-autoenc_version = 'tf_model_autoenc_16bneck_12_8__16_48.h5'
-mapper_version = 'tf_model_mapper_9_28__15_48.h5'
-beat_gen_version = 'tf_beat_gen_5_5.1_11_29__12_15.h5'
-
 # Beat prediction model configuration
-beat_n_epochs = 10
+beat_learning_rate = 0.003
+beat_n_epochs = 20
 tcn_len = 100
 tcn_test_samples = 1000
 # tcn_skip = 10

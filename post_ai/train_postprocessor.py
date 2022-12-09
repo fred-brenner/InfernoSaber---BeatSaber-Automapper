@@ -89,7 +89,7 @@ if mapper_model is None:
 
 training = mapper_model.fit(x=ml_input_r, y=ml_output_r,
                             epochs=n_epochs, batch_size=batch_size,
-                            shuffle=False, verbose=1, validation_split=0.2)
+                            shuffle=True, verbose=1, validation_split=0.2)
 
 # Evaluate model
 ################

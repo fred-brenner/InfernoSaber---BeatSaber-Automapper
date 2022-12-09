@@ -66,18 +66,18 @@ dim_out = out_class_train.shape[1]
 
 # delete variables to free ram
 # keras.backend.clear_session()
-# del(encoder)
-del(in_class_l)
-del(in_class_test)
-del(in_song)
-del(in_song_l)
-del(in_song_test)
-del(in_song_train)
-del(in_time_l)
-del(in_time_test)
-del(in_time_train)
-del(ml_input)
-del(ml_output)
+# del encoder
+del in_class_l
+del in_class_test
+del in_song
+del in_song_l
+del in_song_test
+del in_song_train
+del in_time_l
+del in_time_test
+del in_time_train
+del ml_input
+del ml_output
 
 
 # Create model

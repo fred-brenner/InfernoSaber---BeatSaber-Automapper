@@ -98,7 +98,7 @@ if auto_encoder is None:
 # Training
 training = auto_encoder.fit(x=ds_train, y=ds_train, validation_data=(ds_val, ds_val),
                             epochs=n_epochs, batch_size=batch_size,
-                            shuffle=False, verbose=1)
+                            shuffle=True, verbose=1)
 
 # Model Evaluation
 ##################
