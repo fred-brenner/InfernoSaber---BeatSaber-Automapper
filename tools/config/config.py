@@ -12,7 +12,7 @@ window = 2.0                # window in seconds for each song to spectrum pictur
 specgram_res = 24           # y resolution of the spectrogram (frequency subdivisions)
 
 min_bps_limit = 8           # minimum beats_per_second value for training
-max_bps_limit = 10          # maximum beats_per_second value for training
+max_bps_limit = 12          # maximum beats_per_second value for training
 
 # Model versions
 enc_version = 'tf_model_enc_16bneck_12_8__16_48.h5'
@@ -43,12 +43,12 @@ tcn_test_samples = 1000
 # tcn_skip = 10
 
 # Map creation model configuration
-thresh_beat = 0.3           # minimum beat response required to trigger generator
+thresh_beat = 0.5           # minimum beat response required to trigger generator
 cdf = 0.55                  # cut director factor (to calculate speed)
 min_beat_time = 0.04        # in seconds (first sanity check)
 beat_spacing = 28.505102    # 5587/196s = 28.5051 steps/s
-max_speed = 9.0             # set around 3-15 (normal-expert+)
-favor_last_class = 0.15     # set factor to favor the next beat class (0.0-0.3)
+max_speed = 7.0             # set around 3-15 (normal-expert+)
+favor_last_class = 0.25     # set factor to favor the next beat class (0.0-0.3)
 max_double_note_speed = 15  # set maximum speed difference between double notes (10 or 15 or 20)
 
 # Postprocessing model configuration

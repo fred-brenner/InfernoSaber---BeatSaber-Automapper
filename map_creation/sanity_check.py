@@ -81,7 +81,7 @@ def sanity_check_timing(name, timings, song_duration):
     allowed_timings = allowed_timings[allowed_timings > 0]
 
     # match timing from beat generator
-    max_time_diff = 0.3
+    max_time_diff = 0.5
     last_beat = 0
     for i in range(len(timings)):
         diff = np.abs(allowed_timings - timings[i])
@@ -234,6 +234,7 @@ def correct_notes_all(notes_r, notes_l, notes_b, time_diff):
                                 notes_l, rm_counter = offset_notes(notes_l, idx, offs, rm_counter)
                                 pos_l = calc_note_pos(notes_l[idx])
                                 break
+                    # if second_run:
                     for pl_test in pos_l:
                         if pl_test in pos_r_check:
                             # remove left note(s)
