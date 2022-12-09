@@ -7,6 +7,8 @@
 ##########################################
 
 import os
+from tools.config import config
+
 
 ################################# (change this for your pc)
 # setup folder for input data
@@ -50,7 +52,7 @@ songs_pred = pred_path + "songs_predict/"
 # pic_path_pred = pred_path + "songs_pic_predict/"
 
 # pred_path = pred_path + "np_pred/"
-pred_input_path = pred_path + "input/"
+# pred_input_path = pred_path + "input/"
 new_map_path = pred_path + "new_map/"
 
 fail_path = train_path + "fail_list/"
@@ -66,24 +68,8 @@ name_ar_file = diff_path + "name_ar.npy"
 ml_input_beat_file = ml_input_path + "beat_ar.npy"
 ml_input_song_file = ml_input_path + "song_ar.npy"
 
-# class_beat_list_file = class_maps + "beat_list.pkl"
-# class_notes_dict_file = class_maps + "notes_dict_list.pkl"
-# class_output_ML_file = class_maps + "output_ML.pkl"
-# class_time_list_file = class_maps + "time_list.pkl"
-# class_song_input_file = class_maps + "song_input_list.pkl"
-# class_song_title_file = class_maps + "song_title_list.pkl"
-# class_title_file = class_maps + "title_list.pkl"
-# class_map_diff_file = class_maps + "map_diff.pkl"
-
-pred_song_input_file = pred_input_path + "song_input.pkl"
-pred_beat_input_file = pred_input_path + "beat_input.pkl"
-pred_ml_output_file = pred_input_path + "ml_output.pkl"
-pred_title_file = pred_input_path + "title_list.pkl"
-
 black_list_file = fail_path + "black_list.txt"
 
-model_autoenc_music_file = model_path + "autoenc_music"
-model_automap_file = model_path + "automapper"
-notes_classify_dict_file = pred_path + "notes_class_dict.pkl"
+notes_classify_dict_file = f"{pred_path}notes_class_dict_{config.min_bps_limit}-{config.max_bps_limit}.pkl"
 beats_classify_encoder_file = pred_path + "onehot_encoder.pkl"
 ############################

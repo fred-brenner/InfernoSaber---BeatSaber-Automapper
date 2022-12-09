@@ -140,7 +140,7 @@ def main(name_ar: list) -> None:
         y_class_map.append(y_class)
 
     # calculate bpm
-    file = paths.pred_input_path + name_ar[0] + '.egg'
+    file = paths.songs_pred + name_ar[0] + '.egg'
     bpm, song_duration = get_file_bpm(file)
     bpm = int(bpm)
 
@@ -156,8 +156,6 @@ def main(name_ar: list) -> None:
 
     create_map(y_class_num, map_times, name_ar[0], bpm)
 
-    print("Finished map generator")
-
 
 if __name__ == '__main__':
     # choose song
@@ -165,3 +163,5 @@ if __name__ == '__main__':
     name_ar = [name_ar[0]]
 
     main(name_ar)
+
+    print("Finished map generator")

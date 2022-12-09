@@ -44,7 +44,7 @@ def create_map(y_class_num, timings, name, bpm):
     # copy supplementary files to folder
     src = f"{paths.new_map_path}cover.jpg"
     shutil.copy(src, new_map_folder)
-    src = f"{paths.pred_input_path}{name}.egg"
+    src = f"{paths.songs_pred}{name}.egg"
     shutil.copy(src, new_map_folder)
     print(f"Finished song: {name}")
 

@@ -9,10 +9,13 @@ import map_creation.gen_beats as beat_generator
 
 # MAP GENERATOR
 ###############
-# TODO: iterate over songs
+print(f"Found {len(os.listdir(paths.songs_pred))} songs. Iterating...")
 for song_name in os.listdir(paths.songs_pred):
-    beat_generator.main(song_name)
+    song_name = song_name[:-4]
+    print(f"Analyzing song: {song_name}")
+    beat_generator.main([song_name])
 
+print("Finished map generator")
 
 # TRAINING
 ##########

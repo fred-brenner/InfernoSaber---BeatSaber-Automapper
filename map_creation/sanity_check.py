@@ -33,7 +33,7 @@ def sanity_check_timing(name, timings, song_duration):
     #####################################
     # import song to analyze volume peaks
     #####################################
-    file = paths.pred_input_path + name + ".egg"
+    file = paths.songs_pred + name + ".egg"
 
     # analyze song pitches
     total_read = 0

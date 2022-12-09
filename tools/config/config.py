@@ -11,14 +11,15 @@ hop_size = 512
 window = 2.0                # window in seconds for each song to spectrum picture (from wav_to_pic)
 specgram_res = 24           # y resolution of the spectrogram (frequency subdivisions)
 
-min_bps_limit = 6           # minimum beats_per_second value for training
+min_bps_limit = 8           # minimum beats_per_second value for training
 max_bps_limit = 10          # maximum beats_per_second value for training
 
 # Model versions
 enc_version = 'tf_model_enc_16bneck_12_8__16_48.h5'
 autoenc_version = 'tf_model_autoenc_16bneck_12_8__16_48.h5'
 mapper_version = 'tf_model_mapper_8-10_12_9__0_0.h5'
-beat_gen_version = 'tf_beat_gen_5_5.1_11_29__12_15.h5'
+# beat_gen_version = 'tf_beat_gen_5_5.1_11_29__12_15.h5'
+beat_gen_version = 'tf_beat_gen_9.5_10_12_9__1_6.h5'
 
 # Autoencoder model configuration
 learning_rate = 0.0003      # model learning rate
