@@ -12,7 +12,7 @@ window = 2.0                # window in seconds for each song to spectrum pictur
 specgram_res = 24           # y resolution of the spectrogram (frequency subdivisions)
 
 min_bps_limit = 8           # minimum beats_per_second value for training
-max_bps_limit = 12          # maximum beats_per_second value for training
+max_bps_limit = 10          # maximum beats_per_second value for training
 
 # Model versions
 enc_version = 'tf_model_enc_16bneck_12_8__16_48.h5'
@@ -50,6 +50,10 @@ beat_spacing = 28.505102    # 5587/196s = 28.5051 steps/s
 max_speed = 7.0             # set around 3-15 (normal-expert+)
 favor_last_class = 0.25     # set factor to favor the next beat class (0.0-0.3)
 max_double_note_speed = 15  # set maximum speed difference between double notes (10 or 15 or 20)
+emphasize_beats_wait = 0.4
+emphasize_beats_3 = 0.05
+emphasize_beats_2 = 0.25
+
 
 # Postprocessing model configuration
 lstm_len_post = 10

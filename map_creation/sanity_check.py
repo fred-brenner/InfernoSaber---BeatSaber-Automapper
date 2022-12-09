@@ -99,6 +99,38 @@ def sanity_check_timing(name, timings, song_duration):
     return timings
 
 
+def emphasize_beats(notes, timings):
+
+    def calc_new_note(note, new_pos):
+        new_note = note * len(new_pos)
+        for i in range(len(new_pos)):
+            new_note[i * 4:i * 4 + 2] = new_pos[i]
+        return new_note
+
+    def update_new_note(notes, n, new_note):
+        notes[n] = new_note
+        return notes
+
+    for n in range(len(notes)):
+        if timings[n] >= config.emphasize_beats_wait:
+            note = notes[n]
+            if len(note) > 0:
+                rd = np.random.random()
+                if rd > 1 - config.emphasize_beats_3:
+                    new_pos = calc_note_pos(note)
+                    new_note = calc_new_note(note, new_pos)
+                    if len(new_pos) < 3:
+                        new_pos = calc_note_pos(new_note)[:3]
+                        new_note = calc_new_note(note, new_pos)
+                    update_new_note(notes, n, new_note)
+                elif rd > 1 - config.emphasize_beats_3 - config.emphasize_beats_2:
+                    new_pos = calc_note_pos(note)[:2]
+                    new_note = calc_new_note(note, new_pos)
+                    update_new_note(notes, n, new_note)
+
+    return notes
+
+
 def sanity_check_notes(notes: list, timings):
     [notes_r, notes_l, notes_b] = split_notes_rl(notes)
     # test = unpslit_notes(notes_r, notes_l, notes_b)
@@ -111,7 +143,7 @@ def sanity_check_notes(notes: list, timings):
     print("Left notes: ", end=' ')
     notes_l = correct_notes(notes_l, timings)
 
-    # TODO: (emphasize important beats with double notes)
+    notes_l = emphasize_beats(notes_l, timings)
 
     time_diffs = np.concatenate((np.ones(1), np.diff(timings)), axis=0)
     notes_r, notes_l, notes_b = correct_notes_all(notes_r, notes_l, notes_b, time_diffs)
@@ -125,7 +157,8 @@ def calc_note_pos(n, add_cut=True, inv=None):
     position = []
     for i in range(int(len(n) / 4)):
         pos = n[0 + i * 4:2 + i * 4]
-        position.append(pos)
+        if pos not in position:
+            position.append(pos)
 
         if add_cut:
             def add_position(n, pos, inv):
@@ -141,20 +174,19 @@ def calc_note_pos(n, add_cut=True, inv=None):
                         cut_pos = [pos[0] + int(cut_x), pos[1] + int(cut_y)]
                     if 0 <= cut_pos[0] < 4:  # x axis
                         if 0 <= cut_pos[1] < 3:  # y axis
-                            # position.append(cut_pos)
                             return cut_pos
                 return None
 
             if inv is None:
                 cut_pos = add_position(n, pos, True)
-                if cut_pos is not None:
+                if cut_pos is not None and cut_pos not in position:
                     position.append(cut_pos)
                 cut_pos = add_position(n, pos, False)
-                if cut_pos is not None:
+                if cut_pos is not None and cut_pos not in position:
                     position.append(cut_pos)
             else:
                 cut_pos = add_position(n, pos, inv)
-                if cut_pos is not None:
+                if cut_pos is not None and cut_pos not in position:
                     position.append(cut_pos)
 
     return position
