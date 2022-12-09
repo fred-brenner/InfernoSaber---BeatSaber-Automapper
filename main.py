@@ -7,6 +7,11 @@ from tools.config import paths
 import map_creation.gen_beats as beat_generator
 
 
+# ############################################################
+# if fails, rerun train_bs_automapper with correct min/max_bps
+# until training is started (then cancel)
+##############################################################
+
 # MAP GENERATOR
 ###############
 print(f"Found {len(os.listdir(paths.songs_pred))} songs. Iterating...")

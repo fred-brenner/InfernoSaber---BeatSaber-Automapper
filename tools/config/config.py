@@ -47,8 +47,8 @@ thresh_beat = 0.3           # minimum beat response required to trigger generato
 cdf = 0.55                  # cut director factor (to calculate speed)
 min_beat_time = 0.04        # in seconds (first sanity check)
 beat_spacing = 28.505102    # 5587/196s = 28.5051 steps/s
-max_speed = 6.0            # set around 3-15 (normal-expert+)
-favor_last_class = 0.2      # set factor to favor the next beat class (0.0-0.3)
+max_speed = 9.0             # set around 3-15 (normal-expert+)
+favor_last_class = 0.15     # set factor to favor the next beat class (0.0-0.3)
 max_double_note_speed = 15  # set maximum speed difference between double notes (10 or 15 or 20)
 
 # Postprocessing model configuration

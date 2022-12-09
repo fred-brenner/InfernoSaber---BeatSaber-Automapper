@@ -121,6 +121,52 @@ def sanity_check_notes(notes: list, timings):
     return new_notes
 
 
+def calc_note_pos(n, add_cut=True, inv=None):
+    position = []
+    for i in range(int(len(n) / 4)):
+        pos = n[0 + i * 4:2 + i * 4]
+        position.append(pos)
+
+        if add_cut:
+            def add_position(n, pos, inv):
+                cut_x, cut_y = get_cut_dir_xy(n[3 + i * 4])
+                if cut_x == cut_y == 0:
+                    return None
+                else:
+                    # cut_pos = [pos[0] - int(cut_x), pos[1] - int(cut_y)]
+                    # cut_pos.append([pos[0] + int(cut_x), pos[1] + int(cut_y)])
+                    if not inv:
+                        cut_pos = [pos[0] - int(cut_x), pos[1] - int(cut_y)]
+                    else:
+                        cut_pos = [pos[0] + int(cut_x), pos[1] + int(cut_y)]
+                    if 0 <= cut_pos[0] < 4:  # x axis
+                        if 0 <= cut_pos[1] < 3:  # y axis
+                            # position.append(cut_pos)
+                            return cut_pos
+                return None
+
+            if inv is None:
+                cut_pos = add_position(n, pos, True)
+                if cut_pos is not None:
+                    position.append(cut_pos)
+                cut_pos = add_position(n, pos, False)
+                if cut_pos is not None:
+                    position.append(cut_pos)
+            else:
+                cut_pos = add_position(n, pos, inv)
+                if cut_pos is not None:
+                    position.append(cut_pos)
+
+    return position
+
+
+def cut_dir_values(notes):
+    cut_values = []
+    for idx in range(int(len(notes) / 4)):
+        cut_values.append(notes[idx * 4 + 3])
+    return cut_values
+
+
 def correct_notes_all(notes_r, notes_l, notes_b, time_diff):
     pos_r_last = []
     pos_l_last = []
@@ -132,37 +178,21 @@ def correct_notes_all(notes_r, notes_l, notes_b, time_diff):
         nr = notes_r[idx]
         nl = notes_l[idx]
 
-        def calc_note_pos(n, add_cut=True, inv=False):
-            position = []
-            for i in range(int(len(n) / 4)):
-                pos = n[0 + i * 4:2 + i * 4]
-                position.append(pos)
-
-                if add_cut:
-                    cut_x, cut_y = get_cut_dir_xy(n[3 + i * 4])
-                    if cut_x == cut_y == 0:
-                        if not inv:
-                            cut_pos = [pos[0] - int(cut_x), pos[1] - int(cut_y)]
-                        else:
-                            cut_pos = [pos[0] + int(cut_x), pos[1] + int(cut_y)]
-                        if 0 <= cut_pos[0] < 4:  # x axis
-                            if 0 <= cut_pos[1] < 3:  # y axis
-                                position.append(cut_pos)
-            return position
-
         pos_r = calc_note_pos(nr)
         pos_l = calc_note_pos(nl)
         pos_b = calc_note_pos(nb, add_cut=False)
+        cut_r = cut_dir_values(nr)
+
+        # calculate next beat for notes
+        if idx < len(notes_r) - 1:
+            pos_r_next = calc_note_pos(notes_r[idx + 1])
+            pos_l_next = calc_note_pos(notes_l[idx + 1])
+        else:
+            pos_r_next = []
+            pos_l_next = []
 
         # check bombs
         if len(pos_b) > 0:
-            # calculate next beat for notes
-            if idx < len(notes_r):
-                pos_r_next = calc_note_pos(notes_r[idx + 1], inv=True)
-                pos_l_next = calc_note_pos(notes_l[idx + 1], inv=True)
-            else:
-                pos_r_next = []
-                pos_l_next = []
             # compare bombs and notes
             rm_b = []
             for i in range(len(pos_b)):
@@ -174,17 +204,23 @@ def correct_notes_all(notes_r, notes_l, notes_b, time_diff):
             rm_b = rm_b[::-1]
             for i in rm_b:
                 notes_b[idx].pop(i)
-        pos_r_last = pos_r
-        pos_l_last = pos_l
 
         # check left notes
         if len(pos_l) > 0:
             for pl in pos_l:
-                if pl in pos_r:
+                if pl in pos_r or pl in pos_r_next or pl in pos_r_last:
+                    # try to re-arrange left note
+                    print("")
+
+
                     # remove left note(s)
                     rm_counter += len(pos_l)
                     notes_l[idx] = []
                     break
+
+        pos_r_last = pos_r
+        pos_l_last = pos_l
+        cut_r_last = cut_r
     print(f"Static sanity check removed {rm_counter} notes.")
 
     return notes_r, notes_l, notes_b
