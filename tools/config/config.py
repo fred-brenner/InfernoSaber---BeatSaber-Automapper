@@ -40,6 +40,7 @@ beat_learning_rate = 0.003
 beat_n_epochs = 20
 tcn_len = 100
 tcn_test_samples = 1000
+delete_offbeats = 0.7      # < 1
 # tcn_skip = 10
 
 # Map creation model configuration

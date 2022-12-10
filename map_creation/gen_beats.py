@@ -5,7 +5,7 @@ from PIL import Image
 
 from beat_prediction.find_beats import find_beats, get_pitch_times
 from beat_prediction.beat_to_lstm import beat_to_lstm
-from beat_prediction.beat_prop import get_beat_prop
+from beat_prediction.beat_prop import get_beat_prop, tcn_reshape
 
 from map_creation.sanity_check import *
 from map_creation.class_helpers import *
@@ -51,6 +51,8 @@ def main(name_ar: list) -> None:
 
     # calculate beat proposals
     [x_volume, x_onset] = get_beat_prop(song_input)
+    x_volume = tcn_reshape(x_volume)
+    x_onset = tcn_reshape(x_onset)
 
     # calculate song input
     x_song, _ = beat_to_lstm(song_input, None)

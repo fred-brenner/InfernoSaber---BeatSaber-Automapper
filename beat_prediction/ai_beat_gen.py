@@ -5,7 +5,7 @@ from PIL import Image
 
 from beat_prediction.find_beats import *
 from beat_prediction.beat_to_lstm import *
-from beat_prediction.beat_prop import get_beat_prop
+from beat_prediction.beat_prop import *
 
 from preprocessing.bs_mapper_pre import load_beat_data
 
@@ -37,8 +37,8 @@ def main():
 
     name_ar, _ = filter_by_bps(config.min_bps_limit, config.max_bps_limit)
     if len(name_ar) > 10:
-        name_ar = name_ar[:10]
-    print(f"{len(name_ar)} songs")
+        name_ar = name_ar[:50]
+    print(f"Importing {len(name_ar)} songs")
     song_input, pitch_input = find_beats(name_ar, train_data=True)
 
     # calculate discrete timings
@@ -67,7 +67,12 @@ def main():
     del im
     del pitch_input, pitch_times
 
+    beat_resampled, song_input, x_volume, x_onset = delete_offbeats(beat_resampled, song_input,
+                                                                    x_volume, x_onset)
+
     print("Reshape input for AI model...")
+    x_volume = tcn_reshape(x_volume)
+    x_onset = tcn_reshape(x_onset)
     x_song, y = beat_to_lstm(song_input, beat_resampled)
 
     x_song = numpy_shorts.minmax_3d(x_song)
