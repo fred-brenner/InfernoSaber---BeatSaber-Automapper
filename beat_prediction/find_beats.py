@@ -2,7 +2,7 @@ import os
 import aubio
 # import madmom
 import numpy as np
-import matplotlib.pyplot as plt
+# import matplotlib.pyplot as plt
 
 from tools.config import config, paths
 from preprocessing.music_processing import log_specgram
