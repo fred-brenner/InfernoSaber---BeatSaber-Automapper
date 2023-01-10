@@ -1,3 +1,4 @@
+import gc
 from datetime import datetime
 from tensorflow import keras
 from keras.optimizers import adam_v2
@@ -78,6 +79,7 @@ del in_time_test
 del in_time_train
 del ml_input
 del ml_output
+gc.collect()
 
 
 # Create model

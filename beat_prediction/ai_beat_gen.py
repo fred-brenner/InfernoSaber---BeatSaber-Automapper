@@ -1,3 +1,4 @@
+import gc
 from datetime import datetime
 from keras.optimizers import adam_v2
 from PIL import Image
@@ -36,8 +37,9 @@ def main():
     print("Gather input data:", end=' ')
 
     name_ar, _ = filter_by_bps(config.min_bps_limit, config.max_bps_limit)
-    if len(name_ar) > 10:
-        name_ar = name_ar[:50]
+    if len(name_ar) > int(config.ram_limit * 1.25):
+        name_ar = name_ar[:int(config.ram_limit * 1.25)]
+        print("Info: Loading reduced song number into generator to not overload the RAM")
     print(f"Importing {len(name_ar)} songs")
     song_input, pitch_input = find_beats(name_ar, train_data=True)
 
@@ -66,6 +68,7 @@ def main():
     del _, real_beats
     del im
     del pitch_input, pitch_times
+    gc.collect()
 
     beat_resampled, song_input, x_volume, x_onset = delete_offbeats(beat_resampled, song_input,
                                                                     x_volume, x_onset)
@@ -84,6 +87,7 @@ def main():
     y_part = y[:test_len]
 
     del x_song, x_volume, x_onset
+    gc.collect()
 
 
     # x_last_beats = last_beats_to_lstm(y)

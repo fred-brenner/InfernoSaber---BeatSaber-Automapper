@@ -14,6 +14,8 @@ specgram_res = 24           # y resolution of the spectrogram (frequency subdivi
 min_bps_limit = 8           # minimum beats_per_second value for training
 max_bps_limit = 10          # maximum beats_per_second value for training
 
+ram_limit = 30              # ram limit roughly in GB
+
 # Model versions
 enc_version = 'tf_model_enc_16bneck_12_8__16_48.h5'
 autoenc_version = 'tf_model_autoenc_16bneck_12_8__16_48.h5'
@@ -37,7 +39,7 @@ lstm_len = 8
 
 # Beat prediction model configuration
 beat_learning_rate = 0.003
-beat_n_epochs = 20
+beat_n_epochs = 50
 tcn_len = 100
 tcn_test_samples = 1000
 delete_offbeats = 0.7      # < 1
