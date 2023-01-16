@@ -112,7 +112,7 @@ def emphasize_beats(notes, timings):
         return notes
 
     for n in range(len(notes)):
-        if timings[n] >= config.emphasize_beats_wait:
+        if timings[n:n+1].max() >= config.emphasize_beats_wait:
             note = notes[n]
             if len(note) > 0:
                 rd = np.random.random()
@@ -143,9 +143,17 @@ def sanity_check_notes(notes: list, timings):
     print("Left notes: ", end=' ')
     notes_l = correct_notes(notes_l, timings)
 
-    notes_l = emphasize_beats(notes_l, timings)
-
     time_diffs = np.concatenate((np.ones(1), np.diff(timings)), axis=0)
+    # shift notes in cut direction
+
+    notes_l = shift_blocks_up_down(notes_l, time_diffs)
+    notes_r = shift_blocks_up_down(notes_r, time_diffs)
+
+    # emphasize some beats randomly
+    notes_l = emphasize_beats(notes_l, time_diffs)
+    notes_r = emphasize_beats(notes_r, time_diffs)
+
+    # merge notes together and final checks
     notes_r, notes_l, notes_b = correct_notes_all(notes_r, notes_l, notes_b, time_diffs)
 
     # rebuild notes
@@ -497,6 +505,38 @@ def reverse_cut_dir_xy(old_cut):
     new_cat = cut_dir_order[cut_dir_order[::-1] == old_cut]
     return int(new_cat)
 
+
+################
+# Postprocessing
+################
+def shift_blocks_up_down(notes: list, time_diffs: np.array):
+    for idx in range(len(notes)):
+        if len(notes[idx]) > 2:
+            note_pos = calc_note_pos(notes[idx], add_cut=False)
+            cut_x, cut_y = get_cut_dir_xy(notes[idx][3])
+
+            new_pos = []
+            # if cut_y == -1:    # up
+            for pos in note_pos:
+                new_pos.append([int(pos[0]-cut_x), int(pos[1]-cut_y)])
+
+            # check all new positions:
+            valid = check_note_pos_valid(new_pos)
+            if valid:
+                if np.random.random() < config.shift_beats_fact:
+                    for ipos in range(len(new_pos)):
+                        notes[idx][0+4*ipos] = new_pos[ipos][0]
+                        notes[idx][1+4*ipos] = new_pos[ipos][1]
+    return notes
+
+
+def check_note_pos_valid(positions: list) -> bool:
+    for pos in positions:
+        if not 0 <= pos[0] <= 3:    # line index
+            return False
+        if not 0 <= pos[0] <= 2:    # line layer
+            return False
+    return True
 
 if __name__ == '__main__':
     notes = np.load(paths.temp_path + 'notes.npy', allow_pickle=True)

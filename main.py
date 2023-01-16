@@ -2,15 +2,10 @@
 # This file is needed to find the working directory
 ###################################################
 import os
+import shutil
 
 from tools.config import paths
 import map_creation.gen_beats as beat_generator
-
-
-# ############################################################
-# if fails, rerun train_bs_automapper with correct min/max_bps
-# until training is started (then cancel)
-##############################################################
 
 # MAP GENERATOR
 ###############
@@ -19,8 +14,15 @@ for song_name in os.listdir(paths.songs_pred):
     song_name = song_name[:-4]
     print(f"Analyzing song: {song_name}")
     beat_generator.main([song_name])
+    shutil.make_archive(f'{paths.new_map_path}1234_{song_name}',
+                        'zip', f'{paths.new_map_path}1234_{song_name}')
 
 print("Finished map generator")
+
+# ############################################################
+# if fails, rerun train_bs_automapper with correct min/max_bps
+# until training is started (cancel after data import)
+##############################################################
 
 # TRAINING
 ##########
