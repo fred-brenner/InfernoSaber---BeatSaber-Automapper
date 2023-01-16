@@ -534,7 +534,7 @@ def check_note_pos_valid(positions: list) -> bool:
     for pos in positions:
         if not 0 <= pos[0] <= 3:    # line index
             return False
-        if not 0 <= pos[0] <= 2:    # line layer
+        if not 0 <= pos[1] <= 2:    # line layer
             return False
     return True
 

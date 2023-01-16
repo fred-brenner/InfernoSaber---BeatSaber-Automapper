@@ -56,7 +56,7 @@ max_double_note_speed = 15  # set maximum speed difference between double notes 
 emphasize_beats_wait = 0.3  # minimum time in seconds
 emphasize_beats_3 = 0.05    # fraction beats to triple
 emphasize_beats_2 = 0.25    # fraction beats to double
-shift_beats_fact = 0.75     # fraction beats to shift in cut direction
+shift_beats_fact = 0.8      # fraction beats to shift in cut direction
 
 # Postprocessing model configuration
 lstm_len_post = 10
