@@ -57,6 +57,9 @@ emphasize_beats_wait = 0.3  # minimum time in seconds
 emphasize_beats_3 = 0.05    # fraction beats to triple
 emphasize_beats_2 = 0.25    # fraction beats to double
 shift_beats_fact = 0.8      # fraction beats to shift in cut direction
+add_beat_low_bound = 0.2    # in seconds
+add_beat_hi_bound = 0.8     # in seconds
+add_beat_fact = 0.6         # fraction beats to add
 
 # Postprocessing model configuration
 lstm_len_post = 10

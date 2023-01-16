@@ -78,8 +78,9 @@ def main(name_ar: list) -> None:
     # get beat times
     timing_ar = y_beat * np.arange(0, len(y_beat), 1)
     timing_ar /= config.beat_spacing
-    # timing_ar = timing_ar[timing_ar > 0]
     timing_ar = timing_ar[timing_ar > config.window]
+    # add beats between far beats
+    timing_ar = fill_map_times(timing_ar)
     time_input = [timing_ar]
 
     # calculate time between beats

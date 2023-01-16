@@ -144,10 +144,14 @@ def sanity_check_notes(notes: list, timings):
     notes_l = correct_notes(notes_l, timings)
 
     time_diffs = np.concatenate((np.ones(1), np.diff(timings)), axis=0)
-    # shift notes in cut direction
 
+    # shift notes in cut direction
     notes_l = shift_blocks_up_down(notes_l, time_diffs)
     notes_r = shift_blocks_up_down(notes_r, time_diffs)
+    print("Right notes:", end=' ')
+    notes_r = correct_notes(notes_r, timings)
+    print("Left notes: ", end=' ')
+    notes_l = correct_notes(notes_l, timings)
 
     # emphasize some beats randomly
     notes_l = emphasize_beats(notes_l, time_diffs)
@@ -509,6 +513,20 @@ def reverse_cut_dir_xy(old_cut):
 ################
 # Postprocessing
 ################
+def fill_map_times(map_times):
+    diff = np.diff(map_times)
+    new_map_times = []
+    for idx in range(len(diff)):
+        if config.add_beat_low_bound < diff[idx] < config.add_beat_hi_bound:
+            if np.random.random() < config.add_beat_fact:
+                beat_time = (map_times[idx] + map_times[idx+1]) / 2
+                new_map_times.append(beat_time)
+    if len(new_map_times) > 0:
+        map_times = np.hstack((map_times, new_map_times))
+        map_times = np.sort(map_times)
+    return map_times
+
+
 def shift_blocks_up_down(notes: list, time_diffs: np.array):
     for idx in range(len(notes)):
         if len(notes[idx]) > 2:
