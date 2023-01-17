@@ -102,6 +102,7 @@ def start_training():
     _, events, _ = load_raw_beat_data(name_ar)  # time, type, value
     time_ar, rm_idx = get_time_from_events(events, diff=False)
     [name_ar.pop(rm) for rm in rm_idx]
+    _, events, _ = load_raw_beat_data(name_ar)
 
     # load song data
     song_ar, rm_idx = run_music_preprocessing(name_ar, time_ar, save_file=False,
@@ -112,6 +113,7 @@ def start_training():
     for idx in range(len(rm_idx)):
         if len(rm_idx[idx]) > 0:
             events[idx] = np.delete(events[idx], rm_idx[idx], axis=-1)
+
 
     time_ar, _ = get_time_from_events(events, diff=True)
     time_ar = np.concatenate(time_ar, axis=0)

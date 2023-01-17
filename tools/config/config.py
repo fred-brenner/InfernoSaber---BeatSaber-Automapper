@@ -11,7 +11,7 @@ hop_size = 512
 window = 2.0                # window in seconds for each song to spectrum picture (from wav_to_pic)
 specgram_res = 24           # y resolution of the spectrogram (frequency subdivisions)
 
-min_bps_limit = 8           # minimum beats_per_second value for training
+min_bps_limit = 9           # minimum beats_per_second value for training
 max_bps_limit = 10          # maximum beats_per_second value for training
 
 ram_limit = 30              # ram limit roughly in GB
