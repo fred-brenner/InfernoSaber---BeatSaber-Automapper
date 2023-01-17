@@ -53,18 +53,23 @@ beat_spacing = 28.505102    # 5587/196s = 28.5051 steps/s
 max_speed = 7.5             # set around 3-12 (normal-expert+)
 favor_last_class = 0.2      # set factor to favor the next beat class (0.0-0.3)
 max_double_note_speed = 15  # set maximum speed difference between double notes (10 or 15 or 20)
-emphasize_beats_wait = 0.25 # minimum time in seconds
-emphasize_beats_3 = 0.05    # fraction beats to triple
-emphasize_beats_2 = 0.25    # fraction beats to double
+emphasize_beats_wait = 0.24 # minimum time in seconds
+emphasize_beats_3 = 0.08    # fraction beats to triple
+emphasize_beats_2 = 0.28    # fraction beats to double
 shift_beats_fact = 0.7      # fraction beats to shift in cut direction
-add_beat_low_bound = 0.2    # in seconds
-add_beat_hi_bound = 0.8     # in seconds
-add_beat_fact = 0.7         # fraction beats to add
+add_beat_low_bound = 0.2    # in seconds (beat_generator)
+add_beat_hi_bound = 0.8     # in seconds (beat_generator)
+add_beat_fact = 0.7         # fraction add beats (beat_generator)
 
 # Postprocessing model configuration
 lstm_len_post = 10
 n_epochs_post = 10
 
+# Event prediction model configuration
+event_learning_rate = 0.003
+event_n_epochs = 50
+event_lstm_len = 8
+event_batch_size = 128
 
 # # cutout_window = 0.1       # window in seconds for cutout
 # # limit_mem = 10            # in GigaByte (free ram | needs about double memory for FAST saving at the end)

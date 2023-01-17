@@ -31,15 +31,6 @@ ml_input, ml_output = lstm_shift(ml_input[0], ml_input[1], ml_output)
 [in_song, in_time_l, in_class_l] = ml_input
 
 
-def ai_encode_song(song):
-    # Load pretrained model
-    encoder_path = paths.model_path + config.enc_version
-    encoder = keras.models.load_model(encoder_path)
-    # apply autoencoder to input
-    in_song_l = encoder.predict(song)
-    return in_song_l
-
-
 in_song_l = ai_encode_song(in_song)
 
 # Sample into train/val/test

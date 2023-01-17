@@ -4,10 +4,18 @@ import matplotlib.pyplot as plt
 import glob
 import os
 from keras.models import load_model
-# from keras import backend as K
 
 from tools.utils.load_and_save import load_npy
 from tools.config import paths, config
+
+
+def ai_encode_song(song):
+    # Load pretrained model
+    encoder_path = paths.model_path + config.enc_version
+    encoder = load_model(encoder_path)
+    # apply autoencoder to input
+    in_song_l = encoder.predict(song)
+    return in_song_l
 
 
 def filter_by_bps(min_limit=None, max_limit=None):

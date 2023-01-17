@@ -72,4 +72,5 @@ black_list_file = fail_path + "black_list.txt"
 
 notes_classify_dict_file = f"{pred_path}notes_class_dict_{config.min_bps_limit}-{config.max_bps_limit}.pkl"
 beats_classify_encoder_file = pred_path + "onehot_encoder.pkl"
+events_classify_encoder_file = pred_path + "onehot_encoder_events.pkl"
 ############################
