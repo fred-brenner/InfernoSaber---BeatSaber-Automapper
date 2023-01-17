@@ -148,16 +148,16 @@ def sanity_check_notes(notes: list, timings):
     # shift notes in cut direction
     notes_l = shift_blocks_up_down(notes_l, time_diffs)
     notes_r = shift_blocks_up_down(notes_r, time_diffs)
-    print("Right notes:", end=' ')
-    notes_r = correct_notes(notes_r, timings)
-    print("Left notes: ", end=' ')
-    notes_l = correct_notes(notes_l, timings)
+    # print("Right notes:", end=' ')
+    # notes_r = correct_notes(notes_r, timings)
+    # print("Left notes: ", end=' ')
+    # notes_l = correct_notes(notes_l, timings)
 
     # emphasize some beats randomly
     notes_l = emphasize_beats(notes_l, time_diffs)
     notes_r = emphasize_beats(notes_r, time_diffs)
 
-    # merge notes together and final checks
+    # check static position for next and last note for left and right together
     notes_r, notes_l, notes_b = correct_notes_all(notes_r, notes_l, notes_b, time_diffs)
 
     # rebuild notes
@@ -334,7 +334,12 @@ def correct_notes(notes, timings):
             # check double notes
             if len(notes[idx]) > 4:
                 rm_temp = np.zeros_like(notes[idx])
+                cut_dir = notes[idx][3]
                 for n in range(int(len(notes[idx]) / 4) - 1):
+                    # check if cut direction is same
+                    if notes[idx][(n+1)*4 + 3] != cut_dir:
+                        notes[idx][(n+1)*4 + 3] = 8
+                    n *= 4
                     speed = calc_note_speed(notes[idx][n:n + 4],
                                             notes[idx][n + 4:n + 8],
                                             time_diff=0.05, cdf=0.5)
@@ -534,14 +539,17 @@ def shift_blocks_up_down(notes: list, time_diffs: np.array):
             cut_x, cut_y = get_cut_dir_xy(notes[idx][3])
 
             new_pos = []
+            new_pos2 = []
             # if cut_y == -1:    # up
             for pos in note_pos:
                 new_pos.append([int(pos[0]-cut_x), int(pos[1]-cut_y)])
+                new_pos2.append([int(pos[0]-2*cut_x), int(pos[1]-2*cut_y)])
 
             # check all new positions:
             valid = check_note_pos_valid(new_pos)
+            valid2 = check_note_pos_valid(new_pos2)     # if true always shift
             if valid:
-                if np.random.random() < config.shift_beats_fact:
+                if valid2 or np.random.random() < config.shift_beats_fact:
                     for ipos in range(len(new_pos)):
                         notes[idx][0+4*ipos] = new_pos[ipos][0]
                         notes[idx][1+4*ipos] = new_pos[ipos][1]
@@ -555,6 +563,7 @@ def check_note_pos_valid(positions: list) -> bool:
         if not 0 <= pos[1] <= 2:    # line layer
             return False
     return True
+
 
 if __name__ == '__main__':
     notes = np.load(paths.temp_path + 'notes.npy', allow_pickle=True)
