@@ -105,7 +105,8 @@ def onehot_encode(ml_output):
     ml_output = encoder.transform(ml_output)
 
     # save onehot encoder
-    with open(paths.beats_classify_encoder_file, "wb") as enc_file:
+    save_path = paths.beats_classify_encoder_file
+    with open(save_path, "wb") as enc_file:
         pickle.dump(encoder, enc_file)
     # return ml data
     return ml_output

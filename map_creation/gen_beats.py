@@ -19,6 +19,8 @@ from preprocessing.bs_mapper_pre import lstm_shift
 from training.helpers import *
 from training.tensorflow_models import *
 
+from lightning_prediction.generate_lighting import generate
+
 from tools.config import config, paths
 from tools.utils import numpy_shorts
 
@@ -88,7 +90,7 @@ def main(name_ar: list) -> None:
 
     # load song data
     song_ar, rm_index = run_music_preprocessing(name_ar, time_ar=time_input, save_file=False,
-                                                song_combined=False)
+                                                song_combined=False, predict_path=True)
 
     # filter invalid indices
     for rm_idx in rm_index[::-1]:
@@ -123,7 +125,7 @@ def main(name_ar: list) -> None:
     y_class_last = None
     for idx in range(len(in_song_l)):
 
-        class_size = get_class_size()
+        class_size = get_class_size(paths.beats_classify_encoder_file)
         if y_class is None:
             in_class_l = np.zeros((len(in_song_l), config.lstm_len, class_size))
 
@@ -153,11 +155,19 @@ def main(name_ar: list) -> None:
     ############
     # create map
     ############
-    y_class_num = decode_onehot_class(y_class_map)
+    y_class_num = decode_onehot_class(y_class_map, paths.beats_classify_encoder_file)
     y_class_num = y_class_num[map_times > 0]
     map_times = map_times[map_times > 0]
 
-    create_map(y_class_num, map_times, name_ar[0], bpm)
+    ############
+    # add events
+    ############
+    if True:
+        events = generate(in_song_l, map_times)
+    else:
+        events = None
+
+    create_map(y_class_num, map_times, events, name_ar[0], bpm)
 
 
 if __name__ == '__main__':

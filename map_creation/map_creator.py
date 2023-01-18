@@ -9,7 +9,7 @@ from map_creation.sanity_check import sanity_check_notes
 from tools.config import config, paths
 
 
-def create_map(y_class_num, timings, name, bpm):
+def create_map(y_class_num, timings, events, name, bpm):
     # load notes classify keys
     with open(paths.notes_classify_dict_file, 'rb') as f:
         class_keys = pickle.load(f)
@@ -22,6 +22,8 @@ def create_map(y_class_num, timings, name, bpm):
     # compensate bps
     timings = timings * bpm / 60
 
+    assert(len(timings) == len(notes))
+
     ###########
     # write map
     ###########
@@ -30,6 +32,7 @@ def create_map(y_class_num, timings, name, bpm):
     os.makedirs(new_map_folder, exist_ok=True)
 
     file = new_map_folder + 'ExpertPlus.dat'
+    events_json = events_to_json(events, timings)
     notes_json = notes_to_json(notes, timings)
     complete_map = get_map_string(notes=notes_json)
     with open(file, 'w') as f:
@@ -72,6 +75,27 @@ def decode_class_keys(encoded):
 
 
 def notes_to_json(notes, timings):
+    note_json = ""
+    for idx in range(len(notes)):
+        for n in range(int(len(notes[idx])/4)):
+            note_json += '{'
+            note_json += f'"_time":{timings[idx]},' \
+                         f'"_lineIndex":{notes[idx][0 + 4*n]},' \
+                         f'"_lineLayer":{notes[idx][1 + 4*n]},' \
+                         f'"_type":{notes[idx][2 + 4*n]},' \
+                         f'"_cutDirection":{notes[idx][3 + 4*n]}'
+            note_json += '},'
+
+            # "_notes":[{"_time":4.116666793823242,
+            # "_lineIndex":1,"_lineLayer":0,"_type":0,"_cutDirection":1},
+
+    # remove last comma
+    note_json = note_json[:-1]
+
+    return note_json
+
+
+def events_to_json(notes, timings):
     note_json = ""
     for idx in range(len(notes)):
         for n in range(int(len(notes[idx])/4)):

@@ -108,7 +108,8 @@ def process_song(song_ar: np.array) -> np.array:
     return np.asarray(spectrogram_ar)
 
 
-def run_music_preprocessing(names_ar: list, time_ar=None, save_file=True, song_combined=True, channels_last=True):
+def run_music_preprocessing(names_ar: list, time_ar=None, save_file=True, song_combined=True,
+                            channels_last=True, predict_path=False):
     # load song notes
     ending = ".egg"
     song_ar = []
@@ -126,7 +127,10 @@ def run_music_preprocessing(names_ar: list, time_ar=None, save_file=True, song_c
         if not n.endswith(ending):
             n += ending
         try:
-            song, remove_idx = load_song(paths.copy_path_song + n, time_ar=time)
+            if predict_path:
+                song, remove_idx = load_song(paths.songs_pred + n, time_ar=time)
+            else:
+                song, remove_idx = load_song(paths.copy_path_song + n, time_ar=time)
         except:
             print(f"Problem with song: {n}")
             append_fail(n[:-4])
