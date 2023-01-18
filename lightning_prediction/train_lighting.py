@@ -44,9 +44,11 @@ def lstm_shift_events(song_in, time_in, ml_out):
 
 
 def onehot_encode_events(in_event):
+    ml_input = [f'{ev[0]};{ev[1]}' for ev in in_event.astype(int)]
+    ml_input = np.asarray(ml_input).reshape(-1, 1)
     encoder = OneHotEncoder(dtype=int)
-    encoder.fit(in_event)
-    ml_output = encoder.transform(in_event).toarray()
+    encoder.fit(ml_input)
+    ml_output = encoder.transform(ml_input).toarray()
 
     # save onehot encoder
     with open(paths.events_classify_encoder_file, "wb") as enc_file:
@@ -113,7 +115,6 @@ def start_training():
     for idx in range(len(rm_idx)):
         if len(rm_idx[idx]) > 0:
             events[idx] = np.delete(events[idx], rm_idx[idx], axis=-1)
-
 
     time_ar, _ = get_time_from_events(events, diff=True)
     time_ar = np.concatenate(time_ar, axis=0)

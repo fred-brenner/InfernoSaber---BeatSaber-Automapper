@@ -24,7 +24,7 @@ def create_tf_model(model_type, dim_in, dim_out, nr=128):
         x = Dropout(0.05)(x)
         x = Dense(512, activation='sigmoid')(x)
 
-        out = Dense(dim_out[1], activation='sigmoid', name='output')(x)
+        out = Dense(dim_out[1], activation='softmax', name='output')(x)
 
         model = Model(inputs=[input_a, input_b, input_c], outputs=out)
         return model
