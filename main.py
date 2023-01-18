@@ -10,9 +10,10 @@ import map_creation.gen_beats as beat_generator
 # MAP GENERATOR
 ###############
 print(f"Found {len(os.listdir(paths.songs_pred))} songs. Iterating...")
-for song_name in os.listdir(paths.songs_pred):
+song_list = os.listdir(paths.songs_pred)
+for i, song_name in enumerate(song_list):
     song_name = song_name[:-4]
-    print(f"Analyzing song: {song_name}")
+    print(f"Analyzing song: {song_name} ({i} of {len(song_list)})")
     beat_generator.main([song_name])
     shutil.make_archive(f'{paths.new_map_path}1234_{song_name}',
                         'zip', f'{paths.new_map_path}1234_{song_name}')

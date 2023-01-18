@@ -34,7 +34,7 @@ def create_map(y_class_num, timings, events, name, bpm):
     file = new_map_folder + 'ExpertPlus.dat'
     events_json = events_to_json(events, timings)
     notes_json = notes_to_json(notes, timings)
-    complete_map = get_map_string(notes=notes_json)
+    complete_map = get_map_string(notes=notes_json, events=events_json)
     with open(file, 'w') as f:
         f.write(complete_map)
 
@@ -96,19 +96,17 @@ def notes_to_json(notes, timings):
 
 
 def events_to_json(notes, timings):
+    timings = timings[:len(notes)]
+    assert(len(timings) == len(notes))
+
     note_json = ""
     for idx in range(len(notes)):
-        for n in range(int(len(notes[idx])/4)):
-            note_json += '{'
-            note_json += f'"_time":{timings[idx]},' \
-                         f'"_lineIndex":{notes[idx][0 + 4*n]},' \
-                         f'"_lineLayer":{notes[idx][1 + 4*n]},' \
-                         f'"_type":{notes[idx][2 + 4*n]},' \
-                         f'"_cutDirection":{notes[idx][3 + 4*n]}'
-            note_json += '},'
-
-            # "_notes":[{"_time":4.116666793823242,
-            # "_lineIndex":1,"_lineLayer":0,"_type":0,"_cutDirection":1},
+        note_json += '{'
+        note_json += f'"_time":{timings[idx]},' \
+                     f'"_type":{notes[idx][0]},' \
+                     f'"_value":{notes[idx][1]}'
+        note_json += '},'
+        # "_events":[{"_time":4,"_type":3,"_value":1},
 
     # remove last comma
     note_json = note_json[:-1]
