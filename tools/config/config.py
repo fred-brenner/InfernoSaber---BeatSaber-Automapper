@@ -48,7 +48,7 @@ delete_offbeats = 0.7      # < 1
 
 # Map creation model configuration
 thresh_beat = 0.5           # minimum beat response required to trigger generator
-cdf = 0.55                  # cut director factor (to calculate speed, ~0.5)
+cdf = 0.7                   # cut director factor (to calculate speed, ~0.5)
 min_beat_time = 0.04        # in seconds (first sanity check)
 beat_spacing = 28.505102    # 5587/196s = 28.5051 steps/s
 max_speed = 7.5             # set around 3-12 (normal-expert+)
