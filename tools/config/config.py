@@ -20,7 +20,6 @@ ram_limit = 30              # ram limit roughly in GB
 enc_version = 'tf_model_enc_16bneck_12_8__16_48.h5'
 autoenc_version = 'tf_model_autoenc_16bneck_12_8__16_48.h5'
 mapper_version = 'tf_model_mapper_8-10_12_9__0_0.h5'
-# beat_gen_version = 'tf_beat_gen_5_5.1_11_29__12_15.h5'
 beat_gen_version = 'tf_beat_gen_9.5_10_12_9__1_6.h5'
 event_gen_version = 'tf_event_gen_8_10_1_19__11_10.h5'
 
@@ -47,20 +46,20 @@ delete_offbeats = 0.7      # < 1
 # tcn_skip = 10
 
 # Map creation model configuration
-thresh_beat = 0.5           # minimum beat response required to trigger generator
+thresh_beat = 0.6           # minimum beat response required to trigger generator
 cdf = 0.7                   # cut director factor (to calculate speed, ~0.5)
 min_beat_time = 0.04        # in seconds (first sanity check)
 beat_spacing = 28.505102    # 5587/196s = 28.5051 steps/s
 max_speed = 7.5             # set around 3-12 (normal-expert+)
-favor_last_class = 0.2      # set factor to favor the next beat class (0.0-0.3)
+favor_last_class = 0.15     # set factor to favor the next beat class (0.0-0.3)
 max_double_note_speed = 15  # set maximum speed difference between double notes (10 or 15 or 20)
-emphasize_beats_wait = 0.24 # minimum time in seconds
+emphasize_beats_wait = 0.22 # minimum time in seconds
 emphasize_beats_3 = 0.08    # fraction beats to triple
-emphasize_beats_2 = 0.28    # fraction beats to double
+emphasize_beats_2 = 0.3     # fraction beats to double
 shift_beats_fact = 0.7      # fraction beats to shift in cut direction
-add_beat_low_bound = 0.2    # in seconds (beat_generator)
-add_beat_hi_bound = 0.8     # in seconds (beat_generator)
-add_beat_fact = 0.5         # fraction add beats (beat_generator)
+add_beat_low_bound = 0.15   # in seconds (beat_generator)
+add_beat_hi_bound = 0.7     # in seconds (beat_generator)
+add_beat_fact = 0.6         # fraction add beats (beat_generator)
 
 # Postprocessing model configuration
 lstm_len_post = 10

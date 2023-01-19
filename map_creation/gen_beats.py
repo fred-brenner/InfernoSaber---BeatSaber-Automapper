@@ -86,11 +86,21 @@ def main(name_ar: list) -> None:
     timing_ar = fill_map_times(timing_ar)
     time_input = [timing_ar]
 
+    # calculate bpm
+    file = paths.songs_pred + name_ar[0] + '.egg'
+    bpm, song_duration = get_file_bpm(file)
+    bpm = int(bpm)
+
+    # sanity check timings      # TODO: put before y_class
+    map_times = sanity_check_timing(name_ar[0], timing_ar, song_duration)
+    map_times = map_times[map_times > 0]
+    map_times = fill_map_times(map_times)
+
     # calculate time between beats
-    timing_diff_ar = calc_time_between_beats(time_input)
+    timing_diff_ar = calc_time_between_beats([map_times])
 
     # load song data
-    song_ar, rm_index = run_music_preprocessing(name_ar, time_ar=time_input, save_file=False,
+    song_ar, rm_index = run_music_preprocessing(name_ar, time_ar=[map_times], save_file=False,
                                                 song_combined=False, predict_path=True)
 
     # filter invalid indices
@@ -140,20 +150,14 @@ def main(name_ar: list) -> None:
         y_class_last = y_class.copy()
         y_class_map.append(y_class)
 
-    # calculate bpm
-    file = paths.songs_pred + name_ar[0] + '.egg'
-    bpm, song_duration = get_file_bpm(file)
-    bpm = int(bpm)
-
-    # sanity check timings
-    map_times = sanity_check_timing(name_ar[0], timing_ar[config.lstm_len+1:], song_duration)
-
     ############
     # create map
     ############
     y_class_num = decode_onehot_class(y_class_map, paths.beats_classify_encoder_file)
-    y_class_num = y_class_num[map_times > 0]
-    map_times = map_times[map_times > 0]
+    map_times = map_times[config.lstm_len+1:]
+    assert(len(map_times) == len(y_class_num))
+    # y_class_num = y_class_num[map_times > 0]
+    # map_times = map_times[map_times > 0]
 
     ############
     # add events
@@ -161,7 +165,7 @@ def main(name_ar: list) -> None:
     if True:
         events = generate(in_song_l, map_times)
     else:
-        events = None
+        events = []
 
     create_map(y_class_num, map_times, events, name_ar[0], bpm)
 

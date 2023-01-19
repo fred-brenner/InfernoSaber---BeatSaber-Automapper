@@ -101,6 +101,9 @@ def events_to_json(notes, timings):
         notes = notes[:len(timings)]
     assert(len(timings) == len(notes))
 
+    if len(timings) == 0:
+        return f""
+
     note_json = ""
     for idx in range(len(notes)):
         note_json += '{'

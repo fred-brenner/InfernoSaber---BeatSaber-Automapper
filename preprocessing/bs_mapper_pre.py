@@ -118,14 +118,15 @@ def calc_time_between_beats(time_ar):
     timing_input = []
 
     for song in time_ar:
-        temp = []
-        for idx in range(len(song)):
-            if idx == 0:
-                timing = dft_time
-            else:
-                timing = song[idx] - song[idx-1]
-            temp.append(timing)
-        timing_input.append(temp)
+        temp = np.concatenate(([dft_time], np.diff(song)), axis=0)
+        # temp = []
+        # for idx in range(len(song)):
+        #     if idx == 0:
+        #         timing = dft_time
+        #     else:
+        #         timing = song[idx] - song[idx-1]
+        #     temp.append(timing)
+        timing_input.append(list(temp))
     return timing_input
 
 
