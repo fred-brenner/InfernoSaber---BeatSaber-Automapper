@@ -132,10 +132,9 @@ def start_training():
 
     x_input, y_out = lstm_shift_events(in_song, time_ar, y_out)
 
-    [in_song_l, in_time_l, in_class_l] = x_input
+    # [in_song_l, in_time_l, in_class_l] = x_input
     # input_song_enc, input_time_lstm, input_class_lstm
     x_input_shape = [x.shape for x in x_input]
-    # TODO: class weights?
 
     # setup ML model
     ################

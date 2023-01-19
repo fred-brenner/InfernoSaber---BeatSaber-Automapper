@@ -15,11 +15,15 @@ config.gpu_options.allow_growth=True
 sess = tf.compat.v1.Session(config=config)
 tf.compat.v1.keras.backend.set_session(sess)
 
+# TODO: Monstercat track not working
+#  same Till i collapse
 
 # MAP GENERATOR
 ###############
-print(f"Found {len(os.listdir(paths.songs_pred))} songs. Iterating...")
 song_list = os.listdir(paths.songs_pred)
+song_list = [song for song in song_list if song.endswith('.egg')]
+print(f"Found {len(song_list)} songs. Iterating...")
+
 for i, song_name in enumerate(song_list):
     song_name = song_name[:-4]
     print(f"Analyzing song: {song_name} ({i+1} of {len(song_list)})")

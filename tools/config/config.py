@@ -22,7 +22,7 @@ autoenc_version = 'tf_model_autoenc_16bneck_12_8__16_48.h5'
 mapper_version = 'tf_model_mapper_8-10_12_9__0_0.h5'
 # beat_gen_version = 'tf_beat_gen_5_5.1_11_29__12_15.h5'
 beat_gen_version = 'tf_beat_gen_9.5_10_12_9__1_6.h5'
-event_gen_version = 'tf_event_gen_9.9_10_1_18__17_27.h5'
+event_gen_version = 'tf_event_gen_8_10_1_19__11_10.h5'
 
 # Autoencoder model configuration
 learning_rate = 0.0003      # model learning rate
@@ -40,7 +40,7 @@ lstm_len = 8
 
 # Beat prediction model configuration
 beat_learning_rate = 0.003
-beat_n_epochs = 50
+beat_n_epochs = 80
 tcn_len = 100
 tcn_test_samples = 1000
 delete_offbeats = 0.7      # < 1
@@ -60,7 +60,7 @@ emphasize_beats_2 = 0.28    # fraction beats to double
 shift_beats_fact = 0.7      # fraction beats to shift in cut direction
 add_beat_low_bound = 0.2    # in seconds (beat_generator)
 add_beat_hi_bound = 0.8     # in seconds (beat_generator)
-add_beat_fact = 0.7         # fraction add beats (beat_generator)
+add_beat_fact = 0.5         # fraction add beats (beat_generator)
 
 # Postprocessing model configuration
 lstm_len_post = 10

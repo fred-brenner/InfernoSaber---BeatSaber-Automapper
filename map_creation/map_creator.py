@@ -97,6 +97,8 @@ def notes_to_json(notes, timings):
 
 def events_to_json(notes, timings):
     timings = timings[:len(notes)]
+    if len(timings) != len(notes):
+        notes = notes[:len(timings)]
     assert(len(timings) == len(notes))
 
     note_json = ""

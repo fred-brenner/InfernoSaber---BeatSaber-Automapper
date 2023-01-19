@@ -83,6 +83,7 @@ def main(name_ar: list) -> None:
     timing_ar = timing_ar[timing_ar > config.window]
     # add beats between far beats
     timing_ar = fill_map_times(timing_ar)
+    timing_ar = fill_map_times(timing_ar)
     time_input = [timing_ar]
 
     # calculate time between beats
@@ -93,14 +94,9 @@ def main(name_ar: list) -> None:
                                                 song_combined=False, predict_path=True)
 
     # filter invalid indices
-    for rm_idx in rm_index[::-1]:
-        if len(rm_idx) > 0:
-            print(f"Unknown problem with song: {name_ar[rm_idx]}. "
-                  f"Check config or remove song!")
-            exit()
-            # remove invalid timings
-            # name_ar.pop(idx)
-            # song_ar.pop(idx)
+    for rm_idx in rm_index[0][::-1]:
+        timing_diff_ar[0].pop(rm_idx)
+        timing_ar = np.delete(timing_ar, rm_idx)
 
     # apply lstm shift
     ml_input, _ = lstm_shift(song_ar[0], timing_diff_ar[0], None)
