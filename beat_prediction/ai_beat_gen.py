@@ -36,9 +36,10 @@ def main():
     ##############
     print("Gather input data:", end=' ')
 
+    ram_limit = int(3 * config.ram_limit)
     name_ar, _ = filter_by_bps(config.min_bps_limit, config.max_bps_limit)
-    if len(name_ar) > int(config.ram_limit * 1.25):
-        name_ar = name_ar[:int(config.ram_limit * 1.25)]
+    if len(name_ar) > ram_limit:
+        name_ar = name_ar[:ram_limit]
         print("Info: Loading reduced song number into generator to not overload the RAM")
     print(f"Importing {len(name_ar)} songs")
     song_input, pitch_input = find_beats(name_ar, train_data=True)
@@ -70,6 +71,7 @@ def main():
     del pitch_input, pitch_times
     gc.collect()
 
+    # delete a fraction of the offbeats to balance the dataset (n_beats << n_empty)
     beat_resampled, song_input, x_volume, x_onset = delete_offbeats(beat_resampled, song_input,
                                                                     x_volume, x_onset)
 
@@ -89,7 +91,6 @@ def main():
     del x_song, x_volume, x_onset
     gc.collect()
 
-
     # x_last_beats = last_beats_to_lstm(y)
 
     # setup ML model
@@ -103,12 +104,12 @@ def main():
     print(model.summary())
 
     model.fit(x=x_input, y=y, epochs=config.beat_n_epochs, shuffle=True,
-              batch_size=config.batch_size, verbose=1, class_weight=cw)
+              batch_size=config.beat_batch_size, verbose=1, class_weight=cw)
 
     # save model
     ############
-    print(f"Saving model at: {paths.model_path}")
-    model.save(paths.model_path + save_model_name, )
+    print(f"Saving model at: {paths.model_path + save_model_name}")
+    model.save(paths.model_path + save_model_name)
 
     # plot test result
     ##################

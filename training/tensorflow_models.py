@@ -112,12 +112,12 @@ def create_music_model(model_type, dim_in, tcn_len):
                 activation='relu'
                 )(input_a)
 
-        b = CuDNNLSTM(8, return_sequences=False)(input_b)
-        c = CuDNNLSTM(8, return_sequences=False)(input_c)
+        b = CuDNNLSTM(4, return_sequences=False)(input_b)
+        c = CuDNNLSTM(4, return_sequences=False)(input_c)
 
         x = concatenate([a, b, c])
         x = Dense(256, activation='relu')(x)
-        x = Dense(256, activation='relu')(x)
+        x = Dense(128, activation='relu')(x)
 
         out = Dense(1, activation='sigmoid')(x)
 

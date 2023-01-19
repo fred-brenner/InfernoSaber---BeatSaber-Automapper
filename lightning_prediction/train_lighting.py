@@ -6,6 +6,7 @@ import pickle
 from datetime import datetime
 from keras.optimizers import adam_v2
 from sklearn.preprocessing import OneHotEncoder
+from tabulate import tabulate
 
 from lightning_prediction.tf_lighting import create_tf_model
 
@@ -132,6 +133,9 @@ def start_training():
 
     x_input, y_out = lstm_shift_events(in_song, time_ar, y_out)
 
+    # only use song and time data, not class as input
+    x_input = x_input[:2]
+
     # [in_song_l, in_time_l, in_class_l] = x_input
     # input_song_enc, input_time_lstm, input_class_lstm
     x_input_shape = [x.shape for x in x_input]
@@ -154,24 +158,25 @@ def start_training():
     print(f"Saving model at: {paths.model_path + save_model_name}")
     model.save(paths.model_path + save_model_name)
 
-    # plot test result
-    ##################
-    # if True:
-    #     y_pred = model.predict(x_part)
-    #     # bound prediction to 0 or 1
-    #     thresh = 0.5
-    #     y_pred[y_pred > thresh] = 1
-    #     y_pred[y_pred <= thresh] = 0
-    #
-    #     fig = plt.figure()
-    #     # plt.plot(y, 'b-', label='original')
-    #     y_count = np.arange(0, len(y_part), 1)
-    #     y_count = y_part * y_count
-    #
-    #     plt.vlines(y_count, ymin=-0.1, ymax=1.1, colors='k', label='original', linewidth=2)
-    #     plt.plot(y_pred, 'b-', label='prediction', linewidth=1)
-    #     plt.legend()
-    #     plt.show()
+    # Evaluate model
+    ################
+    test_samples = 30
+    command_len = 10
+    x_test = [x[:test_samples] for x in x_input]
+    y_test = y_out[:test_samples]
+    print("Validate model...")
+    validation = model.evaluate(x=x_test, y=y_test)
+    pred_result = model.predict(x=x_test)
+
+    pred_class = categorical_to_class(pred_result)
+    real_class = categorical_to_class(y_test)
+
+    if test_samples % command_len == 0:
+        pred_class = pred_class.reshape(-1, command_len)
+        real_class = real_class.reshape(-1, command_len)
+
+    print(tabulate([['Pred', pred_class], ['Real', real_class]],
+                   headers=['Type', 'Result (test data)']))
 
     print("Finished lighting generator training")
 
