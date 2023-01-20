@@ -50,16 +50,17 @@ delete_offbeats = 0.8      # < 1
 thresh_beat = 0.45          # minimum beat response required to trigger generator
 thresh_pitch = 0.67         # minimum beat for pitch check (0.01,low-1,high)
 cdf = 0.7                   # cut director factor (to calculate speed, ~0.5)
-min_beat_time = 0.04        # in seconds (first sanity check)
+min_beat_time = 1/20        # in seconds (first sanity check)
 beat_spacing = 5587/196     # 5587/196s = 28.5051 steps/s
-max_speed = 8.0             # set around 3-12 (normal-expert+)
+max_speed = 9.0             # set around 3-12 (normal-expert+)
+reaction_time = 1.0         # reaction time (0.5-2)
 favor_last_class = 0.15     # set factor to favor the next beat class (0.0-0.3)
 max_double_note_speed = 20  # set maximum speed difference between double notes (10 or 15 or 20)
 emphasize_beats_wait = 0.2  # minimum time in seconds
 emphasize_beats_3 = 0.15    # fraction beats to triple
 emphasize_beats_2 = 0.55    # fraction beats to double
 shift_beats_fact = 0.7      # fraction beats to shift in cut direction
-add_beat_low_bound = 0.10   # in seconds (beat_generator)
+add_beat_low_bound = 0.15   # in seconds (beat_generator)
 add_beat_hi_bound = 0.65    # in seconds (beat_generator)
 add_beat_fact = 0.75        # fraction add beats (beat_generator)
 

@@ -433,7 +433,7 @@ def calc_note_speed(notes_last, notes_new, time_diff, cdf):
     # cut director factor
     # cdf = config.cdf
 
-    dist = 0.5      # reaction time
+    dist = config.reaction_time     # reaction time
     cut_x_last, cut_y_last = get_cut_dir_xy(notes_last[3])
     cut_x_new, cut_y_new = get_cut_dir_xy(notes_new[3])
     # x direction
