@@ -33,7 +33,7 @@ def main(name_ar: list) -> None:
         exit()
 
     # load song data
-    song_input, pitch_input = find_beats(name_ar, train_data=False)     # 0.2
+    song_input, pitch_input = find_beats(name_ar, train_data=False)     # 0.9
 
     ################
     # beat generator
@@ -64,10 +64,10 @@ def main(name_ar: list) -> None:
 
     # load pretrained generator model
     model_path = paths.model_path + config.beat_gen_version
-    beat_model = load_model(model_path, custom_objects={'TCN': TCN})    # 0.5
+    beat_model = load_model(model_path, custom_objects={'TCN': TCN})    # 2.9
 
     # apply beat generator
-    y_beat = beat_model.predict(x_input)    # 1.5
+    y_beat = beat_model.predict(x_input)    # 12
 
     y_beat[y_beat > config.thresh_beat] = 1
     y_beat[y_beat <= config.thresh_beat] = 0
@@ -89,12 +89,13 @@ def main(name_ar: list) -> None:
 
     # calculate bpm
     file = paths.songs_pred + name_ar[0] + '.egg'
-    bpm, song_duration = get_file_bpm(file)     # 0.2
+    bpm, song_duration = get_file_bpm(file)     # 1.6
     bpm = int(bpm)
 
-    # sanity check timings      # TODO: put before y_class
-    map_times = sanity_check_timing(name_ar[0], timing_ar, song_duration)   # 0.3
+    # sanity check timings
+    map_times = sanity_check_timing(name_ar[0], timing_ar, song_duration)   # 3.9
     map_times = map_times[map_times > 0]
+    map_times = fill_map_times(map_times)
     map_times = fill_map_times(map_times)
 
     # calculate time between beats
@@ -102,7 +103,7 @@ def main(name_ar: list) -> None:
 
     # load song data
     song_ar, rm_index = run_music_preprocessing(name_ar, time_ar=[map_times], save_file=False,
-                                                song_combined=False, predict_path=True)     # 0.6
+                                                song_combined=False, predict_path=True)     # 7.8
 
     # filter invalid indices
     for rm_idx in rm_index[0][::-1]:
@@ -112,11 +113,11 @@ def main(name_ar: list) -> None:
 
     # Load pretrained encoder model
     model_path = paths.model_path + config.enc_version
-    enc_model = load_model(model_path)
-    in_song_l = enc_model.predict(song_ar[0])
+    enc_model = load_model(model_path)      # 0.4
+    in_song_l = enc_model.predict(song_ar[0])       # 0.8
 
     y_class_map = generate(in_song_l, map_times, config.mapper_version, config.lstm_len,
-                           paths.beats_classify_encoder_file)
+                           paths.beats_classify_encoder_file)       # 45.2
 
     ############
     # create map
@@ -129,11 +130,11 @@ def main(name_ar: list) -> None:
     ############
     if True:
         events = generate(in_song_l, map_times, config.event_gen_version, config.event_lstm_len,
-                          paths.events_classify_encoder_file)     # 47.0 -> 3.8
+                          paths.events_classify_encoder_file)     # 23.7 (47.0 -> 3.8)
     else:
         events = []
 
-    create_map(y_class_map, map_times, events, name_ar[0], bpm)     # 0.1
+    create_map(y_class_map, map_times, events, name_ar[0], bpm)     # 0.5
 
 
 if __name__ == '__main__':

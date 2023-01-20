@@ -61,7 +61,7 @@ def sanity_check_timing(name, timings, song_duration):
     # plt.show()
 
     last_pitch = 0
-    threshold = 0.0
+    threshold = pitches.mean() * config.thresh_pitch * 3
     beat_flag = False
     beat_pos = np.zeros_like(pitches)
     for idx in range(len(pitches)):

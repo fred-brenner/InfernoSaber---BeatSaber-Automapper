@@ -91,7 +91,7 @@ def test_gpu_tf():
 
 def load_keras_model(save_model_name, lr=None):
     model = None
-    print("Load keras model from disk")
+    # print("Load keras model from disk")
     if save_model_name == "old":
         keras_models = glob.glob(paths.model_path + "*.h5")
         latest_file = max(keras_models, key=os.path.getctime)
