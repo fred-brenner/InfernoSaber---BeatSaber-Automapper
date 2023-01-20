@@ -28,11 +28,16 @@ def lstm_shift_events_half(song_in, time_in, ml_out, lstm_len):
         l_ml_out = None
         l_ml_in = []
     else:
-        l_ml_in = ml_out[:-delete].reshape(-1, lstm_len, ml_out.shape[1])[:-1]
-        l_ml_out = ml_out[:-delete].reshape(-1, lstm_len, ml_out.shape[1])[1:]
+        if delete != 0:
+            ml_out = ml_out[:-delete]
+        l_ml_in = ml_out.reshape(-1, lstm_len, ml_out.shape[1])[:-1]
+        l_ml_out = ml_out.reshape(-1, lstm_len, ml_out.shape[1])[1:]
+    if delete != 0:
+        song_in = song_in[:-delete]
+        time_in = time_in[:-delete]
     # shape(samples, lstm, features)
-    l_song_in = song_in[:-delete].reshape(-1, lstm_len, song_in.shape[1], 1)[:-1]
-    l_time_in = time_in[:-delete].reshape(-1, lstm_len, 1)[:-1]
+    l_song_in = song_in.reshape(-1, lstm_len, song_in.shape[1], 1)[:-1]
+    l_time_in = time_in.reshape(-1, lstm_len, 1)[:-1]
 
     return [l_song_in, l_time_in, l_ml_in], l_ml_out
 

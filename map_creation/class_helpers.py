@@ -18,6 +18,9 @@ def update_out_class(in_class_l, y_class, idx):
 
 def get_class_size(file):
     enc = joblib.load(file)
+    # if type(enc) == list:
+    #     size = len(enc)
+    # else:
     size = len(enc.categories_[0])
     return size
 

@@ -5,6 +5,7 @@ from line_profiler_pycharm import profile
 from beat_prediction.find_beats import find_beats, get_pitch_times
 from beat_prediction.beat_to_lstm import beat_to_lstm
 from beat_prediction.beat_prop import get_beat_prop, tcn_reshape
+from lightning_prediction.train_lighting import lstm_shift_events_half
 
 from map_creation.sanity_check import *
 from map_creation.class_helpers import *
@@ -107,67 +108,32 @@ def main(name_ar: list) -> None:
     for rm_idx in rm_index[0][::-1]:
         timing_diff_ar[0].pop(rm_idx)
         timing_ar = np.delete(timing_ar, rm_idx)
-
-    # apply lstm shift
-    ml_input, _ = lstm_shift(song_ar[0], timing_diff_ar[0], None)
-    [in_song, in_time_l, _] = ml_input
+        map_times = np.delete(map_times, rm_idx)
 
     # Load pretrained encoder model
     model_path = paths.model_path + config.enc_version
     enc_model = load_model(model_path)
+    in_song_l = enc_model.predict(song_ar[0])
 
-    # apply encoder model
-    #####################
-    in_song_l = enc_model.predict(in_song)      # 0.2
-
-    # load pretrained automapper model
-    model_path = paths.model_path + config.mapper_version
-    mapper_model = load_model(model_path)   # 0.2
-
-    # apply automapper
-    ##################
-    y_class = None
-    y_class_map = []
-    y_class_last = None
-    for idx in range(len(in_song_l)):
-
-        class_size = get_class_size(paths.beats_classify_encoder_file)      # 0.8
-        if y_class is None:
-            in_class_l = np.zeros((len(in_song_l), config.lstm_len, class_size))
-
-        in_class_l = update_out_class(in_class_l, y_class, idx)
-
-        #             normal      lstm       lstm
-        ds_train = [in_song_l[idx:idx+1], in_time_l[idx:idx+1], in_class_l[idx:idx+1]]
-        y_class = mapper_model.predict(x=ds_train)      # 91.3
-
-        # add factor to NEXT class
-        y_class = add_favor_factor_next_class(y_class, y_class_last)        # 0.1
-
-        # find class winner
-        y_class = cast_y_class(y_class)
-
-        y_class_last = y_class.copy()
-        y_class_map.append(y_class)
+    y_class_map = generate(in_song_l, map_times, config.mapper_version, config.lstm_len,
+                           paths.beats_classify_encoder_file)
 
     ############
     # create map
     ############
-    y_class_num = decode_onehot_class(y_class_map, paths.beats_classify_encoder_file)
-    map_times = map_times[config.lstm_len+1:]
-    assert(len(map_times) == len(y_class_num))
-    # y_class_num = y_class_num[map_times > 0]
-    # map_times = map_times[map_times > 0]
+    map_times = map_times[config.lstm_len:]
+    map_times = map_times[:len(y_class_map)]
 
     ############
     # add events
     ############
     if True:
-        events = generate(in_song_l, map_times)     # 47.0 -> 3.8
+        events = generate(in_song_l, map_times, config.event_gen_version, config.event_lstm_len,
+                          paths.events_classify_encoder_file)     # 47.0 -> 3.8
     else:
         events = []
 
-    create_map(y_class_num, map_times, events, name_ar[0], bpm)     # 0.1
+    create_map(y_class_map, map_times, events, name_ar[0], bpm)     # 0.1
 
 
 if __name__ == '__main__':
