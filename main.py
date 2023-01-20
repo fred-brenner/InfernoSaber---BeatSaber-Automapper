@@ -11,10 +11,9 @@ import tensorflow as tf
 
 # limit gpu ram usage
 config = tf.compat.v1.ConfigProto()
-config.gpu_options.allow_growth=True
+config.gpu_options.allow_growth = True
 sess = tf.compat.v1.Session(config=config)
 tf.compat.v1.keras.backend.set_session(sess)
-
 
 # MAP GENERATOR
 ###############
@@ -26,7 +25,7 @@ if len(song_list) == 0:
 
 for i, song_name in enumerate(song_list):
     song_name = song_name[:-4]
-    print(f"Analyzing song: {song_name} ({i+1} of {len(song_list)})")
+    print(f"Analyzing song: {song_name} ({i + 1} of {len(song_list)})")
     beat_generator.main([song_name])
     shutil.make_archive(f'{paths.new_map_path}1234_{song_name}',
                         'zip', f'{paths.new_map_path}1234_{song_name}')

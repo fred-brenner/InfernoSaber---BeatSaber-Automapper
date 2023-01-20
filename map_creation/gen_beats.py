@@ -32,7 +32,7 @@ def main(name_ar: list) -> None:
         exit()
 
     # load song data
-    song_input, pitch_input = find_beats(name_ar, train_data=False)
+    song_input, pitch_input = find_beats(name_ar, train_data=False)     # 0.2
 
     ################
     # beat generator
@@ -63,10 +63,10 @@ def main(name_ar: list) -> None:
 
     # load pretrained generator model
     model_path = paths.model_path + config.beat_gen_version
-    beat_model = load_model(model_path, custom_objects={'TCN': TCN})    #0.4
+    beat_model = load_model(model_path, custom_objects={'TCN': TCN})    # 0.5
 
     # apply beat generator
-    y_beat = beat_model.predict(x_input)    #1.3
+    y_beat = beat_model.predict(x_input)    # 1.5
 
     y_beat[y_beat > config.thresh_beat] = 1
     y_beat[y_beat <= config.thresh_beat] = 0
@@ -88,11 +88,11 @@ def main(name_ar: list) -> None:
 
     # calculate bpm
     file = paths.songs_pred + name_ar[0] + '.egg'
-    bpm, song_duration = get_file_bpm(file)
+    bpm, song_duration = get_file_bpm(file)     # 0.2
     bpm = int(bpm)
 
     # sanity check timings      # TODO: put before y_class
-    map_times = sanity_check_timing(name_ar[0], timing_ar, song_duration)   #0.3
+    map_times = sanity_check_timing(name_ar[0], timing_ar, song_duration)   # 0.3
     map_times = map_times[map_times > 0]
     map_times = fill_map_times(map_times)
 
@@ -101,7 +101,7 @@ def main(name_ar: list) -> None:
 
     # load song data
     song_ar, rm_index = run_music_preprocessing(name_ar, time_ar=[map_times], save_file=False,
-                                                song_combined=False, predict_path=True)     #0.5
+                                                song_combined=False, predict_path=True)     # 0.6
 
     # filter invalid indices
     for rm_idx in rm_index[0][::-1]:
@@ -118,11 +118,11 @@ def main(name_ar: list) -> None:
 
     # apply encoder model
     #####################
-    in_song_l = enc_model.predict(in_song)
+    in_song_l = enc_model.predict(in_song)      # 0.2
 
     # load pretrained automapper model
     model_path = paths.model_path + config.mapper_version
-    mapper_model = load_model(model_path)   #0.2
+    mapper_model = load_model(model_path)   # 0.2
 
     # apply automapper
     ##################
@@ -131,7 +131,7 @@ def main(name_ar: list) -> None:
     y_class_last = None
     for idx in range(len(in_song_l)):
 
-        class_size = get_class_size(paths.beats_classify_encoder_file)      #0.5
+        class_size = get_class_size(paths.beats_classify_encoder_file)      # 0.8
         if y_class is None:
             in_class_l = np.zeros((len(in_song_l), config.lstm_len, class_size))
 
@@ -139,10 +139,10 @@ def main(name_ar: list) -> None:
 
         #             normal      lstm       lstm
         ds_train = [in_song_l[idx:idx+1], in_time_l[idx:idx+1], in_class_l[idx:idx+1]]
-        y_class = mapper_model.predict(x=ds_train)      #49.3
+        y_class = mapper_model.predict(x=ds_train)      # 91.3
 
         # add factor to NEXT class
-        y_class = add_favor_factor_next_class(y_class, y_class_last)        #0.1
+        y_class = add_favor_factor_next_class(y_class, y_class_last)        # 0.1
 
         # find class winner
         y_class = cast_y_class(y_class)
@@ -163,11 +163,11 @@ def main(name_ar: list) -> None:
     # add events
     ############
     if True:
-        events = generate(in_song_l, map_times)     #47.0
+        events = generate(in_song_l, map_times)     # 47.0 -> 3.8
     else:
         events = []
 
-    create_map(y_class_num, map_times, events, name_ar[0], bpm)     #0.1
+    create_map(y_class_num, map_times, events, name_ar[0], bpm)     # 0.1
 
 
 if __name__ == '__main__':

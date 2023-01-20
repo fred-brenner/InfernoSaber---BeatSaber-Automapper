@@ -36,7 +36,7 @@ def main():
     ##############
     print("Gather input data:", end=' ')
 
-    ram_limit = int(3 * config.ram_limit)
+    ram_limit = int(5 * config.ram_limit)
     name_ar, _ = filter_by_bps(config.min_bps_limit, config.max_bps_limit)
     if len(name_ar) > ram_limit:
         name_ar = name_ar[:ram_limit]

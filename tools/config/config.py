@@ -21,7 +21,7 @@ enc_version = 'tf_model_enc_16bneck_12_8__16_48.h5'
 autoenc_version = 'tf_model_autoenc_16bneck_12_8__16_48.h5'
 mapper_version = 'tf_model_mapper_8-10_12_9__0_0.h5'
 beat_gen_version = 'tf_beat_gen_8_10_1_19__16_27.h5'
-event_gen_version = 'tf_event_gen_8_10_1_19__18_6.h5'
+event_gen_version = 'tf_event_gen_8_10_1_19__23_49.h5'
 
 # Autoencoder model configuration
 learning_rate = 0.0003      # model learning rate
@@ -67,9 +67,9 @@ lstm_len_post = 10
 n_epochs_post = 10
 
 # Event prediction model configuration
-event_learning_rate = 4e-3
-event_n_epochs = 100
-event_lstm_len = 10
+event_learning_rate = 1e-3
+event_n_epochs = 180
+event_lstm_len = 16
 event_batch_size = 128
 
 # # cutout_window = 0.1       # window in seconds for cutout

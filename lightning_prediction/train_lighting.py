@@ -19,6 +19,26 @@ from tools.utils import numpy_shorts
 from training.helpers import *
 
 
+def lstm_shift_events_half(song_in, time_in, ml_out):
+    n_samples = len(time_in)
+    lstm_len = config.event_lstm_len
+    delete = n_samples % lstm_len
+    start = lstm_len + 1
+
+    # ml_out
+    if ml_out is None:
+        l_ml_out = None
+        l_ml_in = []
+    else:
+        l_ml_in = ml_out[:-delete].reshape(-1, lstm_len, ml_out.shape[1])[:-1]
+        l_ml_out = ml_out[:-delete].reshape(-1, lstm_len, ml_out.shape[1])[1:]
+    # shape(samples, lstm, features)
+    l_song_in = song_in[:-delete].reshape(-1, lstm_len, song_in.shape[1], 1)[:-1]
+    l_time_in = time_in[:-delete].reshape(-1, lstm_len, 1)[:-1]
+
+    return [l_song_in, l_time_in, l_ml_in], l_ml_out
+
+
 def lstm_shift_events(song_in, time_in, ml_out):
     n_samples = len(time_in)
     lstm_len = config.event_lstm_len
@@ -131,10 +151,11 @@ def start_training():
     song_ar = np.concatenate(song_ar, axis=0)
     in_song = ai_encode_song(song_ar)
 
-    x_input, y_out = lstm_shift_events(in_song, time_ar, y_out)
+    # x_input, y_out = lstm_shift_events(in_song, time_ar, y_out)
+    x_input, y_out = lstm_shift_events_half(in_song, time_ar, y_out)
 
     # only use song and time data, not class as input
-    x_input = x_input[:2]
+    # x_input = x_input[:2]
 
     # [in_song_l, in_time_l, in_class_l] = x_input
     # input_song_enc, input_time_lstm, input_class_lstm
@@ -142,7 +163,7 @@ def start_training():
 
     # setup ML model
     ################
-    model = create_tf_model('lstm', x_input_shape, y_out.shape)
+    model = create_tf_model('lstm_half', x_input_shape, y_out.shape)
     adam = adam_v2.Adam(learning_rate=config.event_learning_rate,
                         decay=config.event_learning_rate * 2 / config.event_n_epochs)
     model.compile(loss='binary_crossentropy', optimizer=adam,
