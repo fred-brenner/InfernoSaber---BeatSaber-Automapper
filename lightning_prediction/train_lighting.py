@@ -19,11 +19,9 @@ from tools.utils import numpy_shorts
 from training.helpers import *
 
 
-def lstm_shift_events_half(song_in, time_in, ml_out):
+def lstm_shift_events_half(song_in, time_in, ml_out, lstm_len):
     n_samples = len(time_in)
-    lstm_len = config.event_lstm_len
     delete = n_samples % lstm_len
-    start = lstm_len + 1
 
     # ml_out
     if ml_out is None:
@@ -152,7 +150,7 @@ def start_training():
     in_song = ai_encode_song(song_ar)
 
     # x_input, y_out = lstm_shift_events(in_song, time_ar, y_out)
-    x_input, y_out = lstm_shift_events_half(in_song, time_ar, y_out)
+    x_input, y_out = lstm_shift_events_half(in_song, time_ar, y_out, config.event_lstm_len)
 
     # only use song and time data, not class as input
     # x_input = x_input[:2]
@@ -181,7 +179,7 @@ def start_training():
 
     # Evaluate model
     ################
-    test_samples = 30
+    test_samples = 10
     command_len = 10
     x_test = [x[:test_samples] for x in x_input]
     y_test = y_out[:test_samples]

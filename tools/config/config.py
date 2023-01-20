@@ -19,7 +19,7 @@ ram_limit = 20              # free ram roughly in GB
 # Model versions
 enc_version = 'tf_model_enc_16bneck_12_8__16_48.h5'
 autoenc_version = 'tf_model_autoenc_16bneck_12_8__16_48.h5'
-mapper_version = 'tf_model_mapper_8-10_12_9__0_0.h5'
+mapper_version = 'tf_model_mapper_8-10_1_20__15_10.h5'
 beat_gen_version = 'tf_beat_gen_8_10_1_19__16_27.h5'
 event_gen_version = 'tf_event_gen_8_10_1_19__23_49.h5'
 
@@ -31,10 +31,10 @@ test_samples = 10           # number of test files to plot (excluded from traini
 bottleneck_len = 16         # size of bottleneck distribution (1D array)
 
 # Mapper model configuration
-map_learning_rate = 0.005       # model learning rate
-map_n_epochs = 120              # number of total epochs
-map_batch_size = 128            # batch size
-map_test_samples = 20           # number of test files to plot (excluded from training)
+map_learning_rate = 6e-4       # model learning rate
+map_n_epochs = 140             # number of total epochs
+map_batch_size = 128           # batch size
+map_test_samples = 10          # number of test files to plot (excluded from training)
 lstm_len = 8
 
 # Beat prediction model configuration

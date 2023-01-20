@@ -8,6 +8,7 @@ from helpers import *
 from tensorflow_models import *
 from preprocessing.bs_mapper_pre import load_ml_data, lstm_shift
 from tools.config import config, paths
+from lightning_prediction.train_lighting import lstm_shift_events_half
 
 # Check Cuda compatible GPU
 if not test_gpu_tf():
@@ -25,13 +26,14 @@ np.random.seed(3)
 
 # Data Preprocessing
 ####################
-
 ml_input, ml_output = load_ml_data()
-ml_input, ml_output = lstm_shift(ml_input[0], ml_input[1], ml_output)
-[in_song, in_time_l, in_class_l] = ml_input
+# ml_input, ml_output = lstm_shift(ml_input[0], ml_input[1], ml_output)
+# [in_song, in_time_l, in_class_l] = ml_input
+# in_song_l = ai_encode_song(in_song)
 
-
-in_song_l = ai_encode_song(in_song)
+in_song_l = ai_encode_song(ml_input[0])
+ml_input, ml_output = lstm_shift_events_half(in_song_l, ml_input[1], ml_output, config.lstm_len)
+[in_song_l, in_time_l, in_class_l] = ml_input
 
 # Sample into train/val/test
 ############################
@@ -53,15 +55,17 @@ ds_test = [in_song_test, in_time_test, in_class_test]
 
 ds_train_sample = [in_song_train[:test_samples], in_time_train[:test_samples], in_class_train[:test_samples]]
 
-dim_in = [in_song_train[0].shape, in_time_train[0].shape, in_class_train[0].shape]
-dim_out = out_class_train.shape[1]
+# dim_in = [in_song_train[0].shape, in_time_train[0].shape, in_class_train[0].shape]
+# dim_out = out_class_train.shape[1]
+dim_in = [x.shape for x in ds_train]
+dim_out = out_class_train.shape
 
 # delete variables to free ram
 # keras.backend.clear_session()
 # del encoder
 del in_class_l
 del in_class_test
-del in_song
+# del in_song
 del in_song_l
 del in_song_test
 del in_song_train
@@ -83,8 +87,8 @@ save_model_name = f"tf_model_mapper_{min_bps_limit}-{max_bps_limit}_{timestamp}.
 mapper_model, save_model_name = load_keras_model(save_model_name)
 # create model
 if mapper_model is None:
-    mapper_model = create_keras_model('lstm1', dim_in, dim_out)
-    adam = adam_v2.Adam(learning_rate=learning_rate, decay=learning_rate / n_epochs)
+    mapper_model = create_keras_model('lstm_half', dim_in, dim_out)
+    adam = adam_v2.Adam(learning_rate=learning_rate, decay=2*learning_rate / n_epochs)
     # mapper_model.compile(loss='mean_squared_error', optimizer=adam, metrics=['accuracy'])
     mapper_model.compile(loss='categorical_crossentropy', optimizer=adam, metrics=['accuracy'])
 
@@ -127,7 +131,7 @@ print(tabulate([['Pred', pred_class], ['Real', real_class]],
 
 # Save Model
 ############
-print(f"Saving model at: {paths.model_path}")
+print(f"Saving model at: {paths.model_path + save_model_name}")
 mapper_model.save(paths.model_path + save_model_name)
 
 print("Finished Training")

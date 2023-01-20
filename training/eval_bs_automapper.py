@@ -5,6 +5,7 @@ from keras.optimizers import adam_v2
 from tabulate import tabulate
 
 from helpers import *
+from lightning_prediction.train_lighting import lstm_shift_events_half
 from tensorflow_models import *
 from preprocessing.bs_mapper_pre import load_ml_data, lstm_shift
 from tools.config import config, paths
@@ -25,13 +26,13 @@ np.random.seed(3)
 
 # Data Preprocessing
 ####################
-
 ml_input, ml_output = load_ml_data()
-ml_input, ml_output = lstm_shift(ml_input[0], ml_input[1], ml_output)
-[in_song, in_time_l, in_class_l] = ml_input
-
-
-in_song_l = ai_encode_song(in_song)
+# ml_input, ml_output = lstm_shift(ml_input[0], ml_input[1], ml_output)
+# [in_song, in_time_l, in_class_l] = ml_input
+# in_song_l = ai_encode_song(in_song)
+in_song_l = ai_encode_song(ml_input[0])
+ml_input, ml_output = lstm_shift_events_half(in_song_l, ml_input[1], ml_output, config.lstm_len)
+[in_song_l, in_time_l, in_class_l] = ml_input
 
 # Sample into train/val/test
 ############################
@@ -61,7 +62,7 @@ dim_out = out_class_train.shape[1]
 # del encoder
 del in_class_l
 del in_class_test
-del in_song
+# del in_song
 del in_song_l
 del in_song_test
 del in_song_train

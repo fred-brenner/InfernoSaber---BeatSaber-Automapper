@@ -32,8 +32,33 @@ def create_keras_model(model_type, dim_in=[], dim_out=None):
         model = Model(inputs=[input_a, input_b, input_c], outputs=out)
         return model
 
+    elif model_type == 'lstm_half':
+        # in_song (lin), in_time (rec), in_class (rec)
+        input_a = Input(shape=(dim_in[0][1:]), name='input_song_enc')
+        input_b = Input(shape=(dim_in[1][1:]), name='input_time_lstm')
+        input_c = Input(shape=(dim_in[2][1:]), name='input_class_lstm')
+
+        conv = Conv2D(32, kernel_size=3, activation='relu')(input_a)
+        conv = Flatten('channels_last')(conv)
+        lstm_b = CuDNNLSTM(32, return_sequences=True)(input_b)
+        lstm_c = CuDNNLSTM(64, return_sequences=True)(input_c)
+
+        lstm_in = concatenate([lstm_b, lstm_c])
+        lstm_out = CuDNNLSTM(64, return_sequences=False)(lstm_in)
+
+        x = concatenate([conv, lstm_out])
+        x = Dense(1024, activation='relu')(x)
+        x = Dropout(0.05)(x)
+        x = Dense(dim_out[1] * dim_out[2], activation='sigmoid')(x)
+
+        out = Reshape(target_shape=(dim_out[1:]))(x)
+        # out = Dense(dim_out[1:], activation='softmax', name='output')(x)
+
+        model = Model(inputs=[input_a, input_b, input_c], outputs=out)
+        return model
+
     # autoencoder
-    if model_type == 'enc1':
+    elif model_type == 'enc1':
         input_img = Input(shape=(24, 20, 1))
         # Conv2d(1, 32, 3, padding=1) with Relu
         x = Conv2D(32, (3, 3), activation='relu', padding='same')(input_img)
@@ -59,7 +84,7 @@ def create_keras_model(model_type, dim_in=[], dim_out=None):
         model = Model(input_img, x)
         return model
 
-    if model_type == 'dec1':
+    elif model_type == 'dec1':
         input_img = Input(shape=config.bottleneck_len)
         # Relu(in=config.bottleneck_len, out=128)
         x = Dense(128, activation='relu')(input_img)

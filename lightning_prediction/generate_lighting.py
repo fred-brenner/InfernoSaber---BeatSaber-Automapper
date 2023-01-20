@@ -38,7 +38,7 @@ def generate(l_in_song, time_ar):
 
     time_diff = np.concatenate(([1], np.diff(time_ar)), axis=0)
 
-    x_input, _ = lstm_shift_events_half(l_in_song, time_diff, None)
+    x_input, _ = lstm_shift_events_half(l_in_song, time_diff, None, config.event_lstm_len)
     [in_song_l, in_time_l, _] = x_input
     # x_input = x_input[:2]
 
