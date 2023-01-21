@@ -62,10 +62,18 @@ def sanity_check_timing(name, timings, song_duration):
 
     last_pitch = 0
     threshold = pitches.mean() * config.thresh_pitch * 3
+    threshold_end = 2.2 * threshold
+    idx_end = int(len(pitches) / 30)
+    idx_end_list = list(range(idx_end))
+    idx_end_list.extend(list(range(len(pitches)-idx_end, len(pitches))))
     beat_flag = False
     beat_pos = np.zeros_like(pitches)
     for idx in range(len(pitches)):
-        if pitches[idx] > last_pitch and pitches[idx] > threshold:
+        if idx in idx_end_list:
+            cur_thresh = threshold_end
+        else:
+            cur_thresh = threshold
+        if pitches[idx] > last_pitch and pitches[idx] > cur_thresh:
             beat_flag = True
         else:
             if beat_flag:
