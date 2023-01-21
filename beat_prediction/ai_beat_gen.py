@@ -141,7 +141,7 @@ def main():
     # plot test result
     ##################
     if True:
-        y_pred = model.predict(x_part)
+        y_pred = model.predict(x_part, verbose=0)
         # bound prediction to 0 or 1
         thresh = 0.5
         y_pred[y_pred > thresh] = 1

@@ -93,7 +93,7 @@ def generate(l_in_song, time_ar, save_model_name, lstm_len, encoder_file):
 
         #             normal      lstm       lstm
         ds_train = [in_song_l[idx:idx + 1], in_time_l[idx:idx + 1], in_class_l[idx:idx + 1]]
-        y_class = model.predict(x=ds_train)
+        y_class = model.predict(x=ds_train, verbose=0)
 
         # find class winner
         y_arg_max = np.argmax(y_class, axis=2)[0]

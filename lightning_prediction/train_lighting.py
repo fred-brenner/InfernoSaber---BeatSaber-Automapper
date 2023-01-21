@@ -193,7 +193,7 @@ def start_training():
     y_test = y_out[:test_samples]
     print("Validate model...")
     validation = model.evaluate(x=x_test, y=y_test)
-    pred_result = model.predict(x=x_test)
+    pred_result = model.predict(x=x_test, verbose=0)
 
     pred_class = categorical_to_class(pred_result)
     real_class = categorical_to_class(y_test)

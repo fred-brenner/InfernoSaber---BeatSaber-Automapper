@@ -1,6 +1,6 @@
 import numpy as np
 from PIL import Image
-from line_profiler_pycharm import profile
+# from line_profiler_pycharm import profile
 
 from beat_prediction.find_beats import find_beats, get_pitch_times
 from beat_prediction.beat_to_lstm import beat_to_lstm
@@ -25,7 +25,7 @@ from tools.config import config, paths
 from tools.utils import numpy_shorts
 
 
-@profile
+# @profile
 def main(name_ar: list) -> None:
 
     if len(name_ar) > 1:
@@ -67,7 +67,7 @@ def main(name_ar: list) -> None:
     beat_model = load_model(model_path, custom_objects={'TCN': TCN})    # 2.9
 
     # apply beat generator
-    y_beat = beat_model.predict(x_input)    # 12
+    y_beat = beat_model.predict(x_input, verbose=0)    # 12
 
     y_beat[y_beat > config.thresh_beat] = 1
     y_beat[y_beat <= config.thresh_beat] = 0
@@ -114,7 +114,7 @@ def main(name_ar: list) -> None:
     # Load pretrained encoder model
     model_path = paths.model_path + config.enc_version
     enc_model = load_model(model_path)      # 0.4
-    in_song_l = enc_model.predict(song_ar[0])       # 0.8
+    in_song_l = enc_model.predict(song_ar[0], verbose=0)       # 0.8
 
     y_class_map = generate(in_song_l, map_times, config.mapper_version, config.lstm_len,
                            paths.beats_classify_encoder_file)       # 45.2

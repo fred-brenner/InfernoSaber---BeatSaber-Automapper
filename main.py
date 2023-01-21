@@ -3,6 +3,7 @@
 ###################################################
 import os
 import shutil
+import time
 
 from tools.config import paths
 import map_creation.gen_beats as beat_generator
@@ -24,9 +25,12 @@ if len(song_list) == 0:
     print("No songs found! Only .egg files supported.")
 
 for i, song_name in enumerate(song_list):
+    start_time = time.time()
     song_name = song_name[:-4]
     print(f"Analyzing song: {song_name} ({i + 1} of {len(song_list)})")
     beat_generator.main([song_name])
+    end_time = time.time()
+    print(f"Time needed: {end_time-start_time}s")
     shutil.make_archive(f'{paths.new_map_path}1234_{song_name}',
                         'zip', f'{paths.new_map_path}1234_{song_name}')
 

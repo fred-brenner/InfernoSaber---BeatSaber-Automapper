@@ -103,7 +103,7 @@ training = mapper_model.fit(x=ds_train, y=out_class_train,
 command_len = 10
 print("Validate model with test data...")
 validation = mapper_model.evaluate(x=ds_test, y=out_class_test)
-pred_result = mapper_model.predict(x=ds_test)
+pred_result = mapper_model.predict(x=ds_test, verbose=0)
 
 pred_class = categorical_to_class(pred_result)
 real_class = categorical_to_class(out_class_test)
@@ -118,7 +118,7 @@ print(tabulate([['Pred', pred_class], ['Real', real_class]],
 print("Validate model with train data...")
 validation = mapper_model.evaluate(x=ds_train_sample, y=out_class_train[:test_samples])
 
-pred_result = mapper_model.predict(x=ds_train_sample)
+pred_result = mapper_model.predict(x=ds_train_sample, verbose=0)
 pred_class = categorical_to_class(pred_result)
 real_class = categorical_to_class(out_class_train[:test_samples])
 

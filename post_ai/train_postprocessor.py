@@ -97,7 +97,7 @@ eval_len = 10
 print("Validate model with test data...")
 validation = mapper_model.evaluate(x=ml_input_r[:eval_len],
                                    y=ml_output_r[:eval_len])
-pred_result = mapper_model.predict(x=ml_input_r[:eval_len])
+pred_result = mapper_model.predict(x=ml_input_r[:eval_len], verbose=0)
 
 print(tabulate([['Pred', pred_result], ['Real', ml_output_r]],
                headers=['Type', 'Result (train data)']))

@@ -14,7 +14,7 @@ def ai_encode_song(song):
     encoder_path = paths.model_path + config.enc_version
     encoder = load_model(encoder_path)
     # apply autoencoder to input
-    in_song_l = encoder.predict(song)
+    in_song_l = encoder.predict(song, verbose=0)
     return in_song_l
 
 
@@ -74,8 +74,8 @@ def plot_autoenc_results(img_in, img_repr, img_out, n_samples, scale_repr=True, 
 
 def run_plot_autoenc(enc_model, auto_model, ds_test, save=False):
     # Plot first batch of test images
-    output = auto_model.predict(ds_test)
-    repr_out = enc_model.predict(ds_test)
+    output = auto_model.predict(ds_test, verbose=0)
+    repr_out = enc_model.predict(ds_test, verbose=0)
 
     plot_autoenc_results(ds_test, repr_out, output, len(ds_test), save=save)
 

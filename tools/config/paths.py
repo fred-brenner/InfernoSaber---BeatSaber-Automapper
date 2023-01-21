@@ -19,6 +19,7 @@ bs_song_path = "E:/SteamLibrary/steamapps/common/Beat Saber/Beat Saber_Data/Cust
 ############################# (no need to change)
 # main workspace path
 main_path = os.path.abspath(os.getcwd())
+print(f"Main path: {main_path}")
 max_tries = 3
 for i in range(0, max_tries):
     if not os.path.isfile(main_path + '/main.py'):
