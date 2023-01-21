@@ -19,7 +19,6 @@ bs_song_path = "E:/SteamLibrary/steamapps/common/Beat Saber/Beat Saber_Data/Cust
 ############################# (no need to change)
 # main workspace path
 main_path = os.path.abspath(os.getcwd())
-print(f"Main path: {main_path}")
 max_tries = 3
 for i in range(0, max_tries):
     if not os.path.isfile(main_path + '/main.py'):
@@ -28,6 +27,12 @@ for i in range(0, max_tries):
     else:
         # found main folder
         break
+
+# try Google Drive path
+if not os.path.isdir(dir_path):
+    dir_path = "/content/drive/My Drive/bs_maps/Data/"
+    main_path = "/content/drive/My Drive/bs_maps/Code/"
+
 
 if not os.path.isfile(main_path + '/main.py'):
     print("Could not find root directory. Exit")
