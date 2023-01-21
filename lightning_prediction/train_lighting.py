@@ -1,6 +1,7 @@
 import numpy as np
 import matplotlib.pyplot as plt
 import gc
+import random
 import pickle
 
 from datetime import datetime
@@ -123,9 +124,11 @@ def start_training():
     print("Gather input data:", end=' ')
 
     name_ar, _ = filter_by_bps(config.min_bps_limit, config.max_bps_limit)
-    # if len(name_ar) > int(config.ram_limit * 1.25):
-    #     name_ar = name_ar[:int(config.ram_limit * 1.25)]
-    #     print("Info: Loading reduced song number into generator to not overload the RAM")
+    ram_limit = int(9 * config.ram_limit)
+    if len(name_ar) > ram_limit:
+        random.shuffle(name_ar)
+        print(f"Info: Loading reduced song number into generator to not overload the VRAM (from {len(name_ar)})")
+        name_ar = name_ar[:ram_limit]
     print(f"Importing {len(name_ar)} songs")
 
     # load map data

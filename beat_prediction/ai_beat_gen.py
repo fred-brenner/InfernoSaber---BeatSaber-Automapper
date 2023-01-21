@@ -36,11 +36,13 @@ def main():
     ##############
     print("Gather input data:", end=' ')
 
-    ram_limit = int(5 * config.ram_limit)
+    ram_limit = int(11 * config.ram_limit)      # 100 songs ~9gb
     name_ar, _ = filter_by_bps(config.min_bps_limit, config.max_bps_limit)
-    if len(name_ar) > ram_limit:
-        name_ar = name_ar[:ram_limit]
-        print("Info: Loading reduced song number into generator to not overload the RAM")
+    # if len(name_ar) > ram_limit:
+    #     print(f"Info: Loading reduced song number into generator to not overload the RAM "
+    #           f"(previous {len(name_ar)}")
+    #     name_ar = name_ar[:ram_limit]
+
     print(f"Importing {len(name_ar)} songs")
     song_input, pitch_input = find_beats(name_ar, train_data=True)
 
@@ -76,9 +78,34 @@ def main():
                                                                     x_volume, x_onset)
 
     print("Reshape input for AI model...")
-    x_volume = tcn_reshape(x_volume)
-    x_onset = tcn_reshape(x_onset)
-    x_song, y = beat_to_lstm(song_input, beat_resampled)
+
+    def lstm_reshape_half(song_list, y=False):
+        tcn_len = config.tcn_len
+        song_ar = None
+        for song in song_list:
+            delete = song.shape[-1] % tcn_len
+            if delete != 0:
+                if len(song.shape) == 2:
+                    song = song[:, :-delete]
+                else:
+                    song = song[:-delete]
+            if len(song.shape) == 2:
+                song = song.reshape(-1, tcn_len, song.shape[0])
+            elif len(song.shape) == 1 and not y:
+                song = song.reshape(-1, tcn_len, 1)
+            elif len(song.shape) == 1 and y:
+                song = song[tcn_len-1::tcn_len]
+            song_ar = numpy_shorts.np_append(song_ar, song, axis=0)
+        return song_ar
+
+    x_volume = lstm_reshape_half(x_volume)
+    x_onset = lstm_reshape_half(x_onset)
+    x_song = lstm_reshape_half(song_input)
+    y = lstm_reshape_half(beat_resampled, y=True)
+
+    # x_volume = tcn_reshape(x_volume)
+    # x_onset = tcn_reshape(x_onset)
+    # x_song, y = beat_to_lstm(song_input, beat_resampled)
 
     x_song = numpy_shorts.minmax_3d(x_song)
     cw = calc_class_weight(y)
