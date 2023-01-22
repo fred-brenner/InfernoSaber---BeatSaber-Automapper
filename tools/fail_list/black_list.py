@@ -1,11 +1,4 @@
-# set paths
-import os, sys, inspect
-
-current_dir = os.path.dirname(os.path.abspath(inspect.getfile(inspect.currentframe())))
-parent_dir = os.path.dirname(current_dir)
-sys.path.insert(0, parent_dir)
-
-import config.paths as paths
+from tools.config import paths
 
 
 # Append name of failed title without ending (e.g. no .dat)
@@ -55,15 +48,6 @@ def delete_fails():
 
 
 if __name__ == '__main__':
-    # q = input("Append fail song? (y or n)")
-    # if q == "y":
-    #     name = input("Name (without ending): ")
-    #     append_fail(name)
-    #
-    # q = input("Delete failed songs? (y or n)")
-    # if q == "y":
-    #     delete_fails()
-
     q = input("Reset black list? [y or n]")
     if q == 'y':
         os.remove(paths.black_list_file)

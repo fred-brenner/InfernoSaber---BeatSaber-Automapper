@@ -2,17 +2,19 @@
 # config file for all paths used in project
 ##########################################
 # edit directory paths (C:/...) for each PC
-#!!! Only use "/" and not "\" 
-#!!! Always end with "/"
+# !!! Only use "/" and not "\"
+# !!! Always end with "/"
 ##########################################
 
 import os
+from tools.config import config
+
 
 ################################# (change this for your pc)
 # setup folder for input data
-dir_path = "C:/Users/frede/Desktop/Automapper_data/"
+dir_path = "C:/Users/frede/Desktop/BS_Automapper/Data/"
 
-bs_song_path = "B:/SteamLibrary/steamapps/common/Beat Saber/Beat Saber_Data/CustomLevels/"
+bs_song_path = "E:/SteamLibrary/steamapps/common/Beat Saber/Beat Saber_Data/CustomLevels/"
 
 ############################# (no need to change)
 # main workspace path
@@ -25,6 +27,12 @@ for i in range(0, max_tries):
     else:
         # found main folder
         break
+
+# try Google Drive path
+if not os.path.isdir(dir_path):
+    dir_path = "/content/drive/My Drive/bs_maps/Data/"
+    main_path = "/content/drive/My Drive/bs_maps/Code/"
+
 
 if not os.path.isfile(main_path + '/main.py'):
     print("Could not find root directory. Exit")
@@ -44,37 +52,33 @@ copy_path_song = train_path + "songs_egg/"
 copy_path_map = train_path + "maps/"
 
 dict_all_path = train_path + "maps_dict_all/"
-pic_path = train_path + "songs_pic/"
+# pic_path = train_path + "songs_pic/"
 
 songs_pred = pred_path + "songs_predict/"
 # pic_path_pred = pred_path + "songs_pic_predict/"
 
 # pred_path = pred_path + "np_pred/"
-pred_input_path = pred_path + "input/"
+# pred_input_path = pred_path + "input/"
 new_map_path = pred_path + "new_map/"
-
-keras_path = model_path + "keras_model/"
-keras_path_sec = model_path + "keras_model_sec/"
 
 fail_path = train_path + "fail_list/"
 diff_path = train_path + "songs_diff/"
 song_data = train_path + "song_data/"
 
-class_maps = train_path + "classify_maps/"
+# class_maps = train_path + "classify_maps/"
+ml_input_path = train_path + "ml_input/"
 
-class_beat_list_file = class_maps + "beat_list.pkl"
-class_notes_dict_file = class_maps + "notes_dict_list.pkl"
-class_output_ML_file = class_maps + "output_ML.pkl"
-class_time_list_file = class_maps + "time_list.pkl"
-class_song_input_file = class_maps + "song_input_list.pkl"
-# class_song_title_file = class_maps + "song_title_list.pkl"
-class_title_file = class_maps + "title_list.pkl"
-class_map_diff_file = class_maps + "map_diff.pkl"
+diff_ar_file = diff_path + "diff_ar.npy"
+name_ar_file = diff_path + "name_ar.npy"
 
-pred_song_input_file = pred_input_path + "song_input.pkl"
-pred_beat_input_file = pred_input_path + "beat_input.pkl"
-pred_ml_output_file = pred_input_path + "ml_output.pkl"
-pred_title_file = pred_input_path + "title_list.pkl"
+ml_input_beat_file = ml_input_path + "beat_ar.npy"
+ml_input_song_file = ml_input_path + "song_ar.npy"
 
 black_list_file = fail_path + "black_list.txt"
+
+notes_classify_dict_file = f"{pred_path}notes_class_dict_{config.min_bps_limit}-{config.max_bps_limit}.pkl"
+# beats_classify_encoder_file = pred_path + f"onehot_encoder_beats_{config.min_bps_limit}-{config.max_bps_limit}.pkl"
+# TODO: check which encoder are taken
+beats_classify_encoder_file = pred_path + f"onehot_encoder_beats.pkl"
+events_classify_encoder_file = pred_path + f"onehot_encoder_events.pkl"
 ############################

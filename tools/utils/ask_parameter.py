@@ -58,6 +58,15 @@ def ask_parameter(parameter, param_type=None):
                     input_flag = False  # finished
                 else:
                     print("Wrong input, only string allowed.")
+
+            elif param_type == 'bool':
+                if inp.lower() in ['y', 'true']:
+                    inp = True
+                    input_flag = False
+                elif inp.lower() in ['n', 'false']:
+                    inp = False
+                    input_flag = False
+
             else:
                 if inp.isdigit():
                     inp = int(inp)
