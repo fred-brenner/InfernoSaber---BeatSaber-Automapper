@@ -21,7 +21,8 @@ frederic.brenner@tum.de
 anaconda_environment.yaml
 
 ## To run automapper go to:
-main.py
+Download models from GDrive link in model_data/Data/model/link_to_model.txt
+run main.py
 
 ## To adjust paths go to:
 tools/config/paths.py
