@@ -12,7 +12,7 @@ from tools.config import config
 
 ################################# (change this for your pc)
 # setup folder for input data (automatically determined if inside this project)
-# dir_path = "C:/Users/frede/Desktop/BS_Automapper/Data/"
+dir_path = "C:/Users/frede/Desktop/BS_Automapper/Data/"
 
 bs_song_path = "E:/SteamLibrary/steamapps/common/Beat Saber/Beat Saber_Data/CustomLevels/"
 
@@ -27,7 +27,7 @@ for i in range(0, max_tries):
     else:
         # found main folder
         break
-dir_path = main_path + "model_data/Data/"
+# dir_path = main_path + "model_data/Data/"
 
 # try Google Drive path
 if not os.path.isdir(dir_path):
