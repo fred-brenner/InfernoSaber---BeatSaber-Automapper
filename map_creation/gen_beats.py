@@ -5,7 +5,7 @@ from PIL import Image
 from beat_prediction.find_beats import find_beats, get_pitch_times
 from beat_prediction.beat_to_lstm import beat_to_lstm
 from beat_prediction.beat_prop import get_beat_prop, tcn_reshape
-from lightning_prediction.train_lighting import lstm_shift_events_half
+from lighting_prediction.train_lighting import lstm_shift_events_half
 
 from map_creation.sanity_check import *
 from map_creation.class_helpers import *
@@ -19,7 +19,7 @@ from preprocessing.bs_mapper_pre import lstm_shift
 from training.helpers import *
 from training.tensorflow_models import *
 
-from lightning_prediction.generate_lighting import generate
+from lighting_prediction.generate_lighting import generate
 
 from tools.config import config, paths
 from tools.utils import numpy_shorts
@@ -96,7 +96,7 @@ def main(name_ar: list) -> None:
     map_times = sanity_check_timing(name_ar[0], timing_ar, song_duration)   # 3.9
     map_times = map_times[map_times > 0]
     map_times = fill_map_times(map_times)
-    map_times = fill_map_times(map_times)
+    # map_times = fill_map_times(map_times)
 
     # calculate time between beats
     timing_diff_ar = calc_time_between_beats([map_times])

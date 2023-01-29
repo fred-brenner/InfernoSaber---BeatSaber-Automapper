@@ -1,5 +1,5 @@
 from tools.config import paths
-
+import os
 
 # Append name of failed title without ending (e.g. no .dat)
 def append_fail(name):

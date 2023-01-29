@@ -7,8 +7,8 @@ from datetime import datetime
 from keras.optimizers import adam_v2
 from sklearn.preprocessing import OneHotEncoder
 
-# from lightning_prediction.tf_lighting import create_tf_model
-from lightning_prediction.train_lighting import lstm_shift_events_half
+# from lighting_prediction.tf_lighting import create_tf_model
+from lighting_prediction.train_lighting import lstm_shift_events_half
 from map_creation.class_helpers import get_class_size, update_out_class, add_favor_factor_next_class, \
     cast_y_class, decode_onehot_class
 

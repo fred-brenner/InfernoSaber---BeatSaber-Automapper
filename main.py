@@ -10,6 +10,7 @@ import map_creation.gen_beats as beat_generator
 
 import tensorflow as tf
 
+
 # limit gpu ram usage
 config = tf.compat.v1.ConfigProto()
 config.gpu_options.allow_growth = True
@@ -47,3 +48,4 @@ print("Finished map generator")
 # run training / train_autoenc_music.py
 # run training / train_bs_automapper.py
 # run beat_prediction / ai_beat_gen.py
+# run lighting_prediction / train_lighting.py

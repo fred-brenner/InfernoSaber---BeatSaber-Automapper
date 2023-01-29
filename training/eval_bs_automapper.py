@@ -5,7 +5,7 @@ from keras.optimizers import adam_v2
 from tabulate import tabulate
 
 from helpers import *
-from lightning_prediction.train_lighting import lstm_shift_events_half
+from lighting_prediction.train_lighting import lstm_shift_events_half
 from tensorflow_models import *
 from preprocessing.bs_mapper_pre import load_ml_data, lstm_shift
 from tools.config import config, paths
