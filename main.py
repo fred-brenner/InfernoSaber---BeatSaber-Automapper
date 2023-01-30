@@ -10,6 +10,7 @@ import map_creation.gen_beats as beat_generator
 
 import tensorflow as tf
 
+export_results_to_bs = True
 
 # limit gpu ram usage
 config = tf.compat.v1.ConfigProto()
@@ -31,9 +32,16 @@ for i, song_name in enumerate(song_list):
     print(f"Analyzing song: {song_name} ({i + 1} of {len(song_list)})")
     beat_generator.main([song_name])
     end_time = time.time()
-    print(f"Time needed: {end_time-start_time}s")
+    print(f"Time needed: {end_time - start_time}s")
+
+    # create zip archive for online viewer
     shutil.make_archive(f'{paths.new_map_path}1234_{song_name}',
                         'zip', f'{paths.new_map_path}1234_{song_name}')
+    # export map to beat saber
+    if export_results_to_bs:
+        shutil.copytree(f'{paths.new_map_path}1234_{song_name}',
+                        paths.bs_song_path,
+                        dirs_exist_ok=True)
 
 print("Finished map generator")
 
