@@ -132,20 +132,18 @@ def get_map_string(events='', notes='', obstacles=''):
 
 
 def get_info_map_string(name, bpm):
-    jump_speed = 17
-
     info_string = '{\n'
     info_string += '"_version": "2.0.0",\n'
     info_string += f'"_songName": "{name}",\n'
     info_string += '"_songSubName": "",\n'
-    info_string += '"_songAuthorName": "unknown",\n'
+    info_string += '"_songAuthorName": "unknown",\n'        # TODO: save difficulty
     info_string += '"_levelAuthorName": "BierHerr",\n'
     info_string += f'"_beatsPerMinute": {bpm},\n'
     info_string += '"_songTimeOffset": 0,\n'
     info_string += '"_shuffle": 0,\n'
     info_string += '"_shufflePeriod": 0.5,\n'
     info_string += '"_previewStartTime": 10,\n'
-    info_string += '"_previewDuration": 15,\n'
+    info_string += '"_previewDuration": 20,\n'
     info_string += f'"_songFilename": "{name}.egg",\n'
     info_string += '"_coverImageFilename": "cover.jpg",\n'
     info_string += '"_environmentName": "DefaultEnvironment",\n'
@@ -158,7 +156,7 @@ def get_info_map_string(name, bpm):
     info_string += '"_difficulty": "ExpertPlus",\n'
     info_string += '"_difficultyRank": 9,\n'
     info_string += '"_beatmapFilename": "ExpertPlus.dat",\n'
-    info_string += f'"_noteJumpMovementSpeed": {jump_speed},\n'
+    info_string += f'"_noteJumpMovementSpeed": {config.jump_speed},\n'
     info_string += '"_noteJumpStartBeatOffset": 0.0\n'
     info_string += '}\n'
     info_string += ']\n'

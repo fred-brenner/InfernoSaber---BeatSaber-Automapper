@@ -5,18 +5,18 @@ import os
 import shutil
 import time
 
-from tools.config import paths
+from tools.config import paths, config
 import map_creation.gen_beats as beat_generator
 from bs_shift.export_map import shutil_copy_maps
 
 import tensorflow as tf
 
-export_results_to_bs = True
+export_results_to_bs = False
 
 # limit gpu ram usage
-config = tf.compat.v1.ConfigProto()
-config.gpu_options.allow_growth = True
-sess = tf.compat.v1.Session(config=config)
+conf = tf.compat.v1.ConfigProto()
+conf.gpu_options.allow_growth = True
+sess = tf.compat.v1.Session(config=conf)
 tf.compat.v1.keras.backend.set_session(sess)
 
 # MAP GENERATOR
@@ -36,7 +36,7 @@ for i, song_name in enumerate(song_list):
     print(f"Time needed: {end_time - start_time}s")
 
     # create zip archive for online viewer
-    shutil.make_archive(f'{paths.new_map_path}1234_{song_name}',
+    shutil.make_archive(f'{paths.new_map_path}{config.max_speed}_{song_name}',
                         'zip', f'{paths.new_map_path}1234_{song_name}')
     # export map to beat saber
     if export_results_to_bs:

@@ -22,7 +22,6 @@ autoenc_version = 'tf_model_autoenc_16bneck_12_8__16_48.h5'
 # mapper_version = 'tf_model_mapper_5-10_1_21__13_26.h5'
 # beat_gen_version = 'tf_beat_gen_7.5_10_1_21__16_27.h5'
 # event_gen_version = 'tf_event_gen_7.5_10_1_21__16_6.h5'
-
 mapper_version = 'tf_model_mapper_7-10_1_29__19_34.h5'
 beat_gen_version = 'tf_beat_gen_7_10_1_29__19_39.h5'
 event_gen_version = 'tf_event_gen_7_10_1_29__19_44.h5'
@@ -51,19 +50,27 @@ delete_offbeats = 0.6      # < 1 delete non-beats to free ram
 # tcn_skip = 10
 
 # Map creation model configuration
+"""Do change"""
+max_speed = 30            # set around 5-40 (normal-expert++)
+
+"""Caution on changes"""
+reaction_time = 1.0         # reaction time (0.5-2)
+reaction_time += 0.013*max_speed
+jump_speed = 15             # jump speed from beat saber (15-22)
+jump_speed += int(0.24*max_speed)
 thresh_beat = 0.40          # minimum beat response required to trigger generator
 thresh_pitch = 0.40         # minimum beat for pitch check (0.01,low-1,high)
 threshold_end = 2.0         # factor for start and end threshold
-cdf = 0.7                   # cut director factor (to calculate speed, ~0.5)
-min_beat_time = 1/14        # in seconds (first sanity check)
+cdf = 1.1                   # cut director factor (to calculate speed, ~0.5)
+min_beat_time = 1/16        # in seconds (first sanity check)
 beat_spacing = 5587/196     # 5587/196s = 28.5051 steps/s
-max_speed = 15.0            # set around 5-15 (normal-expert+)
-reaction_time = 1.0         # reaction time (0.5-2)
 favor_last_class = 0.15     # set factor to favor the next beat class (0.0-0.3)
 max_double_note_speed = 40  # set maximum speed difference between double notes (10 or 15 or 20)
 emphasize_beats_wait = 0.2  # minimum time in seconds
-emphasize_beats_3 = 0.10    # fraction beats to triple
-emphasize_beats_2 = 0.45    # fraction beats to double
+emphasize_beats_3 = 0.023   # fraction beats to triple
+emphasize_beats_3 += 0.004*max_speed
+emphasize_beats_2 = 0.23    # fraction beats to double
+emphasize_beats_2 += 0.0085*max_speed
 shift_beats_fact = 0.25     # fraction beats to shift in cut direction
 add_beat_low_bound = 0.18   # in seconds (beat_generator)
 add_beat_hi_bound = 0.90    # in seconds (beat_generator)
