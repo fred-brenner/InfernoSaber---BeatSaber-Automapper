@@ -156,6 +156,10 @@ def sanity_check_notes(notes: list, timings):
     # shift notes in cut direction
     notes_l = shift_blocks_up_down(notes_l, time_diffs)
     notes_r = shift_blocks_up_down(notes_r, time_diffs)
+    # shift notes left and right for better flow
+    notes_l, notes_r = shift_blocks_left_right(notes_l, notes_r, time_diffs)
+    # notes_r = shift_blocks_left_right(notes_r, False, time_diffs)
+
     # print("Right notes:", end=' ')
     # notes_r = correct_notes(notes_r, timings)
     # print("Left notes: ", end=' ')
@@ -562,6 +566,96 @@ def shift_blocks_up_down(notes: list, time_diffs: np.array):
                         notes[idx][0+4*ipos] = new_pos[ipos][0]
                         notes[idx][1+4*ipos] = new_pos[ipos][1]
     return notes
+
+
+# def shift_blocks_left_right(notes: list, left_note: bool, time_diffs: np.array):
+#     # TODO: support both notes simultaneously
+#     last_note_pos = [[-1, -1]]
+#     # if left_note:
+#     #     shift = [0, 0]
+#     # else:
+#     #     shift = [0, 0]
+#
+#     for idx in range(len(notes)):
+#         if len(notes[idx]) > 2:
+#             note_pos = calc_note_pos(notes[idx], add_cut=False)
+#             # cut_x, cut_y = get_cut_dir_xy(notes[idx][3])
+#             new_pos = []
+#             new_pos2 = []
+#             for pos in note_pos:
+#                 if pos in last_note_pos:
+#                     if left_note:
+#                         new_pos.append([pos[0]-1, pos[1]])
+#                         new_pos2.append([pos[0]+1, pos[1]])
+#                     else:
+#                         new_pos.append([pos[0]+1, pos[1]])
+#                         new_pos2.append([pos[0]-1, pos[1]])
+#             if len(new_pos) > 0:
+#                 valid = check_note_pos_valid(new_pos)
+#                 valid2 = check_note_pos_valid(new_pos2)
+#                 if valid:
+#                     for ipos in range(len(new_pos)):
+#                         notes[idx][0+4*ipos] = new_pos[ipos][0]
+#                         notes[idx][1+4*ipos] = new_pos[ipos][1]
+#                 elif valid2:
+#                     for ipos in range(len(new_pos2)):
+#                         notes[idx][0+4*ipos] = new_pos2[ipos][0]
+#                         notes[idx][1+4*ipos] = new_pos2[ipos][1]
+#
+#             last_note_pos = note_pos
+#     return notes
+
+
+def shift_blocks_left_right(notes_l: list, notes_r: list, time_diffs: np.array):
+    last_note_pos_l = [[-1, -1]]
+    last_note_pos_r = [[-1, -1]]
+
+    def new_pos_helper(note_pos, last_note_pos_l, last_note_pos_r, left_note):
+        new_pos = []
+        new_pos2 = []
+        for pos in note_pos:
+            if pos in last_note_pos_l or pos in last_note_pos_r:
+                if left_note:
+                    new_pos.append([pos[0]-1, pos[1]])
+                    new_pos2.append([pos[0]+1, pos[1]])
+                else:
+                    new_pos.append([pos[0]+1, pos[1]])
+                    new_pos2.append([pos[0]-1, pos[1]])
+        return new_pos, new_pos2
+
+    def new_note_helper(notes, idx, new_pos, new_pos2):
+        if len(new_pos) > 0:
+            valid = check_note_pos_valid(new_pos)
+            valid2 = check_note_pos_valid(new_pos2)
+            if valid:
+                for ipos in range(len(new_pos)):
+                    notes[idx][0 + 4 * ipos] = new_pos[ipos][0]
+                    notes[idx][1 + 4 * ipos] = new_pos[ipos][1]
+            elif valid2:
+                for ipos in range(len(new_pos2)):
+                    notes[idx][0 + 4 * ipos] = new_pos2[ipos][0]
+                    notes[idx][1 + 4 * ipos] = new_pos2[ipos][1]
+        return notes
+
+    for idx in range(len(notes_l)):
+        if len(notes_l[idx]) > 2:
+            note_pos = calc_note_pos(notes_l[idx], add_cut=False)
+            new_pos, new_pos2 = new_pos_helper(note_pos, last_note_pos_l, last_note_pos_r, True)
+            notes_l = new_note_helper(notes_l, idx, new_pos, new_pos2)
+            if len(new_pos) == 0:
+                last_note_pos_l = note_pos
+            else:   # recalculate
+                last_note_pos_l = calc_note_pos(notes_l[idx], add_cut=False)
+        if len(notes_r[idx]) > 2:
+            note_pos = calc_note_pos(notes_r[idx], add_cut=False)
+            new_pos, new_pos2 = new_pos_helper(note_pos, last_note_pos_l, last_note_pos_r, False)
+            notes_r = new_note_helper(notes_r, idx, new_pos, new_pos2)
+            if len(new_pos) == 0:
+                last_note_pos_r = note_pos
+            else:   # recalculate
+                last_note_pos_r = calc_note_pos(notes_r[idx], add_cut=False)
+
+    return notes_l, notes_r
 
 
 def check_note_pos_valid(positions: list) -> bool:
