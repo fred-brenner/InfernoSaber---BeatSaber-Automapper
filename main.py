@@ -7,6 +7,7 @@ import time
 
 from tools.config import paths
 import map_creation.gen_beats as beat_generator
+from bs_shift.export_map import shutil_copy_maps
 
 import tensorflow as tf
 
@@ -39,9 +40,7 @@ for i, song_name in enumerate(song_list):
                         'zip', f'{paths.new_map_path}1234_{song_name}')
     # export map to beat saber
     if export_results_to_bs:
-        shutil.copytree(f'{paths.new_map_path}1234_{song_name}',
-                        paths.bs_song_path,
-                        dirs_exist_ok=True)
+        shutil_copy_maps(song_name)
 
 print("Finished map generator")
 

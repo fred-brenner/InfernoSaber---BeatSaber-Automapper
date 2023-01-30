@@ -569,7 +569,6 @@ def shift_blocks_up_down(notes: list, time_diffs: np.array):
 
 
 # def shift_blocks_left_right(notes: list, left_note: bool, time_diffs: np.array):
-#     # TODO: support both notes simultaneously
 #     last_note_pos = [[-1, -1]]
 #     # if left_note:
 #     #     shift = [0, 0]
@@ -638,6 +637,7 @@ def shift_blocks_left_right(notes_l: list, notes_r: list, time_diffs: np.array):
         return notes
 
     for idx in range(len(notes_l)):
+        last_note_l_temp = last_note_pos_l
         if len(notes_l[idx]) > 2:
             note_pos = calc_note_pos(notes_l[idx], add_cut=False)
             note_pos = [[pos[0]] for pos in note_pos]
@@ -648,10 +648,11 @@ def shift_blocks_left_right(notes_l: list, notes_r: list, time_diffs: np.array):
             else:   # recalculate
                 note_pos = calc_note_pos(notes_l[idx], add_cut=False)
                 last_note_pos_l = [[pos[0]] for pos in note_pos]
+                last_note_l_temp.extend(last_note_pos_l)
         if len(notes_r[idx]) > 2:
             note_pos = calc_note_pos(notes_r[idx], add_cut=False)
             note_pos = [[pos[0]] for pos in note_pos]
-            new_pos, new_pos2 = new_pos_helper(note_pos, last_note_pos_l, last_note_pos_r, False)
+            new_pos, new_pos2 = new_pos_helper(note_pos, last_note_l_temp, last_note_pos_r, False)
             notes_r = new_note_helper(notes_r, idx, new_pos, new_pos2)
             if len(new_pos) == 0:
                 last_note_pos_r = note_pos
