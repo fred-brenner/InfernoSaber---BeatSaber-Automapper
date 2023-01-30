@@ -51,21 +51,22 @@ delete_offbeats = 0.6      # < 1 delete non-beats to free ram
 # tcn_skip = 10
 
 # Map creation model configuration
-thresh_beat = 0.35          # minimum beat response required to trigger generator
-thresh_pitch = 0.30         # minimum beat for pitch check (0.01,low-1,high)
+thresh_beat = 0.40          # minimum beat response required to trigger generator
+thresh_pitch = 0.40         # minimum beat for pitch check (0.01,low-1,high)
+threshold_end = 2.0         # factor for start and end threshold
 cdf = 0.7                   # cut director factor (to calculate speed, ~0.5)
-min_beat_time = 1/16        # in seconds (first sanity check)
+min_beat_time = 1/14        # in seconds (first sanity check)
 beat_spacing = 5587/196     # 5587/196s = 28.5051 steps/s
-max_speed = 12.0            # set around 3-12 (normal-expert+)
-reaction_time = 1.2         # reaction time (0.5-2)
+max_speed = 15.0            # set around 3-12 (normal-expert+)
+reaction_time = 1.0         # reaction time (0.5-2)
 favor_last_class = 0.15     # set factor to favor the next beat class (0.0-0.3)
-max_double_note_speed = 30  # set maximum speed difference between double notes (10 or 15 or 20)
+max_double_note_speed = 40  # set maximum speed difference between double notes (10 or 15 or 20)
 emphasize_beats_wait = 0.2  # minimum time in seconds
-emphasize_beats_3 = 0.15    # fraction beats to triple
-emphasize_beats_2 = 0.55    # fraction beats to double
+emphasize_beats_3 = 0.10    # fraction beats to triple
+emphasize_beats_2 = 0.45    # fraction beats to double
 shift_beats_fact = 0.25     # fraction beats to shift in cut direction
-add_beat_low_bound = 0.17   # in seconds (beat_generator)
-add_beat_hi_bound = 0.80    # in seconds (beat_generator)
+add_beat_low_bound = 0.18   # in seconds (beat_generator)
+add_beat_hi_bound = 0.90    # in seconds (beat_generator)
 add_beat_fact = 0.70        # fraction add beats (beat_generator)
 
 # Postprocessing model configuration

@@ -62,7 +62,7 @@ def sanity_check_timing(name, timings, song_duration):
 
     last_pitch = 0
     threshold = pitches.mean() * config.thresh_pitch * 3
-    threshold_end = 2.2 * threshold
+    threshold_end = config.threshold_end * threshold
     idx_end = int(len(pitches) / 30)
     idx_end_list = list(range(idx_end))
     idx_end_list.extend(list(range(len(pitches)-idx_end, len(pitches))))
