@@ -57,7 +57,7 @@ threshold_end = 2.0         # factor for start and end threshold
 cdf = 0.7                   # cut director factor (to calculate speed, ~0.5)
 min_beat_time = 1/14        # in seconds (first sanity check)
 beat_spacing = 5587/196     # 5587/196s = 28.5051 steps/s
-max_speed = 15.0            # set around 3-12 (normal-expert+)
+max_speed = 15.0            # set around 5-15 (normal-expert+)
 reaction_time = 1.0         # reaction time (0.5-2)
 favor_last_class = 0.15     # set factor to favor the next beat class (0.0-0.3)
 max_double_note_speed = 40  # set maximum speed difference between double notes (10 or 15 or 20)

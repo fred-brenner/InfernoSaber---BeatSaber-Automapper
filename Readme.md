@@ -1,36 +1,53 @@
-# This project is still in progress, but the preprocessing is now finished. 
-This means you can extract all custom mapped songs to analyze or predict on it, 
-including notes, obstacles and show effects.
-Map versions with custom modded data (values out of normal boundaries) are excluded,
-so the data is as smooth as possible. 
+# Development branch for Mapper algorithm
+use main branch for a stable environment
 
-### If you are looking for a working automapper, search for BeatSage.
-As of now this code is made for data creation to set up a machine learning framework.
+## Automapper for Beatsaber made for expert+ levels 
+Extract maps from Beatsaber/Bsaber to feed them into AI models
+Map versions with custom modded data (values out of normal boundaries) are excluded,
+so the data is as smooth as possible.
+
+Automapper is trained on expert+ maps for average 5 notes-per-second in prediction
+
+The automapper consists of 4 consecutive AI models:
+1. Deep convolutional autoencoder - to encode the music/simplify all other models
+2. Temporal Convolutional Network (TCN) - to generate the beat
+3. Deep Neural Network (Classification) - mapping the notes/bombs
+4. Deep Neural Network (Classification) - mapping the events/lights
+
+An overview over the current status of map generation (including BSMapper and BeatSage) can be found at:
+https://youtu.be/2bP9YcAgG-E
 
 ### Author: Frederic Brenner
 frederic.brenner@tum.de
 
+## To install suitable python environment import in Anaconda:
+anaconda_environment.yaml
+
+## To run automapper go to:
+Download models from GDrive link in model_data/Data/model/link_to_model.txt
+(not updated)
+
+run main.py
+
 ## To adjust paths go to:
 tools/config/paths.py
 
+## To adjust difficulty go to:
+tools/config/config.py
+
+especially max_speed,
+change the rest with caution!
+
+
 ## folder structure needed for this version:
-.../Automapper_data/training/fail_list/
+can be automatically created with:
+tools/config/check_folder_structure.py
 
-.../Automapper_data/training/maps/
-
-.../Automapper_data/training/maps_dict_all/
-
-.../Automapper_data/training/songs_diff/
-
-.../Automapper_data/training/songs_egg/
-
-Create them on a disk of your choice and link the main folder in the paths.py file,
-the program can't create them currently.
-
-## starting order for extraction of beatsaber data:
+## starting extraction of beatsaber data:
 01/preprocessing/shift.py (whole preprocessing)
 
-prediction may be coming later
+see end of main.py file for more information on training order
+
 
 ## passing the beatsaber songs into a different directory (e.g. for PowerBeats VR)
 tools/PowerBeats_extension/PowerBeats_shift.py
@@ -41,5 +58,5 @@ the destination folder needs to be set inside the file
 The song name detection is quite simple,
 for better naming extract the files from the preprocessing algorithm (not implemented)
 
-## map prediction is in progress
-but several AI methods I tried couldn't reach the performance of a human mapper
+## Automapper is finally there. Have fun!
+Official online deployment planned for end of March-April
