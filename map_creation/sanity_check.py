@@ -607,8 +607,8 @@ def shift_blocks_up_down(notes: list, time_diffs: np.array):
 
 
 def shift_blocks_left_right(notes_l: list, notes_r: list, time_diffs: np.array):
-    last_note_pos_l = [[-1, -1]]
-    last_note_pos_r = [[-1, -1]]
+    last_note_pos_l = [[-1]]
+    last_note_pos_r = [[-1]]
 
     def new_pos_helper(note_pos, last_note_pos_l, last_note_pos_r, left_note):
         new_pos = []
@@ -616,54 +616,70 @@ def shift_blocks_left_right(notes_l: list, notes_r: list, time_diffs: np.array):
         for pos in note_pos:
             if pos in last_note_pos_l or pos in last_note_pos_r:
                 if left_note:
-                    new_pos.append([pos[0]-1, pos[1]])
-                    new_pos2.append([pos[0]+1, pos[1]])
+                    # new_pos.append([pos[0]-1, pos[1]])
+                    # new_pos2.append([pos[0]+1, pos[1]])
+                    new_pos.append([pos[0]-1])
+                    new_pos2.append([pos[0]+1])
                 else:
-                    new_pos.append([pos[0]+1, pos[1]])
-                    new_pos2.append([pos[0]-1, pos[1]])
+                    new_pos.append([pos[0]+1])
+                    new_pos2.append([pos[0]-1])
         return new_pos, new_pos2
 
     def new_note_helper(notes, idx, new_pos, new_pos2):
         if len(new_pos) > 0:
-            valid = check_note_pos_valid(new_pos)
-            valid2 = check_note_pos_valid(new_pos2)
+            valid = check_note_pos_valid(new_pos, xy='x')
+            valid2 = check_note_pos_valid(new_pos2, xy='x')
             if valid:
                 for ipos in range(len(new_pos)):
                     notes[idx][0 + 4 * ipos] = new_pos[ipos][0]
-                    notes[idx][1 + 4 * ipos] = new_pos[ipos][1]
             elif valid2:
                 for ipos in range(len(new_pos2)):
                     notes[idx][0 + 4 * ipos] = new_pos2[ipos][0]
-                    notes[idx][1 + 4 * ipos] = new_pos2[ipos][1]
         return notes
 
     for idx in range(len(notes_l)):
         if len(notes_l[idx]) > 2:
             note_pos = calc_note_pos(notes_l[idx], add_cut=False)
+            note_pos = [[pos[0]] for pos in note_pos]
             new_pos, new_pos2 = new_pos_helper(note_pos, last_note_pos_l, last_note_pos_r, True)
             notes_l = new_note_helper(notes_l, idx, new_pos, new_pos2)
             if len(new_pos) == 0:
                 last_note_pos_l = note_pos
             else:   # recalculate
-                last_note_pos_l = calc_note_pos(notes_l[idx], add_cut=False)
+                note_pos = calc_note_pos(notes_l[idx], add_cut=False)
+                last_note_pos_l = [[pos[0]] for pos in note_pos]
         if len(notes_r[idx]) > 2:
             note_pos = calc_note_pos(notes_r[idx], add_cut=False)
+            note_pos = [[pos[0]] for pos in note_pos]
             new_pos, new_pos2 = new_pos_helper(note_pos, last_note_pos_l, last_note_pos_r, False)
             notes_r = new_note_helper(notes_r, idx, new_pos, new_pos2)
             if len(new_pos) == 0:
                 last_note_pos_r = note_pos
             else:   # recalculate
-                last_note_pos_r = calc_note_pos(notes_r[idx], add_cut=False)
+                note_pos = calc_note_pos(notes_r[idx], add_cut=False)
+                last_note_pos_r = [[pos[0]] for pos in note_pos]
 
     return notes_l, notes_r
 
 
-def check_note_pos_valid(positions: list) -> bool:
-    for pos in positions:
-        if not 0 <= pos[0] <= 3:    # line index
-            return False
-        if not 0 <= pos[1] <= 2:    # line layer
-            return False
+def check_note_pos_valid(positions: list, xy=None) -> bool:
+    if xy is None:
+        for pos in positions:
+            if not 0 <= pos[0] <= 3:    # line index
+                return False
+            if not 0 <= pos[1] <= 2:    # line layer
+                return False
+    elif xy == 'x':
+        for pos in positions:
+            if not 0 <= pos[0] <= 3:    # line index
+                return False
+    elif xy == 'y':
+        for pos in positions:
+            if not 0 <= pos[1] <= 2:    # line index
+                return False
+    else:
+        print("Error, unknown position specified to check valid note")
+        return False
     return True
 
 
