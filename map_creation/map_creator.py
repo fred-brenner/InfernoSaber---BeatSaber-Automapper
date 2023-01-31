@@ -50,6 +50,8 @@ def create_map(y_class_num, timings, events, name, bpm):
         bs_diff = 'Expert'
         config.max_speed *= config.expert_fact
         new_map_folder = write_map(notes, timings, events, name, bpm, bs_diff)
+        # reset max speed
+        config.max_speed = config.max_speed_orig
     # copy supplementary files to folder
     src = f"{paths.new_map_path}cover.jpg"
     shutil.copy(src, new_map_folder)

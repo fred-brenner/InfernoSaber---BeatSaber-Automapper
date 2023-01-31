@@ -102,3 +102,5 @@ event_batch_size = 128
 # bps_hard = 6
 # bps_expert = 8
 # bps_expertplus = 10
+
+max_speed_orig = max_speed

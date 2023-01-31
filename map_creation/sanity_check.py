@@ -324,12 +324,6 @@ def correct_notes(notes, timings):
             # # notes[idx] = optimize_note_movement(nl_last, notes[idx])
             # notes[idx] = check_border_notes(notes, timings, idx)
 
-            # TODO: (change dot notes to cut notes) - schlupfloch aktuell
-            # TODO: check notes direction vs position with probabilistic factor (single)
-            #       alle am rand richtig drehen, zwischendrinnen löschen...
-            # TODO: apply reversed movement to next note (e.g. last[2, 1, 1, 2];new[1, 0, 1, 1])
-            #       not really possible without changing the whole track?
-
             # calculate movement speed (of first element)
             new_time = timings[idx]
             speed = calc_note_speed(nl_last, notes[idx], new_time - last_time,
