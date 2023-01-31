@@ -11,7 +11,7 @@ from bs_shift.export_map import shutil_copy_maps
 
 import tensorflow as tf
 
-export_results_to_bs = False
+export_results_to_bs = True
 
 # limit gpu ram usage
 conf = tf.compat.v1.ConfigProto()

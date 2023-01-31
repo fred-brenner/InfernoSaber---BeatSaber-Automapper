@@ -83,7 +83,7 @@ def main(name_ar: list) -> None:
     timing_ar /= config.beat_spacing
     timing_ar = timing_ar[timing_ar > config.window]
     # add beats between far beats
-    timing_ar = fill_map_times(timing_ar)
+    # timing_ar = fill_map_times(timing_ar)
     timing_ar = fill_map_times(timing_ar)
     time_input = [timing_ar]
 

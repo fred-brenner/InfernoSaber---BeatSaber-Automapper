@@ -4,6 +4,7 @@
 ########################################
 
 # Data Processing configuration
+general_diff = 'ExpertPlus'
 random_seed = 3
 min_time_diff = 0.01        # minimum time between cuts, otherwise synchronized
 samplerate_music = 14800    # samplerate for the music import
@@ -51,13 +52,15 @@ delete_offbeats = 0.6      # < 1 delete non-beats to free ram
 
 # Map creation model configuration
 """Do change"""
-max_speed = 30            # set around 5-40 (normal-expert++)
+max_speed = 25              # set around 5-40 (normal-expert++)
+expert_fact = 0.65          # expert plus to expert factor
+create_expert_flag = True   # create second expert map
 
 """Caution on changes"""
 reaction_time = 1.0         # reaction time (0.5-2)
-reaction_time += 0.013*max_speed
+reaction_time_fact = 0.013  # factor including max_speed
 jump_speed = 15             # jump speed from beat saber (15-22)
-jump_speed += int(0.24*max_speed)
+jump_speed_fact = 0.22      # factor including max_speed
 thresh_beat = 0.40          # minimum beat response required to trigger generator
 thresh_pitch = 0.40         # minimum beat for pitch check (0.01,low-1,high)
 threshold_end = 2.0         # factor for start and end threshold
@@ -68,13 +71,13 @@ favor_last_class = 0.15     # set factor to favor the next beat class (0.0-0.3)
 max_double_note_speed = 40  # set maximum speed difference between double notes (10 or 15 or 20)
 emphasize_beats_wait = 0.2  # minimum time in seconds
 emphasize_beats_3 = 0.023   # fraction beats to triple
-emphasize_beats_3 += 0.004*max_speed
+emphasize_beats_3_fact = 0.004   # factor incl max_speed
 emphasize_beats_2 = 0.23    # fraction beats to double
-emphasize_beats_2 += 0.0085*max_speed
+emphasize_beats_2_fact = 0.0085  # factor incl max_speed
 shift_beats_fact = 0.25     # fraction beats to shift in cut direction
 add_beat_low_bound = 0.18   # in seconds (beat_generator)
 add_beat_hi_bound = 0.90    # in seconds (beat_generator)
-add_beat_fact = 0.70        # fraction add beats (beat_generator)
+add_beat_fact = 0.90        # fraction add beats (beat_generator)
 
 # Postprocessing model configuration
 lstm_len_post = 10

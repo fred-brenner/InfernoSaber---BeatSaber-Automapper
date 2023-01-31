@@ -108,6 +108,8 @@ def sanity_check_timing(name, timings, song_duration):
 
 
 def emphasize_beats(notes, timings):
+    emphasize_beats_3 = config.emphasize_beats_3 + config.emphasize_beats_3_fact * config.max_speed
+    emphasize_beats_2 = config.emphasize_beats_2 + config.emphasize_beats_2_fact * config.max_speed
 
     def calc_new_note(note, new_pos):
         new_note = note * len(new_pos)
@@ -124,14 +126,14 @@ def emphasize_beats(notes, timings):
             note = notes[n]
             if len(note) > 0:
                 rd = np.random.random()
-                if rd > 1 - config.emphasize_beats_3:
+                if rd > 1 - emphasize_beats_3:
                     new_pos = calc_note_pos(note)
                     new_note = calc_new_note(note, new_pos)
                     if len(new_pos) < 3:
                         new_pos = calc_note_pos(new_note)[:3]
                         new_note = calc_new_note(note, new_pos)
                     update_new_note(notes, n, new_note)
-                elif rd > 1 - config.emphasize_beats_3 - config.emphasize_beats_2:
+                elif rd > 1 - emphasize_beats_3 - emphasize_beats_2:
                     new_pos = calc_note_pos(note)[:2]
                     new_note = calc_new_note(note, new_pos)
                     update_new_note(notes, n, new_note)
@@ -442,10 +444,9 @@ def calc_note_speed(notes_last, notes_new, time_diff, cdf):
     if notes_last is None:
         return 0
 
-    # cut director factor
-    # cdf = config.cdf
+    # reaction time
+    dist = config.reaction_time + config.reaction_time_fact * config.max_speed
 
-    dist = config.reaction_time     # reaction time
     cut_x_last, cut_y_last = get_cut_dir_xy(notes_last[3])
     cut_x_new, cut_y_new = get_cut_dir_xy(notes_new[3])
     # x direction
