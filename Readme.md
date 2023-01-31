@@ -1,12 +1,30 @@
 # Development branch for Mapper algorithm
 use main branch for a stable environment
 
+## Roadmap 2023
+March:
+
+    Deploy model on website
+    add bombs before unpredicted patterns
+    add obstacles in unused spaces
+
+April:
+
+    Create Obstacle AI Model
+
+May:
+    
+    Create Cardio Obstacle AI Model
+
+
 ## Automapper for Beatsaber made for expert+ levels 
-Extract maps from Beatsaber/Bsaber to feed them into AI models
+Extract maps from Beatsaber/Bsaber to feed them 
+into AI models.
 Map versions with custom modded data (values out of normal boundaries) are excluded,
 so the data is as smooth as possible.
 
-Automapper is trained on expert+ maps for average 5 notes-per-second in prediction
+Automapper is trained on expert+ maps for 
+average 6 notes-per-second in prediction
 
 The automapper consists of 4 consecutive AI models:
 1. Deep convolutional autoencoder - to encode the music/simplify all other models
@@ -15,7 +33,7 @@ The automapper consists of 4 consecutive AI models:
 4. Deep Neural Network (Classification) - mapping the events/lights
 
 An overview over the current status of map generation (including BSMapper and BeatSage) can be found at:
-https://youtu.be/2bP9YcAgG-E
+https://youtu.be/Jk9KG5EYEOY
 
 ### Author: Frederic Brenner
 frederic.brenner@tum.de
