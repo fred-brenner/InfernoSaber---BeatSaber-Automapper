@@ -53,17 +53,18 @@ delete_offbeats = 0.6      # < 1 delete non-beats to free ram
 # Map creation model configuration
 """Do change"""
 max_speed = 25              # set around 5-40 (normal-expert++)
-expert_fact = 0.65          # expert plus to expert factor
+expert_fact = 0.62          # expert plus to expert factor
 create_expert_flag = True   # create second expert map
+thresh_beat = 0.43          # minimum beat response required to trigger generator
+thresh_pitch = 0.40         # minimum beat for pitch check (0.01,low-1,high)
+threshold_end = 1.9         # factor for start and end threshold
+
 
 """Caution on changes"""
 reaction_time = 1.0         # reaction time (0.5-2)
 reaction_time_fact = 0.013  # factor including max_speed
 jump_speed = 15             # jump speed from beat saber (15-22)
 jump_speed_fact = 0.22      # factor including max_speed
-thresh_beat = 0.40          # minimum beat response required to trigger generator
-thresh_pitch = 0.40         # minimum beat for pitch check (0.01,low-1,high)
-threshold_end = 2.0         # factor for start and end threshold
 cdf = 1.1                   # cut director factor (to calculate speed, ~0.5)
 min_beat_time = 1/16        # in seconds (first sanity check)
 beat_spacing = 5587/196     # 5587/196s = 28.5051 steps/s
