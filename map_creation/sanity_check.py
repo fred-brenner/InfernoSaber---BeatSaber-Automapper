@@ -65,7 +65,7 @@ def sanity_check_timing(name, timings, song_duration):
     threshold_end = config.threshold_end * threshold
     idx_end = int(len(pitches) / 30)
     idx_end_list = list(range(idx_end))
-    idx_end_list.extend(list(range(len(pitches)-idx_end, len(pitches))))
+    idx_end_list.extend(list(range(len(pitches) - idx_end, len(pitches))))
     beat_flag = False
     beat_pos = np.zeros_like(pitches)
     for idx in range(len(pitches)):
@@ -122,7 +122,7 @@ def emphasize_beats(notes, timings):
         return notes
 
     for n in range(len(notes)):
-        if timings[n:n+1].max() >= config.emphasize_beats_wait:
+        if timings[n:n + 1].max() >= config.emphasize_beats_wait:
             note = notes[n]
             if len(note) > 0:
                 rd = np.random.random()
@@ -173,6 +173,9 @@ def sanity_check_notes(notes: list, timings):
 
     # check static position for next and last note for left and right together
     notes_r, notes_l, notes_b = correct_notes_all(notes_r, notes_l, notes_b, time_diffs)
+
+    # shift notes away from the middle
+    notes_r, notes_l, notes_b = shift_blocks_middle(notes_r, notes_l, notes_b)
 
     # rebuild notes
     new_notes = unpslit_notes(notes_r, notes_l, notes_b)
@@ -229,10 +232,10 @@ def offset_notes(notes_l, idx, offset, rm_counter):
     for i in range(int(len(notes_l[idx]) / 4)):
         if i > 1:
             print("")
-        pos_before = np.asarray(notes_l[idx][i*4:i*4+2])
+        pos_before = np.asarray(notes_l[idx][i * 4:i * 4 + 2])
         new_pos = list(pos_before - [offset, 0])
         if 0 <= new_pos[0] < 4 and 0 <= new_pos[1] < 3:
-            notes_l[idx][i*4:i*4+2] = new_pos
+            notes_l[idx][i * 4:i * 4 + 2] = new_pos
         else:
             rm_counter += 1
         return notes_l, rm_counter
@@ -241,8 +244,8 @@ def offset_notes(notes_l, idx, offset, rm_counter):
 def correct_notes_all(notes_r, notes_l, notes_b, time_diff):
     pos_r_last = []
     pos_l_last = []
-    pos_b_last = []
-    last_bomb_idx = 0
+    # pos_b_last = []
+    # last_bomb_idx = 0
     rm_counter = 0
     for idx in range(len(notes_r)):
         nb = notes_b[idx]
@@ -309,6 +312,62 @@ def correct_notes_all(notes_r, notes_l, notes_b, time_diff):
     return notes_r, notes_l, notes_b
 
 
+def shift_blocks_middle(notes_r, notes_l, notes_b):
+    counter = 0
+    for idx in range(len(notes_r)):
+        nb = notes_b[idx]
+        nr = notes_r[idx]
+        nl = notes_l[idx]
+
+        pos_r = calc_note_pos(nr, add_cut=False)
+        pos_l = calc_note_pos(nl, add_cut=False)
+        pos_b = calc_note_pos(nb, add_cut=False)
+
+        pos_all = pos_r.copy()
+        pos_all.extend(pos_l)
+        pos_all.extend(pos_b)
+
+        for ir in range(len(pos_r)):
+            if len(pos_r) <= 2:
+                if pos_r[ir] in [[1, 1], [2, 1]]:
+                    new_pos = calc_note_pos(nr, add_cut=True, inv=False)[-1]
+                    if new_pos not in pos_all:
+                        # change note down or up
+                        notes_r[idx][ir * 4:ir * 4 + 2] = [new_pos[0], new_pos[1]]
+                        counter += 1
+                    else:
+                        new_pos[0] = pos_r[ir][0]
+                        if new_pos not in pos_all:
+                            # change note down or up
+                            notes_r[idx][ir * 4:ir * 4 + 2] = [new_pos[0], new_pos[1]]
+                            counter += 1
+
+        for il in range(len(pos_l)):
+            if len(pos_l) <= 2:
+                if pos_l[il] in [[1, 1], [2, 1]]:
+                    new_pos = calc_note_pos(nl, add_cut=True, inv=False)[-1]
+                    if new_pos not in pos_all:
+                        # change note down or up
+                        notes_l[idx][il * 4:il * 4 + 2] = [new_pos[0], new_pos[1]]
+                        counter += 1
+                    else:
+                        new_pos[0] = pos_l[il][0]
+                        if new_pos not in pos_all:
+                            # change note down or up
+                            notes_l[idx][il * 4:il * 4 + 2] = [new_pos[0], new_pos[1]]
+                            counter += 1
+
+        for ib in range(len(pos_b)):
+            if pos_b[ib] in [[1, 1], [2, 1]]:
+                new_pos = 0
+                notes_b[idx][ib * 4 + 1:ib * 4 + 2] = new_pos
+                counter += 1
+
+    print(f"Shifted {counter} blocks away from the middle.")
+
+    return notes_r, notes_l, notes_b
+
+
 def correct_notes(notes, timings):
     nl_last = None
     last_time = 0
@@ -345,8 +404,8 @@ def correct_notes(notes, timings):
                 cut_dir = notes[idx][3]
                 for n in range(int(len(notes[idx]) / 4) - 1):
                     # check if cut direction is same
-                    if notes[idx][(n+1)*4 + 3] != cut_dir:
-                        notes[idx][(n+1)*4 + 3] = 8
+                    if notes[idx][(n + 1) * 4 + 3] != cut_dir:
+                        notes[idx][(n + 1) * 4 + 3] = 8
                     n *= 4
                     speed = calc_note_speed(notes[idx][n:n + 4],
                                             notes[idx][n + 4:n + 8],
@@ -531,7 +590,7 @@ def fill_map_times(map_times):
     for idx in range(len(diff)):
         if config.add_beat_low_bound < diff[idx] < config.add_beat_hi_bound:
             if np.random.random() < config.add_beat_fact:
-                beat_time = (map_times[idx] + map_times[idx+1]) / 2
+                beat_time = (map_times[idx] + map_times[idx + 1]) / 2
                 new_map_times.append(beat_time)
     if len(new_map_times) > 0:
         map_times = np.hstack((map_times, new_map_times))
@@ -549,17 +608,17 @@ def shift_blocks_up_down(notes: list, time_diffs: np.array):
             new_pos2 = []
             # if cut_y == -1:    # up
             for pos in note_pos:
-                new_pos.append([int(pos[0]-cut_x), int(pos[1]-cut_y)])
-                new_pos2.append([int(pos[0]-2*cut_x), int(pos[1]-2*cut_y)])
+                new_pos.append([int(pos[0] - cut_x), int(pos[1] - cut_y)])
+                new_pos2.append([int(pos[0] - 2 * cut_x), int(pos[1] - 2 * cut_y)])
 
             # check all new positions:
             valid = check_note_pos_valid(new_pos)
-            valid2 = check_note_pos_valid(new_pos2)     # if true always shift
+            valid2 = check_note_pos_valid(new_pos2)  # if true always shift
             if valid:
                 if valid2 or np.random.random() < config.shift_beats_fact:
                     for ipos in range(len(new_pos)):
-                        notes[idx][0+4*ipos] = new_pos[ipos][0]
-                        notes[idx][1+4*ipos] = new_pos[ipos][1]
+                        notes[idx][0 + 4 * ipos] = new_pos[ipos][0]
+                        notes[idx][1 + 4 * ipos] = new_pos[ipos][1]
     return notes
 
 
@@ -612,11 +671,11 @@ def shift_blocks_left_right(notes_l: list, notes_r: list, time_diffs: np.array):
                 if left_note:
                     # new_pos.append([pos[0]-1, pos[1]])
                     # new_pos2.append([pos[0]+1, pos[1]])
-                    new_pos.append([pos[0]-1])
-                    new_pos2.append([pos[0]+1])
+                    new_pos.append([pos[0] - 1])
+                    new_pos2.append([pos[0] + 1])
                 else:
-                    new_pos.append([pos[0]+1])
-                    new_pos2.append([pos[0]-1])
+                    new_pos.append([pos[0] + 1])
+                    new_pos2.append([pos[0] - 1])
         return new_pos, new_pos2
 
     def new_note_helper(notes, idx, new_pos, new_pos2):
@@ -640,7 +699,7 @@ def shift_blocks_left_right(notes_l: list, notes_r: list, time_diffs: np.array):
             notes_l = new_note_helper(notes_l, idx, new_pos, new_pos2)
             if len(new_pos) == 0:
                 last_note_pos_l = note_pos
-            else:   # recalculate
+            else:  # recalculate
                 note_pos = calc_note_pos(notes_l[idx], add_cut=False)
                 last_note_pos_l = [[pos[0]] for pos in note_pos]
                 last_note_l_temp.extend(last_note_pos_l)
@@ -651,7 +710,7 @@ def shift_blocks_left_right(notes_l: list, notes_r: list, time_diffs: np.array):
             notes_r = new_note_helper(notes_r, idx, new_pos, new_pos2)
             if len(new_pos) == 0:
                 last_note_pos_r = note_pos
-            else:   # recalculate
+            else:  # recalculate
                 note_pos = calc_note_pos(notes_r[idx], add_cut=False)
                 last_note_pos_r = [[pos[0]] for pos in note_pos]
 
@@ -661,17 +720,17 @@ def shift_blocks_left_right(notes_l: list, notes_r: list, time_diffs: np.array):
 def check_note_pos_valid(positions: list, xy=None) -> bool:
     if xy is None:
         for pos in positions:
-            if not 0 <= pos[0] <= 3:    # line index
+            if not 0 <= pos[0] <= 3:  # line index
                 return False
-            if not 0 <= pos[1] <= 2:    # line layer
+            if not 0 <= pos[1] <= 2:  # line layer
                 return False
     elif xy == 'x':
         for pos in positions:
-            if not 0 <= pos[0] <= 3:    # line index
+            if not 0 <= pos[0] <= 3:  # line index
                 return False
     elif xy == 'y':
         for pos in positions:
-            if not 0 <= pos[1] <= 2:    # line index
+            if not 0 <= pos[1] <= 2:  # line index
                 return False
     else:
         print("Error, unknown position specified to check valid note")
