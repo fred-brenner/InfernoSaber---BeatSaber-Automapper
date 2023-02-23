@@ -135,6 +135,13 @@ def emphasize_beats(notes, timings):
                     update_new_note(notes, n, new_note)
                 elif rd > 1 - emphasize_beats_3 - emphasize_beats_2:
                     new_pos = calc_note_pos(note)[:2]
+                    for ip in range(len(new_pos)-1, 0, -1):
+                        if new_pos[ip] in [[1, 1], [2, 1]]:
+                            new_pos.pop(ip)
+                    # only check first entry if enough notes are available
+                    if len(new_pos) > 1:
+                        if new_pos[0] in [[1, 1], [2, 1]]:
+                            new_pos.pop(0)
                     new_note = calc_new_note(note, new_pos)
                     update_new_note(notes, n, new_note)
 
@@ -328,7 +335,7 @@ def shift_blocks_middle(notes_r, notes_l, notes_b):
         pos_all.extend(pos_b)
 
         for ir in range(len(pos_r)):
-            if len(pos_r) <= 2:
+            if len(pos_r) <= 1:
                 if pos_r[ir] in [[1, 1], [2, 1]]:
                     new_pos = calc_note_pos(nr, add_cut=True, inv=False)[-1]
                     if new_pos not in pos_all:
@@ -343,7 +350,7 @@ def shift_blocks_middle(notes_r, notes_l, notes_b):
                             counter += 1
 
         for il in range(len(pos_l)):
-            if len(pos_l) <= 2:
+            if len(pos_l) <= 1:
                 if pos_l[il] in [[1, 1], [2, 1]]:
                     new_pos = calc_note_pos(nl, add_cut=True, inv=False)[-1]
                     if new_pos not in pos_all:
