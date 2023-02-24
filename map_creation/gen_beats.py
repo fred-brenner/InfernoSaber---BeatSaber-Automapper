@@ -97,6 +97,7 @@ def main(name_ar: list) -> None:
     map_times = map_times[map_times > 0]
     map_times = fill_map_times(map_times)
     # map_times = fill_map_times(map_times)
+    map_times = add_lstm_prerun(map_times)
 
     # calculate time between beats
     timing_diff_ar = calc_time_between_beats([map_times])

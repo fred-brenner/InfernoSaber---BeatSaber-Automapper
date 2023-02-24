@@ -28,6 +28,7 @@ def sanity_check_beat(beat):
 
 
 def sanity_check_timing(name, timings, song_duration):
+
     samplerate_music = 44100
 
     #####################################
@@ -135,7 +136,7 @@ def emphasize_beats(notes, timings):
                     update_new_note(notes, n, new_note)
                 elif rd > 1 - emphasize_beats_3 - emphasize_beats_2:
                     new_pos = calc_note_pos(note)[:2]
-                    for ip in range(len(new_pos)-1, 0, -1):
+                    for ip in range(len(new_pos) - 1, 0, -1):
                         if new_pos[ip] in [[1, 1], [2, 1]]:
                             new_pos.pop(ip)
                     # only check first entry if enough notes are available
@@ -149,8 +150,8 @@ def emphasize_beats(notes, timings):
 
 
 def sanity_check_notes(notes: list, timings):
-
     # TODO: find bug for multiple notes which are not in a row
+    #       (in combination with random generator)
 
     [notes_r, notes_l, notes_b] = split_notes_rl(notes)
     # test = unpslit_notes(notes_r, notes_l, notes_b)
@@ -383,6 +384,8 @@ def shift_blocks_middle(notes_r, notes_l, notes_b):
 
 
 def correct_notes(notes, timings):
+    # (TODO: decrease max_speed for start and end of song)
+
     nl_last = None
     last_time = 0
     rm_counter = 0
@@ -599,9 +602,10 @@ def reverse_cut_dir_xy(old_cut):
 # Postprocessing
 ################
 def fill_map_times(map_times):
+    se_thresh = int(len(map_times) / 25)  # don't apply filling for first and last 4% of song
     diff = np.diff(map_times)
     new_map_times = []
-    for idx in range(len(diff)):
+    for idx in range(se_thresh, len(diff) - se_thresh):
         if config.add_beat_low_bound < diff[idx] < config.add_beat_hi_bound:
             if np.random.random() < config.add_beat_fact:
                 beat_time = (map_times[idx] + map_times[idx + 1]) / 2
@@ -609,6 +613,14 @@ def fill_map_times(map_times):
     if len(new_map_times) > 0:
         map_times = np.hstack((map_times, new_map_times))
         map_times = np.sort(map_times)
+    return map_times
+
+
+def add_lstm_prerun(map_times):
+    # add cutoff map times to compensate for lstm reshape
+    new_map_times = np.linspace(0, 2, config.lstm_len*2)
+    map_times = np.hstack((new_map_times, map_times))
+    # map_times = np.sort(map_times)
     return map_times
 
 

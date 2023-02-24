@@ -57,8 +57,9 @@ expert_fact = 0.64          # expert plus to expert factor
 create_expert_flag = True   # create second expert map
 thresh_beat = 0.44          # minimum beat response required to trigger generator
 thresh_pitch = 0.41         # minimum beat for pitch check (0.01,low-1,high)
-threshold_end = 1.9         # factor for start and end threshold
-random_note_map_factor = 0.4    # stick note map to random song/center (set to 0 to disable)
+threshold_end = 1.7         # factor for start and end threshold
+# TODO: check random generator
+random_note_map_factor = 0.0    # stick note map to random song/center (set to 0 to disable)
 random_note_map_change = 10     # change frequency for center in seconds
 
 """Caution on changes"""
