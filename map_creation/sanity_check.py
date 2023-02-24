@@ -177,7 +177,6 @@ def sanity_check_notes(notes: list, timings):
     # notes_l = correct_notes(notes_l, timings)
 
     # emphasize some beats randomly
-    # TODO: do not apply on first notes
     notes_l = emphasize_beats(notes_l, time_diffs)
     notes_r = emphasize_beats(notes_r, time_diffs)
 
