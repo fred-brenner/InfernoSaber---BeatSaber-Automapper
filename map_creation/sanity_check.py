@@ -111,7 +111,7 @@ def sanity_check_timing(name, timings, song_duration):
 def emphasize_beats(notes, timings):
     emphasize_beats_3 = config.emphasize_beats_3 + config.emphasize_beats_3_fact * config.max_speed
     emphasize_beats_2 = config.emphasize_beats_2 + config.emphasize_beats_2_fact * config.max_speed
-
+    start_end_idx = 4
     def calc_new_note(note, new_pos):
         new_note = note * len(new_pos)
         for i in range(len(new_pos)):
@@ -122,7 +122,8 @@ def emphasize_beats(notes, timings):
         notes[n] = new_note
         return notes
 
-    for n in range(len(notes)):
+    # for n in range(start_end_idx, len(notes) - start_end_idx):
+    for n in range(start_end_idx, len(notes)):
         if timings[n:n + 1].max() >= config.emphasize_beats_wait:
             note = notes[n]
             if len(note) > 0:
