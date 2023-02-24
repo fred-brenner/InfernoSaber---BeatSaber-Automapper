@@ -9,7 +9,6 @@ from map_creation.sanity_check import sanity_check_notes
 from tools.config import config, paths
 
 
-# TODO: enable expert and expert+
 def create_map(y_class_num, timings, events, name, bpm):
     # load notes classify keys
     with open(paths.notes_classify_dict_file, 'rb') as f:

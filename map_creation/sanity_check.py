@@ -184,6 +184,8 @@ def sanity_check_notes(notes: list, timings):
     # shift notes away from the middle
     notes_r, notes_l, notes_b = shift_blocks_middle(notes_r, notes_l, notes_b)
 
+    # TODO: remove blocking bombs!
+
     # rebuild notes
     new_notes = unpslit_notes(notes_r, notes_l, notes_b)
     return new_notes
