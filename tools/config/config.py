@@ -52,14 +52,14 @@ delete_offbeats = 0.6      # < 1 delete non-beats to free ram
 
 # Map creation model configuration
 """Do change"""
-max_speed = 25              # set around 5-40 (normal-expert++)
-expert_fact = 0.62          # expert plus to expert factor
+max_speed = 23              # set around 5-40 (normal-expert++)
+expert_fact = 0.64          # expert plus to expert factor
 create_expert_flag = True   # create second expert map
-thresh_beat = 0.43          # minimum beat response required to trigger generator
-thresh_pitch = 0.40         # minimum beat for pitch check (0.01,low-1,high)
+thresh_beat = 0.44          # minimum beat response required to trigger generator
+thresh_pitch = 0.41         # minimum beat for pitch check (0.01,low-1,high)
 threshold_end = 1.9         # factor for start and end threshold
-random_note_map_factor = 0.1    # stick note map to random song/center (set to 0 to disable)
-random_note_map_change = 50     # change frequency for center
+random_note_map_factor = 0.4    # stick note map to random song/center (set to 0 to disable)
+random_note_map_change = 20     # change frequency for center
 
 """Caution on changes"""
 reaction_time = 1.0         # reaction time (0.5-2)

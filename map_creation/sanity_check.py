@@ -366,9 +366,11 @@ def shift_blocks_middle(notes_r, notes_l, notes_b):
 
         for ib in range(len(pos_b)):
             if pos_b[ib] in [[1, 1], [2, 1]]:
-                new_pos = 0
-                notes_b[idx][ib * 4 + 1:ib * 4 + 2] = new_pos
-                counter += 1
+                new_pos = [pos_b[ib][0], 0]
+                if new_pos not in pos_all:
+                    # change note down or up
+                    notes_b[idx][ib * 4:ib * 4 + 2] = new_pos
+                    counter += 1
 
     print(f"Shifted {counter} blocks away from the middle.")
 
