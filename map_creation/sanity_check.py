@@ -618,9 +618,11 @@ def fill_map_times(map_times):
 
 def add_lstm_prerun(map_times):
     # add cutoff map times to compensate for lstm reshape
-    new_map_times = np.linspace(0, 2, config.lstm_len*2)
-    map_times = np.hstack((new_map_times, map_times))
-    # map_times = np.sort(map_times)
+    qs = config.quick_start
+    if qs > 0:
+        new_map_times = np.linspace(0, qs, int(config.lstm_len * qs))
+        map_times = np.hstack((new_map_times, map_times))
+        # map_times = np.sort(map_times)
     return map_times
 
 
