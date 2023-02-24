@@ -28,7 +28,6 @@ def sanity_check_beat(beat):
 
 
 def sanity_check_timing(name, timings, song_duration):
-
     samplerate_music = 44100
 
     #####################################
@@ -112,6 +111,7 @@ def emphasize_beats(notes, timings):
     emphasize_beats_3 = config.emphasize_beats_3 + config.emphasize_beats_3_fact * config.max_speed
     emphasize_beats_2 = config.emphasize_beats_2 + config.emphasize_beats_2_fact * config.max_speed
     start_end_idx = 4
+
     def calc_new_note(note, new_pos):
         new_note = note * len(new_pos)
         for i in range(len(new_pos)):
@@ -386,9 +386,9 @@ def correct_notes(notes, timings):
     nl_last = None
     last_time = 0
     rm_counter = 0
-    se_idx = config.decr_speed_range     # start_end_index
+    se_idx = config.decr_speed_range  # start_end_index
     decrease_range = list(range(se_idx))
-    decrease_range.extend(list(range(len(notes)-se_idx, len(notes))))
+    decrease_range.extend(list(range(len(notes) - se_idx, len(notes))))
     decrease_val = config.decr_speed_val
 
     for idx in range(len(notes)):
@@ -430,9 +430,13 @@ def correct_notes(notes, timings):
                     if notes[idx][(n + 1) * 4 + 3] != cut_dir:
                         notes[idx][(n + 1) * 4 + 3] = 8
                     n *= 4
-                    speed = calc_note_speed(notes[idx][n:n + 4],
-                                            notes[idx][n + 4:n + 8],
-                                            time_diff=0.05, cdf=0.9)
+                    speed1 = calc_note_speed(notes[idx][n:n + 4],
+                                             notes[idx][n + 4:n + 8],
+                                             time_diff=0.08, cdf=1.1, react=False)
+                    speed2 = calc_note_speed(notes[idx][n + 4:n + 8],
+                                             notes[idx][n:n + 4],
+                                             time_diff=0.08, cdf=1.1, react=False)
+                    speed = np.min([speed1, speed2])
                     if speed > config.max_double_note_speed:
                         # try to fix second notes
                         try_notes = notes[idx][n + 4:n + 8]
@@ -516,12 +520,15 @@ def check_note_movement(notes_last, notes_new):
     return notes_new
 
 
-def calc_note_speed(notes_last, notes_new, time_diff, cdf):
+def calc_note_speed(notes_last, notes_new, time_diff, cdf, react=True):
     if notes_last is None:
         return 0
 
     # reaction time
-    dist = config.reaction_time + config.reaction_time_fact * config.max_speed
+    if react:
+        dist = config.reaction_time + config.reaction_time_fact * config.max_speed
+    else:
+        dist = 0
 
     cut_x_last, cut_y_last = get_cut_dir_xy(notes_last[3])
     cut_x_new, cut_y_new = get_cut_dir_xy(notes_new[3])
