@@ -79,7 +79,6 @@ black_list_file = fail_path + "black_list.txt"
 
 notes_classify_dict_file = f"{pred_path}notes_class_dict_{config.min_bps_limit}-{config.max_bps_limit}.pkl"
 # beats_classify_encoder_file = pred_path + f"onehot_encoder_beats_{config.min_bps_limit}-{config.max_bps_limit}.pkl"
-# TODO: check which encoder are taken
 beats_classify_encoder_file = pred_path + f"onehot_encoder_beats.pkl"
 events_classify_encoder_file = pred_path + f"onehot_encoder_events.pkl"
 ############################

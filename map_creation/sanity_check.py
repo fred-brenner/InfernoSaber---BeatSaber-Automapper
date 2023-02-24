@@ -494,10 +494,10 @@ def check_note_movement(notes_last, notes_new):
         if dist_x == dist_y == 1:
             return notes_new
 
-        # change cut direction
-        # TODO: (check if new cut direction needs more speed
-        #       only if timing < 0.5)
+        # (TODO: (check if new cut direction needs more speed
+        #       only if timing < 0.5) if necessary)
 
+        # change cut direction
         new_cut = reverse_cut_dir_xy(notes_last[3])
         notes_new[3] = new_cut
 
