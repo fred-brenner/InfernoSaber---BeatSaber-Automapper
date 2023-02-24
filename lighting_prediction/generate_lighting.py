@@ -80,10 +80,13 @@ def generate(l_in_song, time_ar, save_model_name, lstm_len, encoder_file):
     #     y_class_last = y_class.copy()
     #     y_class_map.append(y_class)
 
+
     """Model half"""
     # apply event model
     ###################
     y_class = None
+    rd_counter = 0
+    rd_dist = None
     y_class_map = np.zeros((in_time_l.shape[0], in_time_l.shape[1], class_size), dtype=int)
     for idx in range(len(in_song_l)):
         if y_class is None:
@@ -95,12 +98,12 @@ def generate(l_in_song, time_ar, save_model_name, lstm_len, encoder_file):
         ds_train = [in_song_l[idx:idx + 1], in_time_l[idx:idx + 1], in_class_l[idx:idx + 1]]
         y_class = model.predict(x=ds_train, verbose=0)
 
-        # TODO: Apply random distribution to output changing after long time
-        #       Distribution should be centered on a specific area
+        y_class, rd_dist, rd_counter = apply_random_mapper(y_class, rd_dist, rd_counter)
 
         # find class winner
         y_arg_max = np.argmax(y_class, axis=2)[0]
         for imax in range(len(y_arg_max)):
+            # TODO: Filter out double notes
             y_class_map[idx, imax][y_arg_max[imax]] = 1
 
     # decode event class output
@@ -113,6 +116,41 @@ def generate(l_in_song, time_ar, save_model_name, lstm_len, encoder_file):
     else:
         print("Finished mapping generator")
     return y_class_num
+
+
+def apply_random_mapper(y_class, rd_dist, rd_counter):
+    # Warning: Prediction is not stable enough
+    # May lead to random resampling of ml output
+
+     # initiate random map center
+    c_window = 50
+    c_val = config.random_note_map_factor
+    if c_val == 0:
+        return y_class, rd_dist, rd_counter
+
+    # scale batch to [0, 1]
+    y_class_sc = y_class / np.max(y_class)
+
+    if rd_counter <= 0:
+        # initialization
+        rd_dist = np.random.rand(y_class.shape[0], y_class.shape[1], y_class.shape[2]) * c_val
+        center = int(np.random.rand(1)[0] * y_class.shape[2])
+        # check center is in bounds
+        if center < c_window:
+            center = c_window
+        elif center > y_class.shape[2] - c_window - 1:
+            center = y_class.shape[2] - c_window - 1
+        center_start = center - c_window
+        center_end = center + c_window
+        # shift emphasis towards center
+        rd_dist[:, :, center_start:center_end] += c_val
+        rd_counter = config.random_note_map_change
+
+    rd_counter -= 1
+
+    y_class = y_class_sc + rd_dist
+
+    return y_class, rd_dist, rd_counter
 
 
 if __name__ == '__main__':
