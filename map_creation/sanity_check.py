@@ -150,9 +150,6 @@ def emphasize_beats(notes, timings):
 
 
 def sanity_check_notes(notes: list, timings):
-    # TODO: find bug for multiple notes which are not in a row
-    #       (in combination with random generator)
-
     [notes_r, notes_l, notes_b] = split_notes_rl(notes)
     # test = unpslit_notes(notes_r, notes_l, notes_b)
 
@@ -179,6 +176,7 @@ def sanity_check_notes(notes: list, timings):
     # notes_l = correct_notes(notes_l, timings)
 
     # emphasize some beats randomly
+    # TODO: do not apply on first notes
     notes_l = emphasize_beats(notes_l, time_diffs)
     notes_r = emphasize_beats(notes_r, time_diffs)
 

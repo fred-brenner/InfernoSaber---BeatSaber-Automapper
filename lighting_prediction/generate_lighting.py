@@ -143,11 +143,12 @@ def apply_random_mapper(y_class, rd_dist, rd_counter):
         center_end = center + c_window
         # shift emphasis towards center
         rd_dist[:, :, center_start:center_end] += c_val
-        rd_counter = config.random_note_map_change * 6  # counter from seconds to steps
+        rd_dist += 1
+        rd_counter = config.random_note_map_change
 
     rd_counter -= 1
 
-    y_class = y_class_sc + rd_dist
+    y_class = y_class_sc * rd_dist
 
     return y_class, rd_dist, rd_counter
 
