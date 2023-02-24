@@ -63,6 +63,8 @@ random_note_map_change = 2     # change frequency for center (1-20)
 quick_start = 2.0           # map quick start mode (0 off, 1-3 on)
 
 """Caution on changes"""
+decr_speed_range = 15       # decrease speed for start and end
+decr_speed_val = 0.7        # decrease max speed at start
 reaction_time = 1.1         # reaction time (0.5-2)
 reaction_time_fact = 0.013  # factor including max_speed
 jump_speed = 15             # jump speed from beat saber (15-22)
@@ -71,7 +73,7 @@ cdf = 1.1                   # cut director factor (to calculate speed, ~0.5)
 min_beat_time = 1/16        # in seconds (first sanity check)
 beat_spacing = 5587/196     # 5587/196s = 28.5051 steps/s
 favor_last_class = 0.15     # set factor to favor the next beat class (0.0-0.3)
-max_double_note_speed = 40  # set maximum speed difference between double notes (10 or 15 or 20)
+max_double_note_speed = 25  # set maximum speed difference between double notes (10 or 15 or 20)
 emphasize_beats_wait = 0.2  # minimum time in seconds
 emphasize_beats_3 = 0.023   # fraction beats to triple
 emphasize_beats_3_fact = 0.004   # factor incl max_speed

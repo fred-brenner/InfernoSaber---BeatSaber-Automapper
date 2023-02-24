@@ -383,11 +383,14 @@ def shift_blocks_middle(notes_r, notes_l, notes_b):
 
 
 def correct_notes(notes, timings):
-    # (TODO: decrease max_speed for start and end of song)
-
     nl_last = None
     last_time = 0
     rm_counter = 0
+    se_idx = config.decr_speed_range     # start_end_index
+    decrease_range = list(range(se_idx))
+    decrease_range.extend(list(range(len(notes)-se_idx, len(notes))))
+    decrease_val = config.decr_speed_val
+
     for idx in range(len(notes)):
         if len(notes[idx]) == 0:
             continue
@@ -405,7 +408,11 @@ def correct_notes(notes, timings):
                                     config.cdf)
 
             # remove too fast elements
-            if speed > config.max_speed:
+            if idx in decrease_range:
+                mx_speed = config.max_speed * decrease_val
+            else:
+                mx_speed = config.max_speed
+            if speed > mx_speed:
                 rm_counter += int(len(notes[idx]) / 4)
                 notes[idx] = []
                 continue
@@ -425,7 +432,7 @@ def correct_notes(notes, timings):
                     n *= 4
                     speed = calc_note_speed(notes[idx][n:n + 4],
                                             notes[idx][n + 4:n + 8],
-                                            time_diff=0.05, cdf=0.5)
+                                            time_diff=0.05, cdf=0.9)
                     if speed > config.max_double_note_speed:
                         # try to fix second notes
                         try_notes = notes[idx][n + 4:n + 8]
