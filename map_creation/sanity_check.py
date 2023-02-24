@@ -149,6 +149,9 @@ def emphasize_beats(notes, timings):
 
 
 def sanity_check_notes(notes: list, timings):
+
+    # TODO: find bug for multiple notes which are not in a row
+
     [notes_r, notes_l, notes_b] = split_notes_rl(notes)
     # test = unpslit_notes(notes_r, notes_l, notes_b)
 

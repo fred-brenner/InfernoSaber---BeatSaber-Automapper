@@ -59,10 +59,10 @@ thresh_beat = 0.44          # minimum beat response required to trigger generato
 thresh_pitch = 0.41         # minimum beat for pitch check (0.01,low-1,high)
 threshold_end = 1.9         # factor for start and end threshold
 random_note_map_factor = 0.4    # stick note map to random song/center (set to 0 to disable)
-random_note_map_change = 20     # change frequency for center
+random_note_map_change = 10     # change frequency for center in seconds
 
 """Caution on changes"""
-reaction_time = 1.0         # reaction time (0.5-2)
+reaction_time = 1.1         # reaction time (0.5-2)
 reaction_time_fact = 0.013  # factor including max_speed
 jump_speed = 15             # jump speed from beat saber (15-22)
 jump_speed_fact = 0.22      # factor including max_speed
