@@ -139,19 +139,20 @@ def get_map_string(events='', notes='', obstacles=''):
 
 
 def get_info_map_string(name, bpm, bs_diff):
-    diff_plus = config.max_speed / config.expert_fact
     jump_speed = [int(config.jump_speed + config.jump_speed_fact * config.max_speed)]
     if bs_diff == 'Expert':
+        diff_plus = config.max_speed / config.expert_fact
         diff_list = ['Expert', 'ExpertPlus']
         jump_speed.append(int(config.jump_speed + config.jump_speed_fact * diff_plus))
     else:
+        diff_plus = config.max_speed
         diff_list = ['ExpertPlus']
 
     info_string = '{\n'
     info_string += '"_version": "2.0.0",\n'
     info_string += f'"_songName": "{name}",\n'
-    info_string += '"_songSubName": "",\n'
-    info_string += '"_songAuthorName": "unknown",\n'        # (TODO: save difficulty)
+    info_string += f'"_songSubName": "Diff_{diff_plus}",\n'
+    info_string += '"_songAuthorName": "unknown",\n'
     info_string += '"_levelAuthorName": "BierHerr",\n'
     info_string += f'"_beatsPerMinute": {bpm},\n'
     info_string += '"_songTimeOffset": 0,\n'

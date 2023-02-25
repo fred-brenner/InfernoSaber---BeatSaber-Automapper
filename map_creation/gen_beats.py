@@ -90,7 +90,8 @@ def main(name_ar: list) -> None:
     # calculate bpm
     file = paths.songs_pred + name_ar[0] + '.egg'
     bpm, song_duration = get_file_bpm(file)     # 1.6
-    bpm = int(bpm)
+    # average bpm for songs to make more similar (jump) speeds
+    bpm = int((bpm + 100) / 2)
 
     # sanity check timings
     map_times = sanity_check_timing(name_ar[0], timing_ar, song_duration)   # 3.9
