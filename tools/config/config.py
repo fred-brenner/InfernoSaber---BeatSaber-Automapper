@@ -52,7 +52,7 @@ delete_offbeats = 0.6      # < 1 delete non-beats to free ram
 
 # Map creation model configuration
 """Do change"""
-max_speed = 23              # set around 5-40 (normal-expert++)
+max_speed = 24              # set around 5-40 (normal-expert++)
 expert_fact = 0.64          # expert plus to expert factor
 create_expert_flag = True   # create second expert map
 thresh_beat = 0.44          # minimum beat response required to trigger generator
@@ -63,8 +63,8 @@ random_note_map_change = 2     # change frequency for center (1-20)
 quick_start = 2.0           # map quick start mode (0 off, 1-3 on)
 
 """Caution on changes"""
-decr_speed_range = 15       # decrease speed for start and end
-decr_speed_val = 0.7        # decrease max speed at start
+decr_speed_range = 12       # decrease speed for start and end
+decr_speed_val = 0.25        # decrease max speed at start
 reaction_time = 1.1         # reaction time (0.5-2)
 reaction_time_fact = 0.013  # factor including max_speed
 jump_speed = 15             # jump speed from beat saber (15-22)

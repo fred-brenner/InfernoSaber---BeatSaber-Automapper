@@ -385,8 +385,12 @@ def correct_notes(notes, timings):
     nl_last = None
     last_time = 0
     rm_counter = 0
+
+    # reduce note difficulty at start and end of song
     se_idx = config.decr_speed_range  # start_end_index
-    decrease_range = list(range(se_idx))
+    # compensate quick start behavior
+    se_idx_start = se_idx + int(0.4 * config.quick_start * config.lstm_len + 0.6 * config.lstm_len)
+    decrease_range = list(range(se_idx_start))
     decrease_range.extend(list(range(len(notes) - se_idx, len(notes))))
     decrease_val = config.decr_speed_val
 
@@ -412,6 +416,7 @@ def correct_notes(notes, timings):
             else:
                 mx_speed = config.max_speed
             if speed > mx_speed:
+                # remove notes at this point
                 rm_counter += int(len(notes[idx]) / 4)
                 notes[idx] = []
                 continue
