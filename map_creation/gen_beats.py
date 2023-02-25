@@ -109,8 +109,8 @@ def main(name_ar: list) -> None:
 
     # filter invalid indices
     for rm_idx in rm_index[0][::-1]:
-        timing_diff_ar[0].pop(rm_idx)
-        timing_ar = np.delete(timing_ar, rm_idx)
+        # timing_diff_ar[0].pop(rm_idx)   # not used right now
+        # timing_ar = np.delete(timing_ar, rm_idx)  # not working/unused
         map_times = np.delete(map_times, rm_idx)
 
     # Load pretrained encoder model
