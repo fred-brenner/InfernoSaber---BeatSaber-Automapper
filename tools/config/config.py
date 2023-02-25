@@ -63,7 +63,7 @@ random_note_map_change = 2     # change frequency for center (1-20)
 quick_start = 2.0           # map quick start mode (0 off, 1-3 on)
 
 """Caution on changes"""
-decr_speed_range = 12       # decrease speed for start and end
+decr_speed_range = 10       # decrease speed for start and end
 decr_speed_val = 0.25        # decrease max speed at start
 reaction_time = 1.1         # reaction time (0.5-2)
 reaction_time_fact = 0.013  # factor including max_speed
