@@ -151,6 +151,9 @@ def emphasize_beats(notes, timings):
 
 
 def sanity_check_notes(notes: list, timings):
+    # last sanity check for notes,
+    # result is written to map
+
     [notes_r, notes_l, notes_b] = split_notes_rl(notes)
     # test = unpslit_notes(notes_r, notes_l, notes_b)
 
@@ -186,7 +189,9 @@ def sanity_check_notes(notes: list, timings):
     # shift notes away from the middle
     notes_r, notes_l, notes_b = shift_blocks_middle(notes_r, notes_l, notes_b)
 
-    # TODO: remove blocking bombs!
+    # TODO: add bombs for long pause to focus on next note direction
+
+    # TODO: remove blocking bombs
 
     # rebuild notes
     new_notes = unpslit_notes(notes_r, notes_l, notes_b)
