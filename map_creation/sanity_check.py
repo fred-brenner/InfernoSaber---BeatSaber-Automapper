@@ -104,7 +104,7 @@ def sanity_check_timing(name, timings, song_duration):
         else:
             timings[i] = 0
 
-    return timings
+    return timings, pitches
 
 
 def emphasize_beats(notes, timings):
@@ -123,6 +123,7 @@ def emphasize_beats(notes, timings):
         return notes
 
     # for n in range(start_end_idx, len(notes) - start_end_idx):
+    # TODO: check timings (needed individually for each note side?)
     for n in range(start_end_idx, len(notes)):
         if timings[n:n + 1].max() >= config.emphasize_beats_wait:
             note = notes[n]
@@ -150,7 +151,7 @@ def emphasize_beats(notes, timings):
     return notes
 
 
-def sanity_check_notes(notes: list, timings):
+def sanity_check_notes(notes: list, timings:list, pitch_algo: np.array):
     # last sanity check for notes,
     # result is written to map
 
@@ -190,6 +191,7 @@ def sanity_check_notes(notes: list, timings):
     notes_r, notes_l, notes_b = shift_blocks_middle(notes_r, notes_l, notes_b)
 
     # TODO: add bombs for long pause to focus on next note direction
+    notes_b = add_pause_bombs(notes_r, notes_l, notes_b, time_diffs, pitch_algo)
 
     # TODO: remove blocking bombs
 
@@ -384,6 +386,21 @@ def shift_blocks_middle(notes_r, notes_l, notes_b):
     print(f"Shifted {counter} blocks away from the middle.")
 
     return notes_r, notes_l, notes_b
+
+
+def add_pause_bombs(notes_r, notes_l, notes_b, time_diffs, pitch_algo):
+    # add bombs between notes to improve flow
+
+    # calculate time difference between notes
+    note_mask = np.zeros(len(time_diffs))
+    note_r_mask = np.asarray([1 if len(x) > 0 else 0 for x in notes_r])
+    note_l_mask = np.asarray([1 if len(x) > 0 else 0 for x in notes_l])
+    time_diff_r = time_diffs * note_r_mask
+    time_diff_l = time_diffs * note_l_mask
+
+    # walk through notes times
+    for idx in range(len(time_diff_r)):
+        # TODO: continue
 
 
 def correct_notes(notes, timings):
@@ -793,4 +810,4 @@ if __name__ == '__main__':
     timings = np.load(paths.temp_path + 'timings.npy', allow_pickle=True)
     notes = list(notes)
 
-    sanity_check_notes(notes, timings)
+    sanity_check_notes(notes, timings, None)

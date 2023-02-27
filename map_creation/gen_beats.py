@@ -54,6 +54,11 @@ def main(name_ar: list) -> None:
 
     # calculate beat proposals
     [x_volume, x_onset] = get_beat_prop(song_input)
+    # plt.plot(x_volume[0], label="volume", color="blue")
+    # plt.plot(x_onset[0], label="onset", color="red")
+    # plt.scatter(np.arange(len(pitch_times[0])), pitch_times[0], label="pitch", color="green")
+    # plt.legend()
+    # plt.show()
     x_volume = tcn_reshape(x_volume)
     x_onset = tcn_reshape(x_onset)
 
@@ -94,7 +99,7 @@ def main(name_ar: list) -> None:
     bpm = int((bpm + 100) / 2)
 
     # sanity check timings
-    map_times = sanity_check_timing(name_ar[0], timing_ar, song_duration)   # 3.9
+    map_times, pitch_algo = sanity_check_timing(name_ar[0], timing_ar, song_duration)   # 3.9
     map_times = map_times[map_times > 0]
     map_times = fill_map_times(map_times)
     # map_times = fill_map_times(map_times)
@@ -136,7 +141,7 @@ def main(name_ar: list) -> None:
     else:
         events = []
 
-    create_map(y_class_map, map_times, events, name_ar[0], bpm)     # 0.5
+    create_map(y_class_map, map_times, events, name_ar[0], bpm, pitch_algo)     # 0.5
 
 
 if __name__ == '__main__':
