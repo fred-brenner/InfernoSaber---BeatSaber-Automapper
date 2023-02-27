@@ -22,6 +22,7 @@ tf.compat.v1.keras.backend.set_session(sess)
 # MAP GENERATOR
 ###############
 song_list = os.listdir(paths.songs_pred)
+# TODO: add more song formats (especially mp3)
 song_list = [song for song in song_list if song.endswith('.egg')]
 print(f"Found {len(song_list)} songs. Iterating...")
 if len(song_list) == 0:
