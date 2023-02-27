@@ -399,8 +399,21 @@ def add_pause_bombs(notes_r, notes_l, notes_b, time_diffs, pitch_algo):
     time_diff_l = time_diffs * note_l_mask
 
     # walk through notes times
-    for idx in range(len(time_diff_r)):
+    new_bomb_times = []
+    new_bomb_pos = []
+
+    # check right notes
+    for idx, t_diff in enumerate(time_diff_r):
         # TODO: continue
+        if t_diff > config.t_diff_bomb:
+            # add bombs
+            cur_notes = notes_r[idx]
+            # get all positions of the current notes
+            # get cut_dir
+            # if cut dir is up (up-left, up, up-right):
+            # set bombs in right half to top
+            # else:
+            # set bombs in right half to bottom
 
 
 def correct_notes(notes, timings):
