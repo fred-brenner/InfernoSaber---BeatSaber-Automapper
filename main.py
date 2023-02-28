@@ -7,7 +7,7 @@ import time
 
 from tools.config import paths, config
 import map_creation.gen_beats as beat_generator
-from bs_shift.export_map import shutil_copy_maps
+from bs_shift.export_map import *
 
 import tensorflow as tf
 
@@ -23,10 +23,10 @@ tf.compat.v1.keras.backend.set_session(sess)
 ###############
 song_list = os.listdir(paths.songs_pred)
 # TODO: add more song formats (especially mp3)
-song_list = [song for song in song_list if song.endswith('.egg')]
+song_list = check_music_files(song_list, paths.songs_pred)
 print(f"Found {len(song_list)} songs. Iterating...")
 if len(song_list) == 0:
-    print("No songs found! Only .egg files supported.")
+    print("No songs found!")
 
 for i, song_name in enumerate(song_list):
     start_time = time.time()
