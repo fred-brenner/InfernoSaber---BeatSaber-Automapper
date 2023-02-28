@@ -62,6 +62,7 @@ random_note_map_factor = 0.5    # stick note map to random song/center (set to 0
 random_note_map_change = 2     # change frequency for center (1-20)
 quick_start = 2.0           # map quick start mode (0 off, 1-3 on)
 t_diff_bomb = 1.5           # minimum time between notes to add bomb
+t_diff_bomb_react = 0.3     # minimum time between finished added bombs
 
 """Caution on changes"""
 decr_speed_range = 10       # decrease speed for start and end

@@ -9,16 +9,16 @@ from map_creation.sanity_check import sanity_check_notes
 from tools.config import config, paths
 
 
-def create_map(y_class_num, timings, events, name, bpm, pitch_algo):
+def create_map(y_class_num, timings, events, name, bpm, pitch_algo, pitch_times):
     # load notes classify keys
     with open(paths.notes_classify_dict_file, 'rb') as f:
         class_keys = pickle.load(f)
 
     notes = decode_beats(y_class_num, class_keys)
 
-    def write_map(notes, timings, events, name, bpm, bs_diff, pitch_algo):
+    def write_map(notes, timings, events, name, bpm, bs_diff, pitch_algo, pitch_times):
         # sanity check notes with max speed parameter
-        notes = sanity_check_notes(notes, timings, pitch_algo)
+        notes = sanity_check_notes(notes, timings, pitch_algo, pitch_times)
         # compensate bps
         timings = timings * bpm / 60
         assert(len(timings) == len(notes))
@@ -44,11 +44,11 @@ def create_map(y_class_num, timings, events, name, bpm, pitch_algo):
         return new_map_folder
 
     bs_diff = config.general_diff
-    new_map_folder = write_map(notes.copy(), timings, events, name, bpm, bs_diff, pitch_algo)
+    new_map_folder = write_map(notes.copy(), timings, events, name, bpm, bs_diff, pitch_algo, pitch_times)
     if config.create_expert_flag:
         bs_diff = 'Expert'
         config.max_speed *= config.expert_fact
-        new_map_folder = write_map(notes, timings, events, name, bpm, bs_diff, pitch_algo)
+        new_map_folder = write_map(notes, timings, events, name, bpm, bs_diff, pitch_algo, pitch_times)
         # reset max speed
         config.max_speed = config.max_speed_orig
     # copy supplementary files to folder

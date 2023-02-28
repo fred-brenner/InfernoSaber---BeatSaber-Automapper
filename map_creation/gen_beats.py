@@ -141,7 +141,7 @@ def main(name_ar: list) -> None:
     else:
         events = []
 
-    create_map(y_class_map, map_times, events, name_ar[0], bpm, pitch_algo)     # 0.5
+    create_map(y_class_map, map_times, events, name_ar[0], bpm, pitch_algo, pitch_times)     # 0.5
 
 
 if __name__ == '__main__':
