@@ -11,38 +11,50 @@ from bs_shift.export_map import *
 
 import tensorflow as tf
 
-export_results_to_bs = True
 
-# limit gpu ram usage
-conf = tf.compat.v1.ConfigProto()
-conf.gpu_options.allow_growth = True
-sess = tf.compat.v1.Session(config=conf)
-tf.compat.v1.keras.backend.set_session(sess)
+def main(diff: int, export_results_to_bs=True):
+    # change difficulty
+    if diff is not None:
+        config_diff_value = config.max_speed
+        config.max_speed = diff
 
-# MAP GENERATOR
-###############
-song_list = os.listdir(paths.songs_pred)
-song_list = check_music_files(song_list, paths.songs_pred)
-print(f"Found {len(song_list)} songs. Iterating...")
-if len(song_list) == 0:
-    print("No songs found!")
+    # limit gpu ram usage
+    conf = tf.compat.v1.ConfigProto()
+    conf.gpu_options.allow_growth = True
+    sess = tf.compat.v1.Session(config=conf)
+    tf.compat.v1.keras.backend.set_session(sess)
 
-for i, song_name in enumerate(song_list):
-    start_time = time.time()
-    song_name = song_name[:-4]
-    print(f"Analyzing song: {song_name} ({i + 1} of {len(song_list)})")
-    beat_generator.main([song_name])
-    end_time = time.time()
-    print(f"Time needed: {end_time - start_time}s")
+    # MAP GENERATOR
+    ###############
+    song_list = os.listdir(paths.songs_pred)
+    song_list = check_music_files(song_list, paths.songs_pred)
+    print(f"Found {len(song_list)} songs. Iterating...")
+    if len(song_list) == 0:
+        print("No songs found!")
 
-    # create zip archive for online viewer
-    shutil.make_archive(f'{paths.new_map_path}{config.max_speed}_{song_name}',
-                        'zip', f'{paths.new_map_path}1234_{song_name}')
-    # export map to beat saber
-    if export_results_to_bs:
-        shutil_copy_maps(song_name)
+    for i, song_name in enumerate(song_list):
+        start_time = time.time()
+        song_name = song_name[:-4]
+        print(f"Analyzing song: {song_name} ({i + 1} of {len(song_list)})")
+        beat_generator.main([song_name])
+        end_time = time.time()
+        print(f"Time needed: {end_time - start_time}s")
 
-print("Finished map generator")
+        # create zip archive for online viewer
+        shutil.make_archive(f'{paths.new_map_path}{config.max_speed}_{song_name}',
+                            'zip', f'{paths.new_map_path}1234_{song_name}')
+        # export map to beat saber
+        if export_results_to_bs:
+            shutil_copy_maps(song_name)
+
+    print("Finished map generator")
+
+    # cleanup
+    if difficulty is not None:
+        config.max_speed = config_diff_value
+
+
+# ############################################################
 
 # ############################################################
 # if fails, rerun train_bs_automapper with correct min/max_bps
@@ -56,3 +68,8 @@ print("Finished map generator")
 # run training / train_bs_automapper.py
 # run beat_prediction / ai_beat_gen.py
 # run lighting_prediction / train_lighting.py
+
+if __name__ == "__main__":
+    diff = 10
+    export_results_to_bs = False
+    main(diff, export_results_to_bs)
