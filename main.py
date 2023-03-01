@@ -22,7 +22,6 @@ tf.compat.v1.keras.backend.set_session(sess)
 # MAP GENERATOR
 ###############
 song_list = os.listdir(paths.songs_pred)
-# TODO: add more song formats (especially mp3)
 song_list = check_music_files(song_list, paths.songs_pred)
 print(f"Found {len(song_list)} songs. Iterating...")
 if len(song_list) == 0:

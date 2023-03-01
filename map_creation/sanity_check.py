@@ -192,7 +192,6 @@ def sanity_check_notes(notes: list, timings: list, pitch_algo: np.array, pitch_t
 
     # # TODO: add bombs for long pause to focus on next note direction
     # notes_b, timings_b = add_pause_bombs(notes_r, notes_l, notes_b, timings, pitch_algo, pitch_times)
-
     # TODO: remove blocking bombs
 
     # rebuild notes
@@ -438,7 +437,7 @@ def add_pause_bombs(notes_r, notes_l, notes_b, timings, pitch_algo, pitch_times)
     for idx, t_diff in enumerate(time_diff_r):
         if idx == 0:
             continue
-        # TODO: finish
+        # TODO: not finished
         if t_diff > config.t_diff_bomb:
             # add bombs
             cur_notes = notes_r[idx]
@@ -466,7 +465,6 @@ def add_pause_bombs(notes_r, notes_l, notes_b, timings, pitch_algo, pitch_times)
         for idx, t_diff in enumerate(time_diff_l):
             if idx == 0:
                 continue
-            # TODO: finish
             if t_diff > config.t_diff_bomb:
                 # add bombs
                 cur_notes = notes_l[idx]
