@@ -50,7 +50,7 @@ def main(diff: int, export_results_to_bs=True):
     print("Finished map generator")
 
     # cleanup
-    if difficulty is not None:
+    if diff is not None:
         config.max_speed = config_diff_value
 
 
@@ -70,6 +70,6 @@ def main(diff: int, export_results_to_bs=True):
 # run lighting_prediction / train_lighting.py
 
 if __name__ == "__main__":
-    diff = 10
+    diff = None
     export_results_to_bs = False
     main(diff, export_results_to_bs)
