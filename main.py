@@ -4,6 +4,7 @@
 import os
 import shutil
 import time
+import sys
 
 from tools.config import paths, config
 import map_creation.gen_beats as beat_generator
@@ -12,11 +13,12 @@ from bs_shift.export_map import *
 import tensorflow as tf
 
 
-def main(diff: int, export_results_to_bs=True):
+def main(diff: float, export_results_to_bs=True):
     # change difficulty
     if diff is not None:
         config_diff_value = config.max_speed
         config.max_speed = diff
+        config.max_speed_orig = diff
 
     # limit gpu ram usage
     conf = tf.compat.v1.ConfigProto()
@@ -70,6 +72,12 @@ def main(diff: int, export_results_to_bs=True):
 # run lighting_prediction / train_lighting.py
 
 if __name__ == "__main__":
-    diff = None
-    export_results_to_bs = False
+    diff = os.environ.get('max_speed')
+    if diff is not None:
+        diff = float(diff)
+        print(f"Set max speed to {diff}")
+    else:
+        print("Use default values")
+
+    export_results_to_bs = True
     main(diff, export_results_to_bs)
