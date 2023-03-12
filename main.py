@@ -13,12 +13,13 @@ from bs_shift.export_map import *
 import tensorflow as tf
 
 
-def main(diff: float, export_results_to_bs=True):
+def main(diff: float, export_results_to_bs=True, quick_start=None):
     # change difficulty
     if diff is not None:
-        config_diff_value = config.max_speed
         config.max_speed = diff
         config.max_speed_orig = diff
+    if quick_start is not None:
+        config.quick_start = quick_start
 
     # limit gpu ram usage
     conf = tf.compat.v1.ConfigProto()
@@ -51,10 +52,6 @@ def main(diff: float, export_results_to_bs=True):
 
     print("Finished map generator")
 
-    # cleanup
-    if diff is not None:
-        config.max_speed = config_diff_value
-
 
 # ############################################################
 
@@ -79,5 +76,10 @@ if __name__ == "__main__":
     else:
         print("Use default values")
 
+    qs = os.environ.get('quick_start')
+    if qs is not None:
+        qs = float(qs)
+        print(f"Set quick_start to {qs}")
+
     export_results_to_bs = True
-    main(diff, export_results_to_bs)
+    main(diff, export_results_to_bs, qs)

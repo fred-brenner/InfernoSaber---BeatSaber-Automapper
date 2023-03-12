@@ -19,7 +19,7 @@ def check_music_files(files, dir_path):
     song_list = []
     for file_name in files:
         ending = file_name.split('.')[-1]
-        if ending in ['mp3']:   # (TODO: allow more music formats)
+        if ending in ['mp3', 'mp4']:   # (TODO: allow more music formats)
             # convert music to ogg format
             output_file = f"{file_name[:-4]}.egg"
             convert_music_file(dir_path + file_name, dir_path + output_file)
