@@ -90,6 +90,7 @@ def main(name_ar: list) -> None:
     # add beats between far beats
     # timing_ar = fill_map_times(timing_ar)
     timing_ar = fill_map_times(timing_ar)
+    # TODO: add dynamic fills based on Difficulty and song length
     time_input = [timing_ar]
 
     # calculate bpm
