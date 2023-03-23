@@ -5,19 +5,28 @@ use main branch for a stable environment
 March:
 
     Deploy model on website
+
+May:
+
     add bombs before unpredicted patterns
     add obstacles in unused spaces
 
-April:
+Mid of 2023:
 
     Create Obstacle AI Model
 
-May:
-    
+
+End of 2023:
+
     Create Cardio Obstacle AI Model
+    Check out Reinforcment Models
 
 
 ## Automapper for Beatsaber made for expert+ levels 
+
+    New: Generate BeatSaber maps using AI with the convenience of Google Drive storage.
+    Use the Google Colab template included in the repository without the need of hardware.
+
 Extract maps from Beatsaber/Bsaber to feed them 
 into AI models.
 Map versions with custom modded data (values out of normal boundaries) are excluded,
@@ -37,6 +46,8 @@ https://youtu.be/Jk9KG5EYEOY
 
 ### Author: Frederic Brenner
 frederic.brenner@tum.de
+
+## Alternatively you can run the project local:
 
 ## To install suitable python environment import in Anaconda:
 anaconda_environment.yaml
