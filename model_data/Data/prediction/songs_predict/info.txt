@@ -1,2 +1,2 @@
 put your song files to predict here
-Currently supported: .egg files (ogg format renamed to egg)
+Currently supported: .mp3, .ogg, .egg

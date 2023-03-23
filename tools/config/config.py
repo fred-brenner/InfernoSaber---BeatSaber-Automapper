@@ -4,6 +4,7 @@
 ########################################
 
 # Data Processing configuration
+general_diff = 'ExpertPlus'
 random_seed = 3
 min_time_diff = 0.01        # minimum time between cuts, otherwise synchronized
 samplerate_music = 14800    # samplerate for the music import
@@ -11,7 +12,7 @@ hop_size = 512
 window = 2.0                # window in seconds for each song to spectrum picture (from wav_to_pic)
 specgram_res = 24           # y resolution of the spectrogram (frequency subdivisions)
 
-min_bps_limit = 5           # minimum beats_per_second value for training
+min_bps_limit = 7           # minimum beats_per_second value for training
 max_bps_limit = 10          # maximum beats_per_second value for training
 
 ram_limit = 20              # free ram roughly in GB
@@ -19,9 +20,12 @@ ram_limit = 20              # free ram roughly in GB
 # Model versions
 enc_version = 'tf_model_enc_16bneck_12_8__16_48.h5'
 autoenc_version = 'tf_model_autoenc_16bneck_12_8__16_48.h5'
-mapper_version = 'tf_model_mapper_5-10_1_21__13_26.h5'
-beat_gen_version = 'tf_beat_gen_7.5_10_1_21__16_27.h5'
-event_gen_version = 'tf_event_gen_7.5_10_1_21__16_6.h5'
+# mapper_version = 'tf_model_mapper_5-10_1_21__13_26.h5'
+# beat_gen_version = 'tf_beat_gen_7.5_10_1_21__16_27.h5'
+# event_gen_version = 'tf_event_gen_7.5_10_1_21__16_6.h5'
+mapper_version = 'tf_model_mapper_7-10_1_29__19_34.h5'
+beat_gen_version = 'tf_beat_gen_7_10_1_29__19_39.h5'
+event_gen_version = 'tf_event_gen_7_10_1_29__19_44.h5'
 
 # Autoencoder model configuration
 learning_rate = 3e-4        # model learning rate
@@ -40,28 +44,46 @@ lstm_len = 16
 # Beat prediction model configuration
 beat_learning_rate = 5e-4
 beat_n_epochs = 80
-beat_batch_size = 256
+beat_batch_size = 128
 tcn_len = 24
-tcn_test_samples = 600
+tcn_test_samples = 350
 delete_offbeats = 0.6      # < 1 delete non-beats to free ram
 # tcn_skip = 10
 
 # Map creation model configuration
-thresh_beat = 0.50          # minimum beat response required to trigger generator
-thresh_pitch = 0.35         # minimum beat for pitch check (0.01,low-1,high)
-cdf = 0.7                   # cut director factor (to calculate speed, ~0.5)
-min_beat_time = 1/20        # in seconds (first sanity check)
-beat_spacing = 5587/196     # 5587/196s = 28.5051 steps/s
-max_speed = 9.0             # set around 3-12 (normal-expert+)
+"""Do change"""
+max_speed = 35              # set around 5-40 (normal-expert++)
+expert_fact = 0.64          # expert plus to expert factor
+create_expert_flag = True   # create second expert map
+thresh_beat = 0.44          # minimum beat response required to trigger generator
+thresh_pitch = 0.41         # minimum beat for pitch check (0.01,low-1,high)
+threshold_end = 1.7         # factor for start and end threshold
+random_note_map_factor = 0.5    # stick note map to random song/center (set to 0 to disable)
+random_note_map_change = 2     # change frequency for center (1-20)
+quick_start = 2.0           # map quick start mode (0 off, 1-3 on)
+t_diff_bomb = 1.5           # minimum time between notes to add bomb
+t_diff_bomb_react = 0.3     # minimum time between finished added bombs
+
+"""Caution on changes"""
+decr_speed_range = 10       # decrease speed for start and end
+decr_speed_val = 0.25        # decrease max speed at start
 reaction_time = 1.1         # reaction time (0.5-2)
+reaction_time_fact = 0.013  # factor including max_speed
+jump_speed = 15             # jump speed from beat saber (15-22)
+jump_speed_fact = 0.22      # factor including max_speed
+cdf = 1.1                   # cut director factor (to calculate speed, ~0.5)
+min_beat_time = 1/16        # in seconds (first sanity check)
+beat_spacing = 5587/196     # 5587/196s = 28.5051 steps/s
 favor_last_class = 0.15     # set factor to favor the next beat class (0.0-0.3)
-max_double_note_speed = 20  # set maximum speed difference between double notes (10 or 15 or 20)
+max_double_note_speed = 25  # set maximum speed difference between double notes (10 or 15 or 20)
 emphasize_beats_wait = 0.2  # minimum time in seconds
-emphasize_beats_3 = 0.15    # fraction beats to triple
-emphasize_beats_2 = 0.55    # fraction beats to double
-shift_beats_fact = 0.25     # fraction beats to shift in cut direction
-add_beat_low_bound = 0.17   # in seconds (beat_generator)
-add_beat_hi_bound = 0.70    # in seconds (beat_generator)
+emphasize_beats_3 = 0.023   # fraction beats to triple
+emphasize_beats_3_fact = 0.004   # factor incl max_speed
+emphasize_beats_2 = 0.23    # fraction beats to double
+emphasize_beats_2_fact = 0.0085  # factor incl max_speed
+shift_beats_fact = 0.30     # fraction beats to shift in cut direction
+add_beat_low_bound = 0.18   # in seconds (beat_generator)
+add_beat_hi_bound = 0.90    # in seconds (beat_generator)
 add_beat_fact = 0.90        # fraction add beats (beat_generator)
 
 # Postprocessing model configuration
@@ -87,3 +109,5 @@ event_batch_size = 128
 # bps_hard = 6
 # bps_expert = 8
 # bps_expertplus = 10
+
+max_speed_orig = max_speed

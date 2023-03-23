@@ -5,7 +5,7 @@ from PIL import Image
 from beat_prediction.find_beats import find_beats, get_pitch_times
 from beat_prediction.beat_to_lstm import beat_to_lstm
 from beat_prediction.beat_prop import get_beat_prop, tcn_reshape
-from lightning_prediction.train_lighting import lstm_shift_events_half
+from lighting_prediction.train_lighting import lstm_shift_events_half
 
 from map_creation.sanity_check import *
 from map_creation.class_helpers import *
@@ -19,7 +19,7 @@ from preprocessing.bs_mapper_pre import lstm_shift
 from training.helpers import *
 from training.tensorflow_models import *
 
-from lightning_prediction.generate_lighting import generate
+from lighting_prediction.generate_lighting import generate
 
 from tools.config import config, paths
 from tools.utils import numpy_shorts
@@ -54,6 +54,11 @@ def main(name_ar: list) -> None:
 
     # calculate beat proposals
     [x_volume, x_onset] = get_beat_prop(song_input)
+    # plt.plot(x_volume[0], label="volume", color="blue")
+    # plt.plot(x_onset[0], label="onset", color="red")
+    # plt.scatter(np.arange(len(pitch_times[0])), pitch_times[0], label="pitch", color="green")
+    # plt.legend()
+    # plt.show()
     x_volume = tcn_reshape(x_volume)
     x_onset = tcn_reshape(x_onset)
 
@@ -83,20 +88,23 @@ def main(name_ar: list) -> None:
     timing_ar /= config.beat_spacing
     timing_ar = timing_ar[timing_ar > config.window]
     # add beats between far beats
+    # timing_ar = fill_map_times(timing_ar)
     timing_ar = fill_map_times(timing_ar)
-    timing_ar = fill_map_times(timing_ar)
+    # TODO: add dynamic fills based on Difficulty and song length
     time_input = [timing_ar]
 
     # calculate bpm
     file = paths.songs_pred + name_ar[0] + '.egg'
     bpm, song_duration = get_file_bpm(file)     # 1.6
-    bpm = int(bpm)
+    # average bpm for songs to make more similar (jump) speeds
+    bpm = int((bpm + 100) / 2)
 
     # sanity check timings
-    map_times = sanity_check_timing(name_ar[0], timing_ar, song_duration)   # 3.9
+    map_times, pitch_algo = sanity_check_timing(name_ar[0], timing_ar, song_duration)   # 3.9
     map_times = map_times[map_times > 0]
     map_times = fill_map_times(map_times)
-    map_times = fill_map_times(map_times)
+    # map_times = fill_map_times(map_times)
+    map_times = add_lstm_prerun(map_times)
 
     # calculate time between beats
     timing_diff_ar = calc_time_between_beats([map_times])
@@ -107,8 +115,8 @@ def main(name_ar: list) -> None:
 
     # filter invalid indices
     for rm_idx in rm_index[0][::-1]:
-        timing_diff_ar[0].pop(rm_idx)
-        timing_ar = np.delete(timing_ar, rm_idx)
+        # timing_diff_ar[0].pop(rm_idx)   # not used right now
+        # timing_ar = np.delete(timing_ar, rm_idx)  # not working/unused
         map_times = np.delete(map_times, rm_idx)
 
     # Load pretrained encoder model
@@ -134,7 +142,7 @@ def main(name_ar: list) -> None:
     else:
         events = []
 
-    create_map(y_class_map, map_times, events, name_ar[0], bpm)     # 0.5
+    create_map(y_class_map, map_times, events, name_ar[0], bpm, pitch_algo, pitch_times)     # 0.5
 
 
 if __name__ == '__main__':

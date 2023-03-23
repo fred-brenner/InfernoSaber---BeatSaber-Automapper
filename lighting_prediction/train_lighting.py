@@ -9,7 +9,7 @@ from keras.optimizers import adam_v2
 from sklearn.preprocessing import OneHotEncoder
 from tabulate import tabulate
 
-from lightning_prediction.tf_lighting import create_tf_model
+from lighting_prediction.tf_lighting import create_tf_model
 
 from preprocessing.beat_data_helper import load_raw_beat_data
 from preprocessing.music_processing import run_music_preprocessing

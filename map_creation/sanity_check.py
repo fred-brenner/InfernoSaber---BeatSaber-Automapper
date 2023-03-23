@@ -62,10 +62,10 @@ def sanity_check_timing(name, timings, song_duration):
 
     last_pitch = 0
     threshold = pitches.mean() * config.thresh_pitch * 3
-    threshold_end = 2.2 * threshold
+    threshold_end = config.threshold_end * threshold
     idx_end = int(len(pitches) / 30)
     idx_end_list = list(range(idx_end))
-    idx_end_list.extend(list(range(len(pitches)-idx_end, len(pitches))))
+    idx_end_list.extend(list(range(len(pitches) - idx_end, len(pitches))))
     beat_flag = False
     beat_pos = np.zeros_like(pitches)
     for idx in range(len(pitches)):
@@ -104,10 +104,13 @@ def sanity_check_timing(name, timings, song_duration):
         else:
             timings[i] = 0
 
-    return timings
+    return timings, allowed_timings
 
 
 def emphasize_beats(notes, timings):
+    emphasize_beats_3 = config.emphasize_beats_3 + config.emphasize_beats_3_fact * config.max_speed
+    emphasize_beats_2 = config.emphasize_beats_2 + config.emphasize_beats_2_fact * config.max_speed
+    start_end_idx = 4
 
     def calc_new_note(note, new_pos):
         new_note = note * len(new_pos)
@@ -119,27 +122,39 @@ def emphasize_beats(notes, timings):
         notes[n] = new_note
         return notes
 
-    for n in range(len(notes)):
-        if timings[n:n+1].max() >= config.emphasize_beats_wait:
+    # for n in range(start_end_idx, len(notes) - start_end_idx):
+    # TODO: check timings (needed individually for each note side?)
+    for n in range(start_end_idx, len(notes)):
+        if timings[n:n + 1].max() >= config.emphasize_beats_wait:
             note = notes[n]
             if len(note) > 0:
                 rd = np.random.random()
-                if rd > 1 - config.emphasize_beats_3:
+                if rd > 1 - emphasize_beats_3:
                     new_pos = calc_note_pos(note)
                     new_note = calc_new_note(note, new_pos)
                     if len(new_pos) < 3:
                         new_pos = calc_note_pos(new_note)[:3]
                         new_note = calc_new_note(note, new_pos)
                     update_new_note(notes, n, new_note)
-                elif rd > 1 - config.emphasize_beats_3 - config.emphasize_beats_2:
+                elif rd > 1 - emphasize_beats_3 - emphasize_beats_2:
                     new_pos = calc_note_pos(note)[:2]
+                    for ip in range(len(new_pos) - 1, 0, -1):
+                        if new_pos[ip] in [[1, 1], [2, 1]]:
+                            new_pos.pop(ip)
+                    # only check first entry if enough notes are available
+                    if len(new_pos) > 1:
+                        if new_pos[0] in [[1, 1], [2, 1]]:
+                            new_pos.pop(0)
                     new_note = calc_new_note(note, new_pos)
                     update_new_note(notes, n, new_note)
 
     return notes
 
 
-def sanity_check_notes(notes: list, timings):
+def sanity_check_notes(notes: list, timings: list, pitch_algo: np.array, pitch_times):
+    # last sanity check for notes,
+    # result is written to map
+
     [notes_r, notes_l, notes_b] = split_notes_rl(notes)
     # test = unpslit_notes(notes_r, notes_l, notes_b)
 
@@ -156,6 +171,10 @@ def sanity_check_notes(notes: list, timings):
     # shift notes in cut direction
     notes_l = shift_blocks_up_down(notes_l, time_diffs)
     notes_r = shift_blocks_up_down(notes_r, time_diffs)
+    # shift notes left and right for better flow
+    notes_l, notes_r = shift_blocks_left_right(notes_l, notes_r, time_diffs)
+    # notes_r = shift_blocks_left_right(notes_r, False, time_diffs)
+
     # print("Right notes:", end=' ')
     # notes_r = correct_notes(notes_r, timings)
     # print("Left notes: ", end=' ')
@@ -167,6 +186,13 @@ def sanity_check_notes(notes: list, timings):
 
     # check static position for next and last note for left and right together
     notes_r, notes_l, notes_b = correct_notes_all(notes_r, notes_l, notes_b, time_diffs)
+
+    # shift notes away from the middle
+    notes_r, notes_l, notes_b = shift_blocks_middle(notes_r, notes_l, notes_b)
+
+    # # TODO: add bombs for long pause to focus on next note direction
+    # notes_b, timings_b = add_pause_bombs(notes_r, notes_l, notes_b, timings, pitch_algo, pitch_times)
+    # TODO: remove blocking bombs
 
     # rebuild notes
     new_notes = unpslit_notes(notes_r, notes_l, notes_b)
@@ -223,10 +249,10 @@ def offset_notes(notes_l, idx, offset, rm_counter):
     for i in range(int(len(notes_l[idx]) / 4)):
         if i > 1:
             print("")
-        pos_before = np.asarray(notes_l[idx][i*4:i*4+2])
+        pos_before = np.asarray(notes_l[idx][i * 4:i * 4 + 2])
         new_pos = list(pos_before - [offset, 0])
         if 0 <= new_pos[0] < 4 and 0 <= new_pos[1] < 3:
-            notes_l[idx][i*4:i*4+2] = new_pos
+            notes_l[idx][i * 4:i * 4 + 2] = new_pos
         else:
             rm_counter += 1
         return notes_l, rm_counter
@@ -235,8 +261,8 @@ def offset_notes(notes_l, idx, offset, rm_counter):
 def correct_notes_all(notes_r, notes_l, notes_b, time_diff):
     pos_r_last = []
     pos_l_last = []
-    pos_b_last = []
-    last_bomb_idx = 0
+    # pos_b_last = []
+    # last_bomb_idx = 0
     rm_counter = 0
     for idx in range(len(notes_r)):
         nb = notes_b[idx]
@@ -303,10 +329,184 @@ def correct_notes_all(notes_r, notes_l, notes_b, time_diff):
     return notes_r, notes_l, notes_b
 
 
+def shift_blocks_middle(notes_r, notes_l, notes_b):
+    counter = 0
+    for idx in range(len(notes_r)):
+        nb = notes_b[idx]
+        nr = notes_r[idx]
+        nl = notes_l[idx]
+
+        pos_r = calc_note_pos(nr, add_cut=False)
+        pos_l = calc_note_pos(nl, add_cut=False)
+        pos_b = calc_note_pos(nb, add_cut=False)
+
+        pos_all = pos_r.copy()
+        pos_all.extend(pos_l)
+        pos_all.extend(pos_b)
+
+        for ir in range(len(pos_r)):
+            if len(pos_r) <= 1:
+                if pos_r[ir] in [[1, 1], [2, 1]]:
+                    new_pos = calc_note_pos(nr, add_cut=True, inv=False)[-1]
+                    if new_pos not in pos_all:
+                        # change note down or up
+                        notes_r[idx][ir * 4:ir * 4 + 2] = [new_pos[0], new_pos[1]]
+                        counter += 1
+                    else:
+                        new_pos[0] = pos_r[ir][0]
+                        if new_pos not in pos_all:
+                            # change note down or up
+                            notes_r[idx][ir * 4:ir * 4 + 2] = [new_pos[0], new_pos[1]]
+                            counter += 1
+
+        for il in range(len(pos_l)):
+            if len(pos_l) <= 1:
+                if pos_l[il] in [[1, 1], [2, 1]]:
+                    new_pos = calc_note_pos(nl, add_cut=True, inv=False)[-1]
+                    if new_pos not in pos_all:
+                        # change note down or up
+                        notes_l[idx][il * 4:il * 4 + 2] = [new_pos[0], new_pos[1]]
+                        counter += 1
+                    else:
+                        new_pos[0] = pos_l[il][0]
+                        if new_pos not in pos_all:
+                            # change note down or up
+                            notes_l[idx][il * 4:il * 4 + 2] = [new_pos[0], new_pos[1]]
+                            counter += 1
+
+        for ib in range(len(pos_b)):
+            if pos_b[ib] in [[1, 1], [2, 1]]:
+                new_pos = [pos_b[ib][0], 0]
+                if new_pos not in pos_all:
+                    # change note down or up
+                    notes_b[idx][ib * 4:ib * 4 + 2] = new_pos
+                    counter += 1
+
+    print(f"Shifted {counter} blocks away from the middle.")
+
+    return notes_r, notes_l, notes_b
+
+
+def add_pause_bombs(notes_r, notes_l, notes_b, timings, pitch_algo, pitch_times):
+    # add bombs between notes to improve flow
+
+    # calculate time difference between notes
+    time_diffs = np.concatenate((np.ones(1), np.diff(timings)), axis=0)
+    note_r_mask = np.asarray([1 if len(x) > 0 else 0 for x in notes_r])
+    note_l_mask = np.asarray([1 if len(x) > 0 else 0 for x in notes_l])
+    time_diff_r = time_diffs * note_r_mask
+    time_diff_l = time_diffs * note_l_mask
+
+    # walk through notes times
+    new_bomb_times = []
+    new_bomb_pos = []
+
+    def add_bomb_pos(up=True, right=True, n=1):
+        if up:
+            n_up = 2
+        else:
+            n_up = 0
+        if right:
+            n_right = [2, 3]
+        else:
+            n_left = [0, 1]
+        # [2, 2, 3, 8, 3, 2, 3, 8]
+        bomb_ar = n*[[n_right[0], n_up, 3, 8, n_right[1], n_up, 3, 8]]
+        return bomb_ar
+
+    def get_time_pos(time_window, pitch_algo, pitch_times):
+        # get the time indices
+        pitch_times = pitch_times[0]
+        t1_all = pitch_times - time_window[0]
+        t1_all = np.argmax(t1_all >= config.t_diff_bomb_react)
+        t2_all = pitch_times - time_window[1]
+        t2_all = np.argmin(t2_all <= -config.t_diff_bomb_react) - 1
+        t1_beat = pitch_algo - time_window[0]
+        t1_beat = np.argmax(t1_beat >= config.t_diff_bomb_react)
+        t2_beat = pitch_algo - time_window[1]
+        t2_beat = np.argmin(t2_beat <= -config.t_diff_bomb_react) - 1
+
+        t_pos_all = pitch_times[t1_all:t2_all]
+        if t1_beat < t2_beat:
+            t_pos_beat = pitch_algo[t1_beat:t2_beat]
+        else:
+            t_pos_beat = []
+        return t_pos_all, t_pos_beat
+
+    # check right notes
+    for idx, t_diff in enumerate(time_diff_r):
+        if idx == 0:
+            continue
+        # TODO: not finished
+        if t_diff > config.t_diff_bomb:
+            # add bombs
+            cur_notes = notes_r[idx]
+            # get all positions of the current notes
+            positions = calc_note_pos(cur_notes, add_cut=False)
+            # get (first) cut_dir
+            cut_x, cut_y = get_cut_dir_xy(cur_notes[3])
+
+            # get time window
+            time_window = [timings[idx - 1], timings[idx]]
+            time_pos_all, time_pos_beat = get_time_pos(time_window, pitch_algo, pitch_times)
+
+            if cut_y == 1:
+                # next note is downwards -> bombs down
+                new_bomb_times.extend(time_pos_all)
+                new_bomb_pos.extend(add_bomb_pos(up=False, right=True, n=len(time_pos_all)))
+            elif cut_y == -1:
+                # next note is upwards -> bombs up
+                new_bomb_times.extend(time_pos_all)
+                new_bomb_pos.extend(add_bomb_pos(up=True, right=True, n=len(time_pos_all)))
+            else:
+                pass
+
+        # check left notes
+        for idx, t_diff in enumerate(time_diff_l):
+            if idx == 0:
+                continue
+            if t_diff > config.t_diff_bomb:
+                # add bombs
+                cur_notes = notes_l[idx]
+                # get all positions of the current notes
+                positions = calc_note_pos(cur_notes, add_cut=False)
+                # get (first) cut_dir
+                cut_x, cut_y = get_cut_dir_xy(cur_notes[3])
+
+                # get time window
+                time_window = [timings[idx - 1], timings[idx]]
+                time_pos_all, time_pos_beat = get_time_pos(time_window, pitch_algo, pitch_times)
+
+                if cut_y == 1:
+                    # next note is downwards -> bombs down
+                    new_bomb_times.extend(time_pos_all)
+                    new_bomb_pos.extend(add_bomb_pos(up=False, right=False, n=len(time_pos_all)))
+                elif cut_y == -1:
+                    # next note is upwards -> bombs up
+                    new_bomb_times.extend(time_pos_all)
+                    new_bomb_pos.extend(add_bomb_pos(up=True, right=False, n=len(time_pos_all)))
+                else:
+                    pass
+
+    # add new bombs to notes framework
+    new_times = list(timings)
+    new_times.extend(new_bomb_times)
+    return notes_b
+
+
 def correct_notes(notes, timings):
     nl_last = None
     last_time = 0
     rm_counter = 0
+
+    # reduce note difficulty at start and end of song
+    se_idx = config.decr_speed_range  # start_end_index
+    # compensate quick start behavior
+    se_idx_start = se_idx + int(0.3 * config.quick_start * config.lstm_len + 1.0 * config.lstm_len)
+    decrease_range = list(range(se_idx_start))
+    decrease_range.extend(list(range(len(notes) - se_idx, len(notes))))
+    decrease_val = config.decr_speed_val
+
     for idx in range(len(notes)):
         if len(notes[idx]) == 0:
             continue
@@ -318,19 +518,18 @@ def correct_notes(notes, timings):
             # # notes[idx] = optimize_note_movement(nl_last, notes[idx])
             # notes[idx] = check_border_notes(notes, timings, idx)
 
-            # TODO: (change dot notes to cut notes) - schlupfloch aktuell
-            # TODO: check notes direction vs position with probabilistic factor (single)
-            #       alle am rand richtig drehen, zwischendrinnen löschen...
-            # TODO: apply reversed movement to next note (e.g. last[2, 1, 1, 2];new[1, 0, 1, 1])
-            #       not really possible without changing the whole track?
-
             # calculate movement speed (of first element)
             new_time = timings[idx]
             speed = calc_note_speed(nl_last, notes[idx], new_time - last_time,
                                     config.cdf)
 
             # remove too fast elements
-            if speed > config.max_speed:
+            if idx in decrease_range:
+                mx_speed = config.max_speed * decrease_val
+            else:
+                mx_speed = config.max_speed
+            if speed > mx_speed:
+                # remove notes at this point
                 rm_counter += int(len(notes[idx]) / 4)
                 notes[idx] = []
                 continue
@@ -345,12 +544,16 @@ def correct_notes(notes, timings):
                 cut_dir = notes[idx][3]
                 for n in range(int(len(notes[idx]) / 4) - 1):
                     # check if cut direction is same
-                    if notes[idx][(n+1)*4 + 3] != cut_dir:
-                        notes[idx][(n+1)*4 + 3] = 8
+                    if notes[idx][(n + 1) * 4 + 3] != cut_dir:
+                        notes[idx][(n + 1) * 4 + 3] = 8
                     n *= 4
-                    speed = calc_note_speed(notes[idx][n:n + 4],
-                                            notes[idx][n + 4:n + 8],
-                                            time_diff=0.05, cdf=0.5)
+                    speed1 = calc_note_speed(notes[idx][n:n + 4],
+                                             notes[idx][n + 4:n + 8],
+                                             time_diff=0.08, cdf=1.1, react=False)
+                    speed2 = calc_note_speed(notes[idx][n + 4:n + 8],
+                                             notes[idx][n:n + 4],
+                                             time_diff=0.08, cdf=1.1, react=False)
+                    speed = np.min([speed1, speed2])
                     if speed > config.max_double_note_speed:
                         # try to fix second notes
                         try_notes = notes[idx][n + 4:n + 8]
@@ -424,24 +627,26 @@ def check_note_movement(notes_last, notes_new):
         if dist_x == dist_y == 1:
             return notes_new
 
-        # change cut direction
-        # TODO: (check if new cut direction needs more speed
-        #       only if timing < 0.5)
+        # (TODO: (check if new cut direction needs more speed
+        #       only if timing < 0.5) if necessary)
 
+        # change cut direction
         new_cut = reverse_cut_dir_xy(notes_last[3])
         notes_new[3] = new_cut
 
     return notes_new
 
 
-def calc_note_speed(notes_last, notes_new, time_diff, cdf):
+def calc_note_speed(notes_last, notes_new, time_diff, cdf, react=True):
     if notes_last is None:
         return 0
 
-    # cut director factor
-    # cdf = config.cdf
+    # reaction time
+    if react:
+        dist = config.reaction_time + config.reaction_time_fact * config.max_speed
+    else:
+        dist = 0
 
-    dist = config.reaction_time     # reaction time
     cut_x_last, cut_y_last = get_cut_dir_xy(notes_last[3])
     cut_x_new, cut_y_new = get_cut_dir_xy(notes_new[3])
     # x direction
@@ -527,16 +732,27 @@ def reverse_cut_dir_xy(old_cut):
 # Postprocessing
 ################
 def fill_map_times(map_times):
+    se_thresh = int(len(map_times) / 25)  # don't apply filling for first and last 4% of song
     diff = np.diff(map_times)
     new_map_times = []
-    for idx in range(len(diff)):
+    for idx in range(se_thresh, len(diff) - se_thresh):
         if config.add_beat_low_bound < diff[idx] < config.add_beat_hi_bound:
             if np.random.random() < config.add_beat_fact:
-                beat_time = (map_times[idx] + map_times[idx+1]) / 2
+                beat_time = (map_times[idx] + map_times[idx + 1]) / 2
                 new_map_times.append(beat_time)
     if len(new_map_times) > 0:
         map_times = np.hstack((map_times, new_map_times))
         map_times = np.sort(map_times)
+    return map_times
+
+
+def add_lstm_prerun(map_times):
+    # add cutoff map times to compensate for lstm reshape
+    qs = config.quick_start
+    if qs > 0:
+        new_map_times = np.linspace(0, qs, int(config.lstm_len * qs))
+        map_times = np.hstack((new_map_times, map_times))
+        # map_times = np.sort(map_times)
     return map_times
 
 
@@ -550,26 +766,133 @@ def shift_blocks_up_down(notes: list, time_diffs: np.array):
             new_pos2 = []
             # if cut_y == -1:    # up
             for pos in note_pos:
-                new_pos.append([int(pos[0]-cut_x), int(pos[1]-cut_y)])
-                new_pos2.append([int(pos[0]-2*cut_x), int(pos[1]-2*cut_y)])
+                new_pos.append([int(pos[0] - cut_x), int(pos[1] - cut_y)])
+                new_pos2.append([int(pos[0] - 2 * cut_x), int(pos[1] - 2 * cut_y)])
 
             # check all new positions:
             valid = check_note_pos_valid(new_pos)
-            valid2 = check_note_pos_valid(new_pos2)     # if true always shift
+            valid2 = check_note_pos_valid(new_pos2)  # if true always shift
             if valid:
                 if valid2 or np.random.random() < config.shift_beats_fact:
                     for ipos in range(len(new_pos)):
-                        notes[idx][0+4*ipos] = new_pos[ipos][0]
-                        notes[idx][1+4*ipos] = new_pos[ipos][1]
+                        notes[idx][0 + 4 * ipos] = new_pos[ipos][0]
+                        notes[idx][1 + 4 * ipos] = new_pos[ipos][1]
     return notes
 
 
-def check_note_pos_valid(positions: list) -> bool:
-    for pos in positions:
-        if not 0 <= pos[0] <= 3:    # line index
-            return False
-        if not 0 <= pos[1] <= 2:    # line layer
-            return False
+# def shift_blocks_left_right(notes: list, left_note: bool, time_diffs: np.array):
+#     last_note_pos = [[-1, -1]]
+#     # if left_note:
+#     #     shift = [0, 0]
+#     # else:
+#     #     shift = [0, 0]
+#
+#     for idx in range(len(notes)):
+#         if len(notes[idx]) > 2:
+#             note_pos = calc_note_pos(notes[idx], add_cut=False)
+#             # cut_x, cut_y = get_cut_dir_xy(notes[idx][3])
+#             new_pos = []
+#             new_pos2 = []
+#             for pos in note_pos:
+#                 if pos in last_note_pos:
+#                     if left_note:
+#                         new_pos.append([pos[0]-1, pos[1]])
+#                         new_pos2.append([pos[0]+1, pos[1]])
+#                     else:
+#                         new_pos.append([pos[0]+1, pos[1]])
+#                         new_pos2.append([pos[0]-1, pos[1]])
+#             if len(new_pos) > 0:
+#                 valid = check_note_pos_valid(new_pos)
+#                 valid2 = check_note_pos_valid(new_pos2)
+#                 if valid:
+#                     for ipos in range(len(new_pos)):
+#                         notes[idx][0+4*ipos] = new_pos[ipos][0]
+#                         notes[idx][1+4*ipos] = new_pos[ipos][1]
+#                 elif valid2:
+#                     for ipos in range(len(new_pos2)):
+#                         notes[idx][0+4*ipos] = new_pos2[ipos][0]
+#                         notes[idx][1+4*ipos] = new_pos2[ipos][1]
+#
+#             last_note_pos = note_pos
+#     return notes
+
+
+def shift_blocks_left_right(notes_l: list, notes_r: list, time_diffs: np.array):
+    last_note_pos_l = [[-1]]
+    last_note_pos_r = [[-1]]
+
+    def new_pos_helper(note_pos, last_note_pos_l, last_note_pos_r, left_note):
+        new_pos = []
+        new_pos2 = []
+        for pos in note_pos:
+            if pos in last_note_pos_l or pos in last_note_pos_r:
+                if left_note:
+                    # new_pos.append([pos[0]-1, pos[1]])
+                    # new_pos2.append([pos[0]+1, pos[1]])
+                    new_pos.append([pos[0] - 1])
+                    new_pos2.append([pos[0] + 1])
+                else:
+                    new_pos.append([pos[0] + 1])
+                    new_pos2.append([pos[0] - 1])
+        return new_pos, new_pos2
+
+    def new_note_helper(notes, idx, new_pos, new_pos2):
+        if len(new_pos) > 0:
+            valid = check_note_pos_valid(new_pos, xy='x')
+            valid2 = check_note_pos_valid(new_pos2, xy='x')
+            if valid:
+                for ipos in range(len(new_pos)):
+                    notes[idx][0 + 4 * ipos] = new_pos[ipos][0]
+            elif valid2:
+                for ipos in range(len(new_pos2)):
+                    notes[idx][0 + 4 * ipos] = new_pos2[ipos][0]
+        return notes
+
+    for idx in range(len(notes_l)):
+        last_note_l_temp = last_note_pos_l
+        if len(notes_l[idx]) > 2:
+            note_pos = calc_note_pos(notes_l[idx], add_cut=False)
+            note_pos = [[pos[0]] for pos in note_pos]
+            new_pos, new_pos2 = new_pos_helper(note_pos, last_note_pos_l, last_note_pos_r, True)
+            notes_l = new_note_helper(notes_l, idx, new_pos, new_pos2)
+            if len(new_pos) == 0:
+                last_note_pos_l = note_pos
+            else:  # recalculate
+                note_pos = calc_note_pos(notes_l[idx], add_cut=False)
+                last_note_pos_l = [[pos[0]] for pos in note_pos]
+                last_note_l_temp.extend(last_note_pos_l)
+        if len(notes_r[idx]) > 2:
+            note_pos = calc_note_pos(notes_r[idx], add_cut=False)
+            note_pos = [[pos[0]] for pos in note_pos]
+            new_pos, new_pos2 = new_pos_helper(note_pos, last_note_l_temp, last_note_pos_r, False)
+            notes_r = new_note_helper(notes_r, idx, new_pos, new_pos2)
+            if len(new_pos) == 0:
+                last_note_pos_r = note_pos
+            else:  # recalculate
+                note_pos = calc_note_pos(notes_r[idx], add_cut=False)
+                last_note_pos_r = [[pos[0]] for pos in note_pos]
+
+    return notes_l, notes_r
+
+
+def check_note_pos_valid(positions: list, xy=None) -> bool:
+    if xy is None:
+        for pos in positions:
+            if not 0 <= pos[0] <= 3:  # line index
+                return False
+            if not 0 <= pos[1] <= 2:  # line layer
+                return False
+    elif xy == 'x':
+        for pos in positions:
+            if not 0 <= pos[0] <= 3:  # line index
+                return False
+    elif xy == 'y':
+        for pos in positions:
+            if not 0 <= pos[1] <= 2:  # line index
+                return False
+    else:
+        print("Error, unknown position specified to check valid note")
+        return False
     return True
 
 
@@ -578,4 +901,4 @@ if __name__ == '__main__':
     timings = np.load(paths.temp_path + 'timings.npy', allow_pickle=True)
     notes = list(notes)
 
-    sanity_check_notes(notes, timings)
+    sanity_check_notes(notes, timings, None)

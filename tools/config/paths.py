@@ -12,7 +12,7 @@ from tools.config import config
 
 ################################# (change this for your pc)
 # setup folder for input data (automatically determined if inside this project)
-# dir_path = "C:/Users/frede/Desktop/BS_Automapper/Data/"
+dir_path = "C:/Users/frede/Desktop/BS_Automapper/Data/"
 
 bs_song_path = "E:/SteamLibrary/steamapps/common/Beat Saber/Beat Saber_Data/CustomLevels/"
 
@@ -27,7 +27,7 @@ for i in range(0, max_tries):
     else:
         # found main folder
         break
-dir_path = main_path + "model_data/Data/"
+# dir_path = main_path + "model_data/Data/"
 
 # try Google Drive path
 if not os.path.isdir(dir_path):
@@ -79,7 +79,6 @@ black_list_file = fail_path + "black_list.txt"
 
 notes_classify_dict_file = f"{pred_path}notes_class_dict_{config.min_bps_limit}-{config.max_bps_limit}.pkl"
 # beats_classify_encoder_file = pred_path + f"onehot_encoder_beats_{config.min_bps_limit}-{config.max_bps_limit}.pkl"
-# TODO: check which encoder are taken
 beats_classify_encoder_file = pred_path + f"onehot_encoder_beats.pkl"
 events_classify_encoder_file = pred_path + f"onehot_encoder_events.pkl"
 ############################
