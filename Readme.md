@@ -88,4 +88,3 @@ The song name detection is quite simple,
 for better naming extract the files from the preprocessing algorithm (not implemented)
 
 ## Automapper is finally there. Have fun!
-Official online deployment planned for end of March-April
