@@ -72,7 +72,8 @@ if __name__ == "__main__":
     diff = os.environ.get('max_speed')
     if diff is not None:
         diff = float(diff)
-        print(f"Set max speed to {diff}")
+        print(f"Set difficulty to {diff}")
+        diff = diff * 4  # calculate bps to max_speed
     else:
         print("Use default values")
 
