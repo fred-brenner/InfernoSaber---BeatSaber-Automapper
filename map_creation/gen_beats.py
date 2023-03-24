@@ -88,22 +88,27 @@ def main(name_ar: list) -> None:
     timing_ar /= config.beat_spacing
     timing_ar = timing_ar[timing_ar > config.window]
     # add beats between far beats
-    # timing_ar = fill_map_times(timing_ar)
-    timing_ar = fill_map_times(timing_ar)
-    # TODO: add dynamic fills based on Difficulty and song length
+    fill_map_times_scale(timing_ar, scale_index=7)
     time_input = [timing_ar]
 
     # calculate bpm
     file = paths.songs_pred + name_ar[0] + '.egg'
     bpm, song_duration = get_file_bpm(file)     # 1.6
     # average bpm for songs to make more similar (jump) speeds
-    bpm = int((bpm + 100) / 2)
+    bpm = int((bpm + 130) / 2)
 
     # sanity check timings
     map_times, pitch_algo = sanity_check_timing(name_ar[0], timing_ar, song_duration)   # 3.9
     map_times = map_times[map_times > 0]
-    map_times = fill_map_times(map_times)
     # map_times = fill_map_times(map_times)
+    add_beats_min_bps = config.max_speed * 10 / 40  # max_speed=40 -> min_bps = 10
+    scale_idx = 0
+    while scale_idx < 10:
+        map_times = fill_map_times_scale(map_times, scale_idx)
+        scale_idx += 1
+        if len(map_times) > add_beats_min_bps*map_times[-1]:
+            break
+    print(f"Map filler iterated {scale_idx}/10 times.")
     map_times = add_lstm_prerun(map_times)
 
     # calculate time between beats

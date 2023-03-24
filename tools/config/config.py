@@ -52,7 +52,7 @@ delete_offbeats = 0.6      # < 1 delete non-beats to free ram
 
 # Map creation model configuration
 """Do change"""
-max_speed = 35              # set around 5-40 (normal-expert++)
+max_speed = 30              # set around 5-40 (normal-expert++)
 expert_fact = 0.64          # expert plus to expert factor
 create_expert_flag = True   # create second expert map
 thresh_beat = 0.44          # minimum beat response required to trigger generator
@@ -82,9 +82,12 @@ emphasize_beats_3_fact = 0.004   # factor incl max_speed
 emphasize_beats_2 = 0.23    # fraction beats to double
 emphasize_beats_2_fact = 0.0085  # factor incl max_speed
 shift_beats_fact = 0.30     # fraction beats to shift in cut direction
-add_beat_low_bound = 0.18   # in seconds (beat_generator)
+add_beat_low_bound = 0.20   # in seconds (beat_generator)
 add_beat_hi_bound = 0.90    # in seconds (beat_generator)
 add_beat_fact = 0.90        # fraction add beats (beat_generator)
+add_beat_max_bounds = [0.1, 0.5, 0.8, 1.6]
+add_beat_bound_scale = 80  # scaler for beat_generator, 0-100
+# add_beats_min_bps = 10
 
 # Postprocessing model configuration
 lstm_len_post = 10

@@ -732,7 +732,7 @@ def reverse_cut_dir_xy(old_cut):
 # Postprocessing
 ################
 def fill_map_times(map_times):
-    se_thresh = int(len(map_times) / 25)  # don't apply filling for first and last 4% of song
+    se_thresh = int(len(map_times) / 22)  # don't apply filling for first and last 4% of song
     diff = np.diff(map_times)
     new_map_times = []
     for idx in range(se_thresh, len(diff) - se_thresh):
@@ -740,6 +740,32 @@ def fill_map_times(map_times):
             if np.random.random() < config.add_beat_fact:
                 beat_time = (map_times[idx] + map_times[idx + 1]) / 2
                 new_map_times.append(beat_time)
+    if len(new_map_times) > 0:
+        map_times = np.hstack((map_times, new_map_times))
+        map_times = np.sort(map_times)
+    return map_times
+
+
+def fill_map_times_scale(map_times, scale_index=5):
+    # scale lower and upper bounds for fill algorithm (index 0-10)
+    se_thresh = int(len(map_times) * 0.05)  # don't apply filling for first and last 5% of song
+    diff = np.diff(map_times)
+    new_map_times = []
+
+    mb = config.add_beat_max_bounds
+    low_bound_matrix = np.linspace(mb[1], mb[0], 10)
+    high_bound_matrix = np.linspace(mb[2], mb[3], 10)
+
+    low_bound = low_bound_matrix[scale_index]
+    high_bound = high_bound_matrix[scale_index]
+    if low_bound < 0.1:
+        low_bound = 0.1
+
+    for idx in range(se_thresh, len(diff) - se_thresh):
+        if low_bound < diff[idx] < high_bound:
+            # if np.random.random() < config.add_beat_fact:
+            beat_time = (map_times[idx] + map_times[idx + 1]) / 2
+            new_map_times.append(beat_time)
     if len(new_map_times) > 0:
         map_times = np.hstack((map_times, new_map_times))
         map_times = np.sort(map_times)
