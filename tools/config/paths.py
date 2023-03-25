@@ -31,8 +31,8 @@ for i in range(0, max_tries):
 
 # try Google Drive path
 if not os.path.isdir(dir_path):
-    dir_path = "/content/drive/My Drive/bs_maps/Data/"
-    main_path = "/content/drive/My Drive/bs_maps/Code/"
+    dir_path = "/content/drive/My Drive/InfernoSaber/Data/"
+    main_path = "/content/drive/My Drive/InfernoSaber/Code/"
 
 
 if not os.path.isfile(main_path + '/main.py'):
