@@ -104,10 +104,10 @@ def main(name_ar: list) -> None:
     add_beats_min_bps = config.max_speed * 10 / 40  # max_speed=40 -> min_bps = 10
     scale_idx = 0
     while scale_idx < 10:
-        map_times = fill_map_times_scale(map_times, scale_idx)
-        scale_idx += 1
         if len(map_times) > add_beats_min_bps*map_times[-1]:
             break
+        map_times = fill_map_times_scale(map_times, scale_idx)
+        scale_idx += 1
     print(f"Map filler iterated {scale_idx}/10 times.")
     map_times = add_lstm_prerun(map_times)
 
