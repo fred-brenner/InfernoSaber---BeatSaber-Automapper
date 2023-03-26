@@ -52,7 +52,7 @@ delete_offbeats = 0.6      # < 1 delete non-beats to free ram
 
 # Map creation model configuration
 """Do change"""
-max_speed = 30              # set around 5-40 (normal-expert++)
+max_speed = 4 * 6.8         # set around 5-40 (normal-expert++)
 expert_fact = 0.64          # expert plus to expert factor
 create_expert_flag = True   # create second expert map
 thresh_beat = 0.44          # minimum beat response required to trigger generator
