@@ -60,7 +60,7 @@ def sanity_check_timing(name, timings, song_duration):
     # plt.plot(pitches)
     # plt.show()
 
-    last_pitch = 0
+    last_pitch = 0  # TODO: set constant? Holmes anschauen
     threshold = pitches.mean() * config.thresh_pitch * 3
     threshold_end = config.threshold_end * threshold
     idx_end = int(len(pitches) / 30)

@@ -86,8 +86,7 @@ add_beat_low_bound = 0.20   # in seconds (beat_generator)
 add_beat_hi_bound = 0.90    # in seconds (beat_generator)
 add_beat_fact = 0.90        # fraction add beats (beat_generator)
 add_beat_max_bounds = [0.1, 0.5, 0.8, 1.6]
-add_beat_bound_scale = 80  # scaler for beat_generator, 0-100
-# add_beats_min_bps = 10
+add_beat_intensity = 95    # try to match bps by x%
 
 # Postprocessing model configuration
 lstm_len_post = 10
