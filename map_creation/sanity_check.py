@@ -194,6 +194,10 @@ def sanity_check_notes(notes: list, timings: list, pitch_algo: np.array, pitch_t
     # notes_b, timings_b = add_pause_bombs(notes_r, notes_l, notes_b, timings, pitch_algo, pitch_times)
     # TODO: remove blocking bombs
 
+    # turn notes leading into correct direction
+    notes_r = turn_notes_single(notes_r)
+    notes_l = turn_notes_single(notes_l)
+
     # rebuild notes
     new_notes = unpslit_notes(notes_r, notes_l, notes_b)
     return new_notes
@@ -411,7 +415,7 @@ def add_pause_bombs(notes_r, notes_l, notes_b, timings, pitch_algo, pitch_times)
         else:
             n_left = [0, 1]
         # [2, 2, 3, 8, 3, 2, 3, 8]
-        bomb_ar = n*[[n_right[0], n_up, 3, 8, n_right[1], n_up, 3, 8]]
+        bomb_ar = n * [[n_right[0], n_up, 3, 8, n_right[1], n_up, 3, 8]]
         return bomb_ar
 
     def get_time_pos(time_window, pitch_algo, pitch_times):
@@ -492,6 +496,52 @@ def add_pause_bombs(notes_r, notes_l, notes_b, timings, pitch_algo, pitch_times)
     new_times = list(timings)
     new_times.extend(new_bomb_times)
     return notes_b
+
+
+def turn_notes_single(notes_single):
+    notes_old = None
+    for idx, notes in enumerate(notes_single):
+        if len(notes) == 0:
+            continue  # skip empty notes
+        if notes_old is None:
+            notes_old = notes
+            continue
+        cd_new_x, cd_new_y = list(get_cut_dir_xy(notes[3]))
+        cd_old_x, cd_old_y = list(get_cut_dir_xy(notes_old[3]))
+        if cd_new_x == cd_new_y == 0 or cd_old_x == cd_old_y == 0:
+            notes_old = notes
+            continue  # skip notes without direction
+        # inverse old cut dir
+        cd_old_x *= -1
+        cd_old_y *= -1
+
+        def calc_diff_from_list(cd_old, cd_new):
+            diff_score = abs(cd_old[0] - cd_new[0]) + abs(cd_old[1] - cd_new[1])
+            return diff_score
+
+        df_score = calc_diff_from_list([cd_old_x, cd_old_y], [cd_new_x, cd_new_y])
+        if df_score >= 3:
+            notes[3] = reverse_get_cut_dir(0, 0)
+            notes_single[idx][3] = notes[3]
+        elif df_score >= 2:
+            # only ones
+            if abs(cd_old_x) == abs(cd_new_x) == abs(cd_old_y) == abs(cd_new_y) == 1:
+                if cd_old_x != cd_new_x:
+                    notes[3] = reverse_get_cut_dir(0, cd_new_y)
+                else:
+                    notes[3] = reverse_get_cut_dir(cd_new_x, 0)
+            # each one is zero
+            else:
+                if cd_new_x == 0:
+                    notes[3] = reverse_get_cut_dir(cd_old_x, cd_new_y)
+                else:
+                    notes[3] = reverse_get_cut_dir(cd_new_x, cd_old_y)
+
+            # update notes_single
+            notes_single[idx][3] = notes[3]
+        # update old notes
+        notes_old = notes
+    return notes_single
 
 
 def correct_notes(notes, timings):
@@ -726,6 +776,14 @@ def reverse_cut_dir_xy(old_cut):
     cut_dir_order = np.asarray([[4, 0, 5], [2, 8, 3], [6, 1, 7]]).flatten()
     new_cat = cut_dir_order[cut_dir_order[::-1] == old_cut]
     return int(new_cat)
+
+
+def reverse_get_cut_dir(mov_x, mov_y):
+    cut_dir_x = np.asarray([[1, 0, -1]] * 3).flatten()
+    cut_dir_y = np.asarray([[-1] * 3, [0] * 3, [1] * 3]).flatten()
+    cut_dir_order = np.asarray([[4, 0, 5], [2, 8, 3], [6, 1, 7]]).flatten()
+    cut_dir = cut_dir_order[(cut_dir_x == mov_x) & (cut_dir_y == mov_y)][0]
+    return cut_dir
 
 
 ################
