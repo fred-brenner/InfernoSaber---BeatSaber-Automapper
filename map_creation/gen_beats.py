@@ -5,16 +5,15 @@ from PIL import Image
 from beat_prediction.find_beats import find_beats, get_pitch_times
 from beat_prediction.beat_to_lstm import beat_to_lstm
 from beat_prediction.beat_prop import get_beat_prop, tcn_reshape
-from lighting_prediction.train_lighting import lstm_shift_events_half
 
 from map_creation.sanity_check import *
-from map_creation.class_helpers import *
+# from map_creation.class_helpers import *
 from map_creation.map_creator import create_map
 from map_creation.find_bpm import get_file_bpm
 
 from preprocessing.music_processing import run_music_preprocessing
 from preprocessing.bs_mapper_pre import calc_time_between_beats
-from preprocessing.bs_mapper_pre import lstm_shift
+# from preprocessing.bs_mapper_pre import lstm_shift
 
 from training.helpers import *
 from training.tensorflow_models import *

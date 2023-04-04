@@ -2,7 +2,7 @@ from keras.layers import Dense, Input, LSTM, Flatten, Dropout, \
     MaxPooling2D, Conv2D, BatchNormalization, SpatialDropout2D, concatenate, \
     Reshape, Conv2DTranspose, UpSampling2D, CuDNNLSTM
 from keras.models import Model
-import numpy as np
+# import numpy as np
 
 
 def create_tf_model(model_type, dim_in, dim_out, nr=128):
