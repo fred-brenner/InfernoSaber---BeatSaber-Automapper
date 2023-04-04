@@ -13,13 +13,18 @@ from bs_shift.export_map import *
 import tensorflow as tf
 
 
-def main(diff: float, export_results_to_bs=True, quick_start=None):
+def main(diff: float, export_results_to_bs=True, quick_start=None,
+         beat_intensity=None, random_factor=None):
     # change difficulty
     if diff is not None:
         config.max_speed = diff
         config.max_speed_orig = diff
     if quick_start is not None:
         config.quick_start = quick_start
+    if beat_intensity is not None:
+        config.add_beat_intensity = beat_intensity
+    if random_factor is not None:
+        config.random_note_map_factor = random_factor
 
     # limit gpu ram usage
     conf = tf.compat.v1.ConfigProto()
@@ -83,5 +88,15 @@ if __name__ == "__main__":
         qs = float(qs)
         print(f"Set quick_start to {qs}")
 
+    bi = os.environ.get('beat_intensity')
+    if bi is not None:
+        bi = float(bi)
+        print(f"Set beat intensity to {bi}")
+
+    rf = os.environ.get('random_factor')
+    if rf is not None:
+        rf = float(rf)
+        print(f"Set random factor to {rf}")
+
     export_results_to_bs = True
-    main(diff, export_results_to_bs, qs)
+    main(diff, export_results_to_bs, qs, bi, rf)
