@@ -151,7 +151,7 @@ def get_info_map_string(name, bpm, bs_diff):
     info_string = '{\n'
     info_string += '"_version": "2.0.0",\n'
     info_string += f'"_songName": "{name}",\n'
-    info_string += f'"_songSubName": "Diff_{diff_plus:.1f}",\n'
+    info_string += f'"_songSubName": "Diff_{diff_plus/4:.1f}",\n'
     info_string += '"_songAuthorName": "unknown",\n'
     info_string += '"_levelAuthorName": "BierHerr",\n'
     info_string += f'"_beatsPerMinute": {bpm},\n'

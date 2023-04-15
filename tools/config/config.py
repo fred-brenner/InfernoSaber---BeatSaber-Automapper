@@ -57,19 +57,19 @@ add_beat_intensity = 86    # try to match bps by x%
 expert_fact = 0.64          # expert plus to expert factor
 create_expert_flag = True   # create second expert map
 thresh_beat = 0.45          # minimum beat response required to trigger generator
-thresh_pitch = 0.40         # minimum beat for pitch check (0.01,low-1,high)
+thresh_pitch = 0.39         # minimum beat for pitch check (0.01,low-1,high)
 threshold_end = 1.4         # factor for start and end threshold
 random_note_map_factor = 0.3    # stick note map to random song/center (set to 0 to disable)
 random_note_map_change = 2      # change frequency for center (1-20)
-quick_start = 1.7           # map quick start mode (0 off, 1-3 on)
+quick_start = 1.9           # map quick start mode (0 off, 1-3 on)
 t_diff_bomb = 1.5           # minimum time between notes to add bomb
 t_diff_bomb_react = 0.3     # minimum time between finished added bombs
 allow_mismatch_flag = False     # if True, wrong turned notes won't be removed
 furious_lighting_flag = False   # increase frequency of light effects
 
 """Caution on changes"""
-decr_speed_range = 14       # range for start and end (n first and last notes)
-decr_speed_val = 0.25        # decrease max speed at start
+decr_speed_range = 20       # range for start and end (n first and last notes)
+decr_speed_val = 0.28       # decrease max speed at start
 reaction_time = 1.1         # reaction time (0.5-2)
 reaction_time_fact = 0.013  # factor including max_speed
 jump_speed = 15             # jump speed from beat saber (15-22)
