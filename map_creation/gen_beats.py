@@ -28,7 +28,7 @@ from tools.utils import numpy_shorts
 def main(name_ar: list) -> None:
 
     if len(name_ar) > 1:
-        print("Multiple song generation currently not implemented!")
+        print("Multi-core song generation currently not implemented!")
         exit()
 
     # load song data

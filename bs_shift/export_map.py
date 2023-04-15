@@ -16,6 +16,9 @@ def shutil_copy_maps(song_name):
 
 
 def check_music_files(files, dir_path):
+
+    # TODO: shift all music files on same volume!
+
     song_list = []
     for file_name in files:
         ending = file_name.split('.')[-1]
