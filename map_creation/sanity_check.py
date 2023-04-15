@@ -122,8 +122,6 @@ def emphasize_beats(notes, timings):
         notes[n] = new_note
         return notes
 
-    # for n in range(start_end_idx, len(notes) - start_end_idx):
-    # TODO: check timings (needed individually for each note side?)
     for n in range(start_end_idx, len(notes)):
         if timings[n:n + 1].max() >= config.emphasize_beats_wait:
             note = notes[n]
@@ -521,8 +519,12 @@ def turn_notes_single(notes_single):
 
         df_score = calc_diff_from_list([cd_old_x, cd_old_y], [cd_new_x, cd_new_y])
         if df_score >= 3:
-            notes[3] = reverse_get_cut_dir(0, 0)
-            notes_single[idx][3] = notes[3]
+            if config.allow_mismatch_flag:
+                notes[3] = reverse_get_cut_dir(0, 0)
+                notes_single[idx][3] = notes[3]
+            else:
+                notes_single[idx] = []
+                continue    # do not update old notes
         elif df_score >= 2:
             # only ones
             if abs(cd_old_x) == abs(cd_new_x) == abs(cd_old_y) == abs(cd_new_y) == 1:
@@ -676,9 +678,6 @@ def check_note_movement(notes_last, notes_new):
     if dist_x != 2 and dist_y != 2:
         if dist_x == dist_y == 1:
             return notes_new
-
-        # (TODO: (check if new cut direction needs more speed
-        #       only if timing < 0.5) if necessary)
 
         # change cut direction
         new_cut = reverse_cut_dir_xy(notes_last[3])

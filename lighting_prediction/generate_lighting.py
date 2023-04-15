@@ -102,7 +102,6 @@ def generate(l_in_song, time_ar, save_model_name, lstm_len, encoder_file):
         # find class winner
         y_arg_max = np.argmax(y_class, axis=2)[0]
         for imax in range(len(y_arg_max)):
-            # (TODO: Filter out double notes if necessary)
             y_class_map[idx, imax][y_arg_max[imax]] = 1
 
     # decode event class output
