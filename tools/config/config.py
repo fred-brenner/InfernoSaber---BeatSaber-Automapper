@@ -66,6 +66,7 @@ t_diff_bomb = 1.5           # minimum time between notes to add bomb
 t_diff_bomb_react = 0.3     # minimum time between finished added bombs
 allow_mismatch_flag = False     # if True, wrong turned notes won't be removed
 furious_lighting_flag = False   # increase frequency of light effects
+normalize_song_flag = False  # normalize song volume
 
 """Caution on changes"""
 decr_speed_range = 20       # range for start and end (n first and last notes)

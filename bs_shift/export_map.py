@@ -1,8 +1,8 @@
 import shutil
 import os
-from pydub import AudioSegment
+from pydub import AudioSegment, effects
 
-from tools.config import paths
+from tools.config import config, paths
 
 
 def shutil_copy_maps(song_name):
@@ -16,13 +16,10 @@ def shutil_copy_maps(song_name):
 
 
 def check_music_files(files, dir_path):
-
-    # TODO: shift all music files on same volume!
-
     song_list = []
     for file_name in files:
         ending = file_name.split('.')[-1]
-        if ending in ['mp3', 'mp4', 'm4a', 'wav']:   # (TODO: allow more music formats)
+        if ending in ['mp3', 'mp4', 'm4a', 'wav', 'aac', 'flv', 'wma']:   # (TODO: allow more music formats)
             # convert music to ogg format
             output_file = f"{file_name[:-4]}.egg"
             convert_music_file(dir_path + file_name, dir_path + output_file)
@@ -38,6 +35,13 @@ def check_music_files(files, dir_path):
         else:
             print(f"Warning: Can not read {file_name} as music file.")
             pass
+
+    # Normalize the volume for each song in advance
+    if config.normalize_song_flag:
+        for song_name in song_list:
+            audio = AudioSegment.from_file(dir_path + song_name, format="ogg")
+            normalized_song = effects.normalize(audio, headroom=0.01)
+            normalized_song.export(dir_path + song_name, format="ogg")
     return song_list
 
 
