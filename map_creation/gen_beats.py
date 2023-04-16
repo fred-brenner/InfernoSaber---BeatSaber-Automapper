@@ -141,7 +141,7 @@ def main(name_ar: list) -> None:
     # add events
     ############
     if True:
-        # TODO: add furious_lighting_flag to increase effect frequency
+        # TODO: add furious_lighting to increase effect frequency
         events = generate(in_song_l, map_times, config.event_gen_version, config.event_lstm_len,
                           paths.events_classify_encoder_file)     # 23.7 (47.0 -> 3.8)
     else:

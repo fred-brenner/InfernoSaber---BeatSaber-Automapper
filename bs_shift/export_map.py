@@ -38,13 +38,20 @@ def check_music_files(files, dir_path):
 
     # Normalize the volume for each song in advance
     if config.normalize_song_flag:
+        print("Running volume check for input songs...")
         for song_name in song_list:
             audio = AudioSegment.from_file(dir_path + song_name, format="ogg")
-            if audio.max_dBFS > 0.0:
+            if config.increase_volume_flag:
+                rms = audio.rms/1e9
+                print(f"Audio rms: {rms:.2f} x1e9")
+            else:
+                rms = 10
+            if audio.max_dBFS > 0.0 or rms < config.audio_rms_goal:
                 # normalize if volume is below max, else skip
-                normalized_song = effects.normalize(audio, headroom=-1)
+                headroom = -1 * (0.42 + (config.audio_rms_goal - rms) * 16)
+                normalized_song = effects.normalize(audio, headroom=headroom)
                 normalized_song.export(dir_path + song_name, format="ogg")
-                print(f"Normalized volume of song: {song_name}")
+                print(f"Normalized volume of song: {song_name} with new rms: {normalized_song.rms/1e9:.2f}")
     return song_list
 
 

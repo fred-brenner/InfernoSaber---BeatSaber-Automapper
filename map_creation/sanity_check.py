@@ -60,7 +60,7 @@ def sanity_check_timing(name, timings, song_duration):
     # plt.plot(pitches)
     # plt.show()
 
-    last_pitch = 0  # TODO: set constant? Holmes anschauen
+    last_pitch = 0
     threshold = pitches.mean() * config.thresh_pitch * 3
     threshold_end = config.threshold_end * threshold
     idx_end = int(len(pitches) / 30)
@@ -498,6 +498,20 @@ def add_pause_bombs(notes_r, notes_l, notes_b, timings, pitch_algo, pitch_times)
 
 def turn_notes_single(notes_single):
     # TODO: add better_flow version
+    notes_old = None
+    if config.flow_model_flag:
+        for idx, notes in enumerate(notes_single):
+            if len(notes) == 0:
+                continue  # skip empty notes
+            if notes_old is None:
+                notes_old = notes
+                continue
+            if len(notes) > 4:
+                # skip multi notes
+                notes_old = None
+                continue
+            posx, posy = notes[1], notes[2]
+
     notes_old = None
     for idx, notes in enumerate(notes_single):
         if len(notes) == 0:
