@@ -67,9 +67,10 @@ t_diff_bomb_react = 0.3     # minimum time between finished added bombs
 allow_mismatch_flag = False     # if True, wrong turned notes won't be removed
 flow_model_flag = True      # use improved direction flow
 furious_lighting_flag = False   # increase frequency of light effects
-normalize_song_flag = True  # normalize song volume
+normalize_song_flag = False  # normalize song volume
 increase_volume_flag = True     # increase song volume
 audio_rms_goal = 0.50
+allow_no_direction_notes = True     # if False, all notes must have a cut direction
 
 """Caution on changes"""
 decr_speed_range = 20       # range for start and end (n first and last notes)

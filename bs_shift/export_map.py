@@ -43,7 +43,7 @@ def check_music_files(files, dir_path):
             audio = AudioSegment.from_file(dir_path + song_name, format="ogg")
             if config.increase_volume_flag:
                 rms = audio.rms/1e9
-                print(f"Audio rms: {rms:.2f} x1e9")
+                # print(f"Audio rms: {rms:.2f} x1e9")
             else:
                 rms = 10
             if audio.max_dBFS > 0.0 or rms < config.audio_rms_goal:

@@ -497,9 +497,13 @@ def add_pause_bombs(notes_r, notes_l, notes_b, timings, pitch_algo, pitch_times)
 
 
 def turn_notes_single(notes_single):
-    # TODO: add better_flow version
-    notes_old = None
+
+    def calc_diff_from_list(cd_old, cd_new):
+        diff_score = abs(cd_old[0] - cd_new[0]) + abs(cd_old[1] - cd_new[1])
+        return diff_score
+
     if config.flow_model_flag:
+        notes_old = None
         for idx, notes in enumerate(notes_single):
             if len(notes) == 0:
                 continue  # skip empty notes
@@ -510,7 +514,36 @@ def turn_notes_single(notes_single):
                 # skip multi notes
                 notes_old = None
                 continue
-            posx, posy = notes[1], notes[2]
+            dirx = -1*(notes[0] - notes_old[0])
+            if abs(dirx) > 1:
+                dirx = np.sign(dirx)
+            diry = -1*(notes[1] - notes_old[1])
+            if abs(diry) > 1:
+                diry = np.sign(diry)
+            if notes[3] == 8:
+                if config.allow_no_direction_notes:
+                    notes_old = None
+                    continue
+                else:
+                    new_cut_dir = reverse_get_cut_dir(dirx, diry)
+                    notes[3] = new_cut_dir
+            cd_old = get_cut_dir_xy(notes[3])
+            diff_score = calc_diff_from_list(cd_old, [dirx, diry])
+            if diff_score == 1:
+                # use new cut direction
+                new_cut_dir = reverse_get_cut_dir(dirx, diry)
+                notes[3] = new_cut_dir
+            elif diff_score == 2:
+                if dirx == cd_old[0] or diry == cd_old[1]:
+                    new_dirx = int(np.round(0.5 * (dirx + cd_old[0]), 0))
+                    new_diry = int(np.round(0.5 * (diry + cd_old[1]), 0))
+                    new_cut_dir = reverse_get_cut_dir(new_dirx, new_diry)
+                    notes[3] = new_cut_dir
+                elif config.allow_no_direction_notes:
+                    notes[3] = 8
+
+            # update old notes
+            notes_old = notes
 
     notes_old = None
     for idx, notes in enumerate(notes_single):
@@ -527,10 +560,6 @@ def turn_notes_single(notes_single):
         # inverse old cut dir
         cd_old_x *= -1
         cd_old_y *= -1
-
-        def calc_diff_from_list(cd_old, cd_new):
-            diff_score = abs(cd_old[0] - cd_new[0]) + abs(cd_old[1] - cd_new[1])
-            return diff_score
 
         df_score = calc_diff_from_list([cd_old_x, cd_old_y], [cd_new_x, cd_new_y])
         if df_score >= 3:
