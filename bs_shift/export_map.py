@@ -40,8 +40,11 @@ def check_music_files(files, dir_path):
     if config.normalize_song_flag:
         for song_name in song_list:
             audio = AudioSegment.from_file(dir_path + song_name, format="ogg")
-            normalized_song = effects.normalize(audio, headroom=0.01)
-            normalized_song.export(dir_path + song_name, format="ogg")
+            if audio.max_dBFS > 0.0:
+                # normalize if volume is below max, else skip
+                normalized_song = effects.normalize(audio, headroom=-1)
+                normalized_song.export(dir_path + song_name, format="ogg")
+                print(f"Normalized volume of song: {song_name}")
     return song_list
 
 
