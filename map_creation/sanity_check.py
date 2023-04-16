@@ -503,6 +503,7 @@ def turn_notes_single(notes_single):
         return diff_score
 
     if config.flow_model_flag:
+        empty_note_last = False
         notes_old = None
         for idx, notes in enumerate(notes_single):
             if len(notes) == 0:
@@ -522,11 +523,18 @@ def turn_notes_single(notes_single):
                 diry = np.sign(diry)
             if notes[3] == 8:
                 if config.allow_no_direction_notes:
-                    notes_old = None
-                    continue
+                    if not empty_note_last:
+                        new_cut_dir = reverse_get_cut_dir(dirx, diry)
+                        notes[3] = new_cut_dir
+                        empty_note_last = True
+                    else:
+                        notes_old = None
+                        continue
                 else:
                     new_cut_dir = reverse_get_cut_dir(dirx, diry)
                     notes[3] = new_cut_dir
+            else:   # last note has direction
+                empty_note_last = False
             cd_old = get_cut_dir_xy(notes[3])
             diff_score = calc_diff_from_list(cd_old, [dirx, diry])
             if diff_score == 1:
