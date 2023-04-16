@@ -497,6 +497,7 @@ def add_pause_bombs(notes_r, notes_l, notes_b, timings, pitch_algo, pitch_times)
 
 
 def turn_notes_single(notes_single):
+    # TODO: add better_flow version
     notes_old = None
     for idx, notes in enumerate(notes_single):
         if len(notes) == 0:
