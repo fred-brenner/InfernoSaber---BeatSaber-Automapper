@@ -139,6 +139,7 @@ def get_map_string(events='', notes='', obstacles=''):
 
 
 def get_info_map_string(name, bpm, bs_diff):
+    # TODO: check Venom of Venus (note speed too low)
     jump_speed = [int(config.jump_speed + config.jump_speed_fact * config.max_speed)]
     if bs_diff == 'Expert':
         diff_plus = config.max_speed / config.expert_fact
