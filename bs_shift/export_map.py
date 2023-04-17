@@ -51,7 +51,7 @@ def check_music_files(files, dir_path):
                 headroom = -1 * (0.42 + (config.audio_rms_goal - rms) * 16)
                 normalized_song = effects.normalize(audio, headroom=headroom)
                 normalized_song.export(dir_path + song_name, format="ogg")
-                print(f"Normalized volume of song: {song_name} with new rms: {normalized_song.rms/1e9:.2f}")
+                print(f"Normalized volume of song: {song_name} with new RMS: {normalized_song.rms/1e9:.2f}")
     return song_list
 
 
