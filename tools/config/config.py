@@ -52,8 +52,8 @@ delete_offbeats = 0.6      # < 1 delete non-beats to free ram
 
 # Map creation model configuration
 """Do change"""
-max_speed = 4 * 7.5         # set around 5-40 (normal-expert++)
-add_beat_intensity = 86    # try to match bps by x%
+max_speed = 4 * 9.5         # set around 5-40 (normal-expert++)
+add_beat_intensity = 95    # try to match bps by x%
 expert_fact = 0.64          # expert plus to expert factor
 create_expert_flag = True   # create second expert map
 thresh_beat = 0.45          # minimum beat response required to trigger generator
@@ -67,21 +67,22 @@ t_diff_bomb_react = 0.3     # minimum time between finished added bombs
 allow_mismatch_flag = False     # if True, wrong turned notes won't be removed
 flow_model_flag = True      # use improved direction flow
 furious_lighting_flag = False   # increase frequency of light effects
-normalize_song_flag = True  # normalize song volume
-increase_volume_flag = True     # increase song volume
+normalize_song_flag = False  # normalize song volume
+increase_volume_flag = True     # increase song volume (only used in combination with normalize flag)
 audio_rms_goal = 0.50
 allow_no_direction_notes = True     # if False, all notes must have a cut direction
 
 """Caution on changes"""
-jsb_offset = [-0.03, -0.07]     # note jump speed offset for Expert, Expert+ (range [-0.5, 0.5])
-use_orig_bpm_flag = False   # use the song bpm instead of standard value
-max_njs = 22                # maximum Note Jump Speed allowed
+jsb_offset = [0.21, 0.15]   # note jump speed offset for Expert, Expert+ (range [-0.5, 0.5])
+jsb_offset_factor = 0.011  # note jump factor for high difficulties
+use_fixed_bpm = 100         # use fixed bpm or set to None for the song bpm
+max_njs = 25                # maximum Note Jump Speed allowed
 decr_speed_range = 20       # range for start and end (n first and last notes)
 decr_speed_val = 0.28       # decrease max speed at start
 reaction_time = 1.1         # reaction time (0.5-2)
 reaction_time_fact = 0.013  # factor including max_speed
-jump_speed = 11             # jump speed from beat saber (10-15)
-jump_speed_fact = 0.300     # factor including max_speed
+jump_speed = 12.5           # jump speed from beat saber (10-15)
+jump_speed_fact = 0.310     # factor including max_speed
 cdf = 1.2                   # cut director factor (to calculate speed, ~0.5)
 min_beat_time = 1/16        # in seconds (first sanity check)
 beat_spacing = 5587/196     # 5587/196s = 28.5051 steps/s

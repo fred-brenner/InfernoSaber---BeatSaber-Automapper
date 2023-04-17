@@ -100,3 +100,8 @@ if __name__ == "__main__":
 
     export_results_to_bs = True
     main(diff, export_results_to_bs, qs, bi, rf)
+
+    # main(2.5*4, export_results_to_bs)
+    # main(10 * 4, export_results_to_bs)
+    # main(5*4, export_results_to_bs)
+    # main(7.5 * 4, export_results_to_bs)

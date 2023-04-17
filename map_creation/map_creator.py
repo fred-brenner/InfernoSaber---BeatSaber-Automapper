@@ -144,7 +144,7 @@ def get_info_map_string(name, bpm, bs_diff):
         diff_plus = config.max_speed / config.expert_fact
         diff_list = ['Expert', 'ExpertPlus']
         exp_jump_speed = np.round(config.jump_speed + config.jump_speed_fact * diff_plus, 1)
-        jump_speed = [exp_jump_speed, jump_speed[0]]
+        jump_speed = [exp_jump_speed, exp_jump_speed*0.91]
     else:
         diff_plus = config.max_speed
         diff_list = ['ExpertPlus']
@@ -153,6 +153,18 @@ def get_info_map_string(name, bpm, bs_diff):
         if jump_speed[i] > (config.max_njs - 2*i):
             jump_speed[i] = config.max_njs - 2*i
     jump_speed.reverse()    # Set in order Expert (low), ExpertPlus (high)
+
+    if bs_diff == 'Expert':
+        jsb_offset = config.jsb_offset.copy()
+        jsb_offset[1] -= diff_plus * config.jsb_offset_factor
+        jsb_offset[0] -= 2/3 * (diff_plus * config.jsb_offset_factor)
+        # print(jsb_offset)
+    else:
+        jsb_offset = [config.jsb_offset[0] - diff_plus * config.jsb_offset_factor]
+
+    for i in range(len(jump_speed)):
+        if jump_speed[i] < 15:
+            jsb_offset[i] -= 1
 
     info_string = '{\n'
     info_string += '"_version": "2.0.0",\n'
@@ -184,7 +196,7 @@ def get_info_map_string(name, bpm, bs_diff):
             info_string += '"_difficultyRank": 9,\n'
         info_string += f'"_beatmapFilename": "{diff}.dat",\n'
         info_string += f'"_noteJumpMovementSpeed": {jump_speed[i]},\n'
-        info_string += f'"_noteJumpStartBeatOffset": {config.jsb_offset[i]}\n'
+        info_string += f'"_noteJumpStartBeatOffset": {jsb_offset[i]:.2f}\n'
         if i+1 < len(diff_list):
             info_string += '},\n'
         else:

@@ -94,10 +94,10 @@ def main(name_ar: list) -> None:
     file = paths.songs_pred + name_ar[0] + '.egg'
     bpm, song_duration = get_file_bpm(file)     # 1.6
     # average bpm for songs to make more similar (jump) speeds
-    if config.use_orig_bpm_flag:
+    if config.use_fixed_bpm is None:
         bpm = int((bpm + 120) / 2)
     else:
-        bpm = 120
+        bpm = config.use_fixed_bpm
 
 
     # sanity check timings
