@@ -73,15 +73,15 @@ audio_rms_goal = 0.50
 allow_no_direction_notes = True     # if False, all notes must have a cut direction
 
 """Caution on changes"""
-jsb_offset = [-0.05, -0.15]      # note jump speed offset for Expert, Expert+ (range [-0.5, 0.5])
+jsb_offset = [-0.03, -0.09]     # note jump speed offset for Expert, Expert+ (range [-0.5, 0.5])
 use_orig_bpm_flag = False   # use the song bpm instead of standard value
-max_njs = 23                # maximum Note Jump Speed allowed
+max_njs = 22                # maximum Note Jump Speed allowed
 decr_speed_range = 20       # range for start and end (n first and last notes)
 decr_speed_val = 0.28       # decrease max speed at start
 reaction_time = 1.1         # reaction time (0.5-2)
 reaction_time_fact = 0.013  # factor including max_speed
 jump_speed = 11             # jump speed from beat saber (10-15)
-jump_speed_fact = 0.310     # factor including max_speed
+jump_speed_fact = 0.300     # factor including max_speed
 cdf = 1.2                   # cut director factor (to calculate speed, ~0.5)
 min_beat_time = 1/16        # in seconds (first sanity check)
 beat_spacing = 5587/196     # 5587/196s = 28.5051 steps/s
