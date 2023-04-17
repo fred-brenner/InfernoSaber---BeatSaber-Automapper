@@ -139,15 +139,20 @@ def get_map_string(events='', notes='', obstacles=''):
 
 
 def get_info_map_string(name, bpm, bs_diff):
-    # TODO: check Venom of Venus (note speed too low)
-    jump_speed = [int(config.jump_speed + config.jump_speed_fact * config.max_speed)]
+    jump_speed = [np.round(config.jump_speed + config.jump_speed_fact * config.max_speed, 1)]
     if bs_diff == 'Expert':
         diff_plus = config.max_speed / config.expert_fact
         diff_list = ['Expert', 'ExpertPlus']
-        jump_speed.append(int(config.jump_speed + config.jump_speed_fact * diff_plus))
+        exp_jump_speed = np.round(config.jump_speed + config.jump_speed_fact * diff_plus, 1)
+        jump_speed = [exp_jump_speed, jump_speed[0]]
     else:
         diff_plus = config.max_speed
         diff_list = ['ExpertPlus']
+
+    for i in range(len(jump_speed)):
+        if jump_speed[i] > (config.max_njs - 2*i):
+            jump_speed[i] = config.max_njs - 2*i
+    jump_speed.reverse()    # Set in order Expert (low), ExpertPlus (high)
 
     info_string = '{\n'
     info_string += '"_version": "2.0.0",\n'
@@ -179,7 +184,7 @@ def get_info_map_string(name, bpm, bs_diff):
             info_string += '"_difficultyRank": 9,\n'
         info_string += f'"_beatmapFilename": "{diff}.dat",\n'
         info_string += f'"_noteJumpMovementSpeed": {jump_speed[i]},\n'
-        info_string += '"_noteJumpStartBeatOffset": 0.0\n'
+        info_string += f'"_noteJumpStartBeatOffset": {config.jsb_offset[i]}\n'
         if i+1 < len(diff_list):
             info_string += '},\n'
         else:

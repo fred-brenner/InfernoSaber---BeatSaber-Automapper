@@ -94,7 +94,11 @@ def main(name_ar: list) -> None:
     file = paths.songs_pred + name_ar[0] + '.egg'
     bpm, song_duration = get_file_bpm(file)     # 1.6
     # average bpm for songs to make more similar (jump) speeds
-    bpm = int((bpm + 120) / 2)
+    if config.use_orig_bpm_flag:
+        bpm = int((bpm + 120) / 2)
+    else:
+        bpm = 120
+
 
     # sanity check timings
     map_times, pitch_algo = sanity_check_timing(name_ar[0], timing_ar, song_duration)   # 3.9
