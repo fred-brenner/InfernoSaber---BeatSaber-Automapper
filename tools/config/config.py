@@ -73,7 +73,7 @@ audio_rms_goal = 0.50
 allow_no_direction_notes = True     # if False, all notes must have a cut direction
 
 """Caution on changes"""
-jsb_offset = [-0.03, -0.09]     # note jump speed offset for Expert, Expert+ (range [-0.5, 0.5])
+jsb_offset = [-0.03, -0.07]     # note jump speed offset for Expert, Expert+ (range [-0.5, 0.5])
 use_orig_bpm_flag = False   # use the song bpm instead of standard value
 max_njs = 22                # maximum Note Jump Speed allowed
 decr_speed_range = 20       # range for start and end (n first and last notes)
