@@ -67,10 +67,11 @@ t_diff_bomb_react = 0.3     # minimum time between finished added bombs
 allow_mismatch_flag = False     # if True, wrong turned notes won't be removed
 flow_model_flag = True      # use improved direction flow
 furious_lighting_flag = False   # increase frequency of light effects
-normalize_song_flag = False  # normalize song volume
+normalize_song_flag = True  # normalize song volume
 increase_volume_flag = True     # increase song volume (only used in combination with normalize flag)
 audio_rms_goal = 0.50
 allow_no_direction_notes = True     # if False, all notes must have a cut direction
+jump_speed_offset = 0.0     # general offset for jump speed (range [-2, 2])
 
 """Caution on changes"""
 jsb_offset = [0.21, 0.15]   # note jump speed offset for Expert, Expert+ (range [-0.5, 0.5])
@@ -99,28 +100,10 @@ add_beat_hi_bound = 0.90    # in seconds (beat_generator)
 add_beat_fact = 0.90        # fraction add beats (beat_generator)
 add_beat_max_bounds = [0.1, 0.5, 0.8, 1.6]
 
-# Postprocessing model configuration
-lstm_len_post = 10
-n_epochs_post = 10
-
 # Event prediction model configuration
 event_learning_rate = 1e-3
 event_n_epochs = 180
 event_lstm_len = 16
 event_batch_size = 128
-
-# # cutout_window = 0.1       # window in seconds for cutout
-# # limit_mem = 10            # in GigaByte (free ram | needs about double memory for FAST saving at the end)
-# # rec_t = 64                # recurrent timesteps for lstm deep learning model
-# max_pause_sec = 20          # max pause allowed for second ML Model in seconds
-# min_pause_sec = 0.03        # min pause allowed between beats
-# max_velocity = 25           # max speed for cutting notes for expert+, others are lower (still depending on max velocity), 30 means ca max 10 notes (with low distance) per sec per hand!
-
-# bps_borders = 0.7     #set range for bps values to be classified within following variables
-# # 0.15xsong_bps is added onto the border value automatically!
-# bps_normal = 4
-# bps_hard = 6
-# bps_expert = 8
-# bps_expertplus = 10
 
 max_speed_orig = max_speed      # needed for reset

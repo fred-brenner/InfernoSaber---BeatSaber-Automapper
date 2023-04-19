@@ -21,8 +21,8 @@ def sanity_check_beat(beat):
                 beat[idx] = 0
 
     # print result
-    print(f"Got {beat.sum()} beats after sanity check beat"
-          f" (removed {beat_counts - beat.sum()})")
+    # print(f"Got {beat.sum()} beats after sanity check beat"
+    #       f" (removed {beat_counts - beat.sum()})")
 
     return beat
 
@@ -159,9 +159,9 @@ def sanity_check_notes(notes: list, timings: list, pitch_algo: np.array, pitch_t
     # notes_r = correct_cut_dir(notes_r, timings)
     # notes_l = correct_cut_dir(notes_l, timings)
 
-    print("Right notes:", end=' ')
+    # print("Right notes:", end=' ')
     notes_r = correct_notes(notes_r, timings)
-    print("Left notes: ", end=' ')
+    # print("Left notes: ", end=' ')
     notes_l = correct_notes(notes_l, timings)
 
     time_diffs = np.concatenate((np.ones(1), np.diff(timings)), axis=0)
@@ -326,7 +326,7 @@ def correct_notes_all(notes_r, notes_l, notes_b, time_diff):
         pos_r_last = pos_r
         pos_l_last = pos_l
         # cut_r_last = cut_r
-    print(f"Static sanity check removed {rm_counter} notes.")
+    # print(f"Static sanity check removed {rm_counter} notes.")
 
     return notes_r, notes_l, notes_b
 
@@ -384,7 +384,7 @@ def shift_blocks_middle(notes_r, notes_l, notes_b):
                     notes_b[idx][ib * 4:ib * 4 + 2] = new_pos
                     counter += 1
 
-    print(f"Shifted {counter} blocks away from the middle.")
+    # print(f"Shifted {counter} blocks away from the middle.")
 
     return notes_r, notes_l, notes_b
 
@@ -683,7 +683,7 @@ def correct_notes(notes, timings):
                         if rm_temp[rm]:
                             notes[idx].pop(rm)
 
-    print(f"Sanity check note speed removed {rm_counter} elements")
+    # print(f"Sanity check note speed removed {rm_counter} elements")
     return notes
 
 

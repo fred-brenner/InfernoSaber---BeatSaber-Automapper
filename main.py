@@ -14,7 +14,8 @@ import tensorflow as tf
 
 
 def main(diff: float, export_results_to_bs=True, quick_start=None,
-         beat_intensity=None, random_factor=None):
+         beat_intensity=None, random_factor=None, js_offset=None,
+         flow_model_flag=None, allow_no_dir_flag=None):
     # change difficulty
     if diff is not None:
         config.max_speed = diff
@@ -25,6 +26,12 @@ def main(diff: float, export_results_to_bs=True, quick_start=None,
         config.add_beat_intensity = beat_intensity
     if random_factor is not None:
         config.random_note_map_factor = random_factor
+    if js_offset is not None:
+        config.jump_speed_offset = js_offset
+    if flow_model_flag is not None:
+        config.flow_model_flag = flow_model_flag
+    if allow_no_dir_flag is not None:
+        config.allow_no_direction_notes = allow_no_dir_flag
 
     # limit gpu ram usage
     conf = tf.compat.v1.ConfigProto()
@@ -98,8 +105,23 @@ if __name__ == "__main__":
         rf = float(rf)
         print(f"Set random factor to {rf}")
 
+    jso = os.environ.get('jump_speed_offset')
+    if jso is not None:
+        jso = float(jso)
+        print(f"Set jump speed offset to {jso}")
+
+    fmf = os.environ.get('flow_model_flag')
+    if fmf is not None:
+        fmf = bool(fmf)
+        print(f"Set flow_model_flag to {fmf}")
+
+    ndf = os.environ.get('allow_no_direction_flag')
+    if ndf is not None:
+        ndf = bool(ndf)
+        print(f"Set allow_no_direction_flag to {ndf}")
+
     export_results_to_bs = True
-    main(diff, export_results_to_bs, qs, bi, rf)
+    main(diff, export_results_to_bs, qs, bi, rf, jso, fmf, ndf)
 
     # main(2.5*4, export_results_to_bs)
     # main(10 * 4, export_results_to_bs)
