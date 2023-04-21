@@ -52,7 +52,7 @@ delete_offbeats = 0.6      # < 1 delete non-beats to free ram
 
 # Map creation model configuration
 """Do change"""
-max_speed = 4 * 9.5         # set around 5-40 (normal-expert++)
+max_speed = 4 * 7.5         # set around 5-40 (normal-expert++)
 add_beat_intensity = 95    # try to match bps by x%
 expert_fact = 0.64          # expert plus to expert factor
 create_expert_flag = True   # create second expert map
@@ -70,7 +70,7 @@ furious_lighting_flag = False   # increase frequency of light effects
 normalize_song_flag = True  # normalize song volume
 increase_volume_flag = True     # increase song volume (only used in combination with normalize flag)
 audio_rms_goal = 0.50
-allow_no_direction_notes = True     # if False, all notes must have a cut direction
+allow_no_direction_notes = False     # if False, all notes must have a cut direction
 jump_speed_offset = 0.0     # general offset for jump speed (range [-2, 2])
 
 """Caution on changes"""

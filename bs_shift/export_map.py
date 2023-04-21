@@ -36,6 +36,14 @@ def check_music_files(files, dir_path):
             print(f"Warning: Can not read {file_name} as music file.")
             pass
 
+    # Check the file name for unsupported characters
+    for idx, song_name in enumerate(song_list):
+        new_name = song_name.replace(' &', ',')
+        new_name = new_name.replace('&', ',')
+        if new_name != song_name:
+            shutil.move(dir_path + song_name, dir_path + new_name)
+            song_list[idx] = new_name
+
     # Normalize the volume for each song in advance
     if config.normalize_song_flag:
         print("Running volume check for input songs...")
