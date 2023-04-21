@@ -87,7 +87,10 @@ def main(name_ar: list) -> None:
     timing_ar /= config.beat_spacing
     timing_ar = timing_ar[timing_ar > config.window]
     # add beats between far beats
-    fill_map_times_scale(timing_ar, scale_index=7)
+    if config.max_speed >= 5.5 * 4:
+        fill_map_times_scale(timing_ar, scale_index=6)
+    if config.max_speed >= 8 * 4:
+        fill_map_times_scale(timing_ar, scale_index=10)
     time_input = [timing_ar]
 
     # calculate bpm
@@ -98,7 +101,6 @@ def main(name_ar: list) -> None:
         bpm = int((bpm + 120) / 2)
     else:
         bpm = config.use_fixed_bpm
-
 
     # sanity check timings
     map_times, pitch_algo = sanity_check_timing(name_ar[0], timing_ar, song_duration)   # 3.9
