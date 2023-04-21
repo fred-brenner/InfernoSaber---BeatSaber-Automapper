@@ -497,10 +497,11 @@ def add_pause_bombs(notes_r, notes_l, notes_b, timings, pitch_algo, pitch_times)
 
 
 def turn_notes_single(notes_single):
-
     def calc_diff_from_list(cd_old, cd_new):
         diff_score = abs(cd_old[0] - cd_new[0]) + abs(cd_old[1] - cd_new[1])
         return diff_score
+
+    # TODO: implement no_dot logic also for dot notes
 
     if config.flow_model_flag:
         empty_note_last = False
@@ -515,17 +516,18 @@ def turn_notes_single(notes_single):
                 # skip multi notes
                 notes_old = None
                 continue
-            dirx = -1*(notes[0] - notes_old[0])
+            dirx = -1 * (notes[0] - notes_old[0])
             if abs(dirx) > 1:
                 dirx = np.sign(dirx)
-            diry = -1*(notes[1] - notes_old[1])
+            diry = -1 * (notes[1] - notes_old[1])
             if abs(diry) > 1:
                 diry = np.sign(diry)
             if notes[3] == 8:
-                if config.allow_no_direction_notes:
+                if config.allow_dot_notes:
                     if not empty_note_last:
                         new_cut_dir = reverse_get_cut_dir(dirx, diry)
                         notes[3] = new_cut_dir
+                        notes_single[idx] = notes
                         empty_note_last = True
                     else:
                         notes_old = None
@@ -533,22 +535,37 @@ def turn_notes_single(notes_single):
                 else:
                     new_cut_dir = reverse_get_cut_dir(dirx, diry)
                     notes[3] = new_cut_dir
-            else:   # last note has direction
+                    notes_single[idx] = notes
+            else:  # last note has direction
                 empty_note_last = False
-            cd_old = get_cut_dir_xy(notes[3])
+
+            # check if new flow direction suits to (inversed last) cut direction
+            cd_old = get_cut_dir_xy(notes_old[3])
+            cd_old = (cd_old[0] * -1, cd_old[1] * -1)
             diff_score = calc_diff_from_list(cd_old, [dirx, diry])
-            if diff_score == 1:
+            if diff_score == 0:
+                pass
+            elif diff_score == 1:
                 # use new cut direction
                 new_cut_dir = reverse_get_cut_dir(dirx, diry)
                 notes[3] = new_cut_dir
+                notes_single[idx] = notes
             elif diff_score == 2:
                 if dirx == cd_old[0] or diry == cd_old[1]:
                     new_dirx = int(np.round(0.5 * (dirx + cd_old[0]), 0))
                     new_diry = int(np.round(0.5 * (diry + cd_old[1]), 0))
                     new_cut_dir = reverse_get_cut_dir(new_dirx, new_diry)
                     notes[3] = new_cut_dir
-                elif config.allow_no_direction_notes:
+                    notes_single[idx] = notes
+                elif config.allow_dot_notes:
                     notes[3] = 8
+                    notes_single[idx] = notes
+                else:
+                    pass
+            elif diff_score == 3:
+                pass
+            else:
+                pass
 
             # update old notes
             notes_old = notes
@@ -563,8 +580,12 @@ def turn_notes_single(notes_single):
         cd_new_x, cd_new_y = list(get_cut_dir_xy(notes[3]))
         cd_old_x, cd_old_y = list(get_cut_dir_xy(notes_old[3]))
         if cd_new_x == cd_new_y == 0 or cd_old_x == cd_old_y == 0:
-            notes_old = notes
-            continue  # skip notes without direction
+            if config.allow_dot_notes:
+                notes_old = notes
+                continue  # skip notes without direction
+            else:
+                notes_single[idx] = []
+                continue
         # inverse old cut dir
         cd_old_x *= -1
         cd_old_y *= -1
@@ -576,7 +597,7 @@ def turn_notes_single(notes_single):
                 notes_single[idx][3] = notes[3]
             else:
                 notes_single[idx] = []
-                continue    # do not update old notes
+                continue  # do not update old notes
         elif df_score >= 2:
             # only ones
             if abs(cd_old_x) == abs(cd_new_x) == abs(cd_old_y) == abs(cd_new_y) == 1:

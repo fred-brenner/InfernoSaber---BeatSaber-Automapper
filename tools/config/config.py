@@ -70,7 +70,7 @@ furious_lighting_flag = False   # increase frequency of light effects
 normalize_song_flag = True  # normalize song volume
 increase_volume_flag = True     # increase song volume (only used in combination with normalize flag)
 audio_rms_goal = 0.50
-allow_no_direction_notes = False     # if False, all notes must have a cut direction
+allow_dot_notes = False     # if False, all notes must have a cut direction
 jump_speed_offset = 0.0     # general offset for jump speed (range [-2, 2])
 
 """Caution on changes"""
@@ -90,10 +90,10 @@ beat_spacing = 5587/196     # 5587/196s = 28.5051 steps/s
 # favor_last_class = 0.15     # set factor to favor the next beat class (0.0-0.3)
 max_double_note_speed = 25  # set maximum speed difference between double notes (10-30)
 emphasize_beats_wait = 0.2  # minimum time in seconds
-emphasize_beats_3 = 0.023   # fraction beats to triple
-emphasize_beats_3_fact = 0.004   # factor incl max_speed
-emphasize_beats_2 = 0.23    # fraction beats to double
-emphasize_beats_2_fact = 0.0085  # factor incl max_speed
+emphasize_beats_3 = 0.010   # fraction beats to triple
+emphasize_beats_3_fact = 0.003   # factor incl max_speed
+emphasize_beats_2 = 0.35    # fraction beats to double
+emphasize_beats_2_fact = 0.008  # factor incl max_speed
 shift_beats_fact = 0.30     # fraction beats to shift in cut direction
 add_beat_low_bound = 0.20   # in seconds (beat_generator)
 add_beat_hi_bound = 0.90    # in seconds (beat_generator)

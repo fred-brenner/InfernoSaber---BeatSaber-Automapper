@@ -31,7 +31,7 @@ def main(diff: float, export_results_to_bs=True, quick_start=None,
     if flow_model_flag is not None:
         config.flow_model_flag = flow_model_flag
     if allow_no_dir_flag is not None:
-        config.allow_no_direction_notes = allow_no_dir_flag
+        config.allow_dot_notes = allow_no_dir_flag
 
     # limit gpu ram usage
     conf = tf.compat.v1.ConfigProto()
