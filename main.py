@@ -115,12 +115,18 @@ if __name__ == "__main__":
 
     fmf = os.environ.get('flow_model_flag')
     if fmf is not None:
-        fmf = bool(fmf)
+        if fmf == 'True':
+            fmf = True
+        else:
+            fmf = False
         print(f"Set flow_model_flag to {fmf}")
 
     ndf = os.environ.get('allow_no_direction_flag')
     if ndf is not None:
-        ndf = bool(ndf)
+        if ndf == 'True':
+            ndf = True
+        else:
+            ndf = False
         print(f"Set allow_no_direction_flag to {ndf}")
 
     export_results_to_bs = True
