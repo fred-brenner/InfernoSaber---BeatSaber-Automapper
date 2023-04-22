@@ -620,17 +620,20 @@ def turn_notes_single(notes_single):
                 continue  # do not update old notes
         elif df_score >= 2:
             # only ones
-            if abs(cd_old_x) == abs(cd_new_x) == abs(cd_old_y) == abs(cd_new_y) == 1:
-                if cd_old_x != cd_new_x:
-                    notes[3] = reverse_get_cut_dir(0, cd_new_y)
+            if len(notes) == 4:
+                if abs(cd_old_x) == abs(cd_new_x) == abs(cd_old_y) == abs(cd_new_y) == 1:
+                    if cd_old_x != cd_new_x:
+                        notes[3] = reverse_get_cut_dir(0, cd_new_y)
+                    else:
+                        notes[3] = reverse_get_cut_dir(cd_new_x, 0)
+                # each one is zero
                 else:
-                    notes[3] = reverse_get_cut_dir(cd_new_x, 0)
-            # each one is zero
+                    if cd_new_x == 0:
+                        notes[3] = reverse_get_cut_dir(cd_old_x, cd_new_y)
+                    else:
+                        notes[3] = reverse_get_cut_dir(cd_new_x, cd_old_y)
             else:
-                if cd_new_x == 0:
-                    notes[3] = reverse_get_cut_dir(cd_old_x, cd_new_y)
-                else:
-                    notes[3] = reverse_get_cut_dir(cd_new_x, cd_old_y)
+                pass    # ignore multi notes    #TODO: this
             # update notes_single
             notes_single[idx][3] = notes[3]
 
@@ -904,8 +907,8 @@ def fill_map_times_scale(map_times, scale_index=5):
     new_map_times = []
 
     mb = config.add_beat_max_bounds
-    low_bound_matrix = np.linspace(mb[1], mb[0], 10)
-    high_bound_matrix = np.linspace(mb[2], mb[3], 10)
+    low_bound_matrix = np.linspace(mb[1], mb[0], config.map_filler_iters)
+    high_bound_matrix = np.linspace(mb[2], mb[3], config.map_filler_iters)
 
     low_bound = low_bound_matrix[scale_index]
     high_bound = high_bound_matrix[scale_index]

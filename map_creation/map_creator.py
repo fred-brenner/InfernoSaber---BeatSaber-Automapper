@@ -164,8 +164,9 @@ def get_info_map_string(name, bpm, bs_diff):
         jsb_offset = [config.jsb_offset[0] - diff_plus * config.jsb_offset_factor]
 
     for i in range(len(jump_speed)):
-        if jump_speed[i] < 15:
-            jsb_offset[i] -= 1
+        if jump_speed[i] < 15.5:
+            jump_speed[i] = 15.5
+            jsb_offset[i] += 0.2
 
     info_string = '{\n'
     info_string += '"_version": "2.0.0",\n'
