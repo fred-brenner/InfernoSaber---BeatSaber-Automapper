@@ -57,7 +57,7 @@ add_beat_intensity = 105    # try to match bps by x%
 expert_fact = 0.63          # expert plus to expert factor
 create_expert_flag = True   # create second expert map
 thresh_beat = 0.45          # minimum beat response required to trigger generator
-thresh_pitch = 0.45         # minimum beat for pitch check (0.01,low-0.5,high)
+thresh_pitch = 0.45         # minimum beat for pitch check (0.01,low-1,high)
 threshold_end = 1.3         # factor for start and end threshold
 random_note_map_factor = 0.3    # stick note map to random song/center (set to 0 to disable)
 random_note_map_change = 2      # change frequency for center (1-20)
@@ -72,6 +72,7 @@ increase_volume_flag = True     # increase song volume (only used in combination
 audio_rms_goal = 0.50
 allow_dot_notes = False     # if False, all notes must have a cut direction
 jump_speed_offset = 0.0     # general offset for jump speed (range [-2, 2])
+map_filler_iters = 10       # max iterations for map filler
 
 """Caution on changes"""
 jsb_offset = [0.21, 0.15]   # note jump speed offset for Expert, Expert+ (range [-0.5, 0.5])
