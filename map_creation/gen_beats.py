@@ -25,7 +25,7 @@ from tools.utils import numpy_shorts
 
 
 # @profile
-def main(name_ar: list) -> None:
+def main(name_ar: list) -> bool:
 
     if len(name_ar) > 1:
         print("Multi-core song generation currently not implemented!")
@@ -105,6 +105,9 @@ def main(name_ar: list) -> None:
     # sanity check timings
     map_times, pitch_algo = sanity_check_timing(name_ar[0], timing_ar, song_duration)   # 3.9
     map_times = map_times[map_times > 0]
+    if len(map_times) < 3 * config.lstm_len:
+        print(f"Could not match enough beats for song {name_ar[0]}")
+        return 1
     # map_times = fill_map_times(map_times)
     add_beats_min_bps = config.max_speed * 10 / 40  # max_speed=40 -> min_bps = 10
     scale_idx = 0
@@ -154,6 +157,8 @@ def main(name_ar: list) -> None:
         events = []
 
     create_map(y_class_map, map_times, events, name_ar[0], bpm, pitch_algo, pitch_times)     # 0.5
+
+    return 0    # success
 
 
 if __name__ == '__main__':

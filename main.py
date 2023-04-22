@@ -51,7 +51,10 @@ def main(diff: float, export_results_to_bs=True, quick_start=None,
         start_time = time.time()
         song_name = song_name[:-4]
         print(f"Analyzing song: {song_name} ({i + 1} of {len(song_list)})")
-        beat_generator.main([song_name])
+        fail_flag = beat_generator.main([song_name])
+        if fail_flag:
+            print("Continue with next song")
+            continue
         end_time = time.time()
         print(f"Time needed: {end_time - start_time}s")
 

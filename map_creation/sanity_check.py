@@ -61,7 +61,16 @@ def sanity_check_timing(name, timings, song_duration):
     # plt.show()
 
     last_pitch = 0
-    threshold = 700 + pitches.mean() * config.thresh_pitch
+    threshold = 80 + 0.6 * pitches.mean() * config.thresh_pitch
+    pitch_median = np.median(pitch_list)
+    if pitch_median < 100:
+        pitch_median = pitches.mean()
+    threshold += 0.7 * pitch_median * config.thresh_pitch
+    # threshold += 0.2 * pitches.max() * config.thresh_pitch
+    if True:
+        # print debug info on threshold percentage
+        th_count = sum(pitches > threshold)
+        print(f"Percentage of pitches viewed: {100*th_count/len(pitches):.0f}%")
     threshold_end = config.threshold_end * threshold
     idx_end = int(len(pitches) / 30)
     idx_end_list = list(range(idx_end))
