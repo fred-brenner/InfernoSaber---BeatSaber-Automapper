@@ -12,6 +12,9 @@ from bs_shift.export_map import *
 
 import tensorflow as tf
 
+# TODO: needs some breaks after strong patterns
+# TODO: apply dot notes to 10% fast patterns if flagged
+
 
 def main(diff: float, export_results_to_bs=True, quick_start=None,
          beat_intensity=None, random_factor=None, js_offset=None,

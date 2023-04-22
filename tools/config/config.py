@@ -71,7 +71,7 @@ normalize_song_flag = True  # normalize song volume
 increase_volume_flag = True     # increase song volume (only used in combination with normalize flag)
 audio_rms_goal = 0.50
 allow_dot_notes = False     # if False, all notes must have a cut direction
-jump_speed_offset = -0.3     # general offset for jump speed (range [-2, 2])
+jump_speed_offset = -0.4     # general offset for jump speed (range [-2, 2])
 map_filler_iters = 10       # max iterations for map filler
 
 """Caution on changes"""
@@ -100,6 +100,7 @@ add_beat_low_bound = 0.20   # in seconds (beat_generator)
 add_beat_hi_bound = 0.90    # in seconds (beat_generator)
 add_beat_fact = 0.90        # fraction add beats (beat_generator)
 add_beat_max_bounds = [0.1, 0.5, 0.8, 1.6]
+pitches_allowed = [40, 50]  # percentage of pitches to be over threshold
 
 # Event prediction model configuration
 event_learning_rate = 1e-3
