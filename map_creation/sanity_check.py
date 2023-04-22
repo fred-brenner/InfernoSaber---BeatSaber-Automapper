@@ -71,6 +71,7 @@ def sanity_check_timing(name, timings, song_duration):
         # print debug info on threshold percentage
         th_count = sum(pitches > threshold)
         print(f"Percentage of pitches viewed: {100*th_count/len(pitches):.0f}%")
+        # TODO: if percentage below 40 and above 50 redo + factor for max_speed
     threshold_end = config.threshold_end * threshold
     idx_end = int(len(pitches) / 30)
     idx_end_list = list(range(idx_end))
