@@ -12,9 +12,6 @@ from bs_shift.export_map import *
 
 import tensorflow as tf
 
-# TODO: needs some breaks after strong patterns
-# TODO: apply dot notes to 10% fast patterns if flagged
-
 
 def main(diff: float, export_results_to_bs=True, quick_start=None,
          beat_intensity=None, random_factor=None, js_offset=None,
@@ -30,7 +27,7 @@ def main(diff: float, export_results_to_bs=True, quick_start=None,
     if random_factor is not None:
         config.random_note_map_factor = random_factor
     if js_offset is not None:
-        config.jump_speed_offset = js_offset
+        config.jump_speed_offset += js_offset
     if flow_model_flag is not None:
         config.flow_model_flag = flow_model_flag
     if allow_no_dir_flag is not None:

@@ -3,6 +3,61 @@
 # used in multiple codes
 ########################################
 
+# Map creation model configuration
+"""Do change"""
+max_speed = 4 * 7.5         # set around 5-40 (normal-expert++)
+add_beat_intensity = 105    # try to match bps by x%
+expert_fact = 0.63          # expert plus to expert factor
+create_expert_flag = True   # create second expert map
+thresh_beat = 0.45          # minimum beat response required to trigger generator
+thresh_pitch = 0.48         # minimum beat for pitch check (0.01,low-1,high)
+threshold_end = 1.3         # factor for start and end threshold
+random_note_map_factor = 0.3    # stick note map to random song/center (set to 0 to disable)
+random_note_map_change = 2      # change frequency for center (1-20)
+quick_start = 2.1           # map quick start mode (0 off, 1-3 on)
+t_diff_bomb = 1.5           # minimum time between notes to add bomb
+t_diff_bomb_react = 0.3     # minimum time between finished added bombs
+allow_mismatch_flag = False     # if True, wrong turned notes won't be removed
+flow_model_flag = True      # use improved direction flow
+furious_lighting_flag = False   # increase frequency of light effects
+normalize_song_flag = True  # normalize song volume
+increase_volume_flag = True     # increase song volume (only used in combination with normalize flag)
+audio_rms_goal = 0.50
+allow_dot_notes = True     # if False, all notes must have a cut direction
+jump_speed_offset = -0.4     # general offset for jump speed (range [-2, 2])
+map_filler_iters = 10       # max iterations for map filler
+add_dot_notes = 0           # add dot notes for fastest patterns [0, 10]
+
+"""Caution on changes"""
+jsb_offset = [0.21, 0.15]   # note jump speed offset for Expert, Expert+ (range [-0.5, 0.5])
+jsb_offset_factor = 0.011   # note jump factor for high difficulties
+use_fixed_bpm = 100         # use fixed bpm or set to None for the song bpm
+max_njs = 24.5                # maximum Note Jump Speed allowed
+decr_speed_range = 20       # range for start and end (n first and last notes)
+decr_speed_val = 0.28       # decrease max speed at start
+reaction_time = 1.1         # reaction time (0.5-2)
+reaction_time_fact = 0.013  # factor including max_speed
+jump_speed = 12.5           # jump speed from beat saber (10-15)
+jump_speed_fact = 0.310     # factor including max_speed
+cdf = 1.2                   # cut director factor (to calculate speed, ~0.5)
+min_beat_time = 1/16        # in seconds (first sanity check)
+beat_spacing = 5587/196     # 5587/196s = 28.5051 steps/s
+# favor_last_class = 0.15     # set factor to favor the next beat class (0.0-0.3)
+max_double_note_speed = 25  # set maximum speed difference between double notes (10-30)
+emphasize_beats_wait = 0.2  # minimum time in seconds
+emphasize_beats_3 = 0.010   # fraction beats to triple
+emphasize_beats_3_fact = 0.003   # factor incl max_speed
+emphasize_beats_2 = 0.35    # fraction beats to double
+emphasize_beats_2_fact = 0.008  # factor incl max_speed
+shift_beats_fact = 0.30     # fraction beats to shift in cut direction
+add_beat_low_bound = 0.20   # in seconds (beat_generator)
+add_beat_hi_bound = 0.90    # in seconds (beat_generator)
+add_beat_fact = 0.90        # fraction add beats (beat_generator)
+add_beat_max_bounds = [0.1, 0.5, 0.8, 1.6]
+pitches_allowed = [40, 50]  # percentage of pitches to be over threshold
+
+
+"""Do not change"""
 # Data Processing configuration
 general_diff = 'ExpertPlus'
 random_seed = 3
@@ -49,58 +104,6 @@ tcn_len = 24
 tcn_test_samples = 350
 delete_offbeats = 0.6      # < 1 delete non-beats to free ram
 # tcn_skip = 10
-
-# Map creation model configuration
-"""Do change"""
-max_speed = 4 * 8.0         # set around 5-40 (normal-expert++)
-add_beat_intensity = 105    # try to match bps by x%
-expert_fact = 0.63          # expert plus to expert factor
-create_expert_flag = True   # create second expert map
-thresh_beat = 0.45          # minimum beat response required to trigger generator
-thresh_pitch = 0.48         # minimum beat for pitch check (0.01,low-1,high)
-threshold_end = 1.3         # factor for start and end threshold
-random_note_map_factor = 0.3    # stick note map to random song/center (set to 0 to disable)
-random_note_map_change = 2      # change frequency for center (1-20)
-quick_start = 2.1           # map quick start mode (0 off, 1-3 on)
-t_diff_bomb = 1.5           # minimum time between notes to add bomb
-t_diff_bomb_react = 0.3     # minimum time between finished added bombs
-allow_mismatch_flag = False     # if True, wrong turned notes won't be removed
-flow_model_flag = True      # use improved direction flow
-furious_lighting_flag = False   # increase frequency of light effects
-normalize_song_flag = True  # normalize song volume
-increase_volume_flag = True     # increase song volume (only used in combination with normalize flag)
-audio_rms_goal = 0.50
-allow_dot_notes = False     # if False, all notes must have a cut direction
-jump_speed_offset = -0.4     # general offset for jump speed (range [-2, 2])
-map_filler_iters = 10       # max iterations for map filler
-
-"""Caution on changes"""
-jsb_offset = [0.21, 0.15]   # note jump speed offset for Expert, Expert+ (range [-0.5, 0.5])
-jsb_offset_factor = 0.011   # note jump factor for high difficulties
-use_fixed_bpm = 100         # use fixed bpm or set to None for the song bpm
-max_njs = 24.5                # maximum Note Jump Speed allowed
-decr_speed_range = 20       # range for start and end (n first and last notes)
-decr_speed_val = 0.28       # decrease max speed at start
-reaction_time = 1.1         # reaction time (0.5-2)
-reaction_time_fact = 0.013  # factor including max_speed
-jump_speed = 12.5           # jump speed from beat saber (10-15)
-jump_speed_fact = 0.310     # factor including max_speed
-cdf = 1.2                   # cut director factor (to calculate speed, ~0.5)
-min_beat_time = 1/16        # in seconds (first sanity check)
-beat_spacing = 5587/196     # 5587/196s = 28.5051 steps/s
-# favor_last_class = 0.15     # set factor to favor the next beat class (0.0-0.3)
-max_double_note_speed = 25  # set maximum speed difference between double notes (10-30)
-emphasize_beats_wait = 0.2  # minimum time in seconds
-emphasize_beats_3 = 0.010   # fraction beats to triple
-emphasize_beats_3_fact = 0.003   # factor incl max_speed
-emphasize_beats_2 = 0.35    # fraction beats to double
-emphasize_beats_2_fact = 0.008  # factor incl max_speed
-shift_beats_fact = 0.30     # fraction beats to shift in cut direction
-add_beat_low_bound = 0.20   # in seconds (beat_generator)
-add_beat_hi_bound = 0.90    # in seconds (beat_generator)
-add_beat_fact = 0.90        # fraction add beats (beat_generator)
-add_beat_max_bounds = [0.1, 0.5, 0.8, 1.6]
-pitches_allowed = [40, 50]  # percentage of pitches to be over threshold
 
 # Event prediction model configuration
 event_learning_rate = 1e-3

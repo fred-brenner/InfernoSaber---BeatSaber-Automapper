@@ -121,6 +121,29 @@ def sanity_check_timing(name, timings, song_duration):
     return timings, allowed_timings
 
 
+def apply_dots(notes_single, dots_idx):
+    for idx in dots_idx:
+        if len(notes_single[idx]) == 4:
+            notes_single[idx][3] = 8
+        elif len(notes_single[idx]) > 4:
+            pass    # do not apply for multiple notes
+        else:
+            pass    # note removed
+    return notes_single
+
+
+def add_dots(notes_single, time_diffs):
+    # Set timings without notes to 100
+    time_diffs[[len(notes_single[idx]) != 4 for idx in range(len(notes_single))]] = 100
+    # Get indices for x percent fastest notes
+    idx_fast = np.argsort(time_diffs)
+    idx_fast = idx_fast[:int(config.add_dot_notes*sum(time_diffs < 100)/100)]
+    for idx in idx_fast:
+        notes_single[idx][3] = 8
+
+    return notes_single
+
+
 def emphasize_beats(notes, timings):
     emphasize_beats_3 = config.emphasize_beats_3 + config.emphasize_beats_3_fact * config.max_speed
     emphasize_beats_2 = config.emphasize_beats_2 + config.emphasize_beats_2_fact * config.max_speed
@@ -192,10 +215,6 @@ def sanity_check_notes(notes: list, timings: list, pitch_algo: np.array, pitch_t
     # print("Left notes: ", end=' ')
     # notes_l = correct_notes(notes_l, timings)
 
-    # emphasize some beats randomly
-    notes_l = emphasize_beats(notes_l, time_diffs)
-    notes_r = emphasize_beats(notes_r, time_diffs)
-
     # check static position for next and last note for left and right together
     notes_r, notes_l, notes_b = correct_notes_all(notes_r, notes_l, notes_b, time_diffs)
 
@@ -207,8 +226,21 @@ def sanity_check_notes(notes: list, timings: list, pitch_algo: np.array, pitch_t
     # TODO: remove blocking bombs
 
     # turn notes leading into correct direction
-    notes_r = turn_notes_single(notes_r)
-    notes_l = turn_notes_single(notes_l)
+    notes_r, dot_idx_r = turn_notes_single(notes_r)
+    notes_l, dot_idx_l = turn_notes_single(notes_l)
+
+    # emphasize some beats randomly
+    notes_l = emphasize_beats(notes_l, time_diffs)
+    notes_r = emphasize_beats(notes_r, time_diffs)
+
+    if config.allow_dot_notes:
+        notes_l = apply_dots(notes_l, dot_idx_l)
+        notes_r = apply_dots(notes_r, dot_idx_r)
+        if config.add_dot_notes > 0:
+            notes_l = add_dots(notes_l, time_diffs)
+            notes_r = add_dots(notes_r, time_diffs)
+
+    # TODO: needs some breaks after strong patterns
 
     # rebuild notes
     new_notes = unpslit_notes(notes_r, notes_l, notes_b)
@@ -511,6 +543,8 @@ def add_pause_bombs(notes_r, notes_l, notes_b, timings, pitch_algo, pitch_times)
 
 
 def turn_notes_single(notes_single):
+    dot_notes_rem = []
+
     def calc_diff_from_list(cd_old, cd_new):
         diff_score = abs(cd_old[0] - cd_new[0]) + abs(cd_old[1] - cd_new[1])
         return diff_score
@@ -547,18 +581,19 @@ def turn_notes_single(notes_single):
             dirx, diry = get_move_dir_xy(notes, notes_old)
             if notes[3] == 8:
                 if config.allow_dot_notes:
-                    if not empty_note_last:
-                        new_cut_dir = reverse_get_cut_dir(dirx, diry)
-                        notes[3] = new_cut_dir
-                        notes_single[idx] = notes
-                        empty_note_last = True
-                    else:
-                        notes_old = None
-                        continue
-                else:
-                    new_cut_dir = reverse_get_cut_dir(dirx, diry)
-                    notes[3] = new_cut_dir
-                    notes_single[idx] = notes
+                    dot_notes_rem.append(idx)   # remember to redo this
+                #     if not empty_note_last:
+                #         new_cut_dir = reverse_get_cut_dir(dirx, diry)
+                #         notes[3] = new_cut_dir
+                #         notes_single[idx] = notes
+                #         empty_note_last = True
+                #     else:
+                #         notes_old = None
+                #         continue
+                # else:
+                new_cut_dir = reverse_get_cut_dir(dirx, diry)
+                notes[3] = new_cut_dir
+                notes_single[idx] = notes
             else:  # last note has direction
                 empty_note_last = False
 
@@ -581,8 +616,9 @@ def turn_notes_single(notes_single):
                     notes[3] = new_cut_dir
                     notes_single[idx] = notes
                 elif config.allow_dot_notes:
-                    notes[3] = 8
-                    notes_single[idx] = notes
+                    dot_notes_rem.append(idx)
+                    # notes[3] = 8
+                    # notes_single[idx] = notes
                 else:
                     pass
             elif diff_score == 3:
@@ -605,8 +641,13 @@ def turn_notes_single(notes_single):
         cd_old_x, cd_old_y = list(get_cut_dir_xy(notes_old[3]))
         if cd_new_x == cd_new_y == 0 or cd_old_x == cd_old_y == 0:
             if config.allow_dot_notes:
-                notes_old = notes
-                continue  # skip notes without direction
+                notes[3] = reverse_cut_dir_xy(notes_old[3])
+                notes = notes[:4]   # make it single notes if necessary
+                notes_single[idx] = notes
+                dot_notes_rem.append(idx)
+                cd_new_x, cd_new_y = list(get_cut_dir_xy(notes[3]))
+                # notes_old = notes
+                # continue  # skip notes without direction
             else:
                 notes_single[idx] = []
                 continue
@@ -644,7 +685,7 @@ def turn_notes_single(notes_single):
         # update old notes
         notes_old = notes
 
-    return notes_single
+    return notes_single, dot_notes_rem
 
 
 def correct_notes(notes, timings):
