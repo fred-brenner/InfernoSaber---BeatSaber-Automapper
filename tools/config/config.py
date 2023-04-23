@@ -5,7 +5,7 @@
 
 # Map creation model configuration
 """Do change"""
-max_speed = 4 * 8.0         # set around 5-40 (normal-expert++)
+max_speed = 4 * 2.0         # set around 5-40 (normal-expert++)
 add_beat_intensity = 105    # try to match bps by x% [80, 110]
 expert_fact = 0.63          # expert plus to expert factor [0.6, 0.7]
 create_expert_flag = True   # create second expert map

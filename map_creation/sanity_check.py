@@ -127,9 +127,9 @@ def apply_dots(notes_single, dots_idx):
         if len(notes_single[idx]) == 4:
             notes_single[idx][3] = 8
         elif len(notes_single[idx]) > 4:
-            pass    # do not apply for multiple notes
+            pass  # do not apply for multiple notes
         else:
-            pass    # note removed
+            pass  # note removed
     return notes_single
 
 
@@ -138,26 +138,63 @@ def add_dots(notes_single, time_diffs):
     time_diffs[[len(notes_single[idx]) != 4 for idx in range(len(notes_single))]] = 100
     # Get indices for x percent fastest notes
     idx_fast = np.argsort(time_diffs)
-    idx_fast = idx_fast[:int(config.add_dot_notes*sum(time_diffs < 100)/100)]
+    idx_fast = idx_fast[:int(config.add_dot_notes * sum(time_diffs < 100) / 100)]
     for idx in idx_fast:
         notes_single[idx][3] = 8
     return notes_single
 
 
 def add_breaks(notes_single, timings):
+    break_counter = 0
+    start_window = config.decr_speed_range
     # remove timing without notes
-    idx_diffs = [[len(notes_single[idx]) >= 4 for idx in range(len(notes_single))]]
+    idx_diffs = [len(notes_single[idx]) >= 4 for idx in range(len(notes_single))]
     real_timings = timings[idx_diffs]
+    real_diffs = np.hstack([1, np.diff(real_timings)])
+    real_timings = real_timings[start_window:-start_window]
+    real_diffs = real_diffs[start_window:-start_window]
     if len(real_timings) > 50:
-        real_diffs = np.hstack([2, np.diff(real_timings)])
         # apply window filter to diffs
         real_diffs_filt = savgol_filter(real_diffs, window_length=31, polyorder=4)
-        plt.figure()
-        plt.plot(real_diffs)
-        plt.plot(real_diffs_filt)
-        plt.show()
-        # TODO: continue
+        if False:
+            plt.figure()
+            plt.plot(real_diffs)
+            plt.plot(real_diffs_filt)
+            plt.show()
 
+        tresh_diffs = np.quantile(real_diffs_filt, 0.37)
+        strong_counter = 0
+        strong_reset = 0
+        strong_reset_threshold = 2
+        pattern_length = 15
+        for idx, diff in enumerate(real_diffs_filt):
+            if diff < tresh_diffs:
+                # strong pattern
+                strong_counter += 1
+                if strong_reset >= strong_reset_threshold:
+                    strong_reset = 0
+            else:
+                if strong_reset >= strong_reset_threshold:
+                    if strong_counter > pattern_length:
+                        # add break
+                        cur_idx = int(np.argwhere(timings == real_timings[idx])[0])
+                        # remove this note
+                        notes_single[cur_idx] = []
+                        # remove next note
+                        for next_idx, note_flag in enumerate(idx_diffs[cur_idx:]):
+                            if next_idx != 0 and note_flag:
+                                notes_single[cur_idx + next_idx] = []
+                                break
+                        # reset counters
+                        strong_reset = 0
+                        strong_counter = 0
+                        break_counter += 1
+                    # else:
+                    #     # reset pattern
+                    #     strong_counter = 0
+                else:
+                    strong_reset += 1
+    # print(f"Add {break_counter} breaks.")
     return notes_single
 
 
@@ -257,9 +294,10 @@ def sanity_check_notes(notes: list, timings: list, pitch_algo: np.array, pitch_t
             notes_l = add_dots(notes_l, time_diffs.copy())
             notes_r = add_dots(notes_r, time_diffs.copy())
 
-    # if config.add_breaks_flag:
-    #     notes_l = add_breaks(notes_l, timings)
-    #     notes_r = add_breaks(notes_r, timings)
+    if config.add_breaks_flag:
+        # from tools.utils.load_and_save import save_pkl
+        notes_l = add_breaks(notes_l, timings)
+        notes_r = add_breaks(notes_r, timings)
 
     # rebuild notes
     new_notes = unpslit_notes(notes_r, notes_l, notes_b)
@@ -582,8 +620,6 @@ def turn_notes_single(notes_single):
             diry = np.sign(diry)
         return dirx, diry
 
-    # TODO: implement no_dot logic also for dot notes
-
     if config.flow_model_flag:
         empty_note_last = False
         notes_old = None
@@ -600,7 +636,7 @@ def turn_notes_single(notes_single):
             dirx, diry = get_move_dir_xy(notes, notes_old)
             if notes[3] == 8:
                 if config.allow_dot_notes:
-                    dot_notes_rem.append(idx)   # remember to redo this
+                    dot_notes_rem.append(idx)  # remember to redo this
                 #     if not empty_note_last:
                 #         new_cut_dir = reverse_get_cut_dir(dirx, diry)
                 #         notes[3] = new_cut_dir
@@ -661,7 +697,7 @@ def turn_notes_single(notes_single):
         if cd_new_x == cd_new_y == 0 or cd_old_x == cd_old_y == 0:
             if config.allow_dot_notes:
                 notes[3] = reverse_cut_dir_xy(notes_old[3])
-                notes = notes[:4]   # make it single notes if necessary
+                notes = notes[:4]  # make it single notes if necessary
                 notes_single[idx] = notes
                 dot_notes_rem.append(idx)
                 cd_new_x, cd_new_y = list(get_cut_dir_xy(notes[3]))
@@ -697,7 +733,7 @@ def turn_notes_single(notes_single):
                     else:
                         notes[3] = reverse_get_cut_dir(cd_new_x, cd_old_y)
             else:
-                pass    # ignore multi notes    #TODO: this
+                pass  # ignore multi notes    #TODO: this
             # update notes_single
             notes_single[idx][3] = notes[3]
 
