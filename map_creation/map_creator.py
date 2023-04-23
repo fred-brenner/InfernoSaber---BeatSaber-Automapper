@@ -17,7 +17,19 @@ def create_map(y_class_num, timings, events, name, bpm, pitch_algo, pitch_times)
     notes = decode_beats(y_class_num, class_keys)
 
     def write_map(notes, timings, events, name, bpm, bs_diff, pitch_algo, pitch_times):
-        # sanity check notes with max speed parameter
+        # Sanity check timings for first notes
+        time_last = 1.0
+        for idx in range(10):
+            # check if timings are in line
+            if time_last > timings[idx]:
+                rm_idx = idx - 1 if idx > 0 else idx
+                # remove index
+                timings = np.delete(timings, rm_idx)
+                notes.pop(rm_idx)
+                events = np.delete(events, rm_idx, axis=0)
+            time_last = timings[idx]
+
+        # run all beat and note sanity checks
         notes = sanity_check_notes(notes, timings, pitch_algo, pitch_times)
         # compensate bps
         timings = timings * bpm / 60
@@ -44,7 +56,7 @@ def create_map(y_class_num, timings, events, name, bpm, pitch_algo, pitch_times)
         return new_map_folder
 
     bs_diff = config.general_diff
-    new_map_folder = write_map(notes.copy(), timings, events, name, bpm, bs_diff, pitch_algo, pitch_times)
+    new_map_folder = write_map(notes.copy(), timings.copy(), events.copy(), name, bpm, bs_diff, pitch_algo, pitch_times)
     if config.create_expert_flag:
         bs_diff = 'Expert'
         config.max_speed *= config.expert_fact

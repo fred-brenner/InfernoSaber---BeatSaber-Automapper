@@ -1,6 +1,7 @@
 import numpy as np
 import aubio
 import matplotlib.pyplot as plt
+from scipy.signal import savgol_filter
 
 from tools.config import config, paths
 
@@ -140,6 +141,22 @@ def add_dots(notes_single, time_diffs):
     idx_fast = idx_fast[:int(config.add_dot_notes*sum(time_diffs < 100)/100)]
     for idx in idx_fast:
         notes_single[idx][3] = 8
+    return notes_single
+
+
+def add_breaks(notes_single, timings):
+    # remove timing without notes
+    idx_diffs = [[len(notes_single[idx]) >= 4 for idx in range(len(notes_single))]]
+    real_timings = timings[idx_diffs]
+    if len(real_timings) > 50:
+        real_diffs = np.hstack([2, np.diff(real_timings)])
+        # apply window filter to diffs
+        real_diffs_filt = savgol_filter(real_diffs, window_length=31, polyorder=4)
+        plt.figure()
+        plt.plot(real_diffs)
+        plt.plot(real_diffs_filt)
+        plt.show()
+        # TODO: continue
 
     return notes_single
 
@@ -237,10 +254,12 @@ def sanity_check_notes(notes: list, timings: list, pitch_algo: np.array, pitch_t
         notes_l = apply_dots(notes_l, dot_idx_l)
         notes_r = apply_dots(notes_r, dot_idx_r)
         if config.add_dot_notes > 0:
-            notes_l = add_dots(notes_l, time_diffs)
-            notes_r = add_dots(notes_r, time_diffs)
+            notes_l = add_dots(notes_l, time_diffs.copy())
+            notes_r = add_dots(notes_r, time_diffs.copy())
 
-    # TODO: needs some breaks after strong patterns
+    # if config.add_breaks_flag:
+    #     notes_l = add_breaks(notes_l, timings)
+    #     notes_r = add_breaks(notes_r, timings)
 
     # rebuild notes
     new_notes = unpslit_notes(notes_r, notes_l, notes_b)

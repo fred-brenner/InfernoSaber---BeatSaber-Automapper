@@ -5,9 +5,9 @@
 
 # Map creation model configuration
 """Do change"""
-max_speed = 4 * 7.5         # set around 5-40 (normal-expert++)
-add_beat_intensity = 105    # try to match bps by x%
-expert_fact = 0.63          # expert plus to expert factor
+max_speed = 4 * 8.0         # set around 5-40 (normal-expert++)
+add_beat_intensity = 105    # try to match bps by x% [80, 110]
+expert_fact = 0.63          # expert plus to expert factor [0.6, 0.7]
 create_expert_flag = True   # create second expert map
 thresh_beat = 0.45          # minimum beat response required to trigger generator
 thresh_pitch = 0.48         # minimum beat for pitch check (0.01,low-1,high)
@@ -20,13 +20,14 @@ t_diff_bomb_react = 0.3     # minimum time between finished added bombs
 allow_mismatch_flag = False     # if True, wrong turned notes won't be removed
 flow_model_flag = True      # use improved direction flow
 furious_lighting_flag = False   # increase frequency of light effects
-normalize_song_flag = True  # normalize song volume
+normalize_song_flag = False  # normalize song volume
 increase_volume_flag = True     # increase song volume (only used in combination with normalize flag)
 audio_rms_goal = 0.50
 allow_dot_notes = True     # if False, all notes must have a cut direction
-jump_speed_offset = -0.4     # general offset for jump speed (range [-2, 2])
+jump_speed_offset = -0.4    # general offset for jump speed (range [-2, 2])
 map_filler_iters = 10       # max iterations for map filler
-add_dot_notes = 0           # add dot notes for fastest patterns [0, 10]
+add_dot_notes = 2           # add dot notes for fastest patterns [0, 10]
+add_breaks_flag = True      # add breaks after strong patterns
 
 """Caution on changes"""
 jsb_offset = [0.21, 0.15]   # note jump speed offset for Expert, Expert+ (range [-0.5, 0.5])
