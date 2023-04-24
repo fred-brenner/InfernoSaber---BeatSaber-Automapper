@@ -1,36 +1,41 @@
 # Development branch for Mapper algorithm
 use main branch for a stable environment
 
+
+## Flexible Automapper for Beatsaber made for any difficulty
+    
+    Automapper with fully adjustable difficulty (inpsired by star difficulty) ranging from easy maps (1) to Expert++ maps (10+)
+
+    New: Generate BeatSaber maps using AI with the convenience of Google Drive storage.
+    Use the Google Colab template included in the repository without the need of hardware.
+    
+    Alternative: Install the project locally with anaconda (not recommended)
+
+
 ## Roadmap 2023
-March:
-
-    Deploy model on website
-
 May:
 
-    add bombs before unpredicted patterns
-    add obstacles in unused spaces
+    Publish InfernoSaber
+    Add bombs in unused spaces (?)
+    Add obstacles in unused spaces
 
 Mid of 2023:
 
     Create Obstacle AI Model
-
+    Create InfernoSaber server (?)
 
 End of 2023:
 
     Create Cardio Obstacle AI Model
-    Check out Reinforcment Models
+    Check out Reinforcement Models
 
 
-## Automapper for Beatsaber made for expert+ levels 
-
-    New: Generate BeatSaber maps using AI with the convenience of Google Drive storage.
-    Use the Google Colab template included in the repository without the need of hardware.
+## Automapper for Beatsaber made for expert+ levels
 
 Extract maps from Beatsaber/Bsaber to feed them 
 into AI models.
 Map versions with custom modded data (values out of normal boundaries) are excluded,
-so the data is as smooth as possible.
+so that the data is as smooth as possible.
 
 Automapper is trained on expert+ maps for 
 average 6 notes-per-second in prediction
@@ -41,7 +46,7 @@ The automapper consists of 4 consecutive AI models:
 3. Deep Neural Network (Classification) - mapping the notes/bombs
 4. Deep Neural Network (Classification) - mapping the events/lights
 
-An overview over the current status of map generation (including BSMapper and BeatSage) can be found at:
+An overview over the current status of map generation (including BSMapper, BeatSage and InfernoSaber_v1.1) can be found at:
 https://youtu.be/Jk9KG5EYEOY
 
 ### Author: Frederic Brenner
