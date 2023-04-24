@@ -17,7 +17,19 @@ def create_map(y_class_num, timings, events, name, bpm, pitch_algo, pitch_times)
     notes = decode_beats(y_class_num, class_keys)
 
     def write_map(notes, timings, events, name, bpm, bs_diff, pitch_algo, pitch_times):
-        # sanity check notes with max speed parameter
+        # Sanity check timings for first notes
+        time_last = 1.0
+        for idx in range(10):
+            # check if timings are in line
+            if time_last > timings[idx]:
+                rm_idx = idx - 1 if idx > 0 else idx
+                # remove index
+                timings = np.delete(timings, rm_idx)
+                notes.pop(rm_idx)
+                events = np.delete(events, rm_idx, axis=0)
+            time_last = timings[idx]
+
+        # run all beat and note sanity checks
         notes = sanity_check_notes(notes, timings, pitch_algo, pitch_times)
         # compensate bps
         timings = timings * bpm / 60
@@ -44,7 +56,7 @@ def create_map(y_class_num, timings, events, name, bpm, pitch_algo, pitch_times)
         return new_map_folder
 
     bs_diff = config.general_diff
-    new_map_folder = write_map(notes.copy(), timings, events, name, bpm, bs_diff, pitch_algo, pitch_times)
+    new_map_folder = write_map(notes.copy(), timings.copy(), events.copy(), name, bpm, bs_diff, pitch_algo, pitch_times)
     if config.create_expert_flag:
         bs_diff = 'Expert'
         config.max_speed *= config.expert_fact
@@ -139,19 +151,39 @@ def get_map_string(events='', notes='', obstacles=''):
 
 
 def get_info_map_string(name, bpm, bs_diff):
-    jump_speed = [int(config.jump_speed + config.jump_speed_fact * config.max_speed)]
+    jump_speed = [np.round(config.jump_speed + config.jump_speed_fact * config.max_speed, 1)]
     if bs_diff == 'Expert':
         diff_plus = config.max_speed / config.expert_fact
         diff_list = ['Expert', 'ExpertPlus']
-        jump_speed.append(int(config.jump_speed + config.jump_speed_fact * diff_plus))
+        exp_jump_speed = np.round(config.jump_speed + config.jump_speed_fact * diff_plus, 1)
+        jump_speed = [exp_jump_speed, exp_jump_speed*0.91]
     else:
         diff_plus = config.max_speed
         diff_list = ['ExpertPlus']
 
+    for i in range(len(jump_speed)):
+        if jump_speed[i] > (config.max_njs - 2*i):
+            jump_speed[i] = config.max_njs - 2*i
+        jump_speed[i] += config.jump_speed_offset
+    jump_speed.reverse()    # Set in order Expert (low), ExpertPlus (high)
+
+    if bs_diff == 'Expert':
+        jsb_offset = config.jsb_offset.copy()
+        jsb_offset[1] -= diff_plus * config.jsb_offset_factor
+        jsb_offset[0] -= 2/3 * (diff_plus * config.jsb_offset_factor)
+        # print(jsb_offset)
+    else:
+        jsb_offset = [config.jsb_offset[0] - diff_plus * config.jsb_offset_factor]
+
+    for i in range(len(jump_speed)):
+        if jump_speed[i] < 15.5:
+            jump_speed[i] = 15.5
+            jsb_offset[i] += 0.2
+
     info_string = '{\n'
     info_string += '"_version": "2.0.0",\n'
     info_string += f'"_songName": "{name}",\n'
-    info_string += f'"_songSubName": "Diff_{diff_plus:.1f}",\n'
+    info_string += f'"_songSubName": "Diff_{diff_plus/4:.1f}",\n'
     info_string += '"_songAuthorName": "unknown",\n'
     info_string += '"_levelAuthorName": "BierHerr",\n'
     info_string += f'"_beatsPerMinute": {bpm},\n'
@@ -178,7 +210,7 @@ def get_info_map_string(name, bpm, bs_diff):
             info_string += '"_difficultyRank": 9,\n'
         info_string += f'"_beatmapFilename": "{diff}.dat",\n'
         info_string += f'"_noteJumpMovementSpeed": {jump_speed[i]},\n'
-        info_string += '"_noteJumpStartBeatOffset": 0.0\n'
+        info_string += f'"_noteJumpStartBeatOffset": {jsb_offset[i]:.2f}\n'
         if i+1 < len(diff_list):
             info_string += '},\n'
         else:

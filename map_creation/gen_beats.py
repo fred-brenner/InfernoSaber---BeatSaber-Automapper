@@ -5,16 +5,15 @@ from PIL import Image
 from beat_prediction.find_beats import find_beats, get_pitch_times
 from beat_prediction.beat_to_lstm import beat_to_lstm
 from beat_prediction.beat_prop import get_beat_prop, tcn_reshape
-from lighting_prediction.train_lighting import lstm_shift_events_half
 
 from map_creation.sanity_check import *
-from map_creation.class_helpers import *
+# from map_creation.class_helpers import *
 from map_creation.map_creator import create_map
 from map_creation.find_bpm import get_file_bpm
 
 from preprocessing.music_processing import run_music_preprocessing
 from preprocessing.bs_mapper_pre import calc_time_between_beats
-from preprocessing.bs_mapper_pre import lstm_shift
+# from preprocessing.bs_mapper_pre import lstm_shift
 
 from training.helpers import *
 from training.tensorflow_models import *
@@ -26,10 +25,10 @@ from tools.utils import numpy_shorts
 
 
 # @profile
-def main(name_ar: list) -> None:
+def main(name_ar: list) -> bool:
 
     if len(name_ar) > 1:
-        print("Multiple song generation currently not implemented!")
+        print("Multi-core song generation currently not implemented!")
         exit()
 
     # load song data
@@ -88,22 +87,36 @@ def main(name_ar: list) -> None:
     timing_ar /= config.beat_spacing
     timing_ar = timing_ar[timing_ar > config.window]
     # add beats between far beats
-    # timing_ar = fill_map_times(timing_ar)
-    timing_ar = fill_map_times(timing_ar)
-    # TODO: add dynamic fills based on Difficulty and song length
+    if config.max_speed >= 5.5 * 4:
+        fill_map_times_scale(timing_ar, scale_index=int(config.map_filler_iters/2)+1)
+    if config.max_speed >= 8 * 4:
+        fill_map_times_scale(timing_ar, scale_index=int(config.map_filler_iters-1))
     time_input = [timing_ar]
 
     # calculate bpm
     file = paths.songs_pred + name_ar[0] + '.egg'
     bpm, song_duration = get_file_bpm(file)     # 1.6
     # average bpm for songs to make more similar (jump) speeds
-    bpm = int((bpm + 100) / 2)
+    if config.use_fixed_bpm is None:
+        bpm = int((bpm + 120) / 2)
+    else:
+        bpm = config.use_fixed_bpm
 
     # sanity check timings
     map_times, pitch_algo = sanity_check_timing(name_ar[0], timing_ar, song_duration)   # 3.9
     map_times = map_times[map_times > 0]
-    map_times = fill_map_times(map_times)
+    if len(map_times) < 3 * config.lstm_len:
+        print(f"Could not match enough beats for song {name_ar[0]}")
+        return 1
     # map_times = fill_map_times(map_times)
+    add_beats_min_bps = config.max_speed * 10 / 40  # max_speed=40 -> min_bps = 10
+    scale_idx = 0
+    while scale_idx < config.map_filler_iters:
+        if len(map_times) > add_beats_min_bps*map_times[-1]*config.add_beat_intensity/100:
+            break
+        map_times = fill_map_times_scale(map_times, scale_idx)
+        scale_idx += 1
+    print(f"Map filler iterated {scale_idx}/{config.map_filler_iters} times.")
     map_times = add_lstm_prerun(map_times)
 
     # calculate time between beats
@@ -137,12 +150,15 @@ def main(name_ar: list) -> None:
     # add events
     ############
     if True:
+        # TODO: add furious_lighting to increase effect frequency
         events = generate(in_song_l, map_times, config.event_gen_version, config.event_lstm_len,
                           paths.events_classify_encoder_file)     # 23.7 (47.0 -> 3.8)
     else:
         events = []
 
     create_map(y_class_map, map_times, events, name_ar[0], bpm, pitch_algo, pitch_times)     # 0.5
+
+    return 0    # success
 
 
 if __name__ == '__main__':

@@ -1,6 +1,7 @@
 import numpy as np
 import aubio
 import matplotlib.pyplot as plt
+from scipy.signal import savgol_filter
 
 from tools.config import config, paths
 
@@ -21,8 +22,8 @@ def sanity_check_beat(beat):
                 beat[idx] = 0
 
     # print result
-    print(f"Got {beat.sum()} beats after sanity check beat"
-          f" (removed {beat_counts - beat.sum()})")
+    # print(f"Got {beat.sum()} beats after sanity check beat"
+    #       f" (removed {beat_counts - beat.sum()})")
 
     return beat
 
@@ -61,7 +62,20 @@ def sanity_check_timing(name, timings, song_duration):
     # plt.show()
 
     last_pitch = 0
-    threshold = pitches.mean() * config.thresh_pitch * 3
+    threshold = np.median(pitches)
+    if threshold < 100:
+        if np.mean(pitches) > threshold:
+            threshold = np.mean(pitches)
+    # threshold = 80 + 0.6 * pitches.mean() * config.thresh_pitch
+    # pitch_median = np.median(pitch_list)
+    # if pitch_median < 100:
+    #     pitch_median = pitches.mean()
+    # threshold += 0.7 * pitch_median * config.thresh_pitch
+    # threshold += 0.2 * pitches.max() * config.thresh_pitch
+    # th_count = 100 * sum(pitches > threshold) / len(pitches)
+    # if True:
+    #     # print debug info on threshold percentage
+    #     print(f"Percentage of pitches over threshold: {th_count:.0f}%")
     threshold_end = config.threshold_end * threshold
     idx_end = int(len(pitches) / 30)
     idx_end_list = list(range(idx_end))
@@ -89,10 +103,11 @@ def sanity_check_timing(name, timings, song_duration):
     allowed_timings = allowed_timings[allowed_timings > 0]
 
     # match timing from beat generator
-    max_time_diff = 0.5
-    last_beat = 0
+    max_time_diff = 1.0
+    early_start = 0.5
+    last_beat = 1
     for i in range(len(timings)):
-        diff = np.abs(allowed_timings - timings[i])
+        diff = np.abs(allowed_timings - timings[i] - early_start)
         min_diff = diff.min()
         if min_diff < max_time_diff:
             cur_beat = allowed_timings[np.argmin(diff)]
@@ -105,6 +120,82 @@ def sanity_check_timing(name, timings, song_duration):
             timings[i] = 0
 
     return timings, allowed_timings
+
+
+def apply_dots(notes_single, dots_idx):
+    for idx in dots_idx:
+        if len(notes_single[idx]) == 4:
+            notes_single[idx][3] = 8
+        elif len(notes_single[idx]) > 4:
+            pass  # do not apply for multiple notes
+        else:
+            pass  # note removed
+    return notes_single
+
+
+def add_dots(notes_single, time_diffs):
+    # Set timings without notes to 100
+    time_diffs[[len(notes_single[idx]) != 4 for idx in range(len(notes_single))]] = 100
+    # Get indices for x percent fastest notes
+    idx_fast = np.argsort(time_diffs)
+    idx_fast = idx_fast[:int(config.add_dot_notes * sum(time_diffs < 100) / 100)]
+    for idx in idx_fast:
+        notes_single[idx][3] = 8
+    return notes_single
+
+
+def add_breaks(notes_single, timings):
+    break_counter = 0
+    start_window = config.decr_speed_range
+    # remove timing without notes
+    idx_diffs = [len(notes_single[idx]) >= 4 for idx in range(len(notes_single))]
+    real_timings = timings[idx_diffs]
+    real_diffs = np.hstack([1, np.diff(real_timings)])
+    real_timings = real_timings[start_window:-start_window]
+    real_diffs = real_diffs[start_window:-start_window]
+    if len(real_timings) > 50:
+        # apply window filter to diffs
+        real_diffs_filt = savgol_filter(real_diffs, window_length=31, polyorder=4)
+        if False:
+            plt.figure()
+            plt.plot(real_diffs)
+            plt.plot(real_diffs_filt)
+            plt.show()
+
+        tresh_diffs = np.quantile(real_diffs_filt, 0.37)
+        strong_counter = 0
+        strong_reset = 0
+        strong_reset_threshold = 2
+        pattern_length = 15
+        for idx, diff in enumerate(real_diffs_filt):
+            if diff < tresh_diffs:
+                # strong pattern
+                strong_counter += 1
+                if strong_reset >= strong_reset_threshold:
+                    strong_reset = 0
+            else:
+                if strong_reset >= strong_reset_threshold:
+                    if strong_counter > pattern_length:
+                        # add break
+                        cur_idx = int(np.argwhere(timings == real_timings[idx])[0])
+                        # remove this note
+                        notes_single[cur_idx] = []
+                        # remove next note
+                        for next_idx, note_flag in enumerate(idx_diffs[cur_idx:]):
+                            if next_idx != 0 and note_flag:
+                                notes_single[cur_idx + next_idx] = []
+                                break
+                        # reset counters
+                        strong_reset = 0
+                        strong_counter = 0
+                        break_counter += 1
+                    # else:
+                    #     # reset pattern
+                    #     strong_counter = 0
+                else:
+                    strong_reset += 1
+    # print(f"Add {break_counter} breaks.")
+    return notes_single
 
 
 def emphasize_beats(notes, timings):
@@ -122,8 +213,6 @@ def emphasize_beats(notes, timings):
         notes[n] = new_note
         return notes
 
-    # for n in range(start_end_idx, len(notes) - start_end_idx):
-    # TODO: check timings (needed individually for each note side?)
     for n in range(start_end_idx, len(notes)):
         if timings[n:n + 1].max() >= config.emphasize_beats_wait:
             note = notes[n]
@@ -161,9 +250,9 @@ def sanity_check_notes(notes: list, timings: list, pitch_algo: np.array, pitch_t
     # notes_r = correct_cut_dir(notes_r, timings)
     # notes_l = correct_cut_dir(notes_l, timings)
 
-    print("Right notes:", end=' ')
+    # print("Right notes:", end=' ')
     notes_r = correct_notes(notes_r, timings)
-    print("Left notes: ", end=' ')
+    # print("Left notes: ", end=' ')
     notes_l = correct_notes(notes_l, timings)
 
     time_diffs = np.concatenate((np.ones(1), np.diff(timings)), axis=0)
@@ -180,10 +269,6 @@ def sanity_check_notes(notes: list, timings: list, pitch_algo: np.array, pitch_t
     # print("Left notes: ", end=' ')
     # notes_l = correct_notes(notes_l, timings)
 
-    # emphasize some beats randomly
-    notes_l = emphasize_beats(notes_l, time_diffs)
-    notes_r = emphasize_beats(notes_r, time_diffs)
-
     # check static position for next and last note for left and right together
     notes_r, notes_l, notes_b = correct_notes_all(notes_r, notes_l, notes_b, time_diffs)
 
@@ -193,6 +278,26 @@ def sanity_check_notes(notes: list, timings: list, pitch_algo: np.array, pitch_t
     # # TODO: add bombs for long pause to focus on next note direction
     # notes_b, timings_b = add_pause_bombs(notes_r, notes_l, notes_b, timings, pitch_algo, pitch_times)
     # TODO: remove blocking bombs
+
+    # turn notes leading into correct direction
+    notes_r, dot_idx_r = turn_notes_single(notes_r)
+    notes_l, dot_idx_l = turn_notes_single(notes_l)
+
+    # emphasize some beats randomly
+    notes_l = emphasize_beats(notes_l, time_diffs)
+    notes_r = emphasize_beats(notes_r, time_diffs)
+
+    if config.allow_dot_notes:
+        notes_l = apply_dots(notes_l, dot_idx_l)
+        notes_r = apply_dots(notes_r, dot_idx_r)
+        if config.add_dot_notes > 0:
+            notes_l = add_dots(notes_l, time_diffs.copy())
+            notes_r = add_dots(notes_r, time_diffs.copy())
+
+    if config.add_breaks_flag:
+        # from tools.utils.load_and_save import save_pkl
+        notes_l = add_breaks(notes_l, timings)
+        notes_r = add_breaks(notes_r, timings)
 
     # rebuild notes
     new_notes = unpslit_notes(notes_r, notes_l, notes_b)
@@ -324,7 +429,7 @@ def correct_notes_all(notes_r, notes_l, notes_b, time_diff):
         pos_r_last = pos_r
         pos_l_last = pos_l
         # cut_r_last = cut_r
-    print(f"Static sanity check removed {rm_counter} notes.")
+    # print(f"Static sanity check removed {rm_counter} notes.")
 
     return notes_r, notes_l, notes_b
 
@@ -382,7 +487,7 @@ def shift_blocks_middle(notes_r, notes_l, notes_b):
                     notes_b[idx][ib * 4:ib * 4 + 2] = new_pos
                     counter += 1
 
-    print(f"Shifted {counter} blocks away from the middle.")
+    # print(f"Shifted {counter} blocks away from the middle.")
 
     return notes_r, notes_l, notes_b
 
@@ -411,7 +516,7 @@ def add_pause_bombs(notes_r, notes_l, notes_b, timings, pitch_algo, pitch_times)
         else:
             n_left = [0, 1]
         # [2, 2, 3, 8, 3, 2, 3, 8]
-        bomb_ar = n*[[n_right[0], n_up, 3, 8, n_right[1], n_up, 3, 8]]
+        bomb_ar = n * [[n_right[0], n_up, 3, 8, n_right[1], n_up, 3, 8]]
         return bomb_ar
 
     def get_time_pos(time_window, pitch_algo, pitch_times):
@@ -492,6 +597,150 @@ def add_pause_bombs(notes_r, notes_l, notes_b, timings, pitch_algo, pitch_times)
     new_times = list(timings)
     new_times.extend(new_bomb_times)
     return notes_b
+
+
+def turn_notes_single(notes_single):
+    dot_notes_rem = []
+
+    def calc_diff_from_list(cd_old, cd_new):
+        diff_score = abs(cd_old[0] - cd_new[0]) + abs(cd_old[1] - cd_new[1])
+        return diff_score
+
+    def get_move_dir_xy(notes, notes_old):
+        dirx = -1 * (notes[0] - notes_old[0])
+        diry = -1 * (notes[1] - notes_old[1])
+        move_grid_threshold = 1
+        if abs(dirx) >= abs(diry) + move_grid_threshold:
+            diry = 0
+        elif abs(diry) >= abs(dirx) + move_grid_threshold:
+            dirx = 0
+        if abs(dirx) > 1:
+            dirx = np.sign(dirx)
+        if abs(diry) > 1:
+            diry = np.sign(diry)
+        return dirx, diry
+
+    if config.flow_model_flag:
+        empty_note_last = False
+        notes_old = None
+        for idx, notes in enumerate(notes_single):
+            if len(notes) == 0:
+                continue  # skip empty notes
+            if notes_old is None:
+                notes_old = notes
+                continue
+            if len(notes) > 4:
+                # skip multi notes
+                notes_old = None
+                continue
+            dirx, diry = get_move_dir_xy(notes, notes_old)
+            if notes[3] == 8:
+                if config.allow_dot_notes:
+                    dot_notes_rem.append(idx)  # remember to redo this
+                #     if not empty_note_last:
+                #         new_cut_dir = reverse_get_cut_dir(dirx, diry)
+                #         notes[3] = new_cut_dir
+                #         notes_single[idx] = notes
+                #         empty_note_last = True
+                #     else:
+                #         notes_old = None
+                #         continue
+                # else:
+                new_cut_dir = reverse_get_cut_dir(dirx, diry)
+                notes[3] = new_cut_dir
+                notes_single[idx] = notes
+            else:  # last note has direction
+                empty_note_last = False
+
+            # check if new flow direction suits to (inverse last) cut direction
+            cd_old = get_cut_dir_xy(notes_old[3])
+            cd_old = (cd_old[0] * -1, cd_old[1] * -1)
+            diff_score = calc_diff_from_list(cd_old, [dirx, diry])
+            if diff_score == 0:
+                pass
+            elif diff_score == 1:
+                # use new cut direction
+                new_cut_dir = reverse_get_cut_dir(dirx, diry)
+                notes[3] = new_cut_dir
+                notes_single[idx] = notes
+            elif diff_score == 2:
+                if dirx == cd_old[0] or diry == cd_old[1]:
+                    new_dirx = int(np.round(0.5 * (dirx + cd_old[0]), 0))
+                    new_diry = int(np.round(0.5 * (diry + cd_old[1]), 0))
+                    new_cut_dir = reverse_get_cut_dir(new_dirx, new_diry)
+                    notes[3] = new_cut_dir
+                    notes_single[idx] = notes
+                elif config.allow_dot_notes:
+                    dot_notes_rem.append(idx)
+                    # notes[3] = 8
+                    # notes_single[idx] = notes
+                else:
+                    pass
+            elif diff_score == 3:
+                pass
+            else:
+                pass
+
+            # update old notes
+            notes_old = notes
+
+    # Sanity check cut directions
+    notes_old = None
+    for idx, notes in enumerate(notes_single):
+        if len(notes) == 0:
+            continue  # skip empty notes
+        if notes_old is None:
+            notes_old = notes
+            continue
+        cd_new_x, cd_new_y = list(get_cut_dir_xy(notes[3]))
+        cd_old_x, cd_old_y = list(get_cut_dir_xy(notes_old[3]))
+        if cd_new_x == cd_new_y == 0 or cd_old_x == cd_old_y == 0:
+            if config.allow_dot_notes:
+                notes[3] = reverse_cut_dir_xy(notes_old[3])
+                notes = notes[:4]  # make it single notes if necessary
+                notes_single[idx] = notes
+                dot_notes_rem.append(idx)
+                cd_new_x, cd_new_y = list(get_cut_dir_xy(notes[3]))
+                # notes_old = notes
+                # continue  # skip notes without direction
+            else:
+                notes_single[idx] = []
+                continue
+        # inverse old cut dir
+        cd_old_x *= -1
+        cd_old_y *= -1
+
+        df_score = calc_diff_from_list([cd_old_x, cd_old_y], [cd_new_x, cd_new_y])
+        if df_score >= 3:
+            if config.allow_mismatch_flag:
+                notes[3] = reverse_get_cut_dir(0, 0)
+                notes_single[idx][3] = notes[3]
+            else:
+                notes_single[idx] = []
+                continue  # do not update old notes
+        elif df_score >= 2:
+            # only ones
+            if len(notes) == 4:
+                if abs(cd_old_x) == abs(cd_new_x) == abs(cd_old_y) == abs(cd_new_y) == 1:
+                    if cd_old_x != cd_new_x:
+                        notes[3] = reverse_get_cut_dir(0, cd_new_y)
+                    else:
+                        notes[3] = reverse_get_cut_dir(cd_new_x, 0)
+                # each one is zero
+                else:
+                    if cd_new_x == 0:
+                        notes[3] = reverse_get_cut_dir(cd_old_x, cd_new_y)
+                    else:
+                        notes[3] = reverse_get_cut_dir(cd_new_x, cd_old_y)
+            else:
+                pass  # ignore multi notes    #TODO: this
+            # update notes_single
+            notes_single[idx][3] = notes[3]
+
+        # update old notes
+        notes_old = notes
+
+    return notes_single, dot_notes_rem
 
 
 def correct_notes(notes, timings):
@@ -579,7 +828,7 @@ def correct_notes(notes, timings):
                         if rm_temp[rm]:
                             notes[idx].pop(rm)
 
-    print(f"Sanity check note speed removed {rm_counter} elements")
+    # print(f"Sanity check note speed removed {rm_counter} elements")
     return notes
 
 
@@ -626,9 +875,6 @@ def check_note_movement(notes_last, notes_new):
     if dist_x != 2 and dist_y != 2:
         if dist_x == dist_y == 1:
             return notes_new
-
-        # (TODO: (check if new cut direction needs more speed
-        #       only if timing < 0.5) if necessary)
 
         # change cut direction
         new_cut = reverse_cut_dir_xy(notes_last[3])
@@ -728,11 +974,19 @@ def reverse_cut_dir_xy(old_cut):
     return int(new_cat)
 
 
+def reverse_get_cut_dir(mov_x, mov_y):
+    cut_dir_x = np.asarray([[1, 0, -1]] * 3).flatten()
+    cut_dir_y = np.asarray([[-1] * 3, [0] * 3, [1] * 3]).flatten()
+    cut_dir_order = np.asarray([[4, 0, 5], [2, 8, 3], [6, 1, 7]]).flatten()
+    cut_dir = cut_dir_order[(cut_dir_x == mov_x) & (cut_dir_y == mov_y)][0]
+    return cut_dir
+
+
 ################
 # Postprocessing
 ################
 def fill_map_times(map_times):
-    se_thresh = int(len(map_times) / 25)  # don't apply filling for first and last 4% of song
+    se_thresh = int(len(map_times) / 22)  # don't apply filling for first and last 4% of song
     diff = np.diff(map_times)
     new_map_times = []
     for idx in range(se_thresh, len(diff) - se_thresh):
@@ -740,6 +994,32 @@ def fill_map_times(map_times):
             if np.random.random() < config.add_beat_fact:
                 beat_time = (map_times[idx] + map_times[idx + 1]) / 2
                 new_map_times.append(beat_time)
+    if len(new_map_times) > 0:
+        map_times = np.hstack((map_times, new_map_times))
+        map_times = np.sort(map_times)
+    return map_times
+
+
+def fill_map_times_scale(map_times, scale_index=5):
+    # scale lower and upper bounds for fill algorithm (index 0-10)
+    se_thresh = int(len(map_times) * 0.05)  # don't apply filling for first and last 5% of song
+    diff = np.diff(map_times)
+    new_map_times = []
+
+    mb = config.add_beat_max_bounds
+    low_bound_matrix = np.linspace(mb[1], mb[0], config.map_filler_iters)
+    high_bound_matrix = np.linspace(mb[2], mb[3], config.map_filler_iters)
+
+    low_bound = low_bound_matrix[scale_index]
+    high_bound = high_bound_matrix[scale_index]
+    if low_bound < 0.1:
+        low_bound = 0.1
+
+    for idx in range(se_thresh, len(diff) - se_thresh):
+        if low_bound < diff[idx] < high_bound:
+            # if np.random.random() < config.add_beat_fact:
+            beat_time = (map_times[idx] + map_times[idx + 1]) / 2
+            new_map_times.append(beat_time)
     if len(new_map_times) > 0:
         map_times = np.hstack((map_times, new_map_times))
         map_times = np.sort(map_times)

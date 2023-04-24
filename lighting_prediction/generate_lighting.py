@@ -1,11 +1,11 @@
-import numpy as np
-import matplotlib.pyplot as plt
-import gc
-import pickle
+# import numpy as np
+# import matplotlib.pyplot as plt
+# import gc
+# import pickle
 
-from datetime import datetime
-from keras.optimizers import adam_v2
-from sklearn.preprocessing import OneHotEncoder
+# from datetime import datetime
+# from keras.optimizers import adam_v2
+# from sklearn.preprocessing import OneHotEncoder
 
 # from lighting_prediction.tf_lighting import create_tf_model
 from lighting_prediction.train_lighting import lstm_shift_events_half
@@ -14,8 +14,8 @@ from map_creation.class_helpers import get_class_size, update_out_class, add_fav
 
 # from preprocessing.music_processing import run_music_preprocessing
 
-from tools.config import config, paths
-from tools.utils import numpy_shorts
+# from tools.config import config, paths
+# from tools.utils import numpy_shorts
 
 from training.helpers import *
 
@@ -102,7 +102,6 @@ def generate(l_in_song, time_ar, save_model_name, lstm_len, encoder_file):
         # find class winner
         y_arg_max = np.argmax(y_class, axis=2)[0]
         for imax in range(len(y_arg_max)):
-            # (TODO: Filter out double notes if necessary)
             y_class_map[idx, imax][y_arg_max[imax]] = 1
 
     # decode event class output

@@ -1,10 +1,10 @@
 ###################################################
 # This file is needed to find the working directory
 ###################################################
-import os
-import shutil
+# import os
+# import shutil
 import time
-import sys
+# import sys
 
 from tools.config import paths, config
 import map_creation.gen_beats as beat_generator
@@ -13,13 +13,25 @@ from bs_shift.export_map import *
 import tensorflow as tf
 
 
-def main(diff: float, export_results_to_bs=True, quick_start=None):
+def main(diff: float, export_results_to_bs=True, quick_start=None,
+         beat_intensity=None, random_factor=None, js_offset=None,
+         flow_model_flag=None, allow_no_dir_flag=None):
     # change difficulty
     if diff is not None:
         config.max_speed = diff
         config.max_speed_orig = diff
     if quick_start is not None:
         config.quick_start = quick_start
+    if beat_intensity is not None:
+        config.add_beat_intensity = beat_intensity + 10     # add 10% on top
+    if random_factor is not None:
+        config.random_note_map_factor = random_factor
+    if js_offset is not None:
+        config.jump_speed_offset += js_offset
+    if flow_model_flag is not None:
+        config.flow_model_flag = flow_model_flag
+    if allow_no_dir_flag is not None:
+        config.allow_dot_notes = allow_no_dir_flag
 
     # limit gpu ram usage
     conf = tf.compat.v1.ConfigProto()
@@ -39,10 +51,14 @@ def main(diff: float, export_results_to_bs=True, quick_start=None):
         start_time = time.time()
         song_name = song_name[:-4]
         print(f"Analyzing song: {song_name} ({i + 1} of {len(song_list)})")
-        beat_generator.main([song_name])
+        fail_flag = beat_generator.main([song_name])
+        if fail_flag:
+            print("Continue with next song")
+            continue
         end_time = time.time()
         print(f"Time needed: {end_time - start_time}s")
 
+        # TODO: Error if song ends with empty string before .egg?
         # create zip archive for online viewer
         shutil.make_archive(f'{paths.new_map_path}{config.max_speed}_{song_name}',
                             'zip', f'{paths.new_map_path}1234_{song_name}')
@@ -72,14 +88,51 @@ if __name__ == "__main__":
     diff = os.environ.get('max_speed')
     if diff is not None:
         diff = float(diff)
-        print(f"Set max speed to {diff}")
+        print(f"Set BPS difficulty to {diff}")
+        diff = diff * 4  # calculate bps to max_speed
     else:
-        print("Use default values")
+        print("Use default difficulty values")
 
     qs = os.environ.get('quick_start')
     if qs is not None:
         qs = float(qs)
         print(f"Set quick_start to {qs}")
 
+    bi = os.environ.get('beat_intensity')
+    if bi is not None:
+        bi = float(bi)
+        print(f"Set beat intensity to {bi}")
+
+    rf = os.environ.get('random_factor')
+    if rf is not None:
+        rf = float(rf)
+        print(f"Set random factor to {rf}")
+
+    jso = os.environ.get('jump_speed_offset')
+    if jso is not None:
+        jso = float(jso)
+        print(f"Set jump speed offset to {jso}")
+
+    fmf = os.environ.get('flow_model_flag')
+    if fmf is not None:
+        if fmf == 'True':
+            fmf = True
+        else:
+            fmf = False
+        print(f"Set flow_model_flag to {fmf}")
+
+    ndf = os.environ.get('allow_no_direction_flag')
+    if ndf is not None:
+        if ndf == 'True':
+            ndf = True
+        else:
+            ndf = False
+        print(f"Set allow_no_direction_flag to {ndf}")
+
     export_results_to_bs = True
-    main(diff, export_results_to_bs, qs)
+    main(diff, export_results_to_bs, qs, bi, rf, jso, fmf, ndf)
+
+    # main(2.5*4, export_results_to_bs)
+    # main(10 * 4, export_results_to_bs)
+    # main(5*4, export_results_to_bs)
+    # main(7.5 * 4, export_results_to_bs)

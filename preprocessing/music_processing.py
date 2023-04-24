@@ -115,11 +115,11 @@ def run_music_preprocessing(names_ar: list, time_ar=None, save_file=True, song_c
     song_ar = []
     rm_index_ar = []
 
-    bar = ProgressBar(max_value=len(names_ar))
+    # bar = ProgressBar(max_value=len(names_ar))
 
-    print(f"Importing {len(names_ar)} songs")
+    # print(f"Importing {len(names_ar)} songs")
     for idx, n in enumerate(names_ar):
-        bar.update(idx+1)
+        # bar.update(idx+1)
         if time_ar is None:
             time = None
         else:
