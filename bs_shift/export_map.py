@@ -58,6 +58,15 @@ def check_music_files(files, dir_path):
                 # normalize if volume is below max, else skip
                 headroom = -1 * (0.42 + (config.audio_rms_goal - rms) * 16)
                 normalized_song = effects.normalize(audio, headroom=headroom)
+                error_flag = 0
+                while normalized_song.rms/1e9 < config.audio_rms_goal:
+                    error_flag += 1
+                    headroom = -1 * (0.42 + (config.audio_rms_goal - rms) * 16)
+                    normalized_song = effects.normalize(audio, headroom=headroom)
+                    if error_flag > 5:
+                        print(f"Error: Maximum iterations for normalizing song exceeded: {song_name}. Exit")
+                        exit()
+
                 normalized_song.export(dir_path + song_name, format="ogg")
                 print(f"Normalized volume of song: {song_name} with new RMS: {normalized_song.rms/1e9:.2f}")
     return song_list
