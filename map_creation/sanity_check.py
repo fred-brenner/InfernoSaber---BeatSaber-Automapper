@@ -199,7 +199,7 @@ def add_breaks(notes_single, timings):
                     #     strong_counter = 0
                 # else:
                 #     strong_reset += 1
-    print(f"Add {break_counter} breaks.")
+    # print(f"Add {break_counter} breaks.")
     return notes_single
 
 
