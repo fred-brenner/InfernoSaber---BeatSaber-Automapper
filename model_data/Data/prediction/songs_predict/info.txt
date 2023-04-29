@@ -1,2 +1,0 @@
-put your song files to predict here
-Currently supported: .mp3, .ogg, .egg
