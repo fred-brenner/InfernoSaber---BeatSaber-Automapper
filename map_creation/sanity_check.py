@@ -62,7 +62,7 @@ def sanity_check_timing(name, timings, song_duration):
     # plt.show()
 
     last_pitch = 0
-    threshold = np.quantile(pitches, 0.5) * config.thresh_pitch
+    threshold = np.quantile(pitches, 0.6) * config.thresh_pitch
     if threshold < 100:
         if np.mean(pitches) > threshold:
             threshold = np.mean(pitches)
