@@ -130,9 +130,9 @@ if __name__ == "__main__":
         print(f"Set allow_no_direction_flag to {ndf}")
 
     export_results_to_bs = True
-    # main(diff, export_results_to_bs, qs, bi, rf, jso, fmf, ndf)
+    main(diff, export_results_to_bs, qs, bi, rf, jso, fmf, ndf)
 
-    main(2*4, False)
-    main(10 * 4, False)
-    main(5*4, False)
+    # main(2*4, False)
+    # main(10 * 4, False)
+    # main(5*4, False)
     # main(7.5 * 4, False)
