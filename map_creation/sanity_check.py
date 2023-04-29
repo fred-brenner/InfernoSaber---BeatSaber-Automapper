@@ -62,7 +62,7 @@ def sanity_check_timing(name, timings, song_duration):
     # plt.show()
 
     last_pitch = 0
-    threshold = np.median(pitches)
+    threshold = np.median(pitches) * config.thresh_pitch
     if threshold < 100:
         if np.mean(pitches) > threshold:
             threshold = np.mean(pitches)
@@ -162,39 +162,44 @@ def add_breaks(notes_single, timings):
             plt.plot(real_diffs_filt)
             plt.show()
 
-        tresh_diffs = np.quantile(real_diffs_filt, 0.37)
+        thresh_diffs = np.quantile(real_diffs_filt, 0.37)
         strong_counter = 0
-        strong_reset = 0
+        # strong_reset = 0
         strong_reset_threshold = 2
         pattern_length = 15
         for idx, diff in enumerate(real_diffs_filt):
-            if diff < tresh_diffs:
+            if diff < thresh_diffs:
                 # strong pattern
                 strong_counter += 1
-                if strong_reset >= strong_reset_threshold:
-                    strong_reset = 0
+                # if strong_reset >= strong_reset_threshold:
+                    # strong_reset = 0
             else:
-                if strong_reset >= strong_reset_threshold:
-                    if strong_counter > pattern_length:
-                        # add break
-                        cur_idx = int(np.argwhere(timings == real_timings[idx])[0])
-                        # remove this note
-                        notes_single[cur_idx] = []
-                        # remove next note
-                        for next_idx, note_flag in enumerate(idx_diffs[cur_idx:]):
-                            if next_idx != 0 and note_flag:
-                                notes_single[cur_idx + next_idx] = []
-                                break
-                        # reset counters
-                        strong_reset = 0
-                        strong_counter = 0
-                        break_counter += 1
+                if strong_counter > pattern_length:
+                    if idx < len(real_diffs_filt) - 2:
+                        if real_diffs_filt[idx+1] >= thresh_diffs and real_diffs_filt[idx+2] >= thresh_diffs:
+                            # remove next two notes
+
+                # if strong_reset >= strong_reset_threshold:
+                #     if strong_counter > pattern_length:
+                            # add break
+                            cur_idx = int(np.argwhere(timings == real_timings[idx])[0])
+                            # remove this note
+                            notes_single[cur_idx] = []
+                            # remove next note
+                            for next_idx, note_flag in enumerate(idx_diffs[cur_idx:]):
+                                if next_idx != 0 and note_flag:
+                                    notes_single[cur_idx + next_idx] = []
+                                    break
+                            # reset counters
+                            # strong_reset = 0
+                            strong_counter = 0
+                            break_counter += 1
                     # else:
                     #     # reset pattern
                     #     strong_counter = 0
-                else:
-                    strong_reset += 1
-    # print(f"Add {break_counter} breaks.")
+                # else:
+                #     strong_reset += 1
+    print(f"Add {break_counter} breaks.")
     return notes_single
 
 
