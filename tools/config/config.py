@@ -14,7 +14,7 @@ thresh_pitch = 1.10         # minimum beat for pitch check (0.8,low-1.5,high)
 threshold_end = 1.3         # factor for start and end threshold
 random_note_map_factor = 0.3    # stick note map to random song/center (set to 0 to disable)
 random_note_map_change = 2      # change frequency for center (1-20)
-quick_start = 2.1           # map quick start mode (0 off, 1-3 on)
+quick_start = 1.5           # map quick start mode (0 off, 1-3 on)
 t_diff_bomb = 1.5           # minimum time between notes to add bomb
 t_diff_bomb_react = 0.3     # minimum time between finished added bombs
 allow_mismatch_flag = False     # if True, wrong turned notes won't be removed
@@ -28,6 +28,7 @@ jump_speed_offset = -0.4    # general offset for jump speed (range [-2, 2])
 map_filler_iters = 10       # max iterations for map filler
 add_dot_notes = 2           # add dot notes for fastest patterns [0, 10]
 add_breaks_flag = True      # add breaks after strong patterns
+silence_threshold = 0.2     # silence threshold [0.0, 0.3]
 
 """Caution on changes"""
 jsb_offset = [0.21, 0.15]   # note jump speed offset for Expert, Expert+ (range [-0.5, 0.5])

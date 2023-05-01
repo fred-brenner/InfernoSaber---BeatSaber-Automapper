@@ -990,6 +990,16 @@ def reverse_get_cut_dir(mov_x, mov_y):
 ################
 # Postprocessing
 ################
+def remove_silent_times(map_times, silent_times):
+    threshold_timing = 0.05
+    for silent in silent_times:
+        while min(abs(map_times - silent)) < threshold_timing:
+            # remove this value
+            index = np.argmin(abs(map_times - silent))
+            map_times = np.delete(map_times, index)
+    return map_times
+
+
 def fill_map_times(map_times):
     se_thresh = int(len(map_times) / 22)  # don't apply filling for first and last 4% of song
     diff = np.diff(map_times)
