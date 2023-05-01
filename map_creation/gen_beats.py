@@ -33,6 +33,7 @@ def main(name_ar: list) -> bool:
 
     if config.add_silence_flag:
         config.add_beat_intensity += 15
+        config.silence_threshold *= (1 - 0.5 * (config.max_speed_orig / 40))
 
     # load song data
     song_input, pitch_input = find_beats(name_ar, train_data=False)
