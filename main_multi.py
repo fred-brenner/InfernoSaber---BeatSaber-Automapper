@@ -56,13 +56,13 @@ def main_multi(diff_list: list, export_results_to_bs=True):
         for i, song_name in enumerate(song_list):
             start_time = time.time()
             song_name = song_name[:-4]
-            print(f"Analyzing song: {song_name} ({i + 1} of {len(song_list)})")
+            # print(f"Analyzing song: {song_name} ({i + 1} of {len(song_list)})")
             fail_flag = beat_generator.main([song_name])
             if fail_flag:
                 print("Continue with next song")
                 continue
             end_time = time.time()
-            print(f"Time needed: {end_time - start_time}s")
+            # print(f"Time needed: {end_time - start_time}s")
 
     print("Running map combination")
     # MAP STACKER
@@ -94,15 +94,18 @@ def main_multi(diff_list: list, export_results_to_bs=True):
                     with open(src_info) as fp:
                         content = fp.readlines()
                     if i == 0:
+                        dst = f"{overall_folder}/Easy.dat"
+                        new_info_file = stack_info_data(new_info_file, content, "Easy", 1)
+                    if i == 1:
                         dst = f"{overall_folder}/Normal.dat"
                         new_info_file = stack_info_data(new_info_file, content, "Normal", 3)
-                    elif i == 1:
+                    elif i == 2:
                         dst = f"{overall_folder}/Hard.dat"
                         new_info_file = stack_info_data(new_info_file, content, "Hard", 5)
-                    elif i == 2:
+                    elif i == 3:
                         dst = f"{overall_folder}/Expert.dat"
                         new_info_file = stack_info_data(new_info_file, content, "Expert", 7)
-                    elif i == 3:
+                    elif i == 4:
                         dst = f"{overall_folder}/ExpertPlus.dat"
                         new_info_file = stack_info_data(new_info_file, content, "ExpertPlus", 9)
                     shutil.copy(src, dst)
@@ -121,4 +124,4 @@ def main_multi(diff_list: list, export_results_to_bs=True):
 
 
 if __name__ == "__main__":
-    main_multi([2, 4.5, 6.5, 8], False)
+    main_multi([5, 6, 7, 8, 10], False)
