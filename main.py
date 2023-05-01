@@ -60,11 +60,11 @@ def main(diff: float, export_results_to_bs=True, quick_start=None,
 
         # TODO: Error if song ends with empty string before .egg?
         # create zip archive for online viewer
-        shutil.make_archive(f'{paths.new_map_path}{config.max_speed}_{song_name}',
-                            'zip', f'{paths.new_map_path}1234_{song_name}')
+        shutil.make_archive(f'{paths.new_map_path}{config.max_speed_orig}_{song_name}',
+                            'zip', f'{paths.new_map_path}1234_{config.max_speed_orig}_{song_name}')
         # export map to beat saber
         if export_results_to_bs:
-            shutil_copy_maps(song_name)
+            shutil_copy_maps(f"{config.max_speed_orig}_{song_name}")
 
     print("Finished map generator")
 

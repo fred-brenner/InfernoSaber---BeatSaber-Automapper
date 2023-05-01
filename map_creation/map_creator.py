@@ -38,7 +38,7 @@ def create_map(y_class_num, timings, events, name, bpm, pitch_algo, pitch_times)
         # write map
         ###########
         # create output folder
-        new_map_folder = f"{paths.new_map_path}/1234_{name}/"
+        new_map_folder = f"{paths.new_map_path}/1234_{config.max_speed_orig:.1f}_{name}/"
         os.makedirs(new_map_folder, exist_ok=True)
 
         file = f'{new_map_folder}{bs_diff}.dat'
