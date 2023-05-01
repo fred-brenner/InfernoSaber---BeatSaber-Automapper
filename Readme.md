@@ -1,7 +1,3 @@
-# Development branch for Mapper algorithm
-use main branch for a stable environment
-
-
 ## Flexible Automapper for Beatsaber made for any difficulty
     
     Automapper with fully adjustable difficulty (inpsired by star difficulty) ranging from easy maps (1) to Expert++ maps (10+)
