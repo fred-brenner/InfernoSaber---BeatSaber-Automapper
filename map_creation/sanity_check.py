@@ -288,7 +288,7 @@ def sanity_check_notes(notes: list, timings: list, pitch_algo: np.array, pitch_t
     notes_r, dot_idx_r = turn_notes_single(notes_r)
     notes_l, dot_idx_l = turn_notes_single(notes_l)
 
-    # emphasize some beats randomly
+    # emphasize some beats randomly     # TODO: redo with quantiles and at the end
     notes_l = emphasize_beats(notes_l, time_diffs)
     notes_r = emphasize_beats(notes_r, time_diffs)
 
