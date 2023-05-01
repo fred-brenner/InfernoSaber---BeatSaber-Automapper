@@ -6,7 +6,7 @@
 # Map creation model configuration
 """Do change"""
 max_speed = 4 * 8.0         # set around 5-40 (normal-expert++)
-add_beat_intensity = 120    # try to match bps by x% [80, 110]
+add_beat_intensity = 105    # try to match bps by x% [80, 110]
 expert_fact = 0.63          # expert plus to expert factor [0.6, 0.7]
 create_expert_flag = True   # create second expert map
 thresh_beat = 0.48          # minimum beat response required to trigger generator
@@ -29,6 +29,7 @@ map_filler_iters = 10       # max iterations for map filler
 add_dot_notes = 2           # add dot notes for fastest patterns [0, 10]
 add_breaks_flag = True      # add breaks after strong patterns
 silence_threshold = 0.2     # silence threshold [0.0, 0.3]
+add_silence_flag = True     # whether to apply silence threshold
 
 """Caution on changes"""
 jsb_offset = [0.21, 0.15]   # note jump speed offset for Expert, Expert+ (range [-0.5, 0.5])

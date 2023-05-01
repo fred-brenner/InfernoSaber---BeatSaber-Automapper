@@ -31,6 +31,9 @@ def main(name_ar: list) -> bool:
         print("Multi-core song generation currently not implemented!")
         exit()
 
+    if config.add_silence_flag:
+        config.add_beat_intensity += 15
+
     # load song data
     song_input, pitch_input = find_beats(name_ar, train_data=False)
 
@@ -48,8 +51,9 @@ def main(name_ar: list) -> bool:
         im = Image.fromarray(song_input[idx])
         im = im.resize((len(pitch_input[idx]), n_x))
         song_input[idx] = np.asarray(im)
-        # remember silent timings
-        silent_times.append(get_silent_times(pitch_input[idx], pitch_times[-1]))
+        if config.add_silence_flag:
+            # remember silent timings
+            silent_times.append(get_silent_times(pitch_input[idx], pitch_times[-1]))
         # # test song input
         # plt.imshow(song_input[idx])
         # plt.show()
@@ -120,8 +124,9 @@ def main(name_ar: list) -> bool:
         map_times = fill_map_times_scale(map_times, scale_idx)
         scale_idx += 1
     print(f"Map filler iterated {scale_idx}/{config.map_filler_iters} times.")
-    # remove silent parts
-    map_times = remove_silent_times(map_times, silent_times[0])
+    if config.add_silence_flag:
+        # remove silent parts
+        map_times = remove_silent_times(map_times, silent_times[0])
     # compensate for lstm cutoff
     map_times = add_lstm_prerun(map_times)
 
