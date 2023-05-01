@@ -6,15 +6,15 @@
 # Map creation model configuration
 """Do change"""
 max_speed = 4 * 8.0         # set around 5-40 (normal-expert++)
-add_beat_intensity = 105    # try to match bps by x% [80, 110]
+add_beat_intensity = 120    # try to match bps by x% [80, 110]
 expert_fact = 0.63          # expert plus to expert factor [0.6, 0.7]
 create_expert_flag = True   # create second expert map
 thresh_beat = 0.48          # minimum beat response required to trigger generator
 thresh_pitch = 1.10         # minimum beat for pitch check (0.8,low-1.5,high)
-threshold_end = 1.3         # factor for start and end threshold
+threshold_end = 1.2         # factor for start and end threshold
 random_note_map_factor = 0.3    # stick note map to random song/center (set to 0 to disable)
 random_note_map_change = 2      # change frequency for center (1-20)
-quick_start = 1.5           # map quick start mode (0 off, 1-3 on)
+quick_start = 1.9           # map quick start mode (0 off, 1-3 on)
 t_diff_bomb = 1.5           # minimum time between notes to add bomb
 t_diff_bomb_react = 0.3     # minimum time between finished added bombs
 allow_mismatch_flag = False     # if True, wrong turned notes won't be removed

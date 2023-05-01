@@ -991,7 +991,7 @@ def reverse_get_cut_dir(mov_x, mov_y):
 # Postprocessing
 ################
 def remove_silent_times(map_times, silent_times):
-    threshold_timing = 0.05
+    threshold_timing = 0.03
     for silent in silent_times:
         while min(abs(map_times - silent)) < threshold_timing:
             # remove this value
