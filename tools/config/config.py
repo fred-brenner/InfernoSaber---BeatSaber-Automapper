@@ -23,13 +23,14 @@ furious_lighting_flag = False   # increase frequency of light effects
 normalize_song_flag = True  # normalize song volume
 increase_volume_flag = True     # increase song volume (only used in combination with normalize flag)
 audio_rms_goal = 0.50
-allow_dot_notes = True     # if False, all notes must have a cut direction
+allow_dot_notes = True      # if False, all notes must have a cut direction
 jump_speed_offset = -0.4    # general offset for jump speed (range [-2, 2])
 map_filler_iters = 10       # max iterations for map filler
 add_dot_notes = 2           # add dot notes for fastest patterns [0, 10]
 add_breaks_flag = True      # add breaks after strong patterns
 silence_threshold = 0.2     # silence threshold [0.0, 0.3]
 add_silence_flag = True     # whether to apply silence threshold
+emphasize_beats_flag = True     # emphasize beats into double notes
 
 """Caution on changes"""
 jsb_offset = [0.21, 0.15]   # note jump speed offset for Expert, Expert+ (range [-0.5, 0.5])
@@ -49,7 +50,7 @@ beat_spacing = 5587/196     # 5587/196s = 28.5051 steps/s
 max_double_note_speed = 25  # set maximum speed difference between double notes (10-30)
 emphasize_beats_3 = 0.040   # fraction beats to triple
 emphasize_beats_3_fact = 0.001   # factor incl max_speed
-emphasize_beats_2 = 0.65    # fraction beats to double
+emphasize_beats_2 = 0.68    # fraction beats to double
 emphasize_beats_2_fact = 0.002   # factor incl max_speed
 emphasize_beats_quantile = 0.8
 shift_beats_fact = 0.30     # fraction beats to shift in cut direction

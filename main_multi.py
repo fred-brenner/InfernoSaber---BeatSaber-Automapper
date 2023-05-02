@@ -30,8 +30,16 @@ def stack_info_data(new_info_file: list, content: list, diff_str: str, diff_num:
 def main_multi(diff_list: list, export_results_to_bs=True):
     diff_list = np.sort(diff_list)
     diff_list *= 4
+    input("Cleaning output directory. Continue?")
+    exclude_list = ['cover.jpg', 'tmp']
+    for file in os.listdir(paths.new_map_path):
+        if file not in exclude_list:
+            if os.path.isfile(paths.new_map_path + file):
+                os.remove(paths.new_map_path + file)
+            else:
+                shutil.rmtree(paths.new_map_path + file)
 
-    print("Starting multi map generator. Make sure the output directory is clean.")
+    print("Starting multi map generator.")
     for diff in diff_list:
         print(f"Running difficulty: {diff/4:.1f}")
         # change difficulty
