@@ -6,7 +6,7 @@
 # Map creation model configuration
 """Do change"""
 max_speed = 4 * 8.0         # set around 5-40 (normal-expert++)
-add_beat_intensity = 105    # try to match bps by x% [80, 110]
+add_beat_intensity = 100    # try to match bps by x% [80, 110]
 expert_fact = 0.63          # expert plus to expert factor [0.6, 0.7]
 create_expert_flag = True   # create second expert map
 thresh_beat = 0.48          # minimum beat response required to trigger generator
@@ -47,11 +47,11 @@ min_beat_time = 1/16        # in seconds (first sanity check)
 beat_spacing = 5587/196     # 5587/196s = 28.5051 steps/s
 # favor_last_class = 0.15     # set factor to favor the next beat class (0.0-0.3)
 max_double_note_speed = 25  # set maximum speed difference between double notes (10-30)
-emphasize_beats_wait = 0.2  # minimum time in seconds
-emphasize_beats_3 = 0.010   # fraction beats to triple
-emphasize_beats_3_fact = 0.003   # factor incl max_speed
-emphasize_beats_2 = 0.35    # fraction beats to double
-emphasize_beats_2_fact = 0.008  # factor incl max_speed
+emphasize_beats_3 = 0.060   # fraction beats to triple
+emphasize_beats_3_fact = 0.001   # factor incl max_speed
+emphasize_beats_2 = 0.65    # fraction beats to double
+emphasize_beats_2_fact = 0.002   # factor incl max_speed
+emphasize_beats_quantile = 0.8
 shift_beats_fact = 0.30     # fraction beats to shift in cut direction
 add_beat_low_bound = 0.20   # in seconds (beat_generator)
 add_beat_hi_bound = 0.90    # in seconds (beat_generator)

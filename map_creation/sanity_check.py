@@ -129,7 +129,7 @@ def apply_dots(notes_single, dots_idx):
         elif len(notes_single[idx]) > 4:
             pass  # do not apply for multiple notes
         else:
-            pass  # note removed
+            pass  # note removed, no change needed
     return notes_single
 
 
@@ -207,6 +207,7 @@ def emphasize_beats(notes, timings):
     emphasize_beats_3 = config.emphasize_beats_3 + config.emphasize_beats_3_fact * config.max_speed
     emphasize_beats_2 = config.emphasize_beats_2 + config.emphasize_beats_2_fact * config.max_speed
     start_end_idx = 4
+    emphasize_beats_wait = np.quantile(timings, config.emphasize_beats_quantile) + 0.02
 
     def calc_new_note(note, new_pos):
         new_note = note * len(new_pos)
@@ -219,7 +220,7 @@ def emphasize_beats(notes, timings):
         return notes
 
     for n in range(start_end_idx, len(notes)):
-        if timings[n:n + 1].max() >= config.emphasize_beats_wait:
+        if timings[n:n + 1].max() >= emphasize_beats_wait:
             note = notes[n]
             if len(note) > 0:
                 rd = np.random.random()
@@ -280,13 +281,18 @@ def sanity_check_notes(notes: list, timings: list, pitch_algo: np.array, pitch_t
     # shift notes away from the middle
     notes_r, notes_l, notes_b = shift_blocks_middle(notes_r, notes_l, notes_b)
 
-    # # TODO: add bombs for long pause to focus on next note direction
+    # # (TODO: add bombs for long pause to focus on next note direction)
     # notes_b, timings_b = add_pause_bombs(notes_r, notes_l, notes_b, timings, pitch_algo, pitch_times)
-    # TODO: remove blocking bombs
+    # (TODO: remove blocking bombs)
 
     # turn notes leading into correct direction
     notes_r, dot_idx_r = turn_notes_single(notes_r)
     notes_l, dot_idx_l = turn_notes_single(notes_l)
+
+    if config.add_breaks_flag:
+        # from tools.utils.load_and_save import save_pkl
+        notes_l = add_breaks(notes_l, timings)
+        notes_r = add_breaks(notes_r, timings)
 
     # emphasize some beats randomly     # TODO: redo with quantiles and at the end
     notes_l = emphasize_beats(notes_l, time_diffs)
@@ -298,11 +304,6 @@ def sanity_check_notes(notes: list, timings: list, pitch_algo: np.array, pitch_t
         if config.add_dot_notes > 0:
             notes_l = add_dots(notes_l, time_diffs.copy())
             notes_r = add_dots(notes_r, time_diffs.copy())
-
-    if config.add_breaks_flag:
-        # from tools.utils.load_and_save import save_pkl
-        notes_l = add_breaks(notes_l, timings)
-        notes_r = add_breaks(notes_r, timings)
 
     # rebuild notes
     new_notes = unpslit_notes(notes_r, notes_l, notes_b)
@@ -547,7 +548,7 @@ def add_pause_bombs(notes_r, notes_l, notes_b, timings, pitch_algo, pitch_times)
     for idx, t_diff in enumerate(time_diff_r):
         if idx == 0:
             continue
-        # TODO: not finished
+        # (TODO: not finished)
         if t_diff > config.t_diff_bomb:
             # add bombs
             cur_notes = notes_r[idx]
@@ -738,7 +739,7 @@ def turn_notes_single(notes_single):
                     else:
                         notes[3] = reverse_get_cut_dir(cd_new_x, cd_old_y)
             else:
-                pass  # ignore multi notes    #TODO: this
+                pass  # ignore multi notes    # (TODO: change multi notes)
             # update notes_single
             notes_single[idx][3] = notes[3]
 

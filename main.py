@@ -23,7 +23,7 @@ def main(diff: float, export_results_to_bs=True, quick_start=None,
     if quick_start is not None:
         config.quick_start = quick_start
     if beat_intensity is not None:
-        config.add_beat_intensity = beat_intensity + 10     # add 10% on top
+        config.add_beat_intensity = beat_intensity  # + 8     # add 10% on top for add_breaks
     if random_factor is not None:
         config.random_note_map_factor = random_factor
     if js_offset is not None:
