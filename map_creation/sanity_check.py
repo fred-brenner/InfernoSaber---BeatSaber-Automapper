@@ -207,7 +207,7 @@ def emphasize_beats(notes, timings, notes_second):
     emphasize_beats_3 = config.emphasize_beats_3 + config.emphasize_beats_3_fact * config.max_speed
     emphasize_beats_2 = config.emphasize_beats_2 + config.emphasize_beats_2_fact * config.max_speed
     start_end_idx = 4
-    emphasize_beats_wait = np.quantile(timings, config.emphasize_beats_quantile) + 0.02
+    emphasize_beats_wait = np.quantile(timings, config.emphasize_beats_quantile) + 0.03
 
     def calc_new_note(note, new_pos):
         new_note = note * len(new_pos)
