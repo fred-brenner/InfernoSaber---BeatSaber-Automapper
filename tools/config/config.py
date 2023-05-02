@@ -47,7 +47,7 @@ min_beat_time = 1/16        # in seconds (first sanity check)
 beat_spacing = 5587/196     # 5587/196s = 28.5051 steps/s
 # favor_last_class = 0.15     # set factor to favor the next beat class (0.0-0.3)
 max_double_note_speed = 25  # set maximum speed difference between double notes (10-30)
-emphasize_beats_3 = 0.060   # fraction beats to triple
+emphasize_beats_3 = 0.040   # fraction beats to triple
 emphasize_beats_3_fact = 0.001   # factor incl max_speed
 emphasize_beats_2 = 0.65    # fraction beats to double
 emphasize_beats_2_fact = 0.002   # factor incl max_speed
