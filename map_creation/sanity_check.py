@@ -203,7 +203,7 @@ def add_breaks(notes_single, timings):
     return notes_single
 
 
-def emphasize_beats(notes, timings):
+def emphasize_beats(notes, timings, notes_second):
     emphasize_beats_3 = config.emphasize_beats_3 + config.emphasize_beats_3_fact * config.max_speed
     emphasize_beats_2 = config.emphasize_beats_2 + config.emphasize_beats_2_fact * config.max_speed
     start_end_idx = 4
@@ -215,8 +215,27 @@ def emphasize_beats(notes, timings):
             new_note[i * 4:i * 4 + 2] = new_pos[i]
         return new_note
 
-    def update_new_note(notes, n, new_note):
-        notes[n] = new_note
+    def update_new_note(notes, n, new_note, notes_second):
+        if len(new_note) > 4:
+            # get note positions on both sides
+            notes_second_pos = []
+            for i in range(0, len(notes_second[n]), 4):
+                notes_second_pos.append(notes_second[n][i+0:i+2])
+            if len(notes_second_pos) > 0:
+                # only check if other side has notes too
+                notes_pos = []
+                for i in range(0, len(new_note), 4):
+                    notes_pos.append(new_note[i+0:i+2])
+                # sanity check for overlapping notes
+                for new_pos_i in range(len(notes_pos)-1, -1, -1):
+                    if notes_pos[new_pos_i] in notes_second_pos:
+                        # remove particular note
+                        new_note.pop(new_pos_i*4)
+                        new_note.pop(new_pos_i*4)
+                        new_note.pop(new_pos_i*4)
+                        new_note.pop(new_pos_i*4)
+
+            notes[n] = new_note
         return notes
 
     for n in range(start_end_idx, len(notes)):
@@ -230,7 +249,7 @@ def emphasize_beats(notes, timings):
                     if len(new_pos) < 3:
                         new_pos = calc_note_pos(new_note)[:3]
                         new_note = calc_new_note(note, new_pos)
-                    update_new_note(notes, n, new_note)
+                    notes = update_new_note(notes, n, new_note, notes_second)
                 elif rd > 1 - emphasize_beats_3 - emphasize_beats_2:
                     new_pos = calc_note_pos(note)[:2]
                     for ip in range(len(new_pos) - 1, 0, -1):
@@ -241,7 +260,7 @@ def emphasize_beats(notes, timings):
                         if new_pos[0] in [[1, 1], [2, 1]]:
                             new_pos.pop(0)
                     new_note = calc_new_note(note, new_pos)
-                    update_new_note(notes, n, new_note)
+                    notes = update_new_note(notes, n, new_note, notes_second)
 
     return notes
 
@@ -295,8 +314,8 @@ def sanity_check_notes(notes: list, timings: list, pitch_algo: np.array, pitch_t
         notes_r = add_breaks(notes_r, timings)
 
     # emphasize some beats randomly
-    notes_l = emphasize_beats(notes_l, time_diffs)
-    notes_r = emphasize_beats(notes_r, time_diffs)
+    notes_l = emphasize_beats(notes_l, time_diffs, notes_r)
+    notes_r = emphasize_beats(notes_r, time_diffs, notes_l)
 
     if config.allow_dot_notes:
         notes_l = apply_dots(notes_l, dot_idx_l)
