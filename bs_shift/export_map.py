@@ -40,6 +40,8 @@ def check_music_files(files, dir_path):
     for idx, song_name in enumerate(song_list):
         new_name = song_name.replace(' &', ',')
         new_name = new_name.replace('&', ',')
+        while new_name[:-4].endswith(' '):
+            new_name = f"{new_name[:-5]}.egg"
         if new_name != song_name:
             shutil.move(dir_path + song_name, dir_path + new_name)
             song_list[idx] = new_name
