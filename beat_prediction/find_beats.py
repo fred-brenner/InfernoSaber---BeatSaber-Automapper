@@ -55,6 +55,12 @@ def find_beats(name_ar, train_data=True):
     return song_ar, pitch_times_ar
 
 
+def get_silent_times(pitch_list, timings):
+    threshold = np.quantile(pitch_list, config.silence_threshold)
+    silent_list = np.asarray(timings)[np.asarray(pitch_list) < threshold]
+    return silent_list
+
+
 def get_pitch_times(pitch_list, pitch_thresh=-123):
     # plt.figure()
     # plt.plot(pitch_list)

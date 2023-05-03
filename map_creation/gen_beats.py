@@ -2,7 +2,7 @@ import numpy as np
 from PIL import Image
 # from line_profiler_pycharm import profile
 
-from beat_prediction.find_beats import find_beats, get_pitch_times
+from beat_prediction.find_beats import find_beats, get_pitch_times, get_silent_times
 from beat_prediction.beat_to_lstm import beat_to_lstm
 from beat_prediction.beat_prop import get_beat_prop, tcn_reshape
 
@@ -31,14 +31,21 @@ def main(name_ar: list) -> bool:
         print("Multi-core song generation currently not implemented!")
         exit()
 
+    if config.add_silence_flag:
+        config.add_beat_intensity += 10
+        config.silence_threshold *= (1 - 0.5 * (config.max_speed_orig / 40))
+    if config.emphasize_beats_flag:
+        config.add_beat_intensity -= 10
+
     # load song data
-    song_input, pitch_input = find_beats(name_ar, train_data=False)     # 0.9
+    song_input, pitch_input = find_beats(name_ar, train_data=False)
 
     ################
     # beat generator
     ################
 
     # calculate discrete timings
+    silent_times = []
     pitch_times = []
     n_x = song_input[0].shape[0]
     for idx in range(len(pitch_input)):
@@ -47,6 +54,9 @@ def main(name_ar: list) -> bool:
         im = Image.fromarray(song_input[idx])
         im = im.resize((len(pitch_input[idx]), n_x))
         song_input[idx] = np.asarray(im)
+        if config.add_silence_flag:
+            # remember silent timings
+            silent_times.append(get_silent_times(pitch_input[idx], pitch_times[-1]))
         # # test song input
         # plt.imshow(song_input[idx])
         # plt.show()
@@ -117,6 +127,10 @@ def main(name_ar: list) -> bool:
         map_times = fill_map_times_scale(map_times, scale_idx)
         scale_idx += 1
     print(f"Map filler iterated {scale_idx}/{config.map_filler_iters} times.")
+    if config.add_silence_flag:
+        # remove silent parts
+        map_times = remove_silent_times(map_times, silent_times[0])
+    # compensate for lstm cutoff
     map_times = add_lstm_prerun(map_times)
 
     # calculate time between beats

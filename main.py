@@ -15,7 +15,7 @@ import tensorflow as tf
 
 def main(diff: float, export_results_to_bs=True, quick_start=None,
          beat_intensity=None, random_factor=None, js_offset=None,
-         flow_model_flag=None, allow_no_dir_flag=None):
+         allow_no_dir_flag=None):
     # change difficulty
     if diff is not None:
         config.max_speed = diff
@@ -23,13 +23,11 @@ def main(diff: float, export_results_to_bs=True, quick_start=None,
     if quick_start is not None:
         config.quick_start = quick_start
     if beat_intensity is not None:
-        config.add_beat_intensity = beat_intensity + 10     # add 10% on top
+        config.add_beat_intensity = beat_intensity  # + 10     # add 10% on top for add_breaks
     if random_factor is not None:
         config.random_note_map_factor = random_factor
     if js_offset is not None:
         config.jump_speed_offset += js_offset
-    if flow_model_flag is not None:
-        config.flow_model_flag = flow_model_flag
     if allow_no_dir_flag is not None:
         config.allow_dot_notes = allow_no_dir_flag
 
@@ -58,13 +56,12 @@ def main(diff: float, export_results_to_bs=True, quick_start=None,
         end_time = time.time()
         print(f"Time needed: {end_time - start_time}s")
 
-        # TODO: Error if song ends with empty string before .egg?
         # create zip archive for online viewer
-        shutil.make_archive(f'{paths.new_map_path}{config.max_speed}_{song_name}',
-                            'zip', f'{paths.new_map_path}1234_{song_name}')
+        shutil.make_archive(f'{paths.new_map_path}{config.max_speed_orig}_{song_name}',
+                            'zip', f'{paths.new_map_path}1234_{config.max_speed_orig}_{song_name}')
         # export map to beat saber
         if export_results_to_bs:
-            shutil_copy_maps(song_name)
+            shutil_copy_maps(f"{config.max_speed_orig}_{song_name}")
 
     print("Finished map generator")
 
@@ -113,14 +110,6 @@ if __name__ == "__main__":
         jso = float(jso)
         print(f"Set jump speed offset to {jso}")
 
-    fmf = os.environ.get('flow_model_flag')
-    if fmf is not None:
-        if fmf == 'True':
-            fmf = True
-        else:
-            fmf = False
-        print(f"Set flow_model_flag to {fmf}")
-
     ndf = os.environ.get('allow_no_direction_flag')
     if ndf is not None:
         if ndf == 'True':
@@ -130,7 +119,7 @@ if __name__ == "__main__":
         print(f"Set allow_no_direction_flag to {ndf}")
 
     export_results_to_bs = True
-    main(diff, export_results_to_bs, qs, bi, rf, jso, fmf, ndf)
+    main(diff, export_results_to_bs, qs, bi, rf, jso, ndf)
 
     # main(2*4, False)
     # main(10 * 4, False)

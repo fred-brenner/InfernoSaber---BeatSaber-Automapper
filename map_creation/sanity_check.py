@@ -129,7 +129,7 @@ def apply_dots(notes_single, dots_idx):
         elif len(notes_single[idx]) > 4:
             pass  # do not apply for multiple notes
         else:
-            pass  # note removed
+            pass  # note removed, no change needed
     return notes_single
 
 
@@ -203,10 +203,11 @@ def add_breaks(notes_single, timings):
     return notes_single
 
 
-def emphasize_beats(notes, timings):
+def emphasize_beats(notes, timings, notes_second):
     emphasize_beats_3 = config.emphasize_beats_3 + config.emphasize_beats_3_fact * config.max_speed
     emphasize_beats_2 = config.emphasize_beats_2 + config.emphasize_beats_2_fact * config.max_speed
     start_end_idx = 4
+    emphasize_beats_wait = np.quantile(timings, config.emphasize_beats_quantile) + 0.03
 
     def calc_new_note(note, new_pos):
         new_note = note * len(new_pos)
@@ -214,12 +215,31 @@ def emphasize_beats(notes, timings):
             new_note[i * 4:i * 4 + 2] = new_pos[i]
         return new_note
 
-    def update_new_note(notes, n, new_note):
-        notes[n] = new_note
+    def update_new_note(notes, n, new_note, notes_second):
+        if len(new_note) > 4:
+            # get note positions on both sides
+            notes_second_pos = []
+            for i in range(0, len(notes_second[n]), 4):
+                notes_second_pos.append(notes_second[n][i+0:i+2])
+            if len(notes_second_pos) > 0:
+                # only check if other side has notes too
+                notes_pos = []
+                for i in range(0, len(new_note), 4):
+                    notes_pos.append(new_note[i+0:i+2])
+                # sanity check for overlapping notes
+                for new_pos_i in range(len(notes_pos)-1, -1, -1):
+                    if notes_pos[new_pos_i] in notes_second_pos:
+                        # remove particular note
+                        new_note.pop(new_pos_i*4)
+                        new_note.pop(new_pos_i*4)
+                        new_note.pop(new_pos_i*4)
+                        new_note.pop(new_pos_i*4)
+
+            notes[n] = new_note
         return notes
 
     for n in range(start_end_idx, len(notes)):
-        if timings[n:n + 1].max() >= config.emphasize_beats_wait:
+        if timings[n:n + 1].max() >= emphasize_beats_wait:
             note = notes[n]
             if len(note) > 0:
                 rd = np.random.random()
@@ -229,7 +249,7 @@ def emphasize_beats(notes, timings):
                     if len(new_pos) < 3:
                         new_pos = calc_note_pos(new_note)[:3]
                         new_note = calc_new_note(note, new_pos)
-                    update_new_note(notes, n, new_note)
+                    notes = update_new_note(notes, n, new_note, notes_second)
                 elif rd > 1 - emphasize_beats_3 - emphasize_beats_2:
                     new_pos = calc_note_pos(note)[:2]
                     for ip in range(len(new_pos) - 1, 0, -1):
@@ -240,7 +260,7 @@ def emphasize_beats(notes, timings):
                         if new_pos[0] in [[1, 1], [2, 1]]:
                             new_pos.pop(0)
                     new_note = calc_new_note(note, new_pos)
-                    update_new_note(notes, n, new_note)
+                    notes = update_new_note(notes, n, new_note, notes_second)
 
     return notes
 
@@ -280,17 +300,22 @@ def sanity_check_notes(notes: list, timings: list, pitch_algo: np.array, pitch_t
     # shift notes away from the middle
     notes_r, notes_l, notes_b = shift_blocks_middle(notes_r, notes_l, notes_b)
 
-    # # TODO: add bombs for long pause to focus on next note direction
+    # # (TODO: add bombs for long pause to focus on next note direction)
     # notes_b, timings_b = add_pause_bombs(notes_r, notes_l, notes_b, timings, pitch_algo, pitch_times)
-    # TODO: remove blocking bombs
+    # (TODO: remove blocking bombs)
 
     # turn notes leading into correct direction
     notes_r, dot_idx_r = turn_notes_single(notes_r)
     notes_l, dot_idx_l = turn_notes_single(notes_l)
 
+    if config.add_breaks_flag:
+        # from tools.utils.load_and_save import save_pkl
+        notes_l = add_breaks(notes_l, timings)
+        notes_r = add_breaks(notes_r, timings)
+
     # emphasize some beats randomly
-    notes_l = emphasize_beats(notes_l, time_diffs)
-    notes_r = emphasize_beats(notes_r, time_diffs)
+    notes_l = emphasize_beats(notes_l, time_diffs, notes_r)
+    notes_r = emphasize_beats(notes_r, time_diffs, notes_l)
 
     if config.allow_dot_notes:
         notes_l = apply_dots(notes_l, dot_idx_l)
@@ -298,11 +323,6 @@ def sanity_check_notes(notes: list, timings: list, pitch_algo: np.array, pitch_t
         if config.add_dot_notes > 0:
             notes_l = add_dots(notes_l, time_diffs.copy())
             notes_r = add_dots(notes_r, time_diffs.copy())
-
-    if config.add_breaks_flag:
-        # from tools.utils.load_and_save import save_pkl
-        notes_l = add_breaks(notes_l, timings)
-        notes_r = add_breaks(notes_r, timings)
 
     # rebuild notes
     new_notes = unpslit_notes(notes_r, notes_l, notes_b)
@@ -547,7 +567,7 @@ def add_pause_bombs(notes_r, notes_l, notes_b, timings, pitch_algo, pitch_times)
     for idx, t_diff in enumerate(time_diff_r):
         if idx == 0:
             continue
-        # TODO: not finished
+        # (TODO: not finished)
         if t_diff > config.t_diff_bomb:
             # add bombs
             cur_notes = notes_r[idx]
@@ -738,7 +758,7 @@ def turn_notes_single(notes_single):
                     else:
                         notes[3] = reverse_get_cut_dir(cd_new_x, cd_old_y)
             else:
-                pass  # ignore multi notes    #TODO: this
+                pass  # ignore multi notes    # (TODO: change multi notes)
             # update notes_single
             notes_single[idx][3] = notes[3]
 
@@ -990,6 +1010,16 @@ def reverse_get_cut_dir(mov_x, mov_y):
 ################
 # Postprocessing
 ################
+def remove_silent_times(map_times, silent_times):
+    threshold_timing = 0.03
+    for silent in silent_times:
+        while min(abs(map_times - silent)) < threshold_timing:
+            # remove this value
+            index = np.argmin(abs(map_times - silent))
+            map_times = np.delete(map_times, index)
+    return map_times
+
+
 def fill_map_times(map_times):
     se_thresh = int(len(map_times) / 22)  # don't apply filling for first and last 4% of song
     diff = np.diff(map_times)
