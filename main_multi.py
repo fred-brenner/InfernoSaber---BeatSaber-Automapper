@@ -3,6 +3,7 @@ import shutil
 import time
 import sys
 import numpy as np
+import json
 
 from tools.config import paths, config
 import map_creation.gen_beats as beat_generator
@@ -132,4 +133,13 @@ def main_multi(diff_list: list, export_results_to_bs=True):
 
 
 if __name__ == "__main__":
-    main_multi([5, 6, 7, 8, 10], False)
+    diff_list = os.environ.get('diff_list')
+    if diff_list is None:
+        diff_list = [2, 4, 6, 8, 10]
+    else:
+        diff_list = json.loads(diff_list)
+    if len(diff_list) != 5:
+        print(f"Error: Did not get 5 difficulties: {diff_list}")
+    print(f"Using difficulties: {diff_list}")
+    main_multi(diff_list, False)
+
