@@ -128,7 +128,7 @@ def main_multi(diff_list: list, export_results_to_bs=True):
                 # export map to beat saber
                 if export_results_to_bs:
                     shutil_copy_maps(song_name, index="12345_")
-                    print("Successfully exported full difficulty maps to BS")
+                    # print("Successfully exported full difficulty maps to BS")
 
     print("Finished multi-map generator")
 
