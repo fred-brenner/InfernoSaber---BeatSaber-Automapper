@@ -78,10 +78,10 @@ def main(name_ar: list) -> bool:
 
     # load pretrained generator model
     model_path = paths.model_path + config.beat_gen_version
-    beat_model = load_model(model_path, custom_objects={'TCN': TCN})    # 2.9
+    beat_model = load_model(model_path, custom_objects={'TCN': TCN})
 
     # apply beat generator
-    y_beat = beat_model.predict(x_input, verbose=0)    # 12
+    y_beat = beat_model.predict(x_input, verbose=0)
 
     y_beat[y_beat > config.thresh_beat] = 1
     y_beat[y_beat <= config.thresh_beat] = 0
@@ -148,8 +148,8 @@ def main(name_ar: list) -> bool:
 
     # Load pretrained encoder model
     model_path = paths.model_path + config.enc_version
-    enc_model = load_model(model_path)      # 0.4
-    in_song_l = enc_model.predict(song_ar[0], verbose=0)       # 0.8
+    enc_model = load_model(model_path)
+    in_song_l = enc_model.predict(song_ar[0], verbose=0)
 
     y_class_map = generate(in_song_l, map_times, config.mapper_version, config.lstm_len,
                            paths.beats_classify_encoder_file)       # 45.2

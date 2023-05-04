@@ -99,6 +99,7 @@ def generate(l_in_song, time_ar, save_model_name, lstm_len, encoder_file):
 
         y_class, rd_distribution, rd_counter = apply_random_mapper(y_class, rd_distribution, rd_counter)
 
+        # TODO: add favor_bombs flag
         # find class winner
         y_arg_max = np.argmax(y_class, axis=2)[0]
         for imax in range(len(y_arg_max)):
