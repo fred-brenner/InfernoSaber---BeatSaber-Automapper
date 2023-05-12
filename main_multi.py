@@ -86,7 +86,7 @@ def main_multi(diff_list: list, export_results_to_bs=True):
             song_name = folder_name[split_index:]
             if song_name not in folders_check:
                 folders_check.append(song_name)
-                overall_folder = paths.new_map_path + song_name
+                overall_folder = f"{paths.new_map_path}12345_{song_name}"
                 # create new folder
                 os.makedirs(overall_folder, exist_ok=True)
                 # copy redundant data
@@ -123,11 +123,12 @@ def main_multi(diff_list: list, export_results_to_bs=True):
                 with open(f"{overall_folder}/info.dat", 'w') as fp:
                     fp.writelines(new_info_file)
                 # create zip archive for online viewer
-                shutil.make_archive(f'{paths.new_map_path}{song_name}',
-                                    'zip', f'{paths.new_map_path}{song_name}')
+                shutil.make_archive(f'{paths.new_map_path}12345_{song_name}',
+                                    'zip', f'{paths.new_map_path}12345_{song_name}')
                 # export map to beat saber
-                # if export_results_to_bs:
-                # shutil_copy_maps(song_name)
+                if export_results_to_bs:
+                    shutil_copy_maps(song_name, index="12345_")
+                    # print("Successfully exported full difficulty maps to BS")
 
     print("Finished multi-map generator")
 
@@ -135,11 +136,11 @@ def main_multi(diff_list: list, export_results_to_bs=True):
 if __name__ == "__main__":
     diff_list = os.environ.get('diff_list')
     if diff_list is None:
-        diff_list = [2, 4, 6, 8, 10]
+        diff_list = [3, 5, 6.2, 7.2, 8.2]
     else:
         diff_list = json.loads(diff_list)
     if len(diff_list) != 5:
         print(f"Error: Did not get 5 difficulties: {diff_list}")
     print(f"Using difficulties: {diff_list}")
-    main_multi(diff_list, False)
+    main_multi(diff_list, True)
 

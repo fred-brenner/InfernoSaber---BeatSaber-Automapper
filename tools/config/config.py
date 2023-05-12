@@ -74,8 +74,6 @@ specgram_res = 24           # y resolution of the spectrogram (frequency subdivi
 min_bps_limit = 7           # minimum beats_per_second value for training
 max_bps_limit = 10          # maximum beats_per_second value for training
 
-ram_limit = 20              # free ram roughly in GB
-
 # Model versions
 enc_version = 'tf_model_enc_16bneck_12_8__16_48.h5'
 autoenc_version = 'tf_model_autoenc_16bneck_12_8__16_48.h5'

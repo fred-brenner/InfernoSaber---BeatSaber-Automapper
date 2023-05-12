@@ -99,6 +99,7 @@ def generate(l_in_song, time_ar, save_model_name, lstm_len, encoder_file):
 
         y_class, rd_distribution, rd_counter = apply_random_mapper(y_class, rd_distribution, rd_counter)
 
+        # TODO: add favor_bombs flag
         # find class winner
         y_arg_max = np.argmax(y_class, axis=2)[0]
         for imax in range(len(y_arg_max)):
@@ -109,10 +110,11 @@ def generate(l_in_song, time_ar, save_model_name, lstm_len, encoder_file):
     y_class_num = decode_onehot_class(y_class_map, encoder_file)
     if encoder_file == paths.events_classify_encoder_file:
         y_class_num = decode_class_string(y_class_num)
-        print("Finished lighting generator")
+        # print("Finished lighting generator")
     # events_out = np.concatenate((time_ar[config.event_lstm_len+1:].reshape(-1, 1), y_class_num), axis=1)
     else:
-        print("Finished mapping generator")
+        # print("Finished mapping generator")
+        pass
     return y_class_num
 
 
