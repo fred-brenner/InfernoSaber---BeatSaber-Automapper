@@ -28,7 +28,7 @@ jump_speed_offset = -0.4    # general offset for jump speed (range [-2, 2])
 map_filler_iters = 10       # max iterations for map filler
 add_dot_notes = 2           # add dot notes for fastest patterns [0, 10]
 add_breaks_flag = True      # add breaks after strong patterns
-silence_threshold = 0.2     # silence threshold [0.0, 0.3]
+silence_threshold = 0.25     # silence threshold [0.0, 0.4]
 add_silence_flag = True     # whether to apply silence threshold
 emphasize_beats_flag = True     # emphasize beats into double notes
 
