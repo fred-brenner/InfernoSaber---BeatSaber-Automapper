@@ -104,7 +104,7 @@ def notes_to_json(notes, timings):
     for idx in range(len(notes)):
         for n in range(int(len(notes[idx])/4)):
             note_json += '{'
-            note_json += f'"_time":{timings[idx]},' \
+            note_json += f'"_time":{timings[idx]:.6f},' \
                          f'"_lineIndex":{int(notes[idx][0 + 4*n])},' \
                          f'"_lineLayer":{int(notes[idx][1 + 4*n])},' \
                          f'"_type":{int(notes[idx][2 + 4*n])},' \
@@ -132,7 +132,7 @@ def events_to_json(notes, timings):
     note_json = ""
     for idx in range(len(notes)):
         note_json += '{'
-        note_json += f'"_time":{timings[idx]},' \
+        note_json += f'"_time":{timings[idx]:.5f},' \
                      f'"_type":{int(notes[idx][0])},' \
                      f'"_value":{int(notes[idx][1])}'
         note_json += '},'
@@ -151,11 +151,11 @@ def obstacles_to_json(obstacles):
         note_json += f'"_time":{obstacles[idx][0]:4f},' \
                      f'"_lineIndex":{int(obstacles[idx][1])},' \
                      f'"_type":{int(obstacles[idx][2])},' \
-                     f'"_duration":{(obstacles[idx][3]):.2f},' \
-                     f'"_width":{int(obstacles[idx][4])}'
+                     f'"_duration":{obstacles[idx][3]:.2f},' \
+                     f'"_width":{obstacles[idx][4]:.2f}'
         note_json += '},'
-        #_obstacles":[{"_time":64.39733123779297,"_lineIndex":0,"_type":0,"_duration":6.5,"_width":1}
-
+        # _obstacles":[{"_time":64.39733123779297,"_lineIndex":0,
+        #               "_type":0,"_duration":6.5,"_width":1}
 
     # remove last comma
     note_json = note_json[:-1]

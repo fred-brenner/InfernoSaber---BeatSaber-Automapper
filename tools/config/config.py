@@ -39,7 +39,7 @@ obstacle_max_count = 2      # maximum appearance count for obstacles
 
 """Caution on changes"""
 obstacle_allowed_types = [0, 1]
-obstacle_width = 1
+obstacle_width = 0.5
 check_silence_flag = True   # check for extremely silent songs
 check_silence_value = -14.0  # value in dB [-13 to -15]
 jsb_offset = [0.21, 0.15]   # note jump speed offset for Expert, Expert+ (range [-0.5, 0.5])
