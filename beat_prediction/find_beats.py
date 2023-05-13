@@ -55,9 +55,14 @@ def find_beats(name_ar, train_data=True):
     return song_ar, pitch_times_ar
 
 
-def get_silent_times(pitch_list, timings):
+def get_silent_times(song_input, timings):
+    pitch_list = song_input.max(axis=0) + 0.2 * song_input.mean(axis=0)
     threshold = np.quantile(pitch_list, config.silence_threshold)
-    silent_list = np.asarray(timings)[np.asarray(pitch_list) < threshold]
+    if config.check_silence_flag:
+        threshold = np.max([threshold, config.check_silence_value])
+    threshold += config.silence_thresh_hard
+    print(f"Silent threshold: {threshold}")
+    silent_list = np.asarray(timings)[pitch_list <= threshold]
     return silent_list
 
 

@@ -16,6 +16,7 @@ import tensorflow as tf
 def main(diff: float, export_results_to_bs=True, quick_start=None,
          beat_intensity=None, random_factor=None, js_offset=None,
          allow_no_dir_flag=None, silence_factor=None):
+
     # change difficulty
     if diff is not None:
         config.max_speed = diff
