@@ -33,7 +33,6 @@ def create_map(y_class_num, timings, events, name, bpm, pitch_algo, pitch_times)
         # run all beat and note sanity checks
         notes = sanity_check_notes(notes, timings, pitch_algo, pitch_times)
 
-        # TODO: add obstacles here
         obstacles = calculate_obstacles(notes, timings)
 
         # compensate bps

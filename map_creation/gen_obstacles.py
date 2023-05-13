@@ -40,6 +40,7 @@ def check_obstacle_times(first_time, last_time):
 
 
 def calculate_obstacles(notes, timings):
+    # TODO: improve obstacles
 
     obstacles = []
     rows_last = [1, 1, 1, 1]
