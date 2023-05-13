@@ -2,7 +2,9 @@
     
     Automapper with fully adjustable difficulty (inpsired by star difficulty) ranging from easy maps (1) to Expert++ maps (10+)
 
-    New: Generate BeatSaber maps using AI with the convenience of Google Drive storage.
+    New: Get maps from the discord bot (if online): https://discord.gg/cdV6HhpufY
+
+    Recommendation: Generate BeatSaber maps using AI with the convenience of Google Drive storage.
     Use the Google Colab template included in the repository without the need of hardware.
     
     Alternative: Install the project locally with anaconda (not recommended)
