@@ -99,10 +99,10 @@ def notes_to_json(notes, timings):
         for n in range(int(len(notes[idx])/4)):
             note_json += '{'
             note_json += f'"_time":{timings[idx]},' \
-                         f'"_lineIndex":{notes[idx][0 + 4*n]},' \
-                         f'"_lineLayer":{notes[idx][1 + 4*n]},' \
-                         f'"_type":{notes[idx][2 + 4*n]},' \
-                         f'"_cutDirection":{notes[idx][3 + 4*n]}'
+                         f'"_lineIndex":{int(notes[idx][0 + 4*n])},' \
+                         f'"_lineLayer":{int(notes[idx][1 + 4*n])},' \
+                         f'"_type":{int(notes[idx][2 + 4*n])},' \
+                         f'"_cutDirection":{int(notes[idx][3 + 4*n])}'
             note_json += '},'
 
             # "_notes":[{"_time":4.116666793823242,
@@ -127,10 +127,10 @@ def events_to_json(notes, timings):
     for idx in range(len(notes)):
         note_json += '{'
         note_json += f'"_time":{timings[idx]},' \
-                     f'"_type":{notes[idx][0]},' \
-                     f'"_value":{notes[idx][1]}'
+                     f'"_type":{int(notes[idx][0])},' \
+                     f'"_value":{int(notes[idx][1])}'
         note_json += '},'
-        # "_events":[{"_time":4,"_type":3,"_value":1},
+        # "_events":[{"_time":4.1,"_type":3,"_value":1},
 
     # remove last comma
     note_json = note_json[:-1]
