@@ -6,6 +6,7 @@ import os
 import shutil
 
 from map_creation.sanity_check import sanity_check_notes
+from map_creation.gen_obstacles import calculate_obstacles
 from tools.config import config, paths
 
 
@@ -31,6 +32,10 @@ def create_map(y_class_num, timings, events, name, bpm, pitch_algo, pitch_times)
 
         # run all beat and note sanity checks
         notes = sanity_check_notes(notes, timings, pitch_algo, pitch_times)
+
+        # TODO: add obstacles here
+        obstacles = calculate_obstacles(notes, timings)
+
         # compensate bps
         timings = timings * bpm / 60
         assert(len(timings) == len(notes))
@@ -44,7 +49,9 @@ def create_map(y_class_num, timings, events, name, bpm, pitch_algo, pitch_times)
         file = f'{new_map_folder}{bs_diff}.dat'
         events_json = events_to_json(events, timings)
         notes_json = notes_to_json(notes, timings)
-        complete_map = get_map_string(notes=notes_json, events=events_json)
+        obstacles_json = obstacles_to_json(obstacles)
+        complete_map = get_map_string(notes=notes_json, events=events_json,
+                                      obstacles=obstacles_json)
         with open(file, 'w') as f:
             f.write(complete_map)
 
@@ -131,6 +138,25 @@ def events_to_json(notes, timings):
                      f'"_value":{int(notes[idx][1])}'
         note_json += '},'
         # "_events":[{"_time":4.1,"_type":3,"_value":1},
+
+    # remove last comma
+    note_json = note_json[:-1]
+
+    return note_json
+
+
+def obstacles_to_json(obstacles):
+    note_json = ""
+    for idx in range(len(obstacles)):
+        note_json += '{'
+        note_json += f'"_time":{obstacles[idx][0]:4f},' \
+                     f'"_lineIndex":{int(obstacles[idx][1])},' \
+                     f'"_type":{int(obstacles[idx][2])},' \
+                     f'"_duration":{(obstacles[idx][3]):.2f},' \
+                     f'"_width":{int(obstacles[idx][4])}'
+        note_json += '},'
+        #_obstacles":[{"_time":64.39733123779297,"_lineIndex":0,"_type":0,"_duration":6.5,"_width":1}
+
 
     # remove last comma
     note_json = note_json[:-1]
