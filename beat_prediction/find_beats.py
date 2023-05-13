@@ -61,7 +61,7 @@ def get_silent_times(song_input, timings):
     if config.check_silence_flag:
         threshold = np.max([threshold, config.check_silence_value])
     threshold += config.silence_thresh_hard
-    print(f"Silent threshold: {threshold}")
+    # print(f"Silent threshold: {threshold}")
     silent_list = np.asarray(timings)[pitch_list <= threshold]
     return silent_list
 
