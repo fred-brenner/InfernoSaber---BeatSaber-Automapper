@@ -41,18 +41,18 @@ def main_multi(diff_list: list, export_results_to_bs=True):
                 shutil.rmtree(paths.new_map_path + file)
 
     print("Starting multi map generator.")
+    # limit gpu ram usage
+    conf = tf.compat.v1.ConfigProto()
+    conf.gpu_options.allow_growth = True
+    sess = tf.compat.v1.Session(config=conf)
+    tf.compat.v1.keras.backend.set_session(sess)
+
     for diff in diff_list:
         print(f"Running difficulty: {diff/4:.1f}")
         # change difficulty
         if diff is not None:
             config.max_speed = diff
             config.max_speed_orig = diff
-
-        # limit gpu ram usage
-        conf = tf.compat.v1.ConfigProto()
-        conf.gpu_options.allow_growth = True
-        sess = tf.compat.v1.Session(config=conf)
-        tf.compat.v1.keras.backend.set_session(sess)
 
         # MAP GENERATOR
         ###############

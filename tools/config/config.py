@@ -26,13 +26,16 @@ audio_rms_goal = 0.50
 allow_dot_notes = True      # if False, all notes must have a cut direction
 jump_speed_offset = -0.4    # general offset for jump speed (range [-2, 2])
 map_filler_iters = 10       # max iterations for map filler
-add_dot_notes = 2           # add dot notes for fastest patterns [0, 10]
+add_dot_notes = 2           # add dot notes for fastest patterns in percent [0-10]
 add_breaks_flag = True      # add breaks after strong patterns
-silence_threshold = 0.2     # silence threshold [0.0, 0.3]
+silence_threshold = 0.17    # silence threshold [0.0, 0.3]
+silence_thresh_hard = 0.2   # add fixed threshold to dynamic value [0-2]
 add_silence_flag = True     # whether to apply silence threshold
 emphasize_beats_flag = True     # emphasize beats into double notes
 
 """Caution on changes"""
+check_silence_flag = True   # check for extremely silent songs
+check_silence_value = -14.0  # value in dB [-13 to -15]
 jsb_offset = [0.21, 0.15]   # note jump speed offset for Expert, Expert+ (range [-0.5, 0.5])
 jsb_offset_factor = 0.011   # note jump factor for high difficulties
 use_fixed_bpm = 100         # use fixed bpm or set to None for the song bpm
@@ -113,4 +116,7 @@ event_n_epochs = 180
 event_lstm_len = 16
 event_batch_size = 128
 
-max_speed_orig = max_speed      # needed for reset
+# needed for reset
+max_speed_orig = max_speed
+add_beat_intensity_orig = add_beat_intensity
+silence_threshold_orig = silence_threshold

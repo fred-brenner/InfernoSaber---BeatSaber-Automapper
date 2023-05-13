@@ -15,7 +15,8 @@ import tensorflow as tf
 
 def main(diff: float, export_results_to_bs=True, quick_start=None,
          beat_intensity=None, random_factor=None, js_offset=None,
-         allow_no_dir_flag=None):
+         allow_no_dir_flag=None, silence_factor=None):
+
     # change difficulty
     if diff is not None:
         config.max_speed = diff
@@ -30,6 +31,8 @@ def main(diff: float, export_results_to_bs=True, quick_start=None,
         config.jump_speed_offset += js_offset
     if allow_no_dir_flag is not None:
         config.allow_dot_notes = allow_no_dir_flag
+    if silence_factor is not None:
+        config.silence_threshold *= silence_factor
 
     # limit gpu ram usage
     conf = tf.compat.v1.ConfigProto()
@@ -118,8 +121,13 @@ if __name__ == "__main__":
             ndf = False
         print(f"Set allow_no_direction_flag to {ndf}")
 
+    sf = os.environ.get('silence_factor')
+    if sf is not None:
+        sf = float(sf)
+        print(f"Set silence factor to {sf}")
+
     export_results_to_bs = True
-    main(diff, export_results_to_bs, qs, bi, rf, jso, ndf)
+    main(diff, export_results_to_bs, qs, bi, rf, jso, ndf, sf)
 
     # main(2*4, False)
     # main(10 * 4, False)

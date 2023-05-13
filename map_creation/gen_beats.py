@@ -26,16 +26,20 @@ from tools.utils import numpy_shorts
 
 # @profile
 def main(name_ar: list) -> bool:
-
     if len(name_ar) > 1:
         print("Multi-core song generation currently not implemented!")
         exit()
 
+    # update configuration
     if config.add_silence_flag:
-        config.add_beat_intensity += 10
-        config.silence_threshold *= (1 - 0.5 * (config.max_speed_orig / 40))
+        config.add_beat_intensity = config.add_beat_intensity_orig + 10
+        config.silence_threshold = (1 - 0.4 * (config.max_speed_orig / 40)) * \
+                                   config.silence_threshold_orig
     if config.emphasize_beats_flag:
-        config.add_beat_intensity -= 10
+        if config.add_silence_flag:
+            config.add_beat_intensity = config.add_beat_intensity_orig
+        else:
+            config.add_beat_intensity = config.add_beat_intensity_orig - 10
 
     # load song data
     song_input, pitch_input = find_beats(name_ar, train_data=False)
@@ -56,7 +60,7 @@ def main(name_ar: list) -> bool:
         song_input[idx] = np.asarray(im)
         if config.add_silence_flag:
             # remember silent timings
-            silent_times.append(get_silent_times(pitch_input[idx], pitch_times[-1]))
+            silent_times.append(get_silent_times(song_input[idx], pitch_times[-1]))
         # # test song input
         # plt.imshow(song_input[idx])
         # plt.show()
@@ -98,14 +102,14 @@ def main(name_ar: list) -> bool:
     timing_ar = timing_ar[timing_ar > config.window]
     # add beats between far beats
     if config.max_speed >= 5.5 * 4:
-        fill_map_times_scale(timing_ar, scale_index=int(config.map_filler_iters/2)+1)
+        fill_map_times_scale(timing_ar, scale_index=int(config.map_filler_iters / 2) + 1)
     if config.max_speed >= 8 * 4:
-        fill_map_times_scale(timing_ar, scale_index=int(config.map_filler_iters-1))
+        fill_map_times_scale(timing_ar, scale_index=int(config.map_filler_iters - 1))
     time_input = [timing_ar]
 
     # calculate bpm
     file = paths.songs_pred + name_ar[0] + '.egg'
-    bpm, song_duration = get_file_bpm(file)     # 1.6
+    bpm, song_duration = get_file_bpm(file)  # 1.6
     # average bpm for songs to make more similar (jump) speeds
     if config.use_fixed_bpm is None:
         bpm = int((bpm + 120) / 2)
@@ -113,7 +117,7 @@ def main(name_ar: list) -> bool:
         bpm = config.use_fixed_bpm
 
     # sanity check timings
-    map_times, pitch_algo = sanity_check_timing(name_ar[0], timing_ar, song_duration)   # 3.9
+    map_times, pitch_algo = sanity_check_timing(name_ar[0], timing_ar, song_duration)  # 3.9
     map_times = map_times[map_times > 0]
     if len(map_times) < 3 * config.lstm_len:
         print(f"Could not match enough beats for song {name_ar[0]}")
@@ -122,7 +126,7 @@ def main(name_ar: list) -> bool:
     add_beats_min_bps = config.max_speed * 10 / 40  # max_speed=40 -> min_bps = 10
     scale_idx = 0
     while scale_idx < config.map_filler_iters:
-        if len(map_times) > add_beats_min_bps*map_times[-1]*config.add_beat_intensity/100:
+        if len(map_times) > add_beats_min_bps * map_times[-1] * config.add_beat_intensity / 100:
             break
         map_times = fill_map_times_scale(map_times, scale_idx)
         scale_idx += 1
@@ -138,7 +142,7 @@ def main(name_ar: list) -> bool:
 
     # load song data
     song_ar, rm_index = run_music_preprocessing(name_ar, time_ar=[map_times], save_file=False,
-                                                song_combined=False, predict_path=True)     # 7.8
+                                                song_combined=False, predict_path=True)  # 7.8
 
     # filter invalid indices
     for rm_idx in rm_index[0][::-1]:
@@ -152,7 +156,7 @@ def main(name_ar: list) -> bool:
     in_song_l = enc_model.predict(song_ar[0], verbose=0)
 
     y_class_map = generate(in_song_l, map_times, config.mapper_version, config.lstm_len,
-                           paths.beats_classify_encoder_file)       # 45.2
+                           paths.beats_classify_encoder_file)  # 45.2
 
     ############
     # create map
@@ -166,13 +170,13 @@ def main(name_ar: list) -> bool:
     if True:
         # TODO: add furious_lighting to increase effect frequency
         events = generate(in_song_l, map_times, config.event_gen_version, config.event_lstm_len,
-                          paths.events_classify_encoder_file)     # 23.7 (47.0 -> 3.8)
+                          paths.events_classify_encoder_file)  # 23.7 (47.0 -> 3.8)
     else:
         events = []
 
-    create_map(y_class_map, map_times, events, name_ar[0], bpm, pitch_algo, pitch_times)     # 0.5
+    create_map(y_class_map, map_times, events, name_ar[0], bpm, pitch_algo, pitch_times)  # 0.5
 
-    return 0    # success
+    return 0  # success
 
 
 if __name__ == '__main__':
