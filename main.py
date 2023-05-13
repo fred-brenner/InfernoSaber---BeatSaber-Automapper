@@ -128,8 +128,3 @@ if __name__ == "__main__":
 
     export_results_to_bs = True
     main(diff, export_results_to_bs, qs, bi, rf, jso, ndf, sf)
-
-    # main(2*4, False)
-    # main(10 * 4, False)
-    # main(5*4, False)
-    # main(7.5 * 4, False)
