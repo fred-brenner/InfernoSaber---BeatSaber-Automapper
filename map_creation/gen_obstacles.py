@@ -33,6 +33,7 @@ def add_obstacle(obstacles: list, position: int,  first_time, last_time):
 
 
 def check_obstacle_times(first_time, last_time):
+    # TODO: further check 0,3 if obstacle is in middle (1,2)
     time_diff = last_time - first_time
     if time_diff <= config.obstacle_min_duration + config.obstacle_time_gap * 2:
         return False
