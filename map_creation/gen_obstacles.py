@@ -1,4 +1,5 @@
 import numpy as np
+from random import randint
 
 from tools.config import config
 
@@ -22,7 +23,8 @@ def add_obstacle(obstacles: list, position: int,  first_time, last_time, times_e
 
     if obs_counter < config.obstacle_max_count:
         # Add new obstacle
-        o_type = config.obstacle_allowed_types[1]
+        rand_type = randint(0, len(config.obstacle_allowed_types)-1)
+        o_type = config.obstacle_allowed_types[rand_type]
         first_time += time_gap
         last_time -= time_gap
         for t_empty in times_empty[::-1]:
