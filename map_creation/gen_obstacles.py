@@ -3,10 +3,8 @@ from random import randint
 
 from tools.config import config
 
-time_gap = config.obstacle_time_gap * (1 - config.max_speed / 80)
 
-
-def add_obstacle(obstacles: list, position: int,  first_time, last_time, times_empty):
+def add_obstacle(obstacles: list, position: int,  first_time, last_time):
     # check for multi occurrences of obstacles
     # obs_counter = 0
     # obs_break_counter = 4
@@ -25,8 +23,8 @@ def add_obstacle(obstacles: list, position: int,  first_time, last_time, times_e
     # Add new obstacle
     rand_type = randint(0, len(config.obstacle_allowed_types)-1)
     o_type = config.obstacle_allowed_types[rand_type]
-    first_time += time_gap
-    last_time -= time_gap
+    first_time += config.obstacle_time_gap
+    last_time -= config.obstacle_time_gap
 
     duration = last_time - first_time
     # _obstacles":[{"_time":64.39733123779297,"_lineIndex":0,
@@ -38,7 +36,7 @@ def add_obstacle(obstacles: list, position: int,  first_time, last_time, times_e
 
 def check_obstacle_times(first_time, last_time):
     time_diff = last_time - first_time
-    if time_diff <= config.obstacle_min_duration + time_gap * 2:
+    if time_diff <= config.obstacle_min_duration + config.obstacle_time_gap * 2:
         return False
     else:
         return True
@@ -117,7 +115,7 @@ def calculate_obstacles(notes, timings):
                 # if n_row == 0 or n_row == 3:
                 if check_obstacle_times(rows_last[n_row], timings[idx]):
                     obstacles = add_obstacle(obstacles, n_row, rows_last[n_row],
-                                             timings[idx], times_empty)
+                                             timings[idx])
                 rows_last[n_row] = timings[idx]
 
     obstacles = combine_obstacles(obstacles, times_empty)
