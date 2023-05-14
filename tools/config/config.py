@@ -6,7 +6,7 @@
 # Map creation model configuration
 """Do change"""
 max_speed = 4 * 8.0         # set around 5-40 (normal-expert++)
-add_beat_intensity = 100    # try to match bps by x% [80, 110]
+add_beat_intensity = 110    # try to match bps by x% [80, 110]
 expert_fact = 0.63          # expert plus to expert factor [0.6, 0.7]
 create_expert_flag = True   # create second expert map
 thresh_beat = 0.48          # minimum beat response required to trigger generator
@@ -41,7 +41,7 @@ obstacle_max_count = 2      # maximum appearance count for obstacles
 obstacle_allowed_types = [0, 1]
 obstacle_width = 0.5
 check_silence_flag = True   # check for extremely silent songs
-check_silence_value = -14.0  # value in dB [-13 to -15]
+check_silence_value = -14.2  # value in dB [-13 to -15]
 jsb_offset = [0.21, 0.15]   # note jump speed offset for Expert, Expert+ (range [-0.5, 0.5])
 jsb_offset_factor = 0.011   # note jump factor for high difficulties
 use_fixed_bpm = 100         # use fixed bpm or set to None for the song bpm

@@ -4,6 +4,7 @@ from tools.config import config
 
 
 def add_obstacle(obstacles: list, position: int,  first_time, last_time):
+    # TODO: check function!
     # check for multi occurences of
     obs_counter = 0
     obs_break_counter = 4
