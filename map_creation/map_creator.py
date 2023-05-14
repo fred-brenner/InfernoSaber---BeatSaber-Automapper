@@ -48,7 +48,7 @@ def create_map(y_class_num, timings, events, name, bpm, pitch_algo, pitch_times)
         file = f'{new_map_folder}{bs_diff}.dat'
         events_json = events_to_json(events, timings)
         notes_json = notes_to_json(notes, timings)
-        obstacles_json = obstacles_to_json(obstacles)
+        obstacles_json = obstacles_to_json(obstacles, bpm)
         complete_map = get_map_string(notes=notes_json, events=events_json,
                                       obstacles=obstacles_json)
         with open(file, 'w') as f:
@@ -144,7 +144,10 @@ def events_to_json(notes, timings):
     return note_json
 
 
-def obstacles_to_json(obstacles):
+def obstacles_to_json(obstacles, bpm):
+    obstacles = np.asarray(obstacles)
+    obstacles[:, 0] = obstacles[:, 0] * bpm / 60
+    obstacles[:, 3] = obstacles[:, 3] * bpm / 60
     note_json = ""
     for idx in range(len(obstacles)):
         note_json += '{'

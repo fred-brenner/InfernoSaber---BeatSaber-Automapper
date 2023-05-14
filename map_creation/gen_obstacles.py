@@ -60,24 +60,26 @@ def calculate_obstacles(notes, timings):
                 if n_row == 0:
                     times_0.append([rows_last[n_row], timings[idx]])
                     if check_obstacle_times(rows_last[n_row], timings[idx]):
-                        obstacles = add_obstacle(obstacles, n_row, rows_last[n_row], timings[idx])
+                        obstacles = add_obstacle(obstacles, n_row, rows_last[n_row],
+                                                 timings[idx])
                     rows_last[n_row] = timings[idx]
-                elif n_row == 1:
-                    times_1.append([rows_last[n_row], timings[idx]])
-                    if check_obstacle_times(rows_last[n_row], timings[idx]):
-                        obstacles = add_obstacle(obstacles, n_row, rows_last[n_row], timings[idx])
-                    rows_last[n_row] = timings[idx]
-                elif n_row == 2:
-                    times_2.append([rows_last[n_row], timings[idx]])
-                    if check_obstacle_times(rows_last[n_row], timings[idx]):
-                        obstacles = add_obstacle(obstacles, n_row, rows_last[n_row], timings[idx])
-                    rows_last[n_row] = timings[idx]
+                # elif n_row == 1:
+                #     times_1.append([rows_last[n_row], timings[idx]])
+                #     if check_obstacle_times(rows_last[n_row], timings[idx]):
+                #         obstacles = add_obstacle(obstacles, n_row, rows_last[n_row],
+                #                                  timings[idx])
+                #     rows_last[n_row] = timings[idx]
+                # elif n_row == 2:
+                #     times_2.append([rows_last[n_row], timings[idx]])
+                #     if check_obstacle_times(rows_last[n_row], timings[idx]):
+                #         obstacles = add_obstacle(obstacles, n_row, rows_last[n_row],
+                #                                  timings[idx])
+                #     rows_last[n_row] = timings[idx]
                 elif n_row == 3:
                     times_3.append([rows_last[n_row], timings[idx]])
                     if check_obstacle_times(rows_last[n_row], timings[idx]):
-                        obstacles = add_obstacle(obstacles, n_row, rows_last[n_row], timings[idx])
+                        obstacles = add_obstacle(obstacles, n_row, rows_last[n_row],
+                                                 timings[idx])
                     rows_last[n_row] = timings[idx]
-                else:
-                    print("Invalid row number!. Exit.")
-                    exit()
+
     return obstacles
