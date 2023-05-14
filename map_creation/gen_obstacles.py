@@ -6,7 +6,6 @@ time_gap = config.obstacle_time_gap * (1 - config.max_speed / 80)
 
 
 def add_obstacle(obstacles: list, position: int,  first_time, last_time, times_empty):
-    # TODO: check function!
     # check for multi occurrences of obstacles
     obs_counter = 0
     obs_break_counter = 4
@@ -44,7 +43,6 @@ def add_obstacle(obstacles: list, position: int,  first_time, last_time, times_e
 
 
 def check_obstacle_times(first_time, last_time):
-    # TODO: further check 0,3 if obstacle is in middle (1,2)
     time_diff = last_time - first_time
     if time_diff <= config.obstacle_min_duration + time_gap * 2:
         return False
@@ -53,8 +51,6 @@ def check_obstacle_times(first_time, last_time):
 
 
 def calculate_obstacles(notes, timings):
-    # TODO: improve obstacles
-
     obstacles = []
     rows_last = [1, 1, 1, 1]
     times_0 = []
