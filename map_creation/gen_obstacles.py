@@ -84,22 +84,22 @@ def combine_obstacles(obstacles_all, times_empty):
             t_first = t
             t_last = t
         elif t > t_last + 2*step_size:
-            obstacles = found_obstacle(obstacles, t_first, t_last, 0)
+            obstacles = found_obstacle(obstacles, t_first, t_last, config.obstacle_positions[0])
             t_last = -1
         else:
             t_last = t
-    obstacles = found_obstacle(obstacles, t_first, t_last, 0)
+    obstacles = found_obstacle(obstacles, t_first, t_last, config.obstacle_positions[0])
     t_last = -1
     for t in common_val2:
         if t_last == -1:
             t_first = t
             t_last = t
         elif t > t_last + 2*step_size:
-            obstacles = found_obstacle(obstacles, t_first, t_last, 3)
+            obstacles = found_obstacle(obstacles, t_first, t_last, config.obstacle_positions[1])
             t_last = -1
         else:
             t_last = t
-    obstacles = found_obstacle(obstacles, t_first, t_last, 3)
+    obstacles = found_obstacle(obstacles, t_first, t_last, config.obstacle_positions[1])
 
     return obstacles
 

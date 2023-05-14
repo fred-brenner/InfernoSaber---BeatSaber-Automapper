@@ -9,8 +9,8 @@ max_speed = 4 * 5.0         # set around 5-40 (normal-expert++)
 add_beat_intensity = 110    # try to match bps by x% [80, 110]
 expert_fact = 0.63          # expert plus to expert factor [0.6, 0.7]
 create_expert_flag = True   # create second expert map
-thresh_beat = 0.50          # minimum beat response required to trigger generator
-thresh_pitch = 1.05         # minimum beat for pitch check (0.8,low-1.5,high)
+thresh_beat = 0.48          # minimum beat response required to trigger generator
+thresh_pitch = 1.00         # minimum beat for pitch check (0.8,low-1.5,high)
 threshold_end = 1.1         # factor for start and end threshold
 random_note_map_factor = 0.0    # stick note map to random song/center (set to 0 to disable)
 random_note_map_change = 3      # change frequency for center (1-5)
@@ -33,12 +33,18 @@ silence_thresh_hard = 0.2   # add fixed threshold to dynamic value [0-2]
 add_silence_flag = True     # whether to apply silence threshold
 emphasize_beats_flag = True     # emphasize beats into double notes
 add_obstacle_flag = True    # add obstacles in free areas
-obstacle_time_gap = 1.0     # time gap between obstacle and note on each side [0.5-2]
+obstacle_time_gap = 0.6     # time gap between obstacle and note on each side [0.5-2]
 obstacle_min_duration = 0.1  # minimum duration for each obstacle [0.1-2]
 obstacle_max_count = 2      # maximum appearance count for obstacles
+sporty_obstacles = True
 
 """Caution on changes"""
-obstacle_allowed_types = [0, 1]
+if not sporty_obstacles:
+    obstacle_allowed_types = [0, 1]     # 0wall, 1ceiling, 2jump, 3onesaber
+    obstacle_positions = [0, 3]     # outside position of notes
+else:
+    obstacle_allowed_types = [1]    # only ceiling walls
+    obstacle_positions = [1, 2]     # inside positon of notes
 obstacle_width = 1
 check_silence_flag = True   # check for extremely silent songs
 check_silence_value = -14.2  # value in dB [-13 to -15]
