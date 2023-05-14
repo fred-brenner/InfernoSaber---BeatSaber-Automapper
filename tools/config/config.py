@@ -33,13 +33,13 @@ silence_thresh_hard = 0.2   # add fixed threshold to dynamic value [0-2]
 add_silence_flag = True     # whether to apply silence threshold
 emphasize_beats_flag = True     # emphasize beats into double notes
 add_obstacle_flag = True    # add obstacles in free areas
-obstacle_time_gap = 1.0     # time gap between obstacle and note on each side [0.5-2]
-obstacle_min_duration = 0.1  # minimum duration for each obstacle [0.1-2]
+obstacle_time_gap = 1.3     # time gap between obstacle and note on each side [0.5-2]
+obstacle_min_duration = 0.3  # minimum duration for each obstacle [0.1-2]
 obstacle_max_count = 2      # maximum appearance count for obstacles
 
 """Caution on changes"""
 obstacle_allowed_types = [0, 1]
-obstacle_width = 0.5
+obstacle_width = 1
 check_silence_flag = True   # check for extremely silent songs
 check_silence_value = -14.2  # value in dB [-13 to -15]
 jsb_offset = [0.21, 0.15]   # note jump speed offset for Expert, Expert+ (range [-0.5, 0.5])

@@ -155,7 +155,7 @@ def obstacles_to_json(obstacles, bpm):
                      f'"_lineIndex":{int(obstacles[idx][1])},' \
                      f'"_type":{int(obstacles[idx][2])},' \
                      f'"_duration":{obstacles[idx][3]:.2f},' \
-                     f'"_width":{obstacles[idx][4]:.2f}'
+                     f'"_width":{int(obstacles[idx][4])}'
         note_json += '},'
         # _obstacles":[{"_time":64.39733123779297,"_lineIndex":0,
         #               "_type":0,"_duration":6.5,"_width":1}
