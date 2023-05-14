@@ -107,10 +107,6 @@ def combine_obstacles(obstacles_all, times_empty):
 def calculate_obstacles(notes, timings):
     obstacles = [[], [], [], []]
     rows_last = [1, 1, 1, 1]
-    times_0 = []
-    times_1 = []
-    times_2 = []
-    times_3 = []
     times_empty = [0]
     for idx in range(len(notes)):
         if len(notes[idx]) == 0:
@@ -122,31 +118,7 @@ def calculate_obstacles(notes, timings):
                 if check_obstacle_times(rows_last[n_row], timings[idx]):
                     obstacles = add_obstacle(obstacles, n_row, rows_last[n_row],
                                              timings[idx], times_empty)
-                    rows_last[n_row] = timings[idx]
-                # if n_row == 0:
-                #     times_0.append([rows_last[n_row], timings[idx]])
-                #     if check_obstacle_times(rows_last[n_row], timings[idx]):
-                #         obstacles = add_obstacle(obstacles, n_row, rows_last[n_row],
-                #                                  timings[idx])
-                #     rows_last[n_row] = timings[idx]
-                # elif n_row == 1:
-                #     times_1.append([rows_last[n_row], timings[idx]])
-                #     if check_obstacle_times(rows_last[n_row], timings[idx]):
-                #         obstacles = add_obstacle(obstacles, n_row, rows_last[n_row],
-                #                                  timings[idx])
-                #     rows_last[n_row] = timings[idx]
-                # elif n_row == 2:
-                #     times_2.append([rows_last[n_row], timings[idx]])
-                #     if check_obstacle_times(rows_last[n_row], timings[idx]):
-                #         obstacles = add_obstacle(obstacles, n_row, rows_last[n_row],
-                #                                  timings[idx])
-                #     rows_last[n_row] = timings[idx]
-                # elif n_row == 3:
-                #     times_3.append([rows_last[n_row], timings[idx]])
-                #     if check_obstacle_times(rows_last[n_row], timings[idx]):
-                #         obstacles = add_obstacle(obstacles, n_row, rows_last[n_row],
-                #                                  timings[idx])
-                #     rows_last[n_row] = timings[idx]
+                rows_last[n_row] = timings[idx]
 
     obstacles = combine_obstacles(obstacles, times_empty)
 
