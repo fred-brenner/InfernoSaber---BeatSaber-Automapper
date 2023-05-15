@@ -4,7 +4,7 @@ from random import randint
 from tools.config import config
 
 
-def add_obstacle(obstacles: list, position: int,  first_time, last_time):
+def add_obstacle(obstacles: list, position: int, first_time, last_time):
     # check for multi occurrences of obstacles
     # obs_counter = 0
     # obs_break_counter = 4
@@ -21,7 +21,7 @@ def add_obstacle(obstacles: list, position: int,  first_time, last_time):
     # if obs_counter < config.obstacle_max_count:
 
     # Add new obstacle
-    rand_type = randint(0, len(config.obstacle_allowed_types)-1)
+    rand_type = randint(0, len(config.obstacle_allowed_types) - 1)
     o_type = config.obstacle_allowed_types[rand_type]
     first_time += config.obstacle_time_gap
     last_time -= config.obstacle_time_gap
@@ -43,8 +43,7 @@ def check_obstacle_times(first_time, last_time):
 
 
 def combine_obstacles(obstacles_all, times_empty):
-
-    def found_obstacle(obstacles, first_time, last_time, position):
+    def found_obstacle(obst_temp, first_time, last_time, position):
         rand_type = randint(0, len(config.obstacle_allowed_types) - 1)
         o_type = config.obstacle_allowed_types[rand_type]
 
@@ -53,16 +52,21 @@ def combine_obstacles(obstacles_all, times_empty):
                 break
             else:
                 if t_empty < last_time:
-                    duration = round(t_empty - first_time - 0.1, 1)
-                    cur_obstacle = [first_time, position, o_type, duration, config.obstacle_width]
-                    obstacles.append(cur_obstacle)
+                    dur_temp = round(t_empty - first_time - 0.1, 1)
+                    if not 0 < dur_temp < 15:
+                        print(f"obstacle: {dur_temp}")
+                    cur_obstacle = [first_time, position, o_type, dur_temp, config.obstacle_width]
+                    obst_temp.append(cur_obstacle)
                     first_time = t_empty
-        duration = round(last_time - first_time, 1)
-        if duration < 0:
-            print("Error. Encountered negative duration for obstacles! Continue.")
-        cur_obstacle = [first_time, position, o_type, duration, config.obstacle_width]
-        obstacles.append(cur_obstacle)
-        return obstacles
+        dur_temp = round(last_time - first_time, 1)
+        if dur_temp < 0:
+            print("Error. Encountered negative duration for obstacles! Exclude.")
+        if dur_temp > 0:
+            if not 0 < dur_temp < 15:
+                print(f"obstacle: {dur_temp}")
+            cur_obstacle = [first_time, position, o_type, dur_temp, config.obstacle_width]
+            obst_temp.append(cur_obstacle)
+        return obst_temp
 
     step_size = 0.1
     obstacles = []
@@ -80,12 +84,13 @@ def combine_obstacles(obstacles_all, times_empty):
 
     for idx, common_val in enumerate([common_val1, common_val2]):
         t_first = -1
+        t_last = 0
         for t in common_val:
             if t_first == -1:
                 t_first = t
                 t_last = t
-            elif t > t_last + 2*step_size:
-                rnd_pos = randint(0, len(config.obstacle_positions[idx])-1)
+            elif t > t_last + 2 * step_size:
+                rnd_pos = randint(0, len(config.obstacle_positions[idx]) - 1)
                 obstacles = found_obstacle(obstacles, t_first, t_last, config.obstacle_positions[idx][rnd_pos])
                 t_first = -1
             else:
@@ -99,7 +104,7 @@ def combine_obstacles(obstacles_all, times_empty):
 
 
 def calculate_obstacles(notes, timings):
-    obstacles = [[], [], [], []]
+    obstacles_all = [[], [], [], []]
     rows_last = [1, 1, 1, 1]
     times_empty = [0]
     for idx in range(len(notes)):
@@ -110,14 +115,14 @@ def calculate_obstacles(notes, timings):
             for n_row in cur_rows:
                 # if n_row == 0 or n_row == 3:
                 if check_obstacle_times(rows_last[n_row], timings[idx]):
-                    obstacles = add_obstacle(obstacles, n_row, rows_last[n_row],
-                                             timings[idx])
+                    obstacles_all = add_obstacle(obstacles_all, n_row, rows_last[n_row],
+                                                 timings[idx])
                 rows_last[n_row] = timings[idx]
 
-    obstacles = combine_obstacles(obstacles, times_empty)
+    obstacles = combine_obstacles(obstacles_all, times_empty)
 
     # sort by timings
     obstacles = np.asarray(obstacles)
-    obstacles[np.argsort(obstacles[:, 0])]
+    obstacles = obstacles[np.argsort(obstacles[:, 0])]
 
     return obstacles

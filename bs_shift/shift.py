@@ -95,7 +95,7 @@ def shift_bs_songs(allow_diff2=False):
                     # Finished name
                 except:
                     print("Could not understand .info formatting: " + os.path.basename(root))
-                    # Append to black list
+                    # Append to blacklist
                     append_fail(os.path.basename(root))
                     break
                 # print(song_name)
