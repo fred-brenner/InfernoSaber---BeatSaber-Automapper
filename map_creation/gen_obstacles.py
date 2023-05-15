@@ -71,7 +71,7 @@ def combine_obstacles(obstacles_all, times_empty):
         for obst in obstacles_all[idx]:
             start_time = round(obst[0], 1)
             duration = round(obst[3], 1)
-            new_times = np.round(np.arange(start_time, start_time + duration, step_size), 1)
+            new_times = np.round(np.arange(start_time, start_time + duration + step_size, step_size), 1)
             time_list[idx].extend(list(new_times))
     common_val1 = list(set(time_list[0]).intersection(time_list[1]))
     common_val2 = list(set(time_list[2]).intersection(time_list[3]))
@@ -87,13 +87,13 @@ def combine_obstacles(obstacles_all, times_empty):
             elif t > t_last + 2*step_size:
                 rnd_pos = randint(0, len(config.obstacle_positions[idx])-1)
                 obstacles = found_obstacle(obstacles, t_first, t_last, config.obstacle_positions[idx][rnd_pos])
-                t_last = t
-                t_first = t
+                t_first = -1
             else:
                 t_last = t
-        if t_last - t_first >= config.obstacle_min_duration:
-            rnd_pos = randint(0, len(config.obstacle_positions[idx]) - 1)
-            obstacles = found_obstacle(obstacles, t_first, t_last, config.obstacle_positions[idx][rnd_pos])
+        if t_first > 0:
+            if t_last - t_first >= config.obstacle_min_duration:
+                rnd_pos = randint(0, len(config.obstacle_positions[idx]) - 1)
+                obstacles = found_obstacle(obstacles, t_first, t_last, config.obstacle_positions[idx][rnd_pos])
 
     return obstacles
 
@@ -118,6 +118,6 @@ def calculate_obstacles(notes, timings):
 
     # sort by timings
     obstacles = np.asarray(obstacles)
-    np.sort(obstacles, axis=0)
+    obstacles[np.argsort(obstacles[:, 0])]
 
     return obstacles
