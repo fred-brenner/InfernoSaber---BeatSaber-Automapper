@@ -12,6 +12,7 @@ create_expert_flag = True   # create second expert map
 thresh_beat = 0.48          # minimum beat response required to trigger generator
 thresh_pitch = 1.00         # minimum beat for pitch check (0.8,low-1.5,high)
 threshold_end = 1.1         # factor for start and end threshold
+# TODO: re-enable random
 random_note_map_factor = 0.0    # stick note map to random song/center (set to 0 to disable)
 random_note_map_change = 3      # change frequency for center (1-5)
 quick_start = 1.9           # map quick start mode (0 off, 1-3 on)
@@ -36,7 +37,7 @@ add_obstacle_flag = True    # add obstacles in free areas
 obstacle_time_gap = 0.6     # time gap between obstacle and note on each side [0.5-2]
 obstacle_min_duration = 0.1  # minimum duration for each obstacle [0.1-2]
 obstacle_max_count = 2      # maximum appearance count for obstacles
-sporty_obstacles = True
+sporty_obstacles = False
 
 """Caution on changes"""
 if not sporty_obstacles:

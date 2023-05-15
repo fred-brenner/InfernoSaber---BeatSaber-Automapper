@@ -58,6 +58,8 @@ def combine_obstacles(obstacles_all, times_empty):
                     obstacles.append(cur_obstacle)
                     first_time = t_empty
         duration = round(last_time - first_time, 1)
+        if duration < 0:
+            print("Error. Encountered negative duration for obstacles! Continue.")
         cur_obstacle = [first_time, position, o_type, duration, config.obstacle_width]
         obstacles.append(cur_obstacle)
         return obstacles
@@ -75,29 +77,33 @@ def combine_obstacles(obstacles_all, times_empty):
     common_val2 = list(set(time_list[2]).intersection(time_list[3]))
     common_val1.sort()
     common_val2.sort()
-    t_last = -1
 
+    t_first = -1
     for t in common_val1:
-        if t_last == -1:
+        if t_first == -1:
             t_first = t
             t_last = t
         elif t > t_last + 2*step_size:
             obstacles = found_obstacle(obstacles, t_first, t_last, config.obstacle_positions[0])
-            t_last = -1
+            t_last = t
+            t_first = t
         else:
             t_last = t
-    obstacles = found_obstacle(obstacles, t_first, t_last, config.obstacle_positions[0])
-    t_last = -1
+    if t_last - t_first >= config.obstacle_min_duration:
+        obstacles = found_obstacle(obstacles, t_first, t_last, config.obstacle_positions[0])
+    t_first = -1
     for t in common_val2:
-        if t_last == -1:
+        if t_first == -1:
             t_first = t
             t_last = t
         elif t > t_last + 2*step_size:
             obstacles = found_obstacle(obstacles, t_first, t_last, config.obstacle_positions[1])
-            t_last = -1
+            t_last = t
+            t_first = t
         else:
             t_last = t
-    obstacles = found_obstacle(obstacles, t_first, t_last, config.obstacle_positions[1])
+    if t_last - t_first >= config.obstacle_min_duration:
+        obstacles = found_obstacle(obstacles, t_first, t_last, config.obstacle_positions[1])
 
     return obstacles
 
@@ -119,5 +125,9 @@ def calculate_obstacles(notes, timings):
                 rows_last[n_row] = timings[idx]
 
     obstacles = combine_obstacles(obstacles, times_empty)
+
+    # sort by timings
+    obstacles = np.asarray(obstacles)
+    np.sort(obstacles, axis=0)
 
     return obstacles
