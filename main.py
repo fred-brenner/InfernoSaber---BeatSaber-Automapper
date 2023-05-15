@@ -15,7 +15,8 @@ import tensorflow as tf
 
 def main(diff: float, export_results_to_bs=True, quick_start=None,
          beat_intensity=None, random_factor=None, js_offset=None,
-         allow_no_dir_flag=None, silence_factor=None):
+         allow_no_dir_flag=None, silence_factor=None,
+         add_obstacles=None, sporty_obstacles=None):
 
     # change difficulty
     if diff is not None:
@@ -33,6 +34,10 @@ def main(diff: float, export_results_to_bs=True, quick_start=None,
         config.allow_dot_notes = allow_no_dir_flag
     if silence_factor is not None:
         config.silence_threshold *= silence_factor
+    if add_obstacles is not None:
+        config.add_obstacles = add_obstacles
+    if sporty_obstacles is not None:
+        config.sporty_obstacles = sporty_obstacles
 
     # limit gpu ram usage
     conf = tf.compat.v1.ConfigProto()
@@ -126,5 +131,21 @@ if __name__ == "__main__":
         sf = float(sf)
         print(f"Set silence factor to {sf}")
 
+    aof = os.environ.get('add_obstacle_flag')
+    if aof is not None:
+        if aof == 'True':
+            aof = True
+        else:
+            aof = False
+        print(f"Set allow_no_direction_flag to {aof}")
+
+    sof = os.environ.get('sporty_obstacle_flag')
+    if sof is not None:
+        if sof == 'True':
+            sof = True
+        else:
+            sof = False
+        print(f"Set allow_no_direction_flag to {sof}")
+
     export_results_to_bs = True
-    main(diff, export_results_to_bs, qs, bi, rf, jso, ndf, sf)
+    main(diff, export_results_to_bs, qs, bi, rf, jso, ndf, sf, aof, sof)
