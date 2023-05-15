@@ -133,3 +133,4 @@ event_batch_size = 128
 max_speed_orig = max_speed
 add_beat_intensity_orig = add_beat_intensity
 silence_threshold_orig = silence_threshold
+obstacle_time_gap_orig = obstacle_time_gap

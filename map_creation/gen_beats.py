@@ -40,7 +40,7 @@ def main(name_ar: list) -> bool:
             config.add_beat_intensity = config.add_beat_intensity_orig
         else:
             config.add_beat_intensity = config.add_beat_intensity_orig - 10
-    config.obstacle_time_gap = config.obstacle_time_gap * (1 - config.max_speed / 80)
+    config.obstacle_time_gap = config.obstacle_time_gap_orig * (1 - config.max_speed / 80)
 
     # load song data
     song_input, pitch_input = find_beats(name_ar, train_data=False)
