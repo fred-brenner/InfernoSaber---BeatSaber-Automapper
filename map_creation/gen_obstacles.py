@@ -78,32 +78,22 @@ def combine_obstacles(obstacles_all, times_empty):
     common_val1.sort()
     common_val2.sort()
 
-    t_first = -1
-    for t in common_val1:
-        if t_first == -1:
-            t_first = t
-            t_last = t
-        elif t > t_last + 2*step_size:
-            obstacles = found_obstacle(obstacles, t_first, t_last, config.obstacle_positions[0])
-            t_last = t
-            t_first = t
-        else:
-            t_last = t
-    if t_last - t_first >= config.obstacle_min_duration:
-        obstacles = found_obstacle(obstacles, t_first, t_last, config.obstacle_positions[0])
-    t_first = -1
-    for t in common_val2:
-        if t_first == -1:
-            t_first = t
-            t_last = t
-        elif t > t_last + 2*step_size:
-            obstacles = found_obstacle(obstacles, t_first, t_last, config.obstacle_positions[1])
-            t_last = t
-            t_first = t
-        else:
-            t_last = t
-    if t_last - t_first >= config.obstacle_min_duration:
-        obstacles = found_obstacle(obstacles, t_first, t_last, config.obstacle_positions[1])
+    for idx, common_val in enumerate([common_val1, common_val2]):
+        t_first = -1
+        for t in common_val:
+            if t_first == -1:
+                t_first = t
+                t_last = t
+            elif t > t_last + 2*step_size:
+                rnd_pos = randint(0, len(config.obstacle_positions[idx])-1)
+                obstacles = found_obstacle(obstacles, t_first, t_last, config.obstacle_positions[idx][rnd_pos])
+                t_last = t
+                t_first = t
+            else:
+                t_last = t
+        if t_last - t_first >= config.obstacle_min_duration:
+            rnd_pos = randint(0, len(config.obstacle_positions[idx]) - 1)
+            obstacles = found_obstacle(obstacles, t_first, t_last, config.obstacle_positions[idx][rnd_pos])
 
     return obstacles
 
