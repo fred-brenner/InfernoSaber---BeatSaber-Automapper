@@ -31,6 +31,7 @@ def stack_info_data(new_info_file: list, content: list, diff_str: str, diff_num:
 def main_multi(diff_list: list, export_results_to_bs=True):
     diff_list = np.sort(diff_list)
     diff_list *= 4
+    song_list = None
     # input("Cleaning output directory. Continue?")
     # exclude_list = ['cover.jpg', 'tmp']
     # for file in os.listdir(paths.new_map_path):
@@ -56,21 +57,22 @@ def main_multi(diff_list: list, export_results_to_bs=True):
 
         # MAP GENERATOR
         ###############
-        song_list = os.listdir(paths.songs_pred)
-        song_list = check_music_files(song_list, paths.songs_pred)
+        if song_list is None:
+            song_list = os.listdir(paths.songs_pred)
+            song_list = check_music_files(song_list, paths.songs_pred)
         print(f"Found {len(song_list)} songs. Iterating...")
         if len(song_list) == 0:
             print("No songs found!")
 
         for i, song_name in enumerate(song_list):
-            start_time = time.time()
+            # start_time = time.time()
             song_name = song_name[:-4]
             # print(f"Analyzing song: {song_name} ({i + 1} of {len(song_list)})")
             fail_flag = beat_generator.main([song_name])
             if fail_flag:
                 print("Continue with next song")
                 continue
-            end_time = time.time()
+            # end_time = time.time()
             # print(f"Time needed: {end_time - start_time}s")
 
     print("Running map combination")
