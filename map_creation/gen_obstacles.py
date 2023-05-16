@@ -67,18 +67,25 @@ def combine_obstacles(obstacles_all, times_empty):
             obst_temp.append(cur_obstacle)
         return obst_temp
 
-    def check_saved_times(first, lt_save):
-        if len(lt_save) == 0 or not config.sporty_obstacles:
-            return first
+    def check_saved_times(first, last, lt_save_first, lt_save_last):
+        if len(lt_save_last) == 0 or not config.sporty_obstacles:
+            return first, last
+        first_last = [first, last]
         diff_min = round(max(config.obstacle_time_gap), 1)
-        diff_array = np.asarray(lt_save) - first
-        # only check negative values as positive are not possible for sporty mode
-        diff_array = diff_array[diff_array < 0]
-        if len(diff_array) > 0:
-            diff_real = round(abs(max(diff_array)), 1)
-            if diff_real < diff_min:
-                first += round(diff_min - diff_real, 1)
-        return first
+        for i_save, lt_save in enumerate([lt_save_last, lt_save_first]):
+            diff_array = np.asarray(lt_save) - first_last[i_save]
+            # only check negative values as positive are not possible for sporty mode
+            if i_save == 1:
+                diff_array *= -1
+            diff_array = diff_array[diff_array < 0]
+            if len(diff_array) > 0:
+                diff_real = round(abs(max(diff_array)), 1)
+                if diff_real < diff_min:
+                    if i_save == 0:
+                        first += round(diff_min - diff_real, 1)
+                    if i_save == 1:
+                        last -= round(diff_min - diff_real, 1)
+        return first, last
 
     step_size = 0.1
     obstacles = []
@@ -101,6 +108,7 @@ def combine_obstacles(obstacles_all, times_empty):
         common_val3 = []
 
     last_time_saves = []
+    first_time_saves = []
     for idx, common_val in enumerate([common_val1, common_val2]):
         t_first = -1
         t_last = 0
@@ -112,8 +120,9 @@ def combine_obstacles(obstacles_all, times_empty):
                 t_last = t
             elif t > t_last + 2 * step_size:
                 rnd_pos = randint(0, len(config.obstacle_positions[idx]) - 1)
-                t_first = check_saved_times(t_first, last_time_saves)
+                t_first, t_last = check_saved_times(t_first, t_last, first_time_saves, last_time_saves)
                 obstacles = found_obstacle(obstacles, t_first, t_last, config.obstacle_positions[idx][rnd_pos])
+                first_time_saves.append(t_first)
                 last_time_saves.append(t_last)
                 t_first = -1
             else:
@@ -121,8 +130,9 @@ def combine_obstacles(obstacles_all, times_empty):
         if t_first > 0:
             if t_last - t_first >= config.obstacle_min_duration:
                 rnd_pos = randint(0, len(config.obstacle_positions[idx]) - 1)
-                t_first = check_saved_times(t_first, last_time_saves)
+                t_first, t_last = check_saved_times(t_first, t_last, first_time_saves, last_time_saves)
                 obstacles = found_obstacle(obstacles, t_first, t_last, config.obstacle_positions[idx][rnd_pos])
+                first_time_saves.append(t_first)
                 last_time_saves.append(t_last)
 
     # Obstacles for both sides on
