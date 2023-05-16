@@ -153,9 +153,11 @@ def combine_obstacles(obstacles_all, times_empty):
                     obstacle_pos[1] = 3
             if obstacle_pos[0] == 1 and obstacle_pos[1] == 2:
                 # crouch obstacle
+                t_first += 0.2  # allow more time for crouching
                 obstacles = found_obstacle(obstacles, t_first, t_last, randint(1, 2),
                                            config.obstacle_crouch_width)
             else:
+                t_first, t_last = check_saved_times(t_first, t_last, first_time_saves, last_time_saves)
                 obstacles = found_obstacle(obstacles, t_first, t_last, obstacle_pos[0])
                 obstacles = found_obstacle(obstacles, t_first, t_last, obstacle_pos[1])
             t_first = -1
