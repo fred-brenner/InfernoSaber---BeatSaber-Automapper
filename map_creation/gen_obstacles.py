@@ -77,7 +77,7 @@ def combine_obstacles(obstacles_all, times_empty):
         if len(diff_array) > 0:
             diff_real = round(abs(max(diff_array)), 1)
             if diff_real < diff_min:
-                first += (diff_min - diff_real)
+                first += round(diff_min - diff_real, 1)
         return first
 
     step_size = 0.1
