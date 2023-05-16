@@ -1,3 +1,4 @@
+import numpy as np
 ########################################
 # config file for all important values 
 # used in multiple codes
@@ -34,7 +35,7 @@ silence_thresh_hard = 0.2   # add fixed threshold to dynamic value [0-2]
 add_silence_flag = True     # whether to apply silence threshold
 emphasize_beats_flag = True     # emphasize beats into double notes
 add_obstacle_flag = True    # add obstacles in free areas
-obstacle_time_gap = 0.7     # time gap between obstacle and note on each side [0.5-2]
+obstacle_time_gap = [0.2, 0.6]     # time gap before [0.2-1] after [0.5-2]
 obstacle_min_duration = 0.1  # minimum duration for each obstacle [0.1-2]
 obstacle_max_count = 2      # maximum appearance count for obstacles
 sporty_obstacles = True
@@ -133,4 +134,5 @@ event_batch_size = 128
 max_speed_orig = max_speed
 add_beat_intensity_orig = add_beat_intensity
 silence_threshold_orig = silence_threshold
+obstacle_time_gap = np.asarray(obstacle_time_gap)
 obstacle_time_gap_orig = obstacle_time_gap

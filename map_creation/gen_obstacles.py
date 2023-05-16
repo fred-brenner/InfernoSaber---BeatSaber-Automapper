@@ -23,8 +23,8 @@ def add_obstacle(obstacles: list, position: int, first_time, last_time):
     # Add new obstacle
     rand_type = randint(0, len(config.obstacle_allowed_types) - 1)
     o_type = config.obstacle_allowed_types[rand_type]
-    first_time += config.obstacle_time_gap
-    last_time -= config.obstacle_time_gap
+    first_time += config.obstacle_time_gap[0]
+    last_time -= config.obstacle_time_gap[1]
 
     duration = last_time - first_time
     # _obstacles":[{"_time":64.39733123779297,"_lineIndex":0,
@@ -36,7 +36,7 @@ def add_obstacle(obstacles: list, position: int, first_time, last_time):
 
 def check_obstacle_times(first_time, last_time):
     time_diff = last_time - first_time
-    if time_diff <= config.obstacle_min_duration + config.obstacle_time_gap * 2:
+    if time_diff <= config.obstacle_min_duration + sum(config.obstacle_time_gap):
         return False
     else:
         return True
