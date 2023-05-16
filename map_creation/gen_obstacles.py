@@ -60,8 +60,8 @@ def combine_obstacles(obstacles_all, times_empty):
                     obst_temp.append(cur_obstacle)
                     first_time = t_empty
         dur_temp = round(last_time - first_time, 1)
-        if dur_temp < 0:
-            print("Error. Encountered negative duration for obstacles! Exclude.")
+        # if dur_temp < 0:
+        #     print("Error. Encountered negative duration for obstacles! Exclude.")
         if dur_temp > 0:
             cur_obstacle = [first_time, position, o_type, dur_temp, width]
             obst_temp.append(cur_obstacle)
