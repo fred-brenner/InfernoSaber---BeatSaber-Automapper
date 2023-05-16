@@ -40,7 +40,7 @@ obstacle_max_count = 2      # maximum appearance count for obstacles
 sporty_obstacles = True
 
 """Caution on changes"""
-obstacle_crouch_width = 3
+obstacle_crouch_width = 4
 if not sporty_obstacles:
     obstacle_allowed_types = [0, 1]     # 0wall, 1ceiling, 2jump, 3onesaber
     obstacle_positions = [[0], [3]]     # outside position of notes

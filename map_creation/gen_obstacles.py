@@ -67,11 +67,10 @@ def combine_obstacles(obstacles_all, times_empty):
             obst_temp.append(cur_obstacle)
         return obst_temp
 
-    def check_saved_times(first, last, lt_save_first, lt_save_last):
+    def check_saved_times(first, last, lt_save_first, lt_save_last, diff_min):
         if len(lt_save_last) == 0 or not config.sporty_obstacles:
             return first, last
         first_last = [first, last]
-        diff_min = round(max(config.obstacle_time_gap), 1)
         for i_save, lt_save in enumerate([lt_save_last, lt_save_first]):
             diff_array = np.asarray(lt_save) - first_last[i_save]
             # only check negative values as positive are not possible for sporty mode
@@ -109,6 +108,7 @@ def combine_obstacles(obstacles_all, times_empty):
 
     last_time_saves = []
     first_time_saves = []
+    diff_gap_min = round(max(config.obstacle_time_gap), 1)
     for idx, common_val in enumerate([common_val1, common_val2]):
         t_first = -1
         t_last = 0
@@ -120,8 +120,10 @@ def combine_obstacles(obstacles_all, times_empty):
                 t_last = t
             elif t > t_last + 2 * step_size:
                 rnd_pos = randint(0, len(config.obstacle_positions[idx]) - 1)
-                t_first, t_last = check_saved_times(t_first, t_last, first_time_saves, last_time_saves)
-                obstacles = found_obstacle(obstacles, t_first, t_last, config.obstacle_positions[idx][rnd_pos])
+                t_first, t_last = check_saved_times(t_first, t_last, first_time_saves,
+                                                    last_time_saves, diff_gap_min)
+                obstacles = found_obstacle(obstacles, t_first, t_last,
+                                           config.obstacle_positions[idx][rnd_pos])
                 first_time_saves.append(t_first)
                 last_time_saves.append(t_last)
                 t_first = -1
@@ -130,14 +132,17 @@ def combine_obstacles(obstacles_all, times_empty):
         if t_first > 0:
             if t_last - t_first >= config.obstacle_min_duration:
                 rnd_pos = randint(0, len(config.obstacle_positions[idx]) - 1)
-                t_first, t_last = check_saved_times(t_first, t_last, first_time_saves, last_time_saves)
-                obstacles = found_obstacle(obstacles, t_first, t_last, config.obstacle_positions[idx][rnd_pos])
+                t_first, t_last = check_saved_times(t_first, t_last, first_time_saves,
+                                                    last_time_saves, diff_gap_min)
+                obstacles = found_obstacle(obstacles, t_first, t_last,
+                                           config.obstacle_positions[idx][rnd_pos])
                 first_time_saves.append(t_first)
                 last_time_saves.append(t_last)
 
     # Obstacles for both sides on
     t_first = -1
     t_last = 0
+    diff_gap_min = round(max(config.obstacle_time_gap) * 0.5, 1)
     for t in common_val3:
         if t_first == -1:
             t_first = t
@@ -153,11 +158,15 @@ def combine_obstacles(obstacles_all, times_empty):
                     obstacle_pos[1] = 3
             if obstacle_pos[0] == 1 and obstacle_pos[1] == 2:
                 # crouch obstacle
+                # t_first, t_last = check_saved_times(t_first, t_last, first_time_saves,
+                #                                     last_time_saves, diff_gap_min)
                 t_first += 0.2  # allow more time for crouching
-                obstacles = found_obstacle(obstacles, t_first, t_last, randint(1, 2),
+                t_last -= 0.2
+                obstacles = found_obstacle(obstacles, t_first, t_last, 0,
                                            config.obstacle_crouch_width)
             else:
-                t_first, t_last = check_saved_times(t_first, t_last, first_time_saves, last_time_saves)
+                t_first, t_last = check_saved_times(t_first, t_last, first_time_saves,
+                                                    last_time_saves, diff_gap_min)
                 obstacles = found_obstacle(obstacles, t_first, t_last, obstacle_pos[0])
                 obstacles = found_obstacle(obstacles, t_first, t_last, obstacle_pos[1])
             t_first = -1
