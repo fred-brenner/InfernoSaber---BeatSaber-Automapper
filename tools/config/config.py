@@ -41,11 +41,12 @@ obstacle_max_count = 2      # maximum appearance count for obstacles
 sporty_obstacles = True
 
 """Caution on changes"""
+obstacle_crouch_width = 3
 if not sporty_obstacles:
     obstacle_allowed_types = [0, 1]     # 0wall, 1ceiling, 2jump, 3onesaber
     obstacle_positions = [[0], [3]]     # outside position of notes
 else:
-    obstacle_allowed_types = [1]    # only ceiling walls
+    obstacle_allowed_types = [0, 1]    # (ceiling walls for crouch are fixed)
     obstacle_positions = [[0, 1], [2, 3]]     # inside position of notes
 obstacle_width = 1
 check_silence_flag = True   # check for extremely silent songs

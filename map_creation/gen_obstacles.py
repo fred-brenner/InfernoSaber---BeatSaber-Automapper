@@ -43,9 +43,12 @@ def check_obstacle_times(first_time, last_time):
 
 
 def combine_obstacles(obstacles_all, times_empty):
-    def found_obstacle(obst_temp, first_time, last_time, position):
-        rand_type = randint(0, len(config.obstacle_allowed_types) - 1)
-        o_type = config.obstacle_allowed_types[rand_type]
+    def found_obstacle(obst_temp, first_time, last_time, position, width=config.obstacle_width):
+        if width > 2:
+            o_type = 1  # only allow ceiling type for crouch walls
+        else:
+            rand_type = randint(0, len(config.obstacle_allowed_types) - 1)
+            o_type = config.obstacle_allowed_types[rand_type]
 
         for t_empty in times_empty:
             if first_time >= t_empty:
@@ -53,18 +56,14 @@ def combine_obstacles(obstacles_all, times_empty):
             else:
                 if t_empty < last_time:
                     dur_temp = round(t_empty - first_time - 0.1, 1)
-                    if not 0 < dur_temp < 15:
-                        print(f"obstacle: {dur_temp}")
-                    cur_obstacle = [first_time, position, o_type, dur_temp, config.obstacle_width]
+                    cur_obstacle = [first_time, position, o_type, dur_temp, width]
                     obst_temp.append(cur_obstacle)
                     first_time = t_empty
         dur_temp = round(last_time - first_time, 1)
         if dur_temp < 0:
             print("Error. Encountered negative duration for obstacles! Exclude.")
         if dur_temp > 0:
-            if not 0 < dur_temp < 15:
-                print(f"obstacle: {dur_temp}")
-            cur_obstacle = [first_time, position, o_type, dur_temp, config.obstacle_width]
+            cur_obstacle = [first_time, position, o_type, dur_temp, width]
             obst_temp.append(cur_obstacle)
         return obst_temp
 
@@ -82,11 +81,18 @@ def combine_obstacles(obstacles_all, times_empty):
     common_val1.sort()
     common_val2.sort()
 
+    if config.sporty_obstacles:
+        common_val3 = list(set(common_val1).intersection(common_val2))
+        common_val3.sort()
+    else:
+        common_val3 = []
     for idx, common_val in enumerate([common_val1, common_val2]):
         t_first = -1
         t_last = 0
         for t in common_val:
-            if t_first == -1:
+            if t in common_val3:
+                pass    # do later for both sides active
+            elif t_first == -1:
                 t_first = t
                 t_last = t
             elif t > t_last + 2 * step_size:
@@ -99,6 +105,28 @@ def combine_obstacles(obstacles_all, times_empty):
             if t_last - t_first >= config.obstacle_min_duration:
                 rnd_pos = randint(0, len(config.obstacle_positions[idx]) - 1)
                 obstacles = found_obstacle(obstacles, t_first, t_last, config.obstacle_positions[idx][rnd_pos])
+    # Obstacles for both sides on
+    t_first = -1
+    t_last = 0
+    for t in common_val3:
+        if t_first == -1:
+            t_first = t
+            t_last = t
+        elif t > t_last + 2 * step_size:
+            obstacle_pos = []
+            for idx in range(2):
+                rnd_pos = randint(0, len(config.obstacle_positions[idx]) - 1)
+                obstacle_pos.append(config.obstacle_positions[idx][rnd_pos])
+            if obstacle_pos[0] == 1 and obstacle_pos[1] == 2:
+                # crouch obstacle
+                obstacles = found_obstacle(obstacles, t_first, t_last, randint(1, 2),
+                                           config.obstacle_crouch_width)
+            else:
+                obstacles = found_obstacle(obstacles, t_first, t_last, obstacle_pos[0])
+                obstacles = found_obstacle(obstacles, t_first, t_last, obstacle_pos[1])
+            t_first = -1
+        else:
+            t_last = t
 
     return obstacles
 
