@@ -137,6 +137,10 @@ def combine_obstacles(obstacles_all, times_empty):
             for idx in range(2):
                 rnd_pos = randint(0, len(config.obstacle_positions[idx]) - 1)
                 obstacle_pos.append(config.obstacle_positions[idx][rnd_pos])
+            if t_first < 10:
+                # do not allow crouching at the beginning of song
+                if obstacle_pos[0] == 1 and obstacle_pos[1] == 2:
+                    obstacle_pos[1] = 3
             if obstacle_pos[0] == 1 and obstacle_pos[1] == 2:
                 # crouch obstacle
                 obstacles = found_obstacle(obstacles, t_first, t_last, randint(1, 2),
@@ -153,7 +157,7 @@ def combine_obstacles(obstacles_all, times_empty):
 
 def calculate_obstacles(notes, timings):
     obstacles_all = [[], [], [], []]
-    rows_last = [1, 1, 1, 1]
+    rows_last = [2, 2, 2, 2]
     times_empty = [0]
     for idx in range(len(notes)):
         if len(notes[idx]) == 0:
