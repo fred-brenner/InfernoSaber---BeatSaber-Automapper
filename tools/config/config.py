@@ -6,7 +6,7 @@ import numpy as np
 
 # Map creation model configuration
 """Do change"""
-max_speed = 4 * 7.0         # set around 5-40 (normal-expert++)
+max_speed = 4 * 5.6         # set around 5-40 (normal-expert++)
 add_beat_intensity = 110    # try to match bps by x% [80, 110]
 expert_fact = 0.63          # expert plus to expert factor [0.6, 0.7]
 create_expert_flag = True   # create second expert map
@@ -37,7 +37,7 @@ add_obstacle_flag = True    # add obstacles in free areas
 obstacle_time_gap = [0.3, 0.7]     # time gap before [0.2-1] after [0.5-2]
 obstacle_min_duration = 0.1  # minimum duration for each obstacle [0.1-2]
 obstacle_max_count = 2      # maximum appearance count for obstacles
-sporty_obstacles = True
+sporty_obstacles = False
 
 """Caution on changes"""
 obstacle_crouch_width = 4
@@ -46,7 +46,7 @@ if not sporty_obstacles:
     obstacle_positions = [[0], [3]]     # outside position of notes
 else:
     obstacle_allowed_types = [0, 1]    # (ceiling walls for crouch are fixed)
-    obstacle_positions = [[0, 1], [2, 3]]     # inside position of notes
+    obstacle_positions = [[0, 1, 1], [2, 2, 3]]     # inside position of notes
 obstacle_width = 1
 check_silence_flag = True   # check for extremely silent songs
 check_silence_value = -14.2  # value in dB [-13 to -15]
@@ -134,5 +134,6 @@ event_batch_size = 128
 max_speed_orig = max_speed
 add_beat_intensity_orig = add_beat_intensity
 silence_threshold_orig = silence_threshold
+jump_speed_offset_orig = jump_speed_offset
 obstacle_time_gap = np.asarray(obstacle_time_gap)
 obstacle_time_gap_orig = obstacle_time_gap

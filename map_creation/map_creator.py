@@ -104,11 +104,11 @@ def notes_to_json(notes, timings):
     for idx in range(len(notes)):
         for n in range(int(len(notes[idx])/4)):
             note_json += '{'
-            note_json += f'"_time":{timings[idx]:.6f},' \
-                         f'"_lineIndex":{int(notes[idx][0 + 4*n])},' \
-                         f'"_lineLayer":{int(notes[idx][1 + 4*n])},' \
-                         f'"_type":{int(notes[idx][2 + 4*n])},' \
-                         f'"_cutDirection":{int(notes[idx][3 + 4*n])}'
+            note_json += f'"_time":{timings[idx]:.5f},' \
+                         f'"_lineIndex":{notes[idx][0 + 4*n]:.0f},' \
+                         f'"_lineLayer":{notes[idx][1 + 4*n]:.0f},' \
+                         f'"_type":{notes[idx][2 + 4*n]:.0f},' \
+                         f'"_cutDirection":{notes[idx][3 + 4*n]:.0f}'
             note_json += '},'
 
             # "_notes":[{"_time":4.116666793823242,
@@ -132,9 +132,9 @@ def events_to_json(notes, timings):
     note_json = ""
     for idx in range(len(notes)):
         note_json += '{'
-        note_json += f'"_time":{timings[idx]:.5f},' \
-                     f'"_type":{int(notes[idx][0])},' \
-                     f'"_value":{int(notes[idx][1])}'
+        note_json += f'"_time":{timings[idx]:.4f},' \
+                     f'"_type":{notes[idx][0]:.0f},' \
+                     f'"_value":{notes[idx][1]:.0f}'
         note_json += '},'
         # "_events":[{"_time":4.1,"_type":3,"_value":1},
 
@@ -151,11 +151,11 @@ def obstacles_to_json(obstacles, bpm):
     note_json = ""
     for idx in range(len(obstacles)):
         note_json += '{'
-        note_json += f'"_time":{obstacles[idx][0]:3f},' \
-                     f'"_lineIndex":{int(obstacles[idx][1])},' \
-                     f'"_type":{int(obstacles[idx][2])},' \
-                     f'"_duration":{obstacles[idx][3]:.2f},' \
-                     f'"_width":{int(obstacles[idx][4])}'
+        note_json += f'"_time":{obstacles[idx][0]:.4f},' \
+                     f'"_lineIndex":{obstacles[idx][1]:.0f},' \
+                     f'"_type":{obstacles[idx][2]:.0f},' \
+                     f'"_duration":{obstacles[idx][3]:.3f},' \
+                     f'"_width":{obstacles[idx][4]:.0f}'
         note_json += '},'
         # _obstacles":[{"_time":64.39733123779297,"_lineIndex":0,
         #               "_type":0,"_duration":6.5,"_width":1}
