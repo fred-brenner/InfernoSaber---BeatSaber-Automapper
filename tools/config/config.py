@@ -37,7 +37,7 @@ add_obstacle_flag = True    # add obstacles in free areas
 obstacle_time_gap = [0.3, 0.7]     # time gap before [0.2-1] after [0.5-2]
 obstacle_min_duration = 0.1  # minimum duration for each obstacle [0.1-2]
 obstacle_max_count = 2      # maximum appearance count for obstacles
-sporty_obstacles = True
+sporty_obstacles = False
 
 """Caution on changes"""
 obstacle_crouch_width = 4

@@ -35,6 +35,8 @@ def main(name_ar: list) -> bool:
         config.add_beat_intensity = config.add_beat_intensity_orig + 10
         config.silence_threshold = (1 - 0.4 * (config.max_speed_orig / 40)) * \
                                    config.silence_threshold_orig
+        if config.silence_threshold < 0.02:
+            config.silence_threshold = 0.02
 
     if config.emphasize_beats_flag:
         if config.add_silence_flag:
@@ -49,7 +51,6 @@ def main(name_ar: list) -> bool:
             config.add_beat_intensity -= 5
         else:
             config.add_beat_intensity = config.add_beat_intensity_orig - 5
-
 
     # load song data
     song_input, pitch_input = find_beats(name_ar, train_data=False)

@@ -142,7 +142,7 @@ def combine_obstacles(obstacles_all, times_empty):
     # Obstacles for both sides on
     t_first = -1
     t_last = 0
-    diff_gap_min = round(max(config.obstacle_time_gap) * 0.5, 1)
+    diff_gap_min = round(max(config.obstacle_time_gap), 1)
     for t in common_val3:
         if t_first == -1:
             t_first = t
@@ -160,8 +160,8 @@ def combine_obstacles(obstacles_all, times_empty):
                 # crouch obstacle
                 # t_first, t_last = check_saved_times(t_first, t_last, first_time_saves,
                 #                                     last_time_saves, diff_gap_min)
-                t_first += 0.2  # allow more time for crouching
-                t_last -= 0.2
+                t_first += 0.1  # allow more time for crouching
+                t_last -= 0.1
                 obstacles = found_obstacle(obstacles, t_first, t_last, 0,
                                            config.obstacle_crouch_width)
             else:
