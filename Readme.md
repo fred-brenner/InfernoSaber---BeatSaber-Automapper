@@ -11,21 +11,22 @@
 
 
 ## Roadmap 2023
-May:
+Already Finished:
 
     Publish InfernoSaber
-    Add bombs in unused spaces (?)
     Add obstacles in unused spaces
+    Simple cardio obstacle model
 
 Mid of 2023:
 
-    Create Obstacle AI Model
-    Create InfernoSaber server (?)
+    Create InfernoSaber website/independent server (?)
+    Rework AI model to create "impossible" note speeds
 
 End of 2023:
 
     Create Cardio Obstacle AI Model
     Check out Reinforcement Models
+    Add bombs in unused spaces (?)
 
 
 ## Automapper for Beatsaber made for expert+ levels
@@ -44,8 +45,8 @@ The automapper consists of 4 consecutive AI models:
 3. Deep Neural Network (Classification) - mapping the notes/bombs
 4. Deep Neural Network (Classification) - mapping the events/lights
 
-An overview over the current status of map generation (including BSMapper, BeatSage and InfernoSaber_v1.1) can be found at:
-https://youtu.be/Jk9KG5EYEOY
+An overview over the current status of map generation (and past ones) can be found at:
+https://youtu.be/2uK22jXeNLw
 
 ### Author: Frederic Brenner
 frederic.brenner@tum.de
@@ -56,8 +57,9 @@ frederic.brenner@tum.de
 anaconda_environment.yaml
 
 ## To run automapper go to:
-Download models from GDrive link in model_data/Data/model/link_to_model.txt
-(not updated)
+[Outdated] Download models from GDrive link in model_data/Data/model/link_to_model.txt
+
+[Currently] Create Colab notebook and download model data from the created GDrive repository.
 
 run main.py
 
