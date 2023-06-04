@@ -1,3 +1,4 @@
+import numpy as np
 ########################################
 # config file for all important values 
 # used in multiple codes
@@ -5,13 +6,13 @@
 
 # Map creation model configuration
 """Do change"""
-max_speed = 4 * 8.0         # set around 5-40 (normal-expert++)
-add_beat_intensity = 100    # try to match bps by x% [80, 110]
+max_speed = 4 * 5.6         # set around 5-40 (normal-expert++)
+add_beat_intensity = 110    # try to match bps by x% [80, 110]
 expert_fact = 0.63          # expert plus to expert factor [0.6, 0.7]
 create_expert_flag = True   # create second expert map
 thresh_beat = 0.48          # minimum beat response required to trigger generator
-thresh_pitch = 1.10         # minimum beat for pitch check (0.8,low-1.5,high)
-threshold_end = 1.2         # factor for start and end threshold
+thresh_pitch = 1.00         # minimum beat for pitch check (0.8,low-1.5,high)
+threshold_end = 1.1         # factor for start and end threshold
 random_note_map_factor = 0.3    # stick note map to random song/center (set to 0 to disable)
 random_note_map_change = 3      # change frequency for center (1-5)
 quick_start = 1.9           # map quick start mode (0 off, 1-3 on)
@@ -32,10 +33,23 @@ silence_threshold = 0.17    # silence threshold [0.0, 0.3]
 silence_thresh_hard = 0.2   # add fixed threshold to dynamic value [0-2]
 add_silence_flag = True     # whether to apply silence threshold
 emphasize_beats_flag = True     # emphasize beats into double notes
+add_obstacle_flag = True    # add obstacles in free areas
+obstacle_time_gap = [0.3, 0.7]     # time gap before [0.2-1] after [0.5-2]
+obstacle_min_duration = 0.1  # minimum duration for each obstacle [0.1-2]
+obstacle_max_count = 2      # maximum appearance count for obstacles
+sporty_obstacles = False
 
 """Caution on changes"""
+obstacle_crouch_width = 4
+if not sporty_obstacles:
+    obstacle_allowed_types = [0, 1]     # 0wall, 1ceiling, 2jump, 3onesaber
+    obstacle_positions = [[0], [3]]     # outside position of notes
+else:
+    obstacle_allowed_types = [0, 1]    # (ceiling walls for crouch are fixed)
+    obstacle_positions = [[0, 1, 1], [2, 2, 3]]     # inside position of notes
+obstacle_width = 1
 check_silence_flag = True   # check for extremely silent songs
-check_silence_value = -14.0  # value in dB [-13 to -15]
+check_silence_value = -14.2  # value in dB [-13 to -15]
 jsb_offset = [0.21, 0.15]   # note jump speed offset for Expert, Expert+ (range [-0.5, 0.5])
 jsb_offset_factor = 0.011   # note jump factor for high difficulties
 use_fixed_bpm = 100         # use fixed bpm or set to None for the song bpm
@@ -57,8 +71,6 @@ emphasize_beats_2 = 0.68    # fraction beats to double
 emphasize_beats_2_fact = 0.002   # factor incl max_speed
 emphasize_beats_quantile = 0.8
 shift_beats_fact = 0.30     # fraction beats to shift in cut direction
-add_beat_low_bound = 0.20   # in seconds (beat_generator)
-add_beat_hi_bound = 0.90    # in seconds (beat_generator)
 add_beat_fact = 0.90        # fraction add beats (beat_generator)
 add_beat_max_bounds = [0.1, 0.5, 0.8, 1.6]
 pitches_allowed = [40, 50]  # percentage of pitches to be over threshold
@@ -120,3 +132,6 @@ event_batch_size = 128
 max_speed_orig = max_speed
 add_beat_intensity_orig = add_beat_intensity
 silence_threshold_orig = silence_threshold
+jump_speed_offset_orig = jump_speed_offset
+obstacle_time_gap = np.asarray(obstacle_time_gap)
+obstacle_time_gap_orig = obstacle_time_gap

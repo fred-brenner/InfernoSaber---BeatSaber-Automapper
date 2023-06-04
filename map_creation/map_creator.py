@@ -6,6 +6,7 @@ import os
 import shutil
 
 from map_creation.sanity_check import sanity_check_notes
+from map_creation.gen_obstacles import calculate_obstacles
 from tools.config import config, paths
 
 
@@ -31,6 +32,9 @@ def create_map(y_class_num, timings, events, name, bpm, pitch_algo, pitch_times)
 
         # run all beat and note sanity checks
         notes = sanity_check_notes(notes, timings, pitch_algo, pitch_times)
+
+        obstacles = calculate_obstacles(notes, timings)
+
         # compensate bps
         timings = timings * bpm / 60
         assert(len(timings) == len(notes))
@@ -44,7 +48,9 @@ def create_map(y_class_num, timings, events, name, bpm, pitch_algo, pitch_times)
         file = f'{new_map_folder}{bs_diff}.dat'
         events_json = events_to_json(events, timings)
         notes_json = notes_to_json(notes, timings)
-        complete_map = get_map_string(notes=notes_json, events=events_json)
+        obstacles_json = obstacles_to_json(obstacles, bpm)
+        complete_map = get_map_string(notes=notes_json, events=events_json,
+                                      obstacles=obstacles_json)
         with open(file, 'w') as f:
             f.write(complete_map)
 
@@ -98,11 +104,11 @@ def notes_to_json(notes, timings):
     for idx in range(len(notes)):
         for n in range(int(len(notes[idx])/4)):
             note_json += '{'
-            note_json += f'"_time":{timings[idx]},' \
-                         f'"_lineIndex":{int(notes[idx][0 + 4*n])},' \
-                         f'"_lineLayer":{int(notes[idx][1 + 4*n])},' \
-                         f'"_type":{int(notes[idx][2 + 4*n])},' \
-                         f'"_cutDirection":{int(notes[idx][3 + 4*n])}'
+            note_json += f'"_time":{timings[idx]:.5f},' \
+                         f'"_lineIndex":{notes[idx][0 + 4*n]:.0f},' \
+                         f'"_lineLayer":{notes[idx][1 + 4*n]:.0f},' \
+                         f'"_type":{notes[idx][2 + 4*n]:.0f},' \
+                         f'"_cutDirection":{notes[idx][3 + 4*n]:.0f}'
             note_json += '},'
 
             # "_notes":[{"_time":4.116666793823242,
@@ -126,11 +132,33 @@ def events_to_json(notes, timings):
     note_json = ""
     for idx in range(len(notes)):
         note_json += '{'
-        note_json += f'"_time":{timings[idx]},' \
-                     f'"_type":{int(notes[idx][0])},' \
-                     f'"_value":{int(notes[idx][1])}'
+        note_json += f'"_time":{timings[idx]:.4f},' \
+                     f'"_type":{notes[idx][0]:.0f},' \
+                     f'"_value":{notes[idx][1]:.0f}'
         note_json += '},'
         # "_events":[{"_time":4.1,"_type":3,"_value":1},
+
+    # remove last comma
+    note_json = note_json[:-1]
+
+    return note_json
+
+
+def obstacles_to_json(obstacles, bpm):
+    obstacles = np.asarray(obstacles)
+    obstacles[:, 0] = obstacles[:, 0] * bpm / 60
+    obstacles[:, 3] = obstacles[:, 3] * bpm / 60
+    note_json = ""
+    for idx in range(len(obstacles)):
+        note_json += '{'
+        note_json += f'"_time":{obstacles[idx][0]:.4f},' \
+                     f'"_lineIndex":{obstacles[idx][1]:.0f},' \
+                     f'"_type":{obstacles[idx][2]:.0f},' \
+                     f'"_duration":{obstacles[idx][3]:.3f},' \
+                     f'"_width":{obstacles[idx][4]:.0f}'
+        note_json += '},'
+        # _obstacles":[{"_time":64.39733123779297,"_lineIndex":0,
+        #               "_type":0,"_duration":6.5,"_width":1}
 
     # remove last comma
     note_json = note_json[:-1]

@@ -77,8 +77,8 @@ def check_music_files(files, dir_path):
 
 def convert_music_file(file_name, output_file):
     # Load the mp3 file
-    format = file_name.split('.')[-1]
-    audio = AudioSegment.from_file(file_name, format=format)
+    m_format = file_name.split('.')[-1]
+    audio = AudioSegment.from_file(file_name, format=m_format)
 
     # Export the audio as ogg file
     audio.export(output_file, format="ogg")

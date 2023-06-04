@@ -517,111 +517,111 @@ def shift_blocks_middle(notes_r, notes_l, notes_b):
     return notes_r, notes_l, notes_b
 
 
-def add_pause_bombs(notes_r, notes_l, notes_b, timings, pitch_algo, pitch_times):
-    # add bombs between notes to improve flow
-
-    # calculate time difference between notes
-    time_diffs = np.concatenate((np.ones(1), np.diff(timings)), axis=0)
-    note_r_mask = np.asarray([1 if len(x) > 0 else 0 for x in notes_r])
-    note_l_mask = np.asarray([1 if len(x) > 0 else 0 for x in notes_l])
-    time_diff_r = time_diffs * note_r_mask
-    time_diff_l = time_diffs * note_l_mask
-
-    # walk through notes times
-    new_bomb_times = []
-    new_bomb_pos = []
-
-    def add_bomb_pos(up=True, right=True, n=1):
-        if up:
-            n_up = 2
-        else:
-            n_up = 0
-        if right:
-            n_right = [2, 3]
-        else:
-            n_left = [0, 1]
-        # [2, 2, 3, 8, 3, 2, 3, 8]
-        bomb_ar = n * [[n_right[0], n_up, 3, 8, n_right[1], n_up, 3, 8]]
-        return bomb_ar
-
-    def get_time_pos(time_window, pitch_algo, pitch_times):
-        # get the time indices
-        pitch_times = pitch_times[0]
-        t1_all = pitch_times - time_window[0]
-        t1_all = np.argmax(t1_all >= config.t_diff_bomb_react)
-        t2_all = pitch_times - time_window[1]
-        t2_all = np.argmin(t2_all <= -config.t_diff_bomb_react) - 1
-        t1_beat = pitch_algo - time_window[0]
-        t1_beat = np.argmax(t1_beat >= config.t_diff_bomb_react)
-        t2_beat = pitch_algo - time_window[1]
-        t2_beat = np.argmin(t2_beat <= -config.t_diff_bomb_react) - 1
-
-        t_pos_all = pitch_times[t1_all:t2_all]
-        if t1_beat < t2_beat:
-            t_pos_beat = pitch_algo[t1_beat:t2_beat]
-        else:
-            t_pos_beat = []
-        return t_pos_all, t_pos_beat
-
-    # check right notes
-    for idx, t_diff in enumerate(time_diff_r):
-        if idx == 0:
-            continue
-        # (TODO: not finished)
-        if t_diff > config.t_diff_bomb:
-            # add bombs
-            cur_notes = notes_r[idx]
-            # get all positions of the current notes
-            positions = calc_note_pos(cur_notes, add_cut=False)
-            # get (first) cut_dir
-            cut_x, cut_y = get_cut_dir_xy(cur_notes[3])
-
-            # get time window
-            time_window = [timings[idx - 1], timings[idx]]
-            time_pos_all, time_pos_beat = get_time_pos(time_window, pitch_algo, pitch_times)
-
-            if cut_y == 1:
-                # next note is downwards -> bombs down
-                new_bomb_times.extend(time_pos_all)
-                new_bomb_pos.extend(add_bomb_pos(up=False, right=True, n=len(time_pos_all)))
-            elif cut_y == -1:
-                # next note is upwards -> bombs up
-                new_bomb_times.extend(time_pos_all)
-                new_bomb_pos.extend(add_bomb_pos(up=True, right=True, n=len(time_pos_all)))
-            else:
-                pass
-
-        # check left notes
-        for idx, t_diff in enumerate(time_diff_l):
-            if idx == 0:
-                continue
-            if t_diff > config.t_diff_bomb:
-                # add bombs
-                cur_notes = notes_l[idx]
-                # get all positions of the current notes
-                positions = calc_note_pos(cur_notes, add_cut=False)
-                # get (first) cut_dir
-                cut_x, cut_y = get_cut_dir_xy(cur_notes[3])
-
-                # get time window
-                time_window = [timings[idx - 1], timings[idx]]
-                time_pos_all, time_pos_beat = get_time_pos(time_window, pitch_algo, pitch_times)
-
-                if cut_y == 1:
-                    # next note is downwards -> bombs down
-                    new_bomb_times.extend(time_pos_all)
-                    new_bomb_pos.extend(add_bomb_pos(up=False, right=False, n=len(time_pos_all)))
-                elif cut_y == -1:
-                    # next note is upwards -> bombs up
-                    new_bomb_times.extend(time_pos_all)
-                    new_bomb_pos.extend(add_bomb_pos(up=True, right=False, n=len(time_pos_all)))
-                else:
-                    pass
-
-    # add new bombs to notes framework
-    new_times = list(timings)
-    new_times.extend(new_bomb_times)
-    return notes_b
+# def add_pause_bombs(notes_r, notes_l, notes_b, timings, pitch_algo, pitch_times):
+#     # add bombs between notes to improve flow
+#
+#     # calculate time difference between notes
+#     time_diffs = np.concatenate((np.ones(1), np.diff(timings)), axis=0)
+#     note_r_mask = np.asarray([1 if len(x) > 0 else 0 for x in notes_r])
+#     note_l_mask = np.asarray([1 if len(x) > 0 else 0 for x in notes_l])
+#     time_diff_r = time_diffs * note_r_mask
+#     time_diff_l = time_diffs * note_l_mask
+#
+#     # walk through notes times
+#     new_bomb_times = []
+#     new_bomb_pos = []
+#
+#     def add_bomb_pos(up=True, right=True, n=1):
+#         if up:
+#             n_up = 2
+#         else:
+#             n_up = 0
+#         if right:
+#             n_right = [2, 3]
+#         else:
+#             n_left = [0, 1]
+#         # [2, 2, 3, 8, 3, 2, 3, 8]
+#         bomb_ar = n * [[n_right[0], n_up, 3, 8, n_right[1], n_up, 3, 8]]
+#         return bomb_ar
+#
+#     def get_time_pos(time_window, pitch_algo, pitch_times):
+#         # get the time indices
+#         pitch_times = pitch_times[0]
+#         t1_all = pitch_times - time_window[0]
+#         t1_all = np.argmax(t1_all >= config.t_diff_bomb_react)
+#         t2_all = pitch_times - time_window[1]
+#         t2_all = np.argmin(t2_all <= -config.t_diff_bomb_react) - 1
+#         t1_beat = pitch_algo - time_window[0]
+#         t1_beat = np.argmax(t1_beat >= config.t_diff_bomb_react)
+#         t2_beat = pitch_algo - time_window[1]
+#         t2_beat = np.argmin(t2_beat <= -config.t_diff_bomb_react) - 1
+#
+#         t_pos_all = pitch_times[t1_all:t2_all]
+#         if t1_beat < t2_beat:
+#             t_pos_beat = pitch_algo[t1_beat:t2_beat]
+#         else:
+#             t_pos_beat = []
+#         return t_pos_all, t_pos_beat
+#
+#     # check right notes
+#     for idx, t_diff in enumerate(time_diff_r):
+#         if idx == 0:
+#             continue
+#         # (TODO: not finished)
+#         if t_diff > config.t_diff_bomb:
+#             # add bombs
+#             cur_notes = notes_r[idx]
+#             # get all positions of the current notes
+#             positions = calc_note_pos(cur_notes, add_cut=False)
+#             # get (first) cut_dir
+#             cut_x, cut_y = get_cut_dir_xy(cur_notes[3])
+#
+#             # get time window
+#             time_window = [timings[idx - 1], timings[idx]]
+#             time_pos_all, time_pos_beat = get_time_pos(time_window, pitch_algo, pitch_times)
+#
+#             if cut_y == 1:
+#                 # next note is downwards -> bombs down
+#                 new_bomb_times.extend(time_pos_all)
+#                 new_bomb_pos.extend(add_bomb_pos(up=False, right=True, n=len(time_pos_all)))
+#             elif cut_y == -1:
+#                 # next note is upwards -> bombs up
+#                 new_bomb_times.extend(time_pos_all)
+#                 new_bomb_pos.extend(add_bomb_pos(up=True, right=True, n=len(time_pos_all)))
+#             else:
+#                 pass
+#
+#     # check left notes
+#     for idx, t_diff in enumerate(time_diff_l):
+#         if idx == 0:
+#             continue
+#         if t_diff > config.t_diff_bomb:
+#             # add bombs
+#             cur_notes = notes_l[idx]
+#             # get all positions of the current notes
+#             positions = calc_note_pos(cur_notes, add_cut=False)
+#             # get (first) cut_dir
+#             cut_x, cut_y = get_cut_dir_xy(cur_notes[3])
+#
+#             # get time window
+#             time_window = [timings[idx - 1], timings[idx]]
+#             time_pos_all, time_pos_beat = get_time_pos(time_window, pitch_algo, pitch_times)
+#
+#             if cut_y == 1:
+#                 # next note is downwards -> bombs down
+#                 new_bomb_times.extend(time_pos_all)
+#                 new_bomb_pos.extend(add_bomb_pos(up=False, right=False, n=len(time_pos_all)))
+#             elif cut_y == -1:
+#                 # next note is upwards -> bombs up
+#                 new_bomb_times.extend(time_pos_all)
+#                 new_bomb_pos.extend(add_bomb_pos(up=True, right=False, n=len(time_pos_all)))
+#             else:
+#                 pass
+#
+#     # add new bombs to notes framework
+#     new_times = list(timings)
+#     new_times.extend(new_bomb_times)
+#     return notes_b
 
 
 def turn_notes_single(notes_single):
