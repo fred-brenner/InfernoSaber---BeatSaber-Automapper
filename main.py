@@ -38,7 +38,7 @@ def main(diff: float, export_results_to_bs=True, quick_start=None,
         config.silence_threshold *= silence_factor
         config.silence_threshold_orig *= silence_factor
     if add_obstacles is not None:
-        config.add_obstacles = add_obstacles
+        config.add_obstacle_flag = add_obstacles
     if sporty_obstacles is not None:
         config.sporty_obstacles = sporty_obstacles
 
