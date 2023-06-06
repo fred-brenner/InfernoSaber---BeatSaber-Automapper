@@ -3,6 +3,14 @@ from random import randint
 
 from tools.config import config
 
+# Switch sport and obstacle mode
+if config.sporty_obstacles:
+    config.obstacle_allowed_types = config.sport_obstacle_allowed_types
+    config.obstacle_positions = config.sport_obstacle_positions
+else:
+    config.obstacle_allowed_types = config.norm_obstacle_allowed_types
+    config.obstacle_positions = config.norm_obstacle_positions
+
 
 def add_obstacle(obstacles: list, position: int, first_time, last_time):
     # check for multi occurrences of obstacles
