@@ -25,17 +25,20 @@ def main(diff: float, export_results_to_bs=True, quick_start=None,
     if quick_start is not None:
         config.quick_start = quick_start
     if beat_intensity is not None:
-        config.add_beat_intensity = beat_intensity  # + 10     # add 10% on top for add_breaks
+        config.add_beat_intensity = beat_intensity
+        config.add_beat_intensity_orig = beat_intensity
     if random_factor is not None:
         config.random_note_map_factor = random_factor
     if js_offset is not None:
         config.jump_speed_offset += js_offset
+        config.jump_speed_offset_orig += js_offset
     if allow_no_dir_flag is not None:
         config.allow_dot_notes = allow_no_dir_flag
     if silence_factor is not None:
         config.silence_threshold *= silence_factor
+        config.silence_threshold_orig *= silence_factor
     if add_obstacles is not None:
-        config.add_obstacles = add_obstacles
+        config.add_obstacle_flag = add_obstacles
     if sporty_obstacles is not None:
         config.sporty_obstacles = sporty_obstacles
 
@@ -137,7 +140,7 @@ if __name__ == "__main__":
             aof = True
         else:
             aof = False
-        print(f"Set allow_no_direction_flag to {aof}")
+        print(f"Set add_obstacle_flag to {aof}")
 
     sof = os.environ.get('sporty_obstacle_flag')
     if sof is not None:
@@ -145,7 +148,7 @@ if __name__ == "__main__":
             sof = True
         else:
             sof = False
-        print(f"Set allow_no_direction_flag to {sof}")
+        print(f"Set sporty_obstacle_flag to {sof}")
 
     export_results_to_bs = True
     main(diff, export_results_to_bs, qs, bi, rf, jso, ndf, sf, aof, sof)

@@ -20,6 +20,14 @@ def add_obstacle(obstacles: list, position: int, first_time, last_time):
     #             break
     # if obs_counter < config.obstacle_max_count:
 
+    # Switch sport and obstacle mode
+    if config.sporty_obstacles:
+        config.obstacle_allowed_types = config.sport_obstacle_allowed_types
+        config.obstacle_positions = config.sport_obstacle_positions
+    else:
+        config.obstacle_allowed_types = config.norm_obstacle_allowed_types
+        config.obstacle_positions = config.norm_obstacle_positions
+
     # Add new obstacle
     rand_type = randint(0, len(config.obstacle_allowed_types) - 1)
     o_type = config.obstacle_allowed_types[rand_type]

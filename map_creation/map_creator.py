@@ -33,7 +33,8 @@ def create_map(y_class_num, timings, events, name, bpm, pitch_algo, pitch_times)
         # run all beat and note sanity checks
         notes = sanity_check_notes(notes, timings, pitch_algo, pitch_times)
 
-        obstacles = calculate_obstacles(notes, timings)
+        if config.add_obstacle_flag:
+            obstacles = calculate_obstacles(notes, timings)
 
         # compensate bps
         timings = timings * bpm / 60
@@ -48,7 +49,10 @@ def create_map(y_class_num, timings, events, name, bpm, pitch_algo, pitch_times)
         file = f'{new_map_folder}{bs_diff}.dat'
         events_json = events_to_json(events, timings)
         notes_json = notes_to_json(notes, timings)
-        obstacles_json = obstacles_to_json(obstacles, bpm)
+        if config.add_obstacle_flag:
+            obstacles_json = obstacles_to_json(obstacles, bpm)
+        else:
+            obstacles_json = ""
         complete_map = get_map_string(notes=notes_json, events=events_json,
                                       obstacles=obstacles_json)
         with open(file, 'w') as f:
