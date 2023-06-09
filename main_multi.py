@@ -77,7 +77,7 @@ def main_multi(diff_list: list, export_results_to_bs=True):
                 print("Continue with next song")
                 continue
             end_time = time.time()
-            time_per_run = (2*time_per_run + (end_time - start_time)) / 3
+            time_per_run = (4*time_per_run + (end_time - start_time)) / 5
             # print(f"Time needed: {end_time - start_time}s")
 
     print("Running map combination")

@@ -45,6 +45,8 @@ def main(name_ar: list) -> bool:
             config.add_beat_intensity = config.add_beat_intensity_orig - 10
 
     config.obstacle_time_gap = config.obstacle_time_gap_orig * (1 - config.max_speed / 80)
+    if min(config.obstacle_time_gap) <= 0.1:
+        config.obstacle_time_gap = np.asarray([0.1, 0.25])
     if config.sporty_obstacles:
         config.jump_speed_offset = config.jump_speed_offset_orig - 0.3
         if config.add_silence_flag or config.emphasize_beats_flag:

@@ -1020,19 +1020,19 @@ def remove_silent_times(map_times, silent_times):
     return map_times
 
 
-def fill_map_times(map_times):
-    se_thresh = int(len(map_times) / 22)  # don't apply filling for first and last 4% of song
-    diff = np.diff(map_times)
-    new_map_times = []
-    for idx in range(se_thresh, len(diff) - se_thresh):
-        if config.add_beat_low_bound < diff[idx] < config.add_beat_hi_bound:
-            if np.random.random() < config.add_beat_fact:
-                beat_time = (map_times[idx] + map_times[idx + 1]) / 2
-                new_map_times.append(beat_time)
-    if len(new_map_times) > 0:
-        map_times = np.hstack((map_times, new_map_times))
-        map_times = np.sort(map_times)
-    return map_times
+# def fill_map_times(map_times):
+#     se_thresh = int(len(map_times) / 22)  # don't apply filling for first and last 4% of song
+#     diff = np.diff(map_times)
+#     new_map_times = []
+#     for idx in range(se_thresh, len(diff) - se_thresh):
+#         if config.add_beat_low_bound < diff[idx] < config.add_beat_hi_bound:
+#             if np.random.random() < config.add_beat_fact:
+#                 beat_time = (map_times[idx] + map_times[idx + 1]) / 2
+#                 new_map_times.append(beat_time)
+#     if len(new_map_times) > 0:
+#         map_times = np.hstack((map_times, new_map_times))
+#         map_times = np.sort(map_times)
+#     return map_times
 
 
 def fill_map_times_scale(map_times, scale_index=5):

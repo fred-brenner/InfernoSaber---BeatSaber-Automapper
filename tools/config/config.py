@@ -6,16 +6,16 @@ import numpy as np
 
 # Map creation model configuration
 """Do change"""
-max_speed = 4 * 5.6         # set around 5-40 (normal-expert++)
+max_speed = 4 * 7.5         # set around 5-40 (normal-expert++)
 add_beat_intensity = 110    # try to match bps by x% [80, 110]
 expert_fact = 0.63          # expert plus to expert factor [0.6, 0.7]
 create_expert_flag = True   # create second expert map
-thresh_beat = 0.48          # minimum beat response required to trigger generator
-thresh_pitch = 1.00         # minimum beat for pitch check (0.8,low-1.5,high)
+thresh_beat = 0.45          # minimum beat response required to trigger generator
+thresh_pitch = 1.1         # minimum beat for pitch check (0.8,low-1.5,high)
 threshold_end = 1.1         # factor for start and end threshold
 random_note_map_factor = 0.3    # stick note map to random song/center (set to 0 to disable)
 random_note_map_change = 3      # change frequency for center (1-5)
-quick_start = 1.9           # map quick start mode (0 off, 1-3 on)
+quick_start = 1.8           # map quick start mode (0 off, 1-3 on)
 t_diff_bomb = 1.5           # minimum time between notes to add bomb
 t_diff_bomb_react = 0.3     # minimum time between finished added bombs
 allow_mismatch_flag = False     # if True, wrong turned notes won't be removed
@@ -23,7 +23,7 @@ flow_model_flag = True      # use improved direction flow
 furious_lighting_flag = False   # increase frequency of light effects
 normalize_song_flag = True  # normalize song volume
 increase_volume_flag = True     # increase song volume (only used in combination with normalize flag)
-audio_rms_goal = 0.50
+audio_rms_goal = 0.55
 allow_dot_notes = True      # if False, all notes must have a cut direction
 jump_speed_offset = -0.4    # general offset for jump speed (range [-2, 2])
 map_filler_iters = 10       # max iterations for map filler
@@ -70,11 +70,11 @@ emphasize_beats_3 = 0.040   # fraction beats to triple
 emphasize_beats_3_fact = 0.001   # factor incl max_speed
 emphasize_beats_2 = 0.68    # fraction beats to double
 emphasize_beats_2_fact = 0.002   # factor incl max_speed
-emphasize_beats_quantile = 0.8
+emphasize_beats_quantile = 0.825
 shift_beats_fact = 0.30     # fraction beats to shift in cut direction
-add_beat_fact = 0.90        # fraction add beats (beat_generator)
+# add_beat_fact = 0.90        # fraction add beats (beat_generator)
 add_beat_max_bounds = [0.1, 0.5, 0.8, 1.6]
-pitches_allowed = [40, 50]  # percentage of pitches to be over threshold
+# pitches_allowed = [40, 50]  # percentage of pitches to be over threshold
 
 
 """Do not change"""
