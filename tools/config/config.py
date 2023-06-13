@@ -7,7 +7,7 @@ import numpy as np
 # Map creation model configuration
 """Do change"""
 max_speed = 4 * 7.5         # set around 5-40 (normal-expert++)
-add_beat_intensity = 110    # try to match bps by x% [80, 110]
+add_beat_intensity = 105    # try to match bps by x% [80, 110]
 expert_fact = 0.63          # expert plus to expert factor [0.6, 0.7]
 create_expert_flag = True   # create second expert map
 thresh_beat = 0.45          # minimum beat response required to trigger generator
@@ -24,7 +24,7 @@ furious_lighting_flag = False   # increase frequency of light effects
 normalize_song_flag = True  # normalize song volume
 increase_volume_flag = True     # increase song volume (only used in combination with normalize flag)
 audio_rms_goal = 0.55
-allow_dot_notes = True      # if False, all notes must have a cut direction
+allow_dot_notes = False      # if False, all notes must have a cut direction
 jump_speed_offset = -0.4    # general offset for jump speed (range [-2, 2])
 map_filler_iters = 10       # max iterations for map filler
 add_dot_notes = 2           # add dot notes for fastest patterns in percent [0-10]
@@ -75,7 +75,9 @@ shift_beats_fact = 0.30     # fraction beats to shift in cut direction
 # add_beat_fact = 0.90        # fraction add beats (beat_generator)
 add_beat_max_bounds = [0.1, 0.5, 0.8, 1.6]
 # pitches_allowed = [40, 50]  # percentage of pitches to be over threshold
-
+check_all_first_notes = False   # if False only change dot notes
+first_note_layer_threshold = 1  # Layer index from where first note should face up [0(all up)-3(all down)]
+allow_double_first_notes = False    # if False remove second note if necessary for first occurrence
 
 """Do not change"""
 # Data Processing configuration

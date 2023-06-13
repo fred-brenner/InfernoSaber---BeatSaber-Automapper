@@ -265,14 +265,39 @@ def emphasize_beats(notes, timings, notes_second):
     return notes
 
 
+def set_first_note_dir(notes_x):
+    for idx, first_note in enumerate(notes_x):
+        if len(first_note) > 0:
+            break
+
+    if not config.allow_double_first_notes:
+        if len(first_note) > 4:
+            # only keep first entry
+            first_note = first_note[0:4]
+            notes_x[idx] = first_note
+
+    if first_note[3] == 8 or config.check_all_first_notes:
+        # dot note is not allowed as first note
+        layer_pos = first_note[1]
+        if layer_pos >= config.first_note_layer_threshold:
+            # change direction to upwards
+            new_dir = 0
+        else:
+            # change direction to downwards
+            new_dir = 1
+        notes_x[idx][3] = new_dir
+
+    return notes_x
+
+
 def sanity_check_notes(notes: list, timings: list, pitch_algo: np.array, pitch_times):
     # last sanity check for notes,
     # result is written to map
 
-    # TODO: set first notes in direction if they are dots
-
     [notes_r, notes_l, notes_b] = split_notes_rl(notes)
-    # test = unpslit_notes(notes_r, notes_l, notes_b)
+
+    notes_r = set_first_note_dir(notes_r)
+    notes_l = set_first_note_dir(notes_l)
 
     # notes_r = correct_cut_dir(notes_r, timings)
     # notes_l = correct_cut_dir(notes_l, timings)
@@ -775,6 +800,7 @@ def turn_notes_single(notes_single):
 
 
 def correct_notes(notes, timings):
+    # calculate movement speed and remove too fast notes
     nl_last = None
     last_time = 0
     rm_counter = 0
