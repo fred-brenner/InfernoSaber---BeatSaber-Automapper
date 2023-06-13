@@ -652,7 +652,7 @@ def turn_notes_single(notes_single):
         return dirx, diry
 
     if config.flow_model_flag:
-        empty_note_last = False
+        # empty_note_last = False
         notes_old = None
         for idx, notes in enumerate(notes_single):
             if len(notes) == 0:
@@ -665,7 +665,7 @@ def turn_notes_single(notes_single):
                 notes_old = None
                 continue
             dirx, diry = get_move_dir_xy(notes, notes_old)
-            if notes[3] == 8:
+            if notes[3] == 8:       # TODO: Bug with T-Pain Panda Remix: first red is dot then no more notes!^
                 if config.allow_dot_notes:
                     dot_notes_rem.append(idx)  # remember to redo this
                 #     if not empty_note_last:
@@ -680,8 +680,8 @@ def turn_notes_single(notes_single):
                 new_cut_dir = reverse_get_cut_dir(dirx, diry)
                 notes[3] = new_cut_dir
                 notes_single[idx] = notes
-            else:  # last note has direction
-                empty_note_last = False
+            # else:  # last note has direction
+            #     empty_note_last = False
 
             # check if new flow direction suits to (inverse last) cut direction
             cd_old = get_cut_dir_xy(notes_old[3])
