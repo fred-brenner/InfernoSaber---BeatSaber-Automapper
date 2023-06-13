@@ -17,6 +17,7 @@ def create_map(y_class_num, timings, events, name, bpm, pitch_algo, pitch_times)
 
     notes = decode_beats(y_class_num, class_keys)
 
+    ################################################################
     def write_map(notes, timings, events, name, bpm, bs_diff, pitch_algo, pitch_times):
         # Sanity check timings for first notes
         time_last = 1.0
@@ -39,6 +40,7 @@ def create_map(y_class_num, timings, events, name, bpm, pitch_algo, pitch_times)
         # compensate bps
         timings = timings * bpm / 60
         assert(len(timings) == len(notes))
+
         ###########
         # write map
         ###########
@@ -64,6 +66,7 @@ def create_map(y_class_num, timings, events, name, bpm, pitch_algo, pitch_times)
         with open(file, 'w') as f:
             f.write(complete_info_map)
         return new_map_folder
+    ################################################################
 
     bs_diff = config.general_diff
     new_map_folder = write_map(notes.copy(), timings.copy(), events.copy(), name, bpm, bs_diff, pitch_algo, pitch_times)

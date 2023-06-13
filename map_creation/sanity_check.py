@@ -269,6 +269,8 @@ def sanity_check_notes(notes: list, timings: list, pitch_algo: np.array, pitch_t
     # last sanity check for notes,
     # result is written to map
 
+    # TODO: set first notes in direction if they are dots
+
     [notes_r, notes_l, notes_b] = split_notes_rl(notes)
     # test = unpslit_notes(notes_r, notes_l, notes_b)
 
@@ -287,6 +289,9 @@ def sanity_check_notes(notes: list, timings: list, pitch_algo: np.array, pitch_t
     notes_r = shift_blocks_up_down(notes_r, time_diffs)
     # shift notes left and right for better flow
     notes_l, notes_r = shift_blocks_left_right(notes_l, notes_r, time_diffs)
+
+    # TODO: apply wave pattern left to right shift
+
     # notes_r = shift_blocks_left_right(notes_r, False, time_diffs)
 
     # print("Right notes:", end=' ')
@@ -460,6 +465,7 @@ def correct_notes_all(notes_r, notes_l, notes_b, time_diff):
 
 
 def shift_blocks_middle(notes_r, notes_l, notes_b):
+    # Shift blocks up or down to prevent blocking view
     counter = 0
     for idx in range(len(notes_r)):
         nb = notes_b[idx]

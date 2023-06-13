@@ -106,9 +106,9 @@ def main(name_ar: list) -> bool:
     # apply beat sanity check (min time diff)
     y_beat = sanity_check_beat(y_beat)
 
-    #####################
-    # map class generator
-    #####################
+    ######################
+    # sanity check timings
+    ######################
     # get beat times
     timing_ar = y_beat * np.arange(0, len(y_beat), 1)
     timing_ar /= config.beat_spacing
@@ -152,6 +152,10 @@ def main(name_ar: list) -> bool:
 
     # calculate time between beats
     timing_diff_ar = calc_time_between_beats([map_times])
+
+    #####################
+    # apply map generator
+    #####################
 
     # load song data
     song_ar, rm_index = run_music_preprocessing(name_ar, time_ar=[map_times], save_file=False,
