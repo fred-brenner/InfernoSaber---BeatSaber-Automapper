@@ -24,7 +24,7 @@ furious_lighting_flag = False   # increase frequency of light effects
 normalize_song_flag = True  # normalize song volume
 increase_volume_flag = True     # increase song volume (only used in combination with normalize flag)
 audio_rms_goal = 0.55
-allow_dot_notes = False      # if False, all notes must have a cut direction
+allow_dot_notes = True      # if False, all notes must have a cut direction
 jump_speed_offset = -0.4    # general offset for jump speed (range [-2, 2])
 map_filler_iters = 10       # max iterations for map filler
 add_dot_notes = 2           # add dot notes for fastest patterns in percent [0-10]
@@ -78,6 +78,9 @@ add_beat_max_bounds = [0.1, 0.5, 0.8, 1.6]
 check_all_first_notes = False   # if False only change dot notes
 first_note_layer_threshold = 1  # Layer index from where first note should face up [0(all up)-3(all down)]
 allow_double_first_notes = False    # if False remove second note if necessary for first occurrence
+add_waveform_pattern_flag = True    # TODO: implement
+waveform_pattern = 'sine'  # waveform pattern [sine, triangle]
+
 
 """Do not change"""
 # Data Processing configuration

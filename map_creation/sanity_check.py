@@ -176,11 +176,11 @@ def add_breaks(notes_single, timings):
             else:
                 if strong_counter > pattern_length:
                     if idx < len(real_diffs_filt) - 2:
-                        if real_diffs_filt[idx+1] >= thresh_diffs and real_diffs_filt[idx+2] >= thresh_diffs:
+                        if real_diffs_filt[idx + 1] >= thresh_diffs and real_diffs_filt[idx + 2] >= thresh_diffs:
                             # remove next two notes
 
-                # if strong_reset >= strong_reset_threshold:
-                #     if strong_counter > pattern_length:
+                            # if strong_reset >= strong_reset_threshold:
+                            #     if strong_counter > pattern_length:
                             # add break
                             cur_idx = int(np.argwhere(timings == real_timings[idx])[0])
                             # remove this note
@@ -220,20 +220,20 @@ def emphasize_beats(notes, timings, notes_second):
             # get note positions on both sides
             notes_second_pos = []
             for i in range(0, len(notes_second[n]), 4):
-                notes_second_pos.append(notes_second[n][i+0:i+2])
+                notes_second_pos.append(notes_second[n][i + 0:i + 2])
             if len(notes_second_pos) > 0:
                 # only check if other side has notes too
                 notes_pos = []
                 for i in range(0, len(new_note), 4):
-                    notes_pos.append(new_note[i+0:i+2])
+                    notes_pos.append(new_note[i + 0:i + 2])
                 # sanity check for overlapping notes
-                for new_pos_i in range(len(notes_pos)-1, -1, -1):
+                for new_pos_i in range(len(notes_pos) - 1, -1, -1):
                     if notes_pos[new_pos_i] in notes_second_pos:
                         # remove particular note
-                        new_note.pop(new_pos_i*4)
-                        new_note.pop(new_pos_i*4)
-                        new_note.pop(new_pos_i*4)
-                        new_note.pop(new_pos_i*4)
+                        new_note.pop(new_pos_i * 4)
+                        new_note.pop(new_pos_i * 4)
+                        new_note.pop(new_pos_i * 4)
+                        new_note.pop(new_pos_i * 4)
 
             notes[n] = new_note
         return notes
@@ -313,7 +313,8 @@ def sanity_check_notes(notes: list, timings: list, pitch_algo: np.array, pitch_t
     notes_l = shift_blocks_up_down(notes_l, time_diffs)
     notes_r = shift_blocks_up_down(notes_r, time_diffs)
     # shift notes left and right for better flow
-    notes_l, notes_r = shift_blocks_left_right(notes_l, notes_r, time_diffs)
+    notes_l, notes_r = shift_blocks_left_right(notes_l, notes_r, time_diffs,
+                                               config.waveform_pattern)
 
     # TODO: apply wave pattern left to right shift
 
@@ -690,7 +691,7 @@ def turn_notes_single(notes_single):
                 notes_old = None
                 continue
             dirx, diry = get_move_dir_xy(notes, notes_old)
-            if notes[3] == 8:       # TODO: Bug with T-Pain Panda Remix: first red is dot then no more notes!^
+            if notes[3] == 8:
                 if config.allow_dot_notes:
                     dot_notes_rem.append(idx)  # remember to redo this
                 #     if not empty_note_last:
@@ -1164,7 +1165,24 @@ def shift_blocks_up_down(notes: list, time_diffs: np.array):
 #     return notes
 
 
-def shift_blocks_left_right(notes_l: list, notes_r: list, time_diffs: np.array):
+def apply_waveform_pattern(note_pos: list, waveform_pattern: str):
+    if waveform_pattern == "sine":
+        for i, pos in enumerate(note_pos):
+            if i % 2 == 0:
+                note_pos[i][0] += 1  # Shift right
+            else:
+                note_pos[i][0] -= 1  # Shift left
+    elif waveform_pattern == "triangle":
+        for i, pos in enumerate(note_pos):
+            if i % 4 == 0 or i % 4 == 3:
+                note_pos[i][0] += 1  # Shift right
+            else:
+                note_pos[i][0] -= 1  # Shift left
+    # Add more waveform patterns as needed
+    return note_pos
+
+
+def shift_blocks_left_right(notes_l: list, notes_r: list, time_diffs: np.array, waveform_pattern: str):
     last_note_pos_l = [[-1]]
     last_note_pos_r = [[-1]]
 
