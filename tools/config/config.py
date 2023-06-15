@@ -8,7 +8,7 @@ import numpy as np
 # Map creation model configuration
 """Do change"""
 max_speed = 4 * 7.5  # set around 5-40 (normal-expert++)
-add_beat_intensity = 105  # try to match bps by x% [80, 110]
+add_beat_intensity = 110  # try to match bps by x% [80, 110]
 expert_fact = 0.63  # expert plus to expert factor [0.6, 0.7]
 create_expert_flag = True  # create second expert map
 thresh_beat = 0.45  # minimum beat response required to trigger generator
@@ -46,13 +46,13 @@ add_waveform_pattern_flag = True
 waveform_pattern = [
     [0, 1, 2, 3, 2, 1],
     [0, 0, 1, 1, 2, 2, 3, 3, 2, 2, 1, 1],
-    [0, 1, 2, 1, 2, 3, 2, 1, 2, 1, 0],
-    [0, 1, 2, 1],
-    [1, 2, 3, 2],
-    [0, 2, 1, 3, 1, 2],
-    [0, 1],
-    [2, 3],
-    [0, 3, 0, 1, 2, 3, 2, 1, 0, 3]
+    # [0, 1, 2, 1, 2, 3, 2, 1, 2, 1, 0],
+    # [0, 1, 2, 1],
+    # [1, 2, 3, 2],
+    # [0, 2, 1, 3, 1, 2],
+    # [0, 1],
+    # [2, 3],
+    # [0, 3, 0, 1, 2, 3, 2, 1, 0, 3],
 ]
 waveform_apply_dir = [0, 4, 5, 1, 6, 7]     # either [0, 1] or [0, 4, 5, 1, 6, 7]
 waveform_pattern_length = 100   # pattern length in sampling rate [30-300]
