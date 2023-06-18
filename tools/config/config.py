@@ -16,7 +16,7 @@ thresh_pitch = 1.1  # minimum beat for pitch check (0.8,low-1.5,high)
 threshold_end = 1.1  # factor for start and end threshold
 random_note_map_factor = 0.3  # stick note map to random song/center (set to 0 to disable)
 random_note_map_change = 3  # change frequency for center (1-5)
-quick_start = 1.8  # map quick start mode (0 off, 1-3 on)
+quick_start = 1.9  # map quick start mode (0 off, 1-3 on)
 t_diff_bomb = 1.5  # minimum time between notes to add bomb
 t_diff_bomb_react = 0.3  # minimum time between finished added bombs
 allow_mismatch_flag = False  # if True, wrong turned notes won't be removed
@@ -42,7 +42,7 @@ sporty_obstacles = False
 check_all_first_notes = False  # if False only change dot notes
 first_note_layer_threshold = 1  # Layer index from where first note should face up [0(all up)-3(all down)]
 allow_double_first_notes = False  # if False remove second note if necessary for first occurrence
-add_waveform_pattern_flag = 1   # [0: off, 1: on, 2: double on]
+add_waveform_pattern_flag = 0   # [0: off, 1: on, 2: double on]
 waveform_pattern = [
     [0, 1, 2, 3, 2, 1],
     [0, 0, 1, 1, 2, 2, 3, 3, 2, 2, 1, 1],
