@@ -309,7 +309,7 @@ def sanity_check_notes(notes: list, timings: list, pitch_algo: np.array, pitch_t
 
     time_diffs = np.concatenate((np.ones(1), np.diff(timings)), axis=0)
 
-    if config.add_waveform_pattern_flag:
+    if config.add_waveform_pattern_flag > 0:
         # shift consecutive blocks into waveform
         notes_l, notes_r = apply_waveform_pattern(notes_l, notes_r)
 
@@ -319,9 +319,9 @@ def sanity_check_notes(notes: list, timings: list, pitch_algo: np.array, pitch_t
     # shift notes left and right for better flow
     notes_l, notes_r = shift_blocks_left_right(notes_l, notes_r, time_diffs)
 
-    # if config.add_waveform_pattern_flag:
-    #     # shift consecutive blocks into waveform
-    #     notes_l, notes_r = apply_waveform_pattern(notes_l, notes_r)
+    if config.add_waveform_pattern_flag > 1:
+        # shift consecutive blocks into waveform
+        notes_l, notes_r = apply_waveform_pattern(notes_l, notes_r)
 
     # check static position for next and last note for left and right together
     notes_r, notes_l, notes_b = correct_notes_all(notes_r, notes_l, notes_b, time_diffs)
@@ -1169,7 +1169,7 @@ def apply_waveform_pattern(notes_l, notes_r):
         rand_dist = []
         while len(rand_dist) <= len_notes:
             new_rand = np.random.randint(0, n_counts)
-            rand_dist.extend([new_rand]*config.waveform_pattern_length)
+            rand_dist.extend([new_rand] * config.waveform_pattern_length)
         return rand_dist
 
     def check_up_down_direction(notes_idx):
@@ -1253,36 +1253,68 @@ def apply_waveform_pattern(notes_l, notes_r):
                     return pos, i
             return [], default_count
 
+    def find_next_start_pos(pos_last: int, pattern: list):
+        # get start index
+        if pos_last in pattern:
+            wave_start = pattern.index(pos_last)
+        else:
+            if pos_last - 1 in pattern:
+                wave_start = pattern.index(pos_last - 1)
+            elif pos_last + 1 in pattern:
+                wave_start = pattern.index(pos_last + 1)
+            elif pos_last - 2 in pattern:
+                wave_start = pattern.index(pos_last - 2)
+            elif pos_last + 2 in pattern:
+                wave_start = pattern.index(pos_last + 2)
+            else:
+                wave_start = 0
+        return wave_start
+
     def calc_waveform_selection(note_pos_last: int, waveform_pattern: list,
-                                start_index: int, first_flag=False):
+                                start_index: int):
+        # find first start position (only for left side)
+        if start_index == 0:
+            start_index = find_next_start_pos(note_pos_last, waveform_pattern)
+
+        # get new note position (x)
         start_index += 1
-        if first_flag:
-            return note_pos_last, start_index
-        # repeat wave pattern
+        # repeat wave pattern, cut start_index
         waveform_pattern_rep = waveform_pattern * 3
         if start_index > len(waveform_pattern):
             start_index = start_index % len(waveform_pattern)
-        waveform_pattern_rep = waveform_pattern_rep[start_index:]
 
-        # get start index
-        if note_pos_last in waveform_pattern:
-            wave_start = waveform_pattern_rep.index(note_pos_last)
-        else:
-            if note_pos_last - 1 in waveform_pattern:
-                wave_start = waveform_pattern_rep.index(note_pos_last - 1)
-            elif note_pos_last + 1 in waveform_pattern:
-                wave_start = waveform_pattern_rep.index(note_pos_last + 1)
-            elif note_pos_last - 2 in waveform_pattern:
-                wave_start = waveform_pattern_rep.index(note_pos_last - 2)
-            elif note_pos_last + 2 in waveform_pattern:
-                wave_start = waveform_pattern_rep.index(note_pos_last + 2)
-            elif note_pos_last - 3 in waveform_pattern:
-                wave_start = waveform_pattern_rep.index(note_pos_last - 3)
-            elif note_pos_last + 3 in waveform_pattern:
-                wave_start = waveform_pattern_rep.index(note_pos_last + 3)
-        # get new note position (x)
-        wave_start += 1
-        return waveform_pattern_rep[wave_start], start_index
+        return waveform_pattern_rep[start_index], start_index
+
+    # def calc_waveform_selection(note_pos_last: int, waveform_pattern: list,
+    #                             start_index: int, first_flag=False):
+    #     start_index += 1
+    #     if first_flag:
+    #         return note_pos_last, start_index
+    #     # repeat wave pattern
+    #     waveform_pattern_rep = waveform_pattern * 3
+    #     if start_index > len(waveform_pattern):
+    #         start_index = start_index % len(waveform_pattern)
+    #     waveform_pattern_rep = waveform_pattern_rep[start_index:]
+    #
+    #     # get start index
+    #     if note_pos_last in waveform_pattern:
+    #         wave_start = waveform_pattern_rep.index(note_pos_last)
+    #     else:
+    #         if note_pos_last - 1 in waveform_pattern:
+    #             wave_start = waveform_pattern_rep.index(note_pos_last - 1)
+    #         elif note_pos_last + 1 in waveform_pattern:
+    #             wave_start = waveform_pattern_rep.index(note_pos_last + 1)
+    #         elif note_pos_last - 2 in waveform_pattern:
+    #             wave_start = waveform_pattern_rep.index(note_pos_last - 2)
+    #         elif note_pos_last + 2 in waveform_pattern:
+    #             wave_start = waveform_pattern_rep.index(note_pos_last + 2)
+    #         elif note_pos_last - 3 in waveform_pattern:
+    #             wave_start = waveform_pattern_rep.index(note_pos_last - 3)
+    #         elif note_pos_last + 3 in waveform_pattern:
+    #             wave_start = waveform_pattern_rep.index(note_pos_last + 3)
+    #     # get new note position (x)
+    #     wave_start += 1
+    #     return waveform_pattern_rep[wave_start], start_index
 
     def check_waveform_selection(new_pos, forbidden_pos):
         if new_pos in forbidden_pos:
@@ -1302,17 +1334,23 @@ def apply_waveform_pattern(notes_l, notes_r):
     rd_pat_list = random_pattern_distribution(len(notes_l))
 
     start_idx = 0
+    start_idx_list = []
+    last_pat = []
     for idx_list in idx_up_down_l:
         if len(idx_list) > config.waveform_threshold:
             for idx in idx_list:
                 pos_l_before, first_flag = find_last_pos(last_pos_l, idx)
                 pos_l_before = pos_l_before[0]
                 cur_pattern = config.waveform_pattern[rd_pat_list[idx]]
-                new_pos_l, start_idx = calc_waveform_selection(pos_l_before, cur_pattern,
-                                                               start_idx, first_flag)
-                new_pos_l = check_waveform_selection(new_pos_l, [])
+                if last_pat != cur_pattern:
+                    start_idx = 0
+                    last_pat = cur_pattern.copy()
+                new_pos_l, start_idx = calc_waveform_selection(pos_l_before, cur_pattern, start_idx)
+                # new_pos_l = check_waveform_selection(new_pos_l, [])
                 if new_pos_l is not None:
                     notes_l = apply_waveform_selection(new_pos_l, notes_l, idx)
+                # save start index and position
+                start_idx_list.append([idx, start_idx])
 
     ########################
     # repeat for right notes
@@ -1328,20 +1366,27 @@ def apply_waveform_pattern(notes_l, notes_r):
         else:
             return f_pos_start
 
+    def calc_pos_from_left(wave_index_array: np.ndarray, cur_idx):
+        array_index = np.argmin(abs(wave_index_array[:, 0] - cur_idx))
+        array_value = wave_index_array[array_index, 1]
+        return array_value
+
     # idx_up_down_l = get_potential_indices(notes_l)
     idx_up_down_r = get_potential_indices(notes_r)
     last_pos_l = get_all_line_index_pos(notes_l)
     last_pos_r = get_all_line_index_pos(notes_r)
 
     start_idx = 0
+    start_idx_list = np.asarray(start_idx_list)
     for idx_list in idx_up_down_r:
         if len(idx_list) > config.waveform_threshold:
             for idx in idx_list:
                 pos_r_before, first_flag = find_last_pos(last_pos_r, idx)
                 pos_r_before = pos_r_before[0]
                 cur_pattern = config.waveform_pattern[rd_pat_list[idx]]
-                new_pos_r, start_idx = calc_waveform_selection(pos_r_before, cur_pattern,
-                                                               start_idx, first_flag)
+                # calculate next position from left side
+                start_idx = calc_pos_from_left(start_idx_list, idx)
+                new_pos_r, start_idx = calc_waveform_selection(pos_r_before, cur_pattern, start_idx)
                 # calculate forbidden positions from left notes
                 pos_l = calc_forbidden_pos(last_pos_l, idx)
                 # continue

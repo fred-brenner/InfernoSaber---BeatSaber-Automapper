@@ -8,7 +8,7 @@ import numpy as np
 # Map creation model configuration
 """Do change"""
 max_speed = 4 * 7.5  # set around 5-40 (normal-expert++)
-add_beat_intensity = 110  # try to match bps by x% [80, 110]
+add_beat_intensity = 105  # try to match bps by x% [80, 120]
 expert_fact = 0.63  # expert plus to expert factor [0.6, 0.7]
 create_expert_flag = True  # create second expert map
 thresh_beat = 0.45  # minimum beat response required to trigger generator
@@ -24,7 +24,7 @@ flow_model_flag = True  # use improved direction flow
 furious_lighting_flag = False  # increase frequency of light effects
 normalize_song_flag = True  # normalize song volume
 increase_volume_flag = True  # increase song volume (only used in combination with normalize flag)
-audio_rms_goal = 0.55
+audio_rms_goal = 0.60
 allow_dot_notes = False  # if False, all notes must have a cut direction
 jump_speed_offset = -0.4  # general offset for jump speed (range [-2, 2])
 map_filler_iters = 10  # max iterations for map filler
@@ -42,20 +42,20 @@ sporty_obstacles = False
 check_all_first_notes = False  # if False only change dot notes
 first_note_layer_threshold = 1  # Layer index from where first note should face up [0(all up)-3(all down)]
 allow_double_first_notes = False  # if False remove second note if necessary for first occurrence
-add_waveform_pattern_flag = True
+add_waveform_pattern_flag = 1   # [0: off, 1: on, 2: double on]
 waveform_pattern = [
     [0, 1, 2, 3, 2, 1],
     [0, 0, 1, 1, 2, 2, 3, 3, 2, 2, 1, 1],
-    # [0, 1, 2, 1, 2, 3, 2, 1, 2, 1, 0],
-    # [0, 1, 2, 1],
-    # [1, 2, 3, 2],
-    # [0, 2, 1, 3, 1, 2],
+    [0, 1, 2, 1, 2, 3, 2, 1, 2, 1, 0],
+    [0, 1, 2, 1],
+    [1, 2, 3, 2],
+    [0, 2, 1, 3, 1, 2],
     # [0, 1],
     # [2, 3],
     # [0, 3, 0, 1, 2, 3, 2, 1, 0, 3],
 ]
 waveform_apply_dir = [0, 4, 5, 1, 6, 7]     # either [0, 1] or [0, 4, 5, 1, 6, 7]
-waveform_pattern_length = 100   # pattern length in sampling rate [30-300]
+waveform_pattern_length = 25   # pattern length in sampling rate [10-200]
 waveform_threshold = 4  # minimum number of notes applicable for waveform to start
 
 """Caution on changes"""
@@ -69,8 +69,10 @@ sport_obstacle_allowed_types = [0, 1]  # (ceiling walls for crouch are fixed)
 sport_obstacle_positions = [[0, 1, 1], [2, 2, 3]]  # inside position of notes
 
 check_silence_flag = True  # check for extremely silent songs
-check_silence_value = -14.2  # value in dB [-13 to -15]
+check_silence_value = -12.5  # value in dB [-11 (high filter) to -15 (low filter)]
+jump_speed_expert_factor = 0.91     # factor from expert+ to expert
 jsb_offset = [0.21, 0.15]  # note jump speed offset for Expert, Expert+ (range [-0.5, 0.5])
+jsb_offset_min = [-0.2, -0.4]  # minimum allowed values (expert, expert+)
 jsb_offset_factor = 0.011  # note jump factor for high difficulties
 use_fixed_bpm = 100  # use fixed bpm or set to None for the song bpm
 max_njs = 24.5  # maximum Note Jump Speed allowed
