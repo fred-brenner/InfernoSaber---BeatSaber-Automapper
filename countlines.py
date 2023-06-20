@@ -98,7 +98,13 @@ def display_function_usage(project_path):
 
     sorted_counts = sorted(function_counts.items(), key=lambda x: x[1], reverse=True)
 
+    print(f"Function calls mean: {np.mean(list(function_counts.values()))}")
+    print("Top ten:")
+    i = 0
     for function, count in sorted_counts:
+        i += 1
+        if i > 10:
+            break
         print(f"Function {function:<30} is called {count:>3} times in the project.")
 
 
