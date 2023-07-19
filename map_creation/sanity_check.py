@@ -1,3 +1,8 @@
+"""
+This script contains all analytic functions
+to improve the note generation output
+"""
+
 import numpy as np
 import aubio
 import matplotlib.pyplot as plt
