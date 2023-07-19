@@ -1,9 +1,82 @@
+"""
+This script contains all analytic functions
+to improve the note generation output
+"""
+
 import numpy as np
 import aubio
 import matplotlib.pyplot as plt
 from scipy.signal import savgol_filter
 
 from tools.config import config, paths
+
+
+def sanity_check_notes(notes: list, timings: list):
+    # last sanity check for notes,
+    # result is written to map
+
+    [notes_r, notes_l, notes_b] = split_notes_rl(notes)
+
+    notes_r = set_first_note_dir(notes_r)
+    notes_l = set_first_note_dir(notes_l)
+
+    # notes_r = correct_cut_dir(notes_r, timings)
+    # notes_l = correct_cut_dir(notes_l, timings)
+
+    # print("Right notes:", end=' ')
+    notes_r = correct_notes(notes_r, timings)
+    # print("Left notes: ", end=' ')
+    notes_l = correct_notes(notes_l, timings)
+
+    time_diffs = np.concatenate((np.ones(1), np.diff(timings)), axis=0)
+
+    if config.add_waveform_pattern_flag > 0:
+        # shift consecutive blocks into waveform
+        notes_l, notes_r = apply_waveform_pattern(notes_l, notes_r)
+
+    # shift notes in cut direction
+    notes_l = shift_blocks_up_down(notes_l, time_diffs)
+    notes_r = shift_blocks_up_down(notes_r, time_diffs)
+    # shift notes left and right for better flow
+    notes_l, notes_r = shift_blocks_left_right(notes_l, notes_r, time_diffs)
+
+    if config.add_waveform_pattern_flag > 1:
+        # shift consecutive blocks into waveform
+        notes_l, notes_r = apply_waveform_pattern(notes_l, notes_r)
+
+    # check static position for next and last note for left and right together
+    notes_r, notes_l, notes_b = correct_notes_all(notes_r, notes_l, notes_b, time_diffs)
+
+    # shift notes away from the middle
+    notes_r, notes_l, notes_b = shift_blocks_middle(notes_r, notes_l, notes_b)
+
+    # # (TODO: add bombs for long pause to focus on next note direction)
+    # notes_b, timings_b = add_pause_bombs(notes_r, notes_l, notes_b, timings, pitch_algo, pitch_times)
+    # (TODO: remove blocking bombs)
+
+    # turn notes leading into correct direction
+    notes_r, dot_idx_r = turn_notes_single(notes_r)
+    notes_l, dot_idx_l = turn_notes_single(notes_l)
+
+    if config.add_breaks_flag:
+        # from tools.utils.load_and_save import save_pkl
+        notes_l = add_breaks(notes_l, timings)
+        notes_r = add_breaks(notes_r, timings)
+
+    # emphasize some beats randomly
+    notes_l = emphasize_beats(notes_l, time_diffs, notes_r)
+    notes_r = emphasize_beats(notes_r, time_diffs, notes_l)
+
+    if config.allow_dot_notes:
+        notes_l = apply_dots(notes_l, dot_idx_l)
+        notes_r = apply_dots(notes_r, dot_idx_r)
+        if config.add_dot_notes > 0:
+            notes_l = add_dots(notes_l, time_diffs.copy())
+            notes_r = add_dots(notes_r, time_diffs.copy())
+
+    # rebuild notes
+    new_notes = unpslit_notes(notes_r, notes_l, notes_b)
+    return new_notes
 
 
 def sanity_check_beat(beat):
@@ -122,6 +195,72 @@ def sanity_check_timing(name, timings, song_duration):
     return timings, allowed_timings
 
 
+def improve_timings(new_notes, timings, pitch_input, pitch_times):
+    # Improve timings after all notes have been set.
+    # Use the pitch detection to find the perfect timing between notes
+    # (currently 0.035s accuracy)
+    mc_factor = config.improve_timings_mcfactor
+    max_change = config.improve_timings_mcchange * mc_factor
+    activation_time = np.float64(config.improve_timings_act_time)
+    activation_time_index = np.where(pitch_times >= activation_time)[0][0]
+
+    def check_for_notes(new_notes, idx):
+        if idx > len(new_notes)-2 or idx < 1:
+            return 1
+        if len(new_notes[idx]) > 0:
+            return 1
+        return 0
+
+    def get_surrounding_beats(timings, idx, new_notes):
+        if idx == 0:
+            last_beat = 0.0
+            idx_iterator = idx + 1
+            while not check_for_notes(new_notes, idx_iterator):
+                idx_iterator += 1
+            next_beat = timings[idx_iterator]
+        elif idx >= len(timings) - 1:
+            idx_iterator = idx - 1
+            while not check_for_notes(new_notes, idx_iterator):
+                idx_iterator -= 1
+            last_beat = timings[idx_iterator]
+            next_beat = timings[idx] + max_change
+        else:
+            idx_iterator = idx - 1
+            while not check_for_notes(new_notes, idx_iterator):
+                idx_iterator -= 1
+            last_beat = timings[idx_iterator]
+            # if idx_iterator == 0:
+            #     last_beat -= max_change
+            idx_iterator = idx + 1
+            while not check_for_notes(new_notes, idx_iterator):
+                idx_iterator += 1
+            next_beat = timings[idx_iterator]
+            # if idx_iterator == len(timings):
+            #     next_beat += max_change
+        return last_beat, next_beat
+
+    for idx in range(len(timings)):
+        if check_for_notes(new_notes, idx):
+            cur_beat = timings[idx]
+            pre_beat, post_beat = get_surrounding_beats(timings, idx, new_notes)
+            t_diff_pre = np.min([cur_beat - pre_beat, max_change]) / mc_factor
+            t_diff_post = np.min([post_beat - cur_beat, max_change]) / mc_factor
+
+            pre_beat = cur_beat - t_diff_pre
+            post_beat = cur_beat + t_diff_post
+
+            # cur_idx_pitch = np.argmin(np.abs(pitch_times - np.float64(cur_beat)))
+            pre_idx_pitch = np.argmin(np.abs(pitch_times - np.float64(pre_beat)))
+            post_idx_pitch = np.argmin(np.abs(pitch_times - np.float64(post_beat)))
+
+            if post_idx_pitch - pre_idx_pitch > activation_time_index:
+                new_idx = pre_idx_pitch + np.argmax(pitch_input[pre_idx_pitch:post_idx_pitch + 1])
+                new_timing = pitch_times[new_idx]
+                timings[idx] = new_timing
+
+    return timings
+
+
 def apply_dots(notes_single, dots_idx):
     for idx in dots_idx:
         if len(notes_single[idx]) == 4:
@@ -172,15 +311,15 @@ def add_breaks(notes_single, timings):
                 # strong pattern
                 strong_counter += 1
                 # if strong_reset >= strong_reset_threshold:
-                    # strong_reset = 0
+                # strong_reset = 0
             else:
                 if strong_counter > pattern_length:
                     if idx < len(real_diffs_filt) - 2:
-                        if real_diffs_filt[idx+1] >= thresh_diffs and real_diffs_filt[idx+2] >= thresh_diffs:
+                        if real_diffs_filt[idx + 1] >= thresh_diffs and real_diffs_filt[idx + 2] >= thresh_diffs:
                             # remove next two notes
 
-                # if strong_reset >= strong_reset_threshold:
-                #     if strong_counter > pattern_length:
+                            # if strong_reset >= strong_reset_threshold:
+                            #     if strong_counter > pattern_length:
                             # add break
                             cur_idx = int(np.argwhere(timings == real_timings[idx])[0])
                             # remove this note
@@ -220,20 +359,20 @@ def emphasize_beats(notes, timings, notes_second):
             # get note positions on both sides
             notes_second_pos = []
             for i in range(0, len(notes_second[n]), 4):
-                notes_second_pos.append(notes_second[n][i+0:i+2])
+                notes_second_pos.append(notes_second[n][i + 0:i + 2])
             if len(notes_second_pos) > 0:
                 # only check if other side has notes too
                 notes_pos = []
                 for i in range(0, len(new_note), 4):
-                    notes_pos.append(new_note[i+0:i+2])
+                    notes_pos.append(new_note[i + 0:i + 2])
                 # sanity check for overlapping notes
-                for new_pos_i in range(len(notes_pos)-1, -1, -1):
+                for new_pos_i in range(len(notes_pos) - 1, -1, -1):
                     if notes_pos[new_pos_i] in notes_second_pos:
                         # remove particular note
-                        new_note.pop(new_pos_i*4)
-                        new_note.pop(new_pos_i*4)
-                        new_note.pop(new_pos_i*4)
-                        new_note.pop(new_pos_i*4)
+                        new_note.pop(new_pos_i * 4)
+                        new_note.pop(new_pos_i * 4)
+                        new_note.pop(new_pos_i * 4)
+                        new_note.pop(new_pos_i * 4)
 
             notes[n] = new_note
         return notes
@@ -265,68 +404,29 @@ def emphasize_beats(notes, timings, notes_second):
     return notes
 
 
-def sanity_check_notes(notes: list, timings: list, pitch_algo: np.array, pitch_times):
-    # last sanity check for notes,
-    # result is written to map
+def set_first_note_dir(notes_x):
+    for idx, first_note in enumerate(notes_x):
+        if len(first_note) > 0:
+            break
 
-    [notes_r, notes_l, notes_b] = split_notes_rl(notes)
-    # test = unpslit_notes(notes_r, notes_l, notes_b)
+    if not config.allow_double_first_notes:
+        if len(first_note) > 4:
+            # only keep first entry
+            first_note = first_note[0:4]
+            notes_x[idx] = first_note
 
-    # notes_r = correct_cut_dir(notes_r, timings)
-    # notes_l = correct_cut_dir(notes_l, timings)
+    if first_note[3] == 8 or config.check_all_first_notes:
+        # dot note is not allowed as first note
+        layer_pos = first_note[1]
+        if layer_pos >= config.first_note_layer_threshold:
+            # change direction to upwards
+            new_dir = 0
+        else:
+            # change direction to downwards
+            new_dir = 1
+        notes_x[idx][3] = new_dir
 
-    # print("Right notes:", end=' ')
-    notes_r = correct_notes(notes_r, timings)
-    # print("Left notes: ", end=' ')
-    notes_l = correct_notes(notes_l, timings)
-
-    time_diffs = np.concatenate((np.ones(1), np.diff(timings)), axis=0)
-
-    # shift notes in cut direction
-    notes_l = shift_blocks_up_down(notes_l, time_diffs)
-    notes_r = shift_blocks_up_down(notes_r, time_diffs)
-    # shift notes left and right for better flow
-    notes_l, notes_r = shift_blocks_left_right(notes_l, notes_r, time_diffs)
-    # notes_r = shift_blocks_left_right(notes_r, False, time_diffs)
-
-    # print("Right notes:", end=' ')
-    # notes_r = correct_notes(notes_r, timings)
-    # print("Left notes: ", end=' ')
-    # notes_l = correct_notes(notes_l, timings)
-
-    # check static position for next and last note for left and right together
-    notes_r, notes_l, notes_b = correct_notes_all(notes_r, notes_l, notes_b, time_diffs)
-
-    # shift notes away from the middle
-    notes_r, notes_l, notes_b = shift_blocks_middle(notes_r, notes_l, notes_b)
-
-    # # (TODO: add bombs for long pause to focus on next note direction)
-    # notes_b, timings_b = add_pause_bombs(notes_r, notes_l, notes_b, timings, pitch_algo, pitch_times)
-    # (TODO: remove blocking bombs)
-
-    # turn notes leading into correct direction
-    notes_r, dot_idx_r = turn_notes_single(notes_r)
-    notes_l, dot_idx_l = turn_notes_single(notes_l)
-
-    if config.add_breaks_flag:
-        # from tools.utils.load_and_save import save_pkl
-        notes_l = add_breaks(notes_l, timings)
-        notes_r = add_breaks(notes_r, timings)
-
-    # emphasize some beats randomly
-    notes_l = emphasize_beats(notes_l, time_diffs, notes_r)
-    notes_r = emphasize_beats(notes_r, time_diffs, notes_l)
-
-    if config.allow_dot_notes:
-        notes_l = apply_dots(notes_l, dot_idx_l)
-        notes_r = apply_dots(notes_r, dot_idx_r)
-        if config.add_dot_notes > 0:
-            notes_l = add_dots(notes_l, time_diffs.copy())
-            notes_r = add_dots(notes_r, time_diffs.copy())
-
-    # rebuild notes
-    new_notes = unpslit_notes(notes_r, notes_l, notes_b)
-    return new_notes
+    return notes_x
 
 
 def calc_note_pos(n, add_cut=True, inv=None):
@@ -460,6 +560,7 @@ def correct_notes_all(notes_r, notes_l, notes_b, time_diff):
 
 
 def shift_blocks_middle(notes_r, notes_l, notes_b):
+    # Shift blocks up or down to prevent blocking view
     counter = 0
     for idx in range(len(notes_r)):
         nb = notes_b[idx]
@@ -646,7 +747,7 @@ def turn_notes_single(notes_single):
         return dirx, diry
 
     if config.flow_model_flag:
-        empty_note_last = False
+        # empty_note_last = False
         notes_old = None
         for idx, notes in enumerate(notes_single):
             if len(notes) == 0:
@@ -674,8 +775,8 @@ def turn_notes_single(notes_single):
                 new_cut_dir = reverse_get_cut_dir(dirx, diry)
                 notes[3] = new_cut_dir
                 notes_single[idx] = notes
-            else:  # last note has direction
-                empty_note_last = False
+            # else:  # last note has direction
+            #     empty_note_last = False
 
             # check if new flow direction suits to (inverse last) cut direction
             cd_old = get_cut_dir_xy(notes_old[3])
@@ -769,6 +870,7 @@ def turn_notes_single(notes_single):
 
 
 def correct_notes(notes, timings):
+    # calculate movement speed and remove too fast notes
     nl_last = None
     last_time = 0
     rm_counter = 0
@@ -1020,19 +1122,19 @@ def remove_silent_times(map_times, silent_times):
     return map_times
 
 
-def fill_map_times(map_times):
-    se_thresh = int(len(map_times) / 22)  # don't apply filling for first and last 4% of song
-    diff = np.diff(map_times)
-    new_map_times = []
-    for idx in range(se_thresh, len(diff) - se_thresh):
-        if config.add_beat_low_bound < diff[idx] < config.add_beat_hi_bound:
-            if np.random.random() < config.add_beat_fact:
-                beat_time = (map_times[idx] + map_times[idx + 1]) / 2
-                new_map_times.append(beat_time)
-    if len(new_map_times) > 0:
-        map_times = np.hstack((map_times, new_map_times))
-        map_times = np.sort(map_times)
-    return map_times
+# def fill_map_times(map_times):
+#     se_thresh = int(len(map_times) / 22)  # don't apply filling for first and last 4% of song
+#     diff = np.diff(map_times)
+#     new_map_times = []
+#     for idx in range(se_thresh, len(diff) - se_thresh):
+#         if config.add_beat_low_bound < diff[idx] < config.add_beat_hi_bound:
+#             if np.random.random() < config.add_beat_fact:
+#                 beat_time = (map_times[idx] + map_times[idx + 1]) / 2
+#                 new_map_times.append(beat_time)
+#     if len(new_map_times) > 0:
+#         map_times = np.hstack((map_times, new_map_times))
+#         map_times = np.sort(map_times)
+#     return map_times
 
 
 def fill_map_times_scale(map_times, scale_index=5):
@@ -1130,6 +1232,240 @@ def shift_blocks_up_down(notes: list, time_diffs: np.array):
 #
 #             last_note_pos = note_pos
 #     return notes
+
+
+def apply_waveform_pattern(notes_l, notes_r):
+    def random_pattern_distribution(len_notes):
+        n_counts = len(config.waveform_pattern)
+        rand_dist = []
+        while len(rand_dist) <= len_notes:
+            new_rand = np.random.randint(0, n_counts)
+            rand_dist.extend([new_rand] * config.waveform_pattern_length)
+        return rand_dist
+
+    def check_up_down_direction(notes_idx):
+        if notes_idx[3] in config.waveform_apply_dir:
+            return True
+        return False
+
+    def update_idx_up_down(idx_up_down, idx_up_down_temp):
+        if len(idx_up_down_temp) > 0:
+            idx_up_down.append(idx_up_down_temp.copy())
+            idx_up_down_temp = []
+        return idx_up_down, idx_up_down_temp
+
+    ####################################
+    # Get all potential waveform indices
+    ####################################
+    def get_potential_indices(notes_x):
+        idx_up_down_x = []
+        idx_up_down_x_temp = []
+        for idx_x in range(len(notes_x)):
+            if len(notes_x[idx_x]) > 0:
+                if check_up_down_direction(notes_x[idx_x]):
+                    # potential index for wave pattern found
+                    idx_up_down_x_temp.append(idx_x)
+                else:
+                    idx_up_down_x, idx_up_down_x_temp = update_idx_up_down(idx_up_down_x,
+                                                                           idx_up_down_x_temp)
+        idx_up_down_x, idx_up_down_x_temp = update_idx_up_down(idx_up_down_x, idx_up_down_x_temp)
+        return idx_up_down_x
+
+    idx_up_down_l = get_potential_indices(notes_l)
+
+    # idx_up_down_r = get_potential_indices(notes_r)
+
+    #############################
+    # Get all LineIndex positions
+    #############################
+
+    def get_all_line_index_pos(notes_x):
+        last_pos = []
+        for idx_x in range(len(notes_x)):
+            note_pos = []
+            if len(notes_x[idx_x]) > 2:
+                note_pos = calc_note_pos(notes_x[idx_x], add_cut=False)
+                note_pos = [pos[0] for pos in note_pos]
+            last_pos.append(note_pos.copy())
+        return last_pos
+
+    last_pos_l = get_all_line_index_pos(notes_l)
+
+    # last_pos_r = get_all_line_index_pos(notes_r)
+
+    ###############################
+    # Apply waveform where possible
+    ###############################
+    def find_last_pos(last_pos: list, idx_pos: int) -> (list, bool):
+        if idx < 1:
+            return last_pos[idx_pos], True
+        last_pos_before = last_pos[:idx_pos]
+        last_pos_before.reverse()
+        for pos in last_pos_before:
+            if len(pos) > 0:
+                return pos, False
+        return last_pos[idx_pos], True
+
+    def find_index_pos(last_pos: list, idx_pos: int, start: bool) -> (list, int):
+        default_count = 9999
+        if start:
+            if idx < 1:
+                return [], default_count
+            last_pos_before = last_pos[:idx_pos]
+            last_pos_before.reverse()
+            for i, pos in enumerate(last_pos_before):
+                if len(pos) > 0:
+                    return pos, i
+            return [], default_count
+        else:
+            last_pos_after = last_pos[idx_pos:]
+            for i, pos in enumerate(last_pos_after):
+                if len(pos) > 0:
+                    return pos, i
+            return [], default_count
+
+    def find_next_start_pos(pos_last: int, pattern: list):
+        # get start index
+        if pos_last in pattern:
+            wave_start = pattern.index(pos_last)
+        else:
+            if pos_last - 1 in pattern:
+                wave_start = pattern.index(pos_last - 1)
+            elif pos_last + 1 in pattern:
+                wave_start = pattern.index(pos_last + 1)
+            elif pos_last - 2 in pattern:
+                wave_start = pattern.index(pos_last - 2)
+            elif pos_last + 2 in pattern:
+                wave_start = pattern.index(pos_last + 2)
+            else:
+                wave_start = 0
+        return wave_start
+
+    def calc_waveform_selection(note_pos_last: int, waveform_pattern: list,
+                                start_index: int):
+        # find first start position (only for left side)
+        if start_index == 0:
+            start_index = find_next_start_pos(note_pos_last, waveform_pattern)
+
+        # get new note position (x)
+        start_index += 1
+        # repeat wave pattern, cut start_index
+        waveform_pattern_rep = waveform_pattern * 3
+        if start_index > len(waveform_pattern):
+            start_index = start_index % len(waveform_pattern)
+
+        return waveform_pattern_rep[start_index], start_index
+
+    # def calc_waveform_selection(note_pos_last: int, waveform_pattern: list,
+    #                             start_index: int, first_flag=False):
+    #     start_index += 1
+    #     if first_flag:
+    #         return note_pos_last, start_index
+    #     # repeat wave pattern
+    #     waveform_pattern_rep = waveform_pattern * 3
+    #     if start_index > len(waveform_pattern):
+    #         start_index = start_index % len(waveform_pattern)
+    #     waveform_pattern_rep = waveform_pattern_rep[start_index:]
+    #
+    #     # get start index
+    #     if note_pos_last in waveform_pattern:
+    #         wave_start = waveform_pattern_rep.index(note_pos_last)
+    #     else:
+    #         if note_pos_last - 1 in waveform_pattern:
+    #             wave_start = waveform_pattern_rep.index(note_pos_last - 1)
+    #         elif note_pos_last + 1 in waveform_pattern:
+    #             wave_start = waveform_pattern_rep.index(note_pos_last + 1)
+    #         elif note_pos_last - 2 in waveform_pattern:
+    #             wave_start = waveform_pattern_rep.index(note_pos_last - 2)
+    #         elif note_pos_last + 2 in waveform_pattern:
+    #             wave_start = waveform_pattern_rep.index(note_pos_last + 2)
+    #         elif note_pos_last - 3 in waveform_pattern:
+    #             wave_start = waveform_pattern_rep.index(note_pos_last - 3)
+    #         elif note_pos_last + 3 in waveform_pattern:
+    #             wave_start = waveform_pattern_rep.index(note_pos_last + 3)
+    #     # get new note position (x)
+    #     wave_start += 1
+    #     return waveform_pattern_rep[wave_start], start_index
+
+    def check_waveform_selection(new_pos, forbidden_pos):
+        if new_pos in forbidden_pos:
+            return None
+        return new_pos
+
+    def apply_waveform_selection(new_pos, notes_x, idx_x):
+        number_notes = len(notes_x[idx_x]) / 4
+        if number_notes < 1.5:
+            notes_x[idx_x][0] = new_pos
+        else:
+            for i in range(len(notes_x[idx_x])):
+                if i % 4 == 0:
+                    notes_x[idx_x][i] = new_pos
+        return notes_x
+
+    rd_pat_list = random_pattern_distribution(len(notes_l))
+
+    start_idx = 0
+    start_idx_list = []
+    last_pat = []
+    for idx_list in idx_up_down_l:
+        if len(idx_list) > config.waveform_threshold:
+            for idx in idx_list:
+                pos_l_before, first_flag = find_last_pos(last_pos_l, idx)
+                pos_l_before = pos_l_before[0]
+                cur_pattern = config.waveform_pattern[rd_pat_list[idx]]
+                if last_pat != cur_pattern:
+                    start_idx = 0
+                    last_pat = cur_pattern.copy()
+                new_pos_l, start_idx = calc_waveform_selection(pos_l_before, cur_pattern, start_idx)
+                # new_pos_l = check_waveform_selection(new_pos_l, [])
+                if new_pos_l is not None:
+                    notes_l = apply_waveform_selection(new_pos_l, notes_l, idx)
+                # save start index and position
+                start_idx_list.append([idx, start_idx])
+
+    ########################
+    # repeat for right notes
+    ########################
+    def calc_forbidden_pos(last_pos_x, idx_x):
+        f_pos = []
+        # before
+        f_pos_start, near_count_start = find_index_pos(last_pos_x, idx_x, start=True)
+        # after
+        f_pos_end, near_count_end = find_index_pos(last_pos_x, idx_x, start=False)
+        if near_count_start > near_count_end:
+            return f_pos_end
+        else:
+            return f_pos_start
+
+    def calc_pos_from_left(wave_index_array: np.ndarray, cur_idx):
+        array_index = np.argmin(abs(wave_index_array[:, 0] - cur_idx))
+        array_value = wave_index_array[array_index, 1]
+        return array_value
+
+    # idx_up_down_l = get_potential_indices(notes_l)
+    idx_up_down_r = get_potential_indices(notes_r)
+    last_pos_l = get_all_line_index_pos(notes_l)
+    last_pos_r = get_all_line_index_pos(notes_r)
+
+    start_idx = 0
+    start_idx_list = np.asarray(start_idx_list)
+    for idx_list in idx_up_down_r:
+        if len(idx_list) > config.waveform_threshold:
+            for idx in idx_list:
+                pos_r_before, first_flag = find_last_pos(last_pos_r, idx)
+                pos_r_before = pos_r_before[0]
+                cur_pattern = config.waveform_pattern[rd_pat_list[idx]]
+                # calculate next position from left side
+                start_idx = calc_pos_from_left(start_idx_list, idx)
+                new_pos_r, start_idx = calc_waveform_selection(pos_r_before, cur_pattern, start_idx)
+                # calculate forbidden positions from left notes
+                pos_l = calc_forbidden_pos(last_pos_l, idx)
+                # continue
+                new_pos_r = check_waveform_selection(new_pos_r, pos_l)
+                if new_pos_r is not None:
+                    notes_r = apply_waveform_selection(new_pos_r, notes_r, idx)
+
+    return notes_l, notes_r
 
 
 def shift_blocks_left_right(notes_l: list, notes_r: list, time_diffs: np.array):

@@ -65,7 +65,7 @@ def main_multi(diff_list: list, export_results_to_bs=True):
             config.max_speed = diff
             config.max_speed_orig = diff
 
-        time_per_run = 25   # time needed in seconds (first guess)
+        time_per_run = 20   # time needed in seconds (first guess)
         for song_name in song_list:
             print(f"### ETA: {(total_runs - counter)*time_per_run/60:.1f} minutes. ###")
             counter += 1
@@ -77,7 +77,7 @@ def main_multi(diff_list: list, export_results_to_bs=True):
                 print("Continue with next song")
                 continue
             end_time = time.time()
-            time_per_run = (2*time_per_run + (end_time - start_time)) / 3
+            time_per_run = (4*time_per_run + (end_time - start_time)) / 5
             # print(f"Time needed: {end_time - start_time}s")
 
     print("Running map combination")
@@ -145,7 +145,7 @@ def main_multi(diff_list: list, export_results_to_bs=True):
 if __name__ == "__main__":
     diff_list = os.environ.get('diff_list')
     if diff_list is None:
-        diff_list = [3, 5, 6, 7, 8]
+        diff_list = [3, 5, 6.5, 7.5, 8.5]
     else:
         diff_list = json.loads(diff_list)
     if len(diff_list) != 5:

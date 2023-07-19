@@ -45,6 +45,8 @@ def main(name_ar: list) -> bool:
             config.add_beat_intensity = config.add_beat_intensity_orig - 10
 
     config.obstacle_time_gap = config.obstacle_time_gap_orig * (1 - config.max_speed / 80)
+    if min(config.obstacle_time_gap) <= 0.1:
+        config.obstacle_time_gap = np.asarray([0.1, 0.25])
     if config.sporty_obstacles:
         config.jump_speed_offset = config.jump_speed_offset_orig - 0.3
         if config.add_silence_flag or config.emphasize_beats_flag:
@@ -104,9 +106,9 @@ def main(name_ar: list) -> bool:
     # apply beat sanity check (min time diff)
     y_beat = sanity_check_beat(y_beat)
 
-    #####################
-    # map class generator
-    #####################
+    ######################
+    # sanity check timings
+    ######################
     # get beat times
     timing_ar = y_beat * np.arange(0, len(y_beat), 1)
     timing_ar /= config.beat_spacing
@@ -148,8 +150,12 @@ def main(name_ar: list) -> bool:
     # compensate for lstm cutoff
     map_times = add_lstm_prerun(map_times)
 
-    # calculate time between beats
-    timing_diff_ar = calc_time_between_beats([map_times])
+    # # calculate time between beats
+    # timing_diff_ar = calc_time_between_beats([map_times])
+
+    #####################
+    # apply map generator
+    #####################
 
     # load song data
     song_ar, rm_index = run_music_preprocessing(name_ar, time_ar=[map_times], save_file=False,
@@ -179,13 +185,13 @@ def main(name_ar: list) -> bool:
     # add events
     ############
     if True:
-        # TODO: add furious_lighting to increase effect frequency
+        # (TODO: add furious_lighting to increase effect frequency)
         events = generate(in_song_l, map_times, config.event_gen_version, config.event_lstm_len,
                           paths.events_classify_encoder_file)  # 23.7 (47.0 -> 3.8)
     else:
         events = []
 
-    create_map(y_class_map, map_times, events, name_ar[0], bpm, pitch_algo, pitch_times)  # 0.5
+    create_map(y_class_map, map_times, events, name_ar[0], bpm, pitch_input[-1], pitch_times[-1])  # 0.5
 
     return 0  # success
 
