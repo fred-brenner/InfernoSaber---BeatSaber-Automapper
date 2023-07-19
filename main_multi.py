@@ -65,7 +65,7 @@ def main_multi(diff_list: list, export_results_to_bs=True):
             config.max_speed = diff
             config.max_speed_orig = diff
 
-        time_per_run = 25   # time needed in seconds (first guess)
+        time_per_run = 20   # time needed in seconds (first guess)
         for song_name in song_list:
             print(f"### ETA: {(total_runs - counter)*time_per_run/60:.1f} minutes. ###")
             counter += 1
