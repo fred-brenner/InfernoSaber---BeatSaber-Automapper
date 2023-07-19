@@ -6,6 +6,74 @@ from scipy.signal import savgol_filter
 from tools.config import config, paths
 
 
+def sanity_check_notes(notes: list, timings: list):
+    # last sanity check for notes,
+    # result is written to map
+
+    [notes_r, notes_l, notes_b] = split_notes_rl(notes)
+
+    notes_r = set_first_note_dir(notes_r)
+    notes_l = set_first_note_dir(notes_l)
+
+    # notes_r = correct_cut_dir(notes_r, timings)
+    # notes_l = correct_cut_dir(notes_l, timings)
+
+    # print("Right notes:", end=' ')
+    notes_r = correct_notes(notes_r, timings)
+    # print("Left notes: ", end=' ')
+    notes_l = correct_notes(notes_l, timings)
+
+    time_diffs = np.concatenate((np.ones(1), np.diff(timings)), axis=0)
+
+    if config.add_waveform_pattern_flag > 0:
+        # shift consecutive blocks into waveform
+        notes_l, notes_r = apply_waveform_pattern(notes_l, notes_r)
+
+    # shift notes in cut direction
+    notes_l = shift_blocks_up_down(notes_l, time_diffs)
+    notes_r = shift_blocks_up_down(notes_r, time_diffs)
+    # shift notes left and right for better flow
+    notes_l, notes_r = shift_blocks_left_right(notes_l, notes_r, time_diffs)
+
+    if config.add_waveform_pattern_flag > 1:
+        # shift consecutive blocks into waveform
+        notes_l, notes_r = apply_waveform_pattern(notes_l, notes_r)
+
+    # check static position for next and last note for left and right together
+    notes_r, notes_l, notes_b = correct_notes_all(notes_r, notes_l, notes_b, time_diffs)
+
+    # shift notes away from the middle
+    notes_r, notes_l, notes_b = shift_blocks_middle(notes_r, notes_l, notes_b)
+
+    # # (TODO: add bombs for long pause to focus on next note direction)
+    # notes_b, timings_b = add_pause_bombs(notes_r, notes_l, notes_b, timings, pitch_algo, pitch_times)
+    # (TODO: remove blocking bombs)
+
+    # turn notes leading into correct direction
+    notes_r, dot_idx_r = turn_notes_single(notes_r)
+    notes_l, dot_idx_l = turn_notes_single(notes_l)
+
+    if config.add_breaks_flag:
+        # from tools.utils.load_and_save import save_pkl
+        notes_l = add_breaks(notes_l, timings)
+        notes_r = add_breaks(notes_r, timings)
+
+    # emphasize some beats randomly
+    notes_l = emphasize_beats(notes_l, time_diffs, notes_r)
+    notes_r = emphasize_beats(notes_r, time_diffs, notes_l)
+
+    if config.allow_dot_notes:
+        notes_l = apply_dots(notes_l, dot_idx_l)
+        notes_r = apply_dots(notes_r, dot_idx_r)
+        if config.add_dot_notes > 0:
+            notes_l = add_dots(notes_l, time_diffs.copy())
+            notes_r = add_dots(notes_r, time_diffs.copy())
+
+    # rebuild notes
+    new_notes = unpslit_notes(notes_r, notes_l, notes_b)
+    return new_notes
+
+
 def sanity_check_beat(beat):
     beat = beat.reshape(len(beat))
     beat_counts = beat.sum()
@@ -120,6 +188,70 @@ def sanity_check_timing(name, timings, song_duration):
             timings[i] = 0
 
     return timings, allowed_timings
+
+
+def improve_timings(new_notes, timings, pitch_input, pitch_times):
+    # Improve timings after all notes have been set.
+    # Use the pitch detection to find the perfect timing between notes
+    # (currently 0.035s accuracy)
+    mc_factor = 2
+    max_change = 1.0 * mc_factor
+
+    def check_for_notes(new_notes, idx):
+        if idx > len(new_notes)-2 or idx < 1:
+            return 1
+        if len(new_notes[idx]) > 0:
+            return 1
+        return 0
+
+    def get_surrounding_beats(timings, idx, new_notes):
+        if idx == 0:
+            last_beat = 0.0
+            idx_iterator = idx + 1
+            while not check_for_notes(new_notes, idx_iterator):
+                idx_iterator += 1
+            next_beat = timings[idx_iterator]
+        elif idx >= len(timings) - 1:
+            idx_iterator = idx - 1
+            while not check_for_notes(new_notes, idx_iterator):
+                idx_iterator -= 1
+            last_beat = timings[idx_iterator]
+            next_beat = timings[idx] + max_change
+        else:
+            idx_iterator = idx - 1
+            while not check_for_notes(new_notes, idx_iterator):
+                idx_iterator -= 1
+            last_beat = timings[idx_iterator]
+            # if idx_iterator == 0:
+            #     last_beat -= max_change
+            idx_iterator = idx + 1
+            while not check_for_notes(new_notes, idx_iterator):
+                idx_iterator += 1
+            next_beat = timings[idx_iterator]
+            # if idx_iterator == len(timings):
+            #     next_beat += max_change
+        return last_beat, next_beat
+
+    for idx in range(len(timings)):
+        if check_for_notes(new_notes, idx):
+            cur_beat = timings[idx]
+            pre_beat, post_beat = get_surrounding_beats(timings, idx, new_notes)
+            t_diff_pre = np.min([cur_beat - pre_beat, max_change]) / mc_factor
+            t_diff_post = np.min([post_beat - cur_beat, max_change]) / mc_factor
+
+            pre_beat = cur_beat - t_diff_pre
+            post_beat = cur_beat + t_diff_post
+
+            # cur_idx_pitch = np.argmin(np.abs(pitch_times - np.float64(cur_beat)))
+            pre_idx_pitch = np.argmin(np.abs(pitch_times - np.float64(pre_beat)))
+            post_idx_pitch = np.argmin(np.abs(pitch_times - np.float64(post_beat)))
+
+            if post_idx_pitch - pre_idx_pitch > 1:
+                new_idx = pre_idx_pitch + np.argmax(pitch_input[pre_idx_pitch:post_idx_pitch + 1])
+                new_timing = pitch_times[new_idx]
+                timings[idx] = new_timing
+
+    return timings
 
 
 def apply_dots(notes_single, dots_idx):
@@ -288,74 +420,6 @@ def set_first_note_dir(notes_x):
         notes_x[idx][3] = new_dir
 
     return notes_x
-
-
-def sanity_check_notes(notes: list, timings: list, pitch_algo: np.array, pitch_times):
-    # last sanity check for notes,
-    # result is written to map
-
-    [notes_r, notes_l, notes_b] = split_notes_rl(notes)
-
-    notes_r = set_first_note_dir(notes_r)
-    notes_l = set_first_note_dir(notes_l)
-
-    # notes_r = correct_cut_dir(notes_r, timings)
-    # notes_l = correct_cut_dir(notes_l, timings)
-
-    # print("Right notes:", end=' ')
-    notes_r = correct_notes(notes_r, timings)
-    # print("Left notes: ", end=' ')
-    notes_l = correct_notes(notes_l, timings)
-
-    time_diffs = np.concatenate((np.ones(1), np.diff(timings)), axis=0)
-
-    if config.add_waveform_pattern_flag > 0:
-        # shift consecutive blocks into waveform
-        notes_l, notes_r = apply_waveform_pattern(notes_l, notes_r)
-
-    # shift notes in cut direction
-    notes_l = shift_blocks_up_down(notes_l, time_diffs)
-    notes_r = shift_blocks_up_down(notes_r, time_diffs)
-    # shift notes left and right for better flow
-    notes_l, notes_r = shift_blocks_left_right(notes_l, notes_r, time_diffs)
-
-    if config.add_waveform_pattern_flag > 1:
-        # shift consecutive blocks into waveform
-        notes_l, notes_r = apply_waveform_pattern(notes_l, notes_r)
-
-    # check static position for next and last note for left and right together
-    notes_r, notes_l, notes_b = correct_notes_all(notes_r, notes_l, notes_b, time_diffs)
-
-    # shift notes away from the middle
-    notes_r, notes_l, notes_b = shift_blocks_middle(notes_r, notes_l, notes_b)
-
-    # # (TODO: add bombs for long pause to focus on next note direction)
-    # notes_b, timings_b = add_pause_bombs(notes_r, notes_l, notes_b, timings, pitch_algo, pitch_times)
-    # (TODO: remove blocking bombs)
-
-    # turn notes leading into correct direction
-    notes_r, dot_idx_r = turn_notes_single(notes_r)
-    notes_l, dot_idx_l = turn_notes_single(notes_l)
-
-    if config.add_breaks_flag:
-        # from tools.utils.load_and_save import save_pkl
-        notes_l = add_breaks(notes_l, timings)
-        notes_r = add_breaks(notes_r, timings)
-
-    # emphasize some beats randomly
-    notes_l = emphasize_beats(notes_l, time_diffs, notes_r)
-    notes_r = emphasize_beats(notes_r, time_diffs, notes_l)
-
-    if config.allow_dot_notes:
-        notes_l = apply_dots(notes_l, dot_idx_l)
-        notes_r = apply_dots(notes_r, dot_idx_r)
-        if config.add_dot_notes > 0:
-            notes_l = add_dots(notes_l, time_diffs.copy())
-            notes_r = add_dots(notes_r, time_diffs.copy())
-
-    # rebuild notes
-    new_notes = unpslit_notes(notes_r, notes_l, notes_b)
-    return new_notes
 
 
 def calc_note_pos(n, add_cut=True, inv=None):

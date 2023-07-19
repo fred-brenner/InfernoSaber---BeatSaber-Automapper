@@ -150,8 +150,8 @@ def main(name_ar: list) -> bool:
     # compensate for lstm cutoff
     map_times = add_lstm_prerun(map_times)
 
-    # calculate time between beats
-    timing_diff_ar = calc_time_between_beats([map_times])
+    # # calculate time between beats
+    # timing_diff_ar = calc_time_between_beats([map_times])
 
     #####################
     # apply map generator
@@ -191,7 +191,7 @@ def main(name_ar: list) -> bool:
     else:
         events = []
 
-    create_map(y_class_map, map_times, events, name_ar[0], bpm, pitch_algo, pitch_times)  # 0.5
+    create_map(y_class_map, map_times, events, name_ar[0], bpm, pitch_input[-1], pitch_times[-1])  # 0.5
 
     return 0  # success
 

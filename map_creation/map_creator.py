@@ -5,12 +5,12 @@ import aubio
 import os
 import shutil
 
-from map_creation.sanity_check import sanity_check_notes
+from map_creation.sanity_check import sanity_check_notes, improve_timings
 from map_creation.gen_obstacles import calculate_obstacles
 from tools.config import config, paths
 
 
-def create_map(y_class_num, timings, events, name, bpm, pitch_algo, pitch_times):
+def create_map(y_class_num, timings, events, name, bpm, pitch_input, pitch_times):
     # load notes classify keys
     with open(paths.notes_classify_dict_file, 'rb') as f:
         class_keys = pickle.load(f)
@@ -18,7 +18,7 @@ def create_map(y_class_num, timings, events, name, bpm, pitch_algo, pitch_times)
     notes = decode_beats(y_class_num, class_keys)
 
     ################################################################
-    def write_map(notes, timings, events, name, bpm, bs_diff, pitch_algo, pitch_times):
+    def write_map(notes, timings, events, name, bpm, bs_diff, pitch_input, pitch_times):
         # Sanity check timings for first notes
         time_last = 1.0
         for idx in range(10):
@@ -32,7 +32,8 @@ def create_map(y_class_num, timings, events, name, bpm, pitch_algo, pitch_times)
             time_last = timings[idx]
 
         # run all beat and note sanity checks
-        notes = sanity_check_notes(notes, timings, pitch_algo, pitch_times)
+        notes = sanity_check_notes(notes, timings)
+        timings = improve_timings(notes, timings, pitch_input, pitch_times)
 
         if config.add_obstacle_flag:
             obstacles = calculate_obstacles(notes, timings)
@@ -70,11 +71,12 @@ def create_map(y_class_num, timings, events, name, bpm, pitch_algo, pitch_times)
     ################################################################
 
     bs_diff = config.general_diff
-    new_map_folder = write_map(notes.copy(), timings.copy(), events.copy(), name, bpm, bs_diff, pitch_algo, pitch_times)
+    new_map_folder = write_map(notes.copy(), timings.copy(), events.copy(), name,
+                               bpm, bs_diff, pitch_input, pitch_times)
     if config.create_expert_flag:
         bs_diff = 'Expert'
         config.max_speed *= config.expert_fact
-        new_map_folder = write_map(notes, timings, events, name, bpm, bs_diff, pitch_algo, pitch_times)
+        new_map_folder = write_map(notes, timings, events, name, bpm, bs_diff, pitch_input, pitch_times)
         # reset max speed
         config.max_speed = config.max_speed_orig
     # copy supplementary files to folder
