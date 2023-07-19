@@ -1,5 +1,7 @@
 import numpy as np
 
+from map_creation.sanity_check import improve_timings
+
 ########################################
 # config file for all important values 
 # used in multiple codes
@@ -42,6 +44,11 @@ sporty_obstacles = False
 check_all_first_notes = False  # if False only change dot notes
 first_note_layer_threshold = 1  # Layer index from where first note should face up [0(all up)-3(all down)]
 allow_double_first_notes = False  # if False remove second note if necessary for first occurrence
+# improve timings
+improve_timings_mcfactor = 2.5  # max change bandwidth (2 wide, 4+ narrow)
+improve_timings_mcchange = 1.2   # max change time in seconds
+improve_timings_act_time = 0.33  # min time gap to activate
+
 add_waveform_pattern_flag = 0   # [0: off, 1: on, 2: double on]
 waveform_pattern = [
     [0, 1, 2, 3, 2, 1],

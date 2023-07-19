@@ -199,8 +199,10 @@ def improve_timings(new_notes, timings, pitch_input, pitch_times):
     # Improve timings after all notes have been set.
     # Use the pitch detection to find the perfect timing between notes
     # (currently 0.035s accuracy)
-    mc_factor = 2
-    max_change = 1.0 * mc_factor
+    mc_factor = config.improve_timings_mcfactor
+    max_change = config.improve_timings_mcchange * mc_factor
+    activation_time = np.float64(config.improve_timings_act_time)
+    activation_time_index = np.where(pitch_times >= activation_time)[0][0]
 
     def check_for_notes(new_notes, idx):
         if idx > len(new_notes)-2 or idx < 1:
@@ -251,7 +253,7 @@ def improve_timings(new_notes, timings, pitch_input, pitch_times):
             pre_idx_pitch = np.argmin(np.abs(pitch_times - np.float64(pre_beat)))
             post_idx_pitch = np.argmin(np.abs(pitch_times - np.float64(post_beat)))
 
-            if post_idx_pitch - pre_idx_pitch > 1:
+            if post_idx_pitch - pre_idx_pitch > activation_time_index:
                 new_idx = pre_idx_pitch + np.argmax(pitch_input[pre_idx_pitch:post_idx_pitch + 1])
                 new_timing = pitch_times[new_idx]
                 timings[idx] = new_timing
