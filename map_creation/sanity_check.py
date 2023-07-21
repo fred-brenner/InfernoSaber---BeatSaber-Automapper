@@ -201,7 +201,7 @@ def improve_timings(new_notes, timings, pitch_input, pitch_times):
     # (currently 0.035s accuracy)
     mc_factor = config.improve_timings_mcfactor
     max_change = config.improve_timings_mcchange * mc_factor
-    activation_time = np.float64(config.improve_timings_act_time)
+    activation_time = np.float64(config.improve_timings_act_time / mc_factor)
     activation_time_index = np.where(pitch_times >= activation_time)[0][0]
 
     def check_for_notes(new_notes, idx):
