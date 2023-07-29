@@ -6,6 +6,7 @@ from map_creation.sanity_check import improve_timings
 # config file for all important values 
 # used in multiple codes
 ########################################
+InfernoSaber_version = "1.4.2"  # coded into the info.dat file
 
 # Map creation model configuration
 """Do change"""

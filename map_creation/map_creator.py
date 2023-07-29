@@ -230,7 +230,7 @@ def get_info_map_string(name, bpm, bs_diff):
     info_string += f'"_songName": "{name}",\n'
     info_string += f'"_songSubName": "Diff_{diff_plus / 4:.1f}",\n'
     info_string += '"_songAuthorName": "unknown",\n'
-    info_string += '"_levelAuthorName": "BierHerr",\n'
+    info_string += '"_levelAuthorName": "InfernoSaber",\n'
     info_string += f'"_beatsPerMinute": {bpm},\n'
     info_string += '"_songTimeOffset": 0,\n'
     info_string += '"_shuffle": 0,\n'
@@ -261,9 +261,11 @@ def get_info_map_string(name, bpm, bs_diff):
         else:
             info_string += '}\n'
 
-    info_string += ']\n'
-    info_string += '}\n'
-    info_string += ']\n'
+    info_string += ']}],\n'
+    info_string += ('"_customData": {"_editors": {"_lastEditedBy": '
+                    '"InfernoSaber", "InfernoSaber": {"version": "'
+                    f"{config.InfernoSaber_version}"
+                    '"}}}\n')
     info_string += '}\n'
 
     return info_string
