@@ -74,7 +74,7 @@ def main_multi_par(n_workers: int, diff_list: list, export_results_to_bs=True):
     if len(song_list) == 0:
         print("No songs found!")
 
-    total_runs = int(np.ceil(len(diff_list) * len(song_list) / n_workers))
+    total_runs = int(len(diff_list) * np.ceil(len(song_list) / n_workers))
     # Divide the song_list into chunks for each worker
     chunks = np.array_split(song_list, n_workers)
     # Create a partial function with fixed arguments
