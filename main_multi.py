@@ -183,7 +183,7 @@ def combine_maps(song_list, diff_list, export_results_to_bs):
 if __name__ == "__main__":
     diff_list = os.environ.get('diff_list')
     if diff_list is None:
-        diff_list = [3, 5, 6.5, 7.5, 8.5]
+        diff_list = [1.5, 2.5, 3.5, 4.5, 7.5]
     else:
         diff_list = json.loads(diff_list)
     if len(diff_list) != 5:
@@ -191,7 +191,7 @@ if __name__ == "__main__":
     print(f"Using difficulties: {diff_list}")
     # main_multi(diff_list, True)
 
-    # each worker needs ~5gb of ram memory
-    # each worker needs ~4gb of gpu memory
+    # each worker needs ~5gb of ram memory (15gb / 3)
+    # each worker needs ~4gb of gpu memory (11gb / 3)
     n_workers = 3
     main_multi_par(n_workers, diff_list, True)
