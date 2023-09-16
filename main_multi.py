@@ -27,7 +27,7 @@ def stack_info_data(new_info_file: list, content: list, diff_str: str, diff_num:
     return new_info_file
 
 
-def process_song(song_list_worker, diff_list, total_runs):
+def process_song(song_list_worker, total_runs):
     conf = tf.compat.v1.ConfigProto()
     conf.gpu_options.allow_growth = True
     sess = tf.compat.v1.Session(config=conf)
@@ -36,24 +36,23 @@ def process_song(song_list_worker, diff_list, total_runs):
     counter = 0
     time_per_run = 20
     for song_name in song_list_worker:
+        diff = float(song_name[1])
+        print(f"Running difficulty: {diff / 4:.1f}")
+        config.max_speed = diff
+        config.max_speed_orig = diff
+        song_name = song_name[0]
 
-        for diff in diff_list:
-            print(f"Running difficulty: {diff / 4:.1f}")
-            if diff is not None:
-                config.max_speed = diff
-                config.max_speed_orig = diff
-
-            print(f"### ETA: {(total_runs - counter) * time_per_run / 60:.1f} minutes. ###")
-            counter += 1
-            start_time = time.time()
-            if song_name.endswith(".egg"):
-                song_name = song_name[:-4]
-            fail_flag = beat_generator.main([song_name])
-            if fail_flag:
-                print("Continue with next song")
-                continue
-            end_time = time.time()
-            time_per_run = (4 * time_per_run + (end_time - start_time)) / 5
+        print(f"### ETA: {(total_runs - counter) * time_per_run / 60:.1f} minutes. ###")
+        counter += 1
+        start_time = time.time()
+        if song_name.endswith(".egg"):
+            song_name = song_name[:-4]
+        fail_flag = beat_generator.main([song_name])
+        if fail_flag:
+            print("Continue with next song")
+            continue
+        end_time = time.time()
+        time_per_run = (4 * time_per_run + (end_time - start_time)) / 5
 
 
 def main_multi_par(n_workers: int, diff_list: list, export_results_to_bs=True):
@@ -68,22 +67,27 @@ def main_multi_par(n_workers: int, diff_list: list, export_results_to_bs=True):
 
     # MAP GENERATOR
     ###############
-    song_list = os.listdir(paths.songs_pred)
-    song_list = check_music_files(song_list, paths.songs_pred)
-    print(f"Found {len(song_list)} songs. Iterating...")
-    if len(song_list) == 0:
+    song_list_files = os.listdir(paths.songs_pred)
+    song_list_files = check_music_files(song_list_files, paths.songs_pred)
+    print(f"Found {len(song_list_files)} songs. Iterating...")
+    if len(song_list_files) == 0:
         print("No songs found!")
 
-    total_runs = int(len(diff_list) * np.ceil(len(song_list) / n_workers))
+    song_list = []
+    for song in song_list_files:
+        for diff in diff_list:
+            song_list.append([song, diff])
+
+    total_runs = int(np.ceil(len(song_list) / n_workers))
     # Divide the song_list into chunks for each worker
     chunks = np.array_split(song_list, n_workers)
     # Create a partial function with fixed arguments
-    process_partial = partial(process_song, diff_list=diff_list, total_runs=total_runs)
+    process_partial = partial(process_song, total_runs=total_runs)
     # Create a pool of workers to execute the process_song function in parallel
     with Pool(processes=n_workers) as pool:
         pool.starmap(process_partial, zip(chunks))
 
-    combine_maps(song_list, diff_list, export_results_to_bs)
+    combine_maps(song_list_files, diff_list, export_results_to_bs)
 
 
 def main_multi(diff_list: list, export_results_to_bs=True):
@@ -183,7 +187,7 @@ def combine_maps(song_list, diff_list, export_results_to_bs):
 if __name__ == "__main__":
     diff_list = os.environ.get('diff_list')
     if diff_list is None:
-        diff_list = [1.5, 2.5, 3.5, 4.5, 7.5]
+        diff_list = [3.5, 4.5, 6.5, 7.5, 8.5]
     else:
         diff_list = json.loads(diff_list)
     if len(diff_list) != 5:
