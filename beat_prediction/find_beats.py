@@ -47,7 +47,7 @@ def find_beats(name_ar, train_data=True):
             # reformat pitch list
             pitch_list = np.asarray(pitch_list)
             pitch_list = np.log(pitch_list + 1)
-            pitch_list *= factor_pitch_certainty / pitch_list.max()
+            pitch_list *= config.factor_pitch_certainty / pitch_list.max()
             pit_mean_list = np.asarray(pit_mean_list)
             pit_mean_list -= pit_mean_list.min()
             pit_mean_list /= pit_mean_list.max()
