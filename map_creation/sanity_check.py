@@ -254,9 +254,10 @@ def improve_timings(new_notes, timings, pitch_input, pitch_times):
             post_idx_pitch = np.argmin(np.abs(pitch_times - np.float64(post_beat)))
 
             if post_idx_pitch - pre_idx_pitch > activation_time_index:
-                new_idx = pre_idx_pitch + np.argmax(pitch_input[pre_idx_pitch:post_idx_pitch + 1])
-                new_timing = pitch_times[new_idx]
-                timings[idx] = new_timing
+                if np.max(pitch_input[pre_idx_pitch:post_idx_pitch + 1]) > 0:
+                    new_idx = pre_idx_pitch + np.argmax(pitch_input[pre_idx_pitch:post_idx_pitch + 1])
+                    new_timing = pitch_times[new_idx]
+                    timings[idx] = new_timing
 
     return timings
 

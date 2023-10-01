@@ -29,18 +29,31 @@ def find_beats(name_ar, train_data=True):
         pitch_list = []
         samples_list = []
         src = aubio.source(n, channels=1, samplerate=config.samplerate_music)
+        pit_mean_list = []
         while True:
             samples, read = src()
+            pit_mean = np.mean(np.abs(samples))
             pit = aubio_pitch(samples)
             samples_list.extend(samples)
             pitch_list.extend(pit)
+            pit_mean_list.append(pit_mean)
             total_read += read
             if read < src.hop_size:
                 break
 
         # get pitch times
         # pitch_times = get_pitch_times(pitch_list, src.hop_size)
-        pitch_times_ar.append(pitch_list)
+        if True:
+            # reformat pitch list
+            pitch_list = np.asarray(pitch_list)
+            pitch_list = np.log(pitch_list + 1)
+            pitch_list *= factor_pitch_certainty / pitch_list.max()
+            pit_mean_list = np.asarray(pit_mean_list)
+            pit_mean_list -= pit_mean_list.min()
+            pit_mean_list /= pit_mean_list.max()
+            pitch_times_ar.append(pitch_list + pit_mean_list)
+        else:
+            pitch_times_ar.append(pitch_list)
 
         # logarithmic spectrogram of song
         window_size = 35.608

@@ -18,7 +18,8 @@ def create_map(y_class_num, timings, events, name, bpm, pitch_input, pitch_times
     notes = decode_beats(y_class_num, class_keys)
 
     ################################################################
-    def write_map(notes, timings, events, name, bpm, bs_diff, pitch_input, pitch_times):
+    def write_map(notes, timings, events, name, bpm, bs_diff,
+                  pitch_input, pitch_times):
         # Sanity check timings for first notes
         time_last = 1.0
         for idx in range(10):
@@ -76,7 +77,8 @@ def create_map(y_class_num, timings, events, name, bpm, pitch_input, pitch_times
     if config.create_expert_flag:
         bs_diff = 'Expert'
         config.max_speed *= config.expert_fact
-        new_map_folder = write_map(notes, timings, events, name, bpm, bs_diff, pitch_input, pitch_times)
+        new_map_folder = write_map(notes, timings, events, name, bpm, bs_diff,
+                                   pitch_input, pitch_times)
         # reset max speed
         config.max_speed = config.max_speed_orig
     # copy supplementary files to folder
