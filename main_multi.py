@@ -85,7 +85,9 @@ def main_multi_par(n_workers: int, diff_list: list, export_results_to_bs=True):
     process_partial = partial(process_song, total_runs=total_runs)
     # Create a pool of workers to execute the process_song function in parallel
     with Pool(processes=n_workers) as pool:
-        pool.starmap(process_partial, zip(chunks))
+        for _ in pool.imap_unordered(process_partial, chunks):
+            pass
+        # pool.starmap(process_partial, zip(chunks))
 
     combine_maps(song_list_files, diff_list, export_results_to_bs)
 
