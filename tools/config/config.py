@@ -1,6 +1,6 @@
 import numpy as np
 
-from map_creation.sanity_check import improve_timings
+# from map_creation.sanity_check import improve_timings
 
 ########################################
 # config file for all important values 
