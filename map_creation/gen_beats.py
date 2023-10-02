@@ -191,7 +191,8 @@ def main(name_ar: list) -> bool:
     else:
         events = []
 
-    create_map(y_class_map, map_times, events, name_ar[0], bpm, pitch_input[-1], pitch_times[-1])  # 0.5
+    create_map(y_class_map, map_times, events, name_ar[0], bpm,
+               pitch_input[-1], pitch_times[-1])
 
     return 0  # success
 

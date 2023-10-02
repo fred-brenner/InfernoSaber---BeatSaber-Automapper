@@ -1,15 +1,14 @@
 import os
-import shutil
 import time
-import sys
 import numpy as np
 import json
+import tensorflow as tf
+from multiprocessing import Pool
+from functools import partial
 
 from tools.config import paths, config
 import map_creation.gen_beats as beat_generator
 from bs_shift.export_map import *
-
-import tensorflow as tf
 
 
 def stack_info_data(new_info_file: list, content: list, diff_str: str, diff_num: int) -> list:
@@ -28,18 +27,74 @@ def stack_info_data(new_info_file: list, content: list, diff_str: str, diff_num:
     return new_info_file
 
 
-def main_multi(diff_list: list, export_results_to_bs=True):
+def process_song(song_list_worker, total_runs):
+    conf = tf.compat.v1.ConfigProto()
+    conf.gpu_options.allow_growth = True
+    sess = tf.compat.v1.Session(config=conf)
+    tf.compat.v1.keras.backend.set_session(sess)
+
+    counter = 0
+    time_per_run = 20
+    for song_name in song_list_worker:
+        diff = float(song_name[1])
+        print(f"Running difficulty: {diff / 4:.1f}")
+        config.max_speed = diff
+        config.max_speed_orig = diff
+        song_name = song_name[0]
+
+        print(f"### ETA: {(total_runs - counter) * time_per_run / 60:.1f} minutes. ###")
+        counter += 1
+        start_time = time.time()
+        if song_name.endswith(".egg"):
+            song_name = song_name[:-4]
+        fail_flag = beat_generator.main([song_name])
+        if fail_flag:
+            print("Continue with next song")
+            continue
+        end_time = time.time()
+        time_per_run = (4 * time_per_run + (end_time - start_time)) / 5
+
+
+def main_multi_par(n_workers: int, diff_list: list, export_results_to_bs=True):
     diff_list = np.sort(diff_list)
     diff_list *= 4
 
-    # input("Cleaning output directory. Continue?")
-    # exclude_list = ['cover.jpg', 'tmp']
-    # for file in os.listdir(paths.new_map_path):
-    #     if file not in exclude_list:
-    #         if os.path.isfile(paths.new_map_path + file):
-    #             os.remove(paths.new_map_path + file)
-    #         else:
-    #             shutil.rmtree(paths.new_map_path + file)
+    print("Starting multi map generator.")
+    conf = tf.compat.v1.ConfigProto()
+    conf.gpu_options.allow_growth = True
+    sess = tf.compat.v1.Session(config=conf)
+    tf.compat.v1.keras.backend.set_session(sess)
+
+    # MAP GENERATOR
+    ###############
+    song_list_files = os.listdir(paths.songs_pred)
+    song_list_files = check_music_files(song_list_files, paths.songs_pred)
+    print(f"Found {len(song_list_files)} songs. Iterating...")
+    if len(song_list_files) == 0:
+        print("No songs found!")
+
+    song_list = []
+    for song in song_list_files:
+        for diff in diff_list:
+            song_list.append([song, diff])
+
+    total_runs = int(np.ceil(len(song_list) / n_workers))
+    # Divide the song_list into chunks for each worker
+    chunks = np.array_split(song_list, n_workers)
+    # Create a partial function with fixed arguments
+    process_partial = partial(process_song, total_runs=total_runs)
+    # Create a pool of workers to execute the process_song function in parallel
+    with Pool(processes=n_workers) as pool:
+        for _ in pool.imap_unordered(process_partial, chunks):
+            pass
+        # pool.starmap(process_partial, zip(chunks))
+
+    combine_maps(song_list_files, diff_list, export_results_to_bs)
+
+
+def main_multi(diff_list: list, export_results_to_bs=True):
+    diff_list = np.sort(diff_list)
+    diff_list *= 4
 
     print("Starting multi map generator.")
     # limit gpu ram usage
@@ -59,15 +114,15 @@ def main_multi(diff_list: list, export_results_to_bs=True):
 
     total_runs = len(diff_list) * len(song_list)
     for diff in diff_list:
-        print(f"Running difficulty: {diff/4:.1f}")
+        print(f"Running difficulty: {diff / 4:.1f}")
         # change difficulty
         if diff is not None:
             config.max_speed = diff
             config.max_speed_orig = diff
 
-        time_per_run = 20   # time needed in seconds (first guess)
+        time_per_run = 20  # time needed in seconds (first guess)
         for song_name in song_list:
-            print(f"### ETA: {(total_runs - counter)*time_per_run/60:.1f} minutes. ###")
+            print(f"### ETA: {(total_runs - counter) * time_per_run / 60:.1f} minutes. ###")
             counter += 1
             start_time = time.time()
             song_name = song_name[:-4]
@@ -77,22 +132,12 @@ def main_multi(diff_list: list, export_results_to_bs=True):
                 print("Continue with next song")
                 continue
             end_time = time.time()
-            time_per_run = (4*time_per_run + (end_time - start_time)) / 5
-            # print(f"Time needed: {end_time - start_time}s")
+            time_per_run = (4 * time_per_run + (end_time - start_time)) / 5
+    combine_maps(song_list, diff_list, export_results_to_bs)
 
+
+def combine_maps(song_list, diff_list, export_results_to_bs):
     print("Running map combination")
-    # MAP STACKER
-    #############
-    # folders_check = []
-    # for folder_name in os.listdir(paths.new_map_path):
-    #     if folder_name.startswith("1234_"):
-    #         split_index = folder_name[5:].find("_") + 5 + 1
-    #         if split_index <= 6:
-    #             # not valid
-    #             continue
-    #         song_name = folder_name[split_index:]
-    #         if song_name not in folders_check:
-    #             folders_check.append(song_name)
     for song_name in song_list:
         song_name = song_name[:-4]
         overall_folder = f"{paths.new_map_path}12345_{song_name}"
@@ -138,17 +183,21 @@ def main_multi(diff_list: list, export_results_to_bs=True):
         if export_results_to_bs:
             shutil_copy_maps(song_name, index="12345_")
             # print("Successfully exported full difficulty maps to BS")
-
     print("Finished multi-map generator")
 
 
 if __name__ == "__main__":
     diff_list = os.environ.get('diff_list')
     if diff_list is None:
-        diff_list = [3, 5, 6.5, 7.5, 8.5]
+        diff_list = [3.5, 4.5, 6.5, 7.5, 8.5]
     else:
         diff_list = json.loads(diff_list)
     if len(diff_list) != 5:
         print(f"Error: Did not get 5 difficulties: {diff_list}")
     print(f"Using difficulties: {diff_list}")
-    main_multi(diff_list, True)
+    # main_multi(diff_list, True)
+
+    # each worker needs ~5gb of ram memory (15gb / 3)
+    # each worker needs ~4gb of gpu memory (11gb / 3)
+    n_workers = 3
+    main_multi_par(n_workers, diff_list, True)

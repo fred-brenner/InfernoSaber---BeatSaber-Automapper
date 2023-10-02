@@ -18,7 +18,8 @@ def create_map(y_class_num, timings, events, name, bpm, pitch_input, pitch_times
     notes = decode_beats(y_class_num, class_keys)
 
     ################################################################
-    def write_map(notes, timings, events, name, bpm, bs_diff, pitch_input, pitch_times):
+    def write_map(notes, timings, events, name, bpm, bs_diff,
+                  pitch_input, pitch_times):
         # Sanity check timings for first notes
         time_last = 1.0
         for idx in range(10):
@@ -76,7 +77,8 @@ def create_map(y_class_num, timings, events, name, bpm, pitch_input, pitch_times
     if config.create_expert_flag:
         bs_diff = 'Expert'
         config.max_speed *= config.expert_fact
-        new_map_folder = write_map(notes, timings, events, name, bpm, bs_diff, pitch_input, pitch_times)
+        new_map_folder = write_map(notes, timings, events, name, bpm, bs_diff,
+                                   pitch_input, pitch_times)
         # reset max speed
         config.max_speed = config.max_speed_orig
     # copy supplementary files to folder
@@ -230,7 +232,7 @@ def get_info_map_string(name, bpm, bs_diff):
     info_string += f'"_songName": "{name}",\n'
     info_string += f'"_songSubName": "Diff_{diff_plus / 4:.1f}",\n'
     info_string += '"_songAuthorName": "unknown",\n'
-    info_string += '"_levelAuthorName": "BierHerr",\n'
+    info_string += '"_levelAuthorName": "InfernoSaber",\n'
     info_string += f'"_beatsPerMinute": {bpm},\n'
     info_string += '"_songTimeOffset": 0,\n'
     info_string += '"_shuffle": 0,\n'
@@ -261,9 +263,11 @@ def get_info_map_string(name, bpm, bs_diff):
         else:
             info_string += '}\n'
 
-    info_string += ']\n'
-    info_string += '}\n'
-    info_string += ']\n'
+    info_string += ']}],\n'
+    info_string += ('"_customData": {"_editors": {"_lastEditedBy": '
+                    '"InfernoSaber", "InfernoSaber": {"version": "'
+                    f"{config.InfernoSaber_version}"
+                    '"}}}\n')
     info_string += '}\n'
 
     return info_string

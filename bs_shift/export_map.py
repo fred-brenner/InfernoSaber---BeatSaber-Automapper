@@ -40,6 +40,8 @@ def check_music_files(files, dir_path):
     for idx, song_name in enumerate(song_list):
         new_name = song_name.replace(' &', ',')
         new_name = new_name.replace('&', ',')
+        new_name = new_name.replace('{', '(')
+        new_name = new_name.replace('}', ')')
         while new_name[:-4].endswith(' '):
             new_name = f"{new_name[:-5]}.egg"
         if new_name != song_name:
@@ -78,7 +80,17 @@ def check_music_files(files, dir_path):
 def convert_music_file(file_name, output_file):
     # Load the mp3 file
     m_format = file_name.split('.')[-1]
+    if m_format == 'egg':
+        m_format = 'ogg'
     audio = AudioSegment.from_file(file_name, format=m_format)
 
+    output_file_format = output_file.split('.')[-1]
+
     # Export the audio as ogg file
-    audio.export(output_file, format="ogg")
+    if output_file_format == 'ogg' or output_file_format == 'egg':
+        audio.export(output_file, format="ogg")
+    elif output_file_format == 'mp3':
+        audio.export(output_file, format="mp3")
+    else:
+        print(f"Error in music converter: Format unknown: {m_format}")
+        exit()

@@ -1,11 +1,12 @@
 import numpy as np
 
-from map_creation.sanity_check import improve_timings
+# from map_creation.sanity_check import improve_timings
 
 ########################################
 # config file for all important values 
 # used in multiple codes
 ########################################
+InfernoSaber_version = "1.4.2"  # coded into the info.dat file
 
 # Map creation model configuration
 """Do change"""
@@ -13,9 +14,10 @@ max_speed = 4 * 7.5  # set around 5-40 (normal-expert++)
 add_beat_intensity = 105  # try to match bps by x% [80, 120]
 expert_fact = 0.63  # expert plus to expert factor [0.6, 0.7]
 create_expert_flag = True  # create second expert map
-thresh_beat = 0.45  # minimum beat response required to trigger generator
-thresh_pitch = 1.1  # minimum beat for pitch check (0.8,low-1.5,high)
-threshold_end = 1.1  # factor for start and end threshold
+thresh_beat = 0.42  # minimum beat response required to trigger generator [0.3, 0.6]
+thresh_pitch = 0.90  # minimum beat for pitch check (0.8,low-1.5,high)
+threshold_end = 1.08  # factor for start and end threshold [1.0, 1.2]
+factor_pitch_certainty = 0.5  # select emphasis on first (>1) or second pitch method
 random_note_map_factor = 0.3  # stick note map to random song/center (set to 0 to disable)
 random_note_map_change = 3  # change frequency for center (1-5)
 quick_start = 1.9  # map quick start mode (0 off, 1-3 on)
@@ -32,7 +34,7 @@ jump_speed_offset = -0.4  # general offset for jump speed (range [-2, 2])
 map_filler_iters = 10  # max iterations for map filler
 add_dot_notes = 2  # add dot notes for fastest patterns in percent [0-10]
 add_breaks_flag = True  # add breaks after strong patterns
-silence_threshold = 0.17  # silence threshold [0.0, 0.3]
+silence_threshold = 0.17  # silence threshold quantile value [0.0, 0.3]
 silence_thresh_hard = 0.2  # add fixed threshold to dynamic value [0-2]
 add_silence_flag = True  # whether to apply silence threshold
 emphasize_beats_flag = True  # emphasize beats into double notes
@@ -41,13 +43,13 @@ obstacle_time_gap = [0.3, 0.8]  # time gap before [0.2-1] after [0.5-2]
 obstacle_min_duration = 0.1  # minimum duration for each obstacle [0.1-2]
 obstacle_max_count = 2  # maximum appearance count for obstacles
 sporty_obstacles = False
-check_all_first_notes = False  # if False only change dot notes
+check_all_first_notes = True  # if False only change dot notes
 first_note_layer_threshold = 1  # Layer index from where first note should face up [0(all up)-3(all down)]
 allow_double_first_notes = False  # if False remove second note if necessary for first occurrence
 # improve timings
 improve_timings_mcfactor = 2.5  # max change bandwidth (2 wide, 4+ narrow)
 improve_timings_mcchange = 1.2   # max change time in seconds
-improve_timings_act_time = 0.33  # min time gap to activate
+improve_timings_act_time = 0.35  # min time gap to activate
 
 add_waveform_pattern_flag = 0   # [0: off, 1: on, 2: double on]
 waveform_pattern = [
@@ -76,7 +78,7 @@ sport_obstacle_allowed_types = [0, 1]  # (ceiling walls for crouch are fixed)
 sport_obstacle_positions = [[0, 1, 1], [2, 2, 3]]  # inside position of notes
 
 check_silence_flag = True  # check for extremely silent songs
-check_silence_value = -12.5  # value in dB [-11 (high filter) to -15 (low filter)]
+check_silence_value = -12.6  # value in dB [-15 (low filter), -11 (high filter)]
 jump_speed_expert_factor = 0.91     # factor from expert+ to expert
 jsb_offset = [0.21, 0.15]  # note jump speed offset for Expert, Expert+ (range [-0.5, 0.5])
 jsb_offset_min = [-0.2, -0.4]  # minimum allowed values (expert, expert+)
@@ -87,18 +89,18 @@ decr_speed_range = 20  # range for start and end (n first and last notes)
 decr_speed_val = 0.28  # decrease max speed at start
 reaction_time = 1.1  # reaction time (0.5-2)
 reaction_time_fact = 0.013  # factor including max_speed
-jump_speed = 12.5  # jump speed from beat saber (10-15)
+jump_speed = 12.4  # jump speed from beat saber (10-15)
 jump_speed_fact = 0.310  # factor including max_speed
-cdf = 1.2  # cut director factor (to calculate speed, ~0.5)
+cdf = 1.2  # cut director factor (to calculate speed, [0.5, 1.5])
 min_beat_time = 1 / 16  # in seconds (first sanity check)
 beat_spacing = 5587 / 196  # 5587/196s = 28.5051 steps/s
 # favor_last_class = 0.15     # set factor to favor the next beat class (0.0-0.3)
 max_double_note_speed = 25  # set maximum speed difference between double notes (10-30)
 emphasize_beats_3 = 0.040  # fraction beats to triple
 emphasize_beats_3_fact = 0.001  # factor incl max_speed
-emphasize_beats_2 = 0.68  # fraction beats to double
+emphasize_beats_2 = 0.70  # fraction beats to double
 emphasize_beats_2_fact = 0.002  # factor incl max_speed
-emphasize_beats_quantile = 0.825
+emphasize_beats_quantile = 0.65     # disengage quantile of fast patterns
 shift_beats_fact = 0.30  # fraction beats to shift in cut direction
 # add_beat_fact = 0.90        # fraction add beats (beat_generator)
 add_beat_max_bounds = [0.1, 0.5, 0.8, 1.6]

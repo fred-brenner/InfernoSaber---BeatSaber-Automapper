@@ -201,7 +201,7 @@ def improve_timings(new_notes, timings, pitch_input, pitch_times):
     # (currently 0.035s accuracy)
     mc_factor = config.improve_timings_mcfactor
     max_change = config.improve_timings_mcchange * mc_factor
-    activation_time = np.float64(config.improve_timings_act_time)
+    activation_time = np.float64(config.improve_timings_act_time / mc_factor)
     activation_time_index = np.where(pitch_times >= activation_time)[0][0]
 
     def check_for_notes(new_notes, idx):
@@ -254,9 +254,10 @@ def improve_timings(new_notes, timings, pitch_input, pitch_times):
             post_idx_pitch = np.argmin(np.abs(pitch_times - np.float64(post_beat)))
 
             if post_idx_pitch - pre_idx_pitch > activation_time_index:
-                new_idx = pre_idx_pitch + np.argmax(pitch_input[pre_idx_pitch:post_idx_pitch + 1])
-                new_timing = pitch_times[new_idx]
-                timings[idx] = new_timing
+                if np.max(pitch_input[pre_idx_pitch:post_idx_pitch + 1]) > 0:
+                    new_idx = pre_idx_pitch + np.argmax(pitch_input[pre_idx_pitch:post_idx_pitch + 1])
+                    new_timing = pitch_times[new_idx]
+                    timings[idx] = new_timing
 
     return timings
 
@@ -346,7 +347,7 @@ def emphasize_beats(notes, timings, notes_second):
     emphasize_beats_3 = config.emphasize_beats_3 + config.emphasize_beats_3_fact * config.max_speed
     emphasize_beats_2 = config.emphasize_beats_2 + config.emphasize_beats_2_fact * config.max_speed
     start_end_idx = 4
-    emphasize_beats_wait = np.quantile(timings, config.emphasize_beats_quantile) + 0.03
+    emphasize_beats_wait = np.quantile(timings, config.emphasize_beats_quantile) + 0.05
 
     def calc_new_note(note, new_pos):
         new_note = note * len(new_pos)
