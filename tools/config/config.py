@@ -8,6 +8,9 @@ import numpy as np
 ########################################
 InfernoSaber_version = "1.4.2"  # coded into the info.dat file
 
+# select mapper style or leave empty for default
+use_mapper_selection = ''   # use level author for selection of maps in training, deactivated if use_bpm_selection=True
+
 # Map creation model configuration
 """Do change"""
 max_speed = 4 * 7.5  # set around 5-40 (normal-expert++)
@@ -117,12 +120,11 @@ samplerate_music = 14800  # samplerate for the music import
 hop_size = 512
 window = 2.0  # window in seconds for each song to spectrum picture (from wav_to_pic)
 specgram_res = 24  # y resolution of the spectrogram (frequency subdivisions)
-
+ram_limit = 24  # free RAM in GB (+ about half of it as VRAM)
 
 use_bpm_selection = False   # use number of beats for selection of maps in training
 min_bps_limit = 7  # minimum beats_per_second value for training
 max_bps_limit = 10  # maximum beats_per_second value for training
-use_mapper_selection = 'Nuketime' # use level author for selection of maps in training, deactivated if use_bpm_selection=True
 
 # Model versions
 enc_version = 'tf_model_enc_16bneck_12_8__16_48.h5'
@@ -130,9 +132,14 @@ autoenc_version = 'tf_model_autoenc_16bneck_12_8__16_48.h5'
 # mapper_version = 'tf_model_mapper_5-10_1_21__13_26.h5'
 # beat_gen_version = 'tf_beat_gen_7.5_10_1_21__16_27.h5'
 # event_gen_version = 'tf_event_gen_7.5_10_1_21__16_6.h5'
-mapper_version = 'tf_model_mapper_7-10_1_29__19_34.h5'
-beat_gen_version = 'tf_beat_gen_7_10_1_29__19_39.h5'
-event_gen_version = 'tf_event_gen_7_10_1_29__19_44.h5'
+if use_mapper_selection == "" or use_mapper_selection is None:
+    mapper_version = 'tf_model_mapper_7-10_1_29__19_34.h5'
+    beat_gen_version = 'tf_beat_gen_7_10_1_29__19_39.h5'
+    event_gen_version = 'tf_event_gen_7_10_1_29__19_44.h5'
+if use_mapper_selection.lower == "nuketime":
+    mapper_version = 'tf_model_mapper_7-10_10_3__12_37.h5'
+    beat_gen_version = 'tf_beat_gen_7_10_10_3__12_43.h5'
+    event_gen_version = 'tf_event_gen_7_10_10_3__12_50.h5'
 
 # Autoencoder model configuration
 learning_rate = 3e-4  # model learning rate

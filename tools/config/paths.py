@@ -43,6 +43,10 @@ main_path += '/'
 ########################
 # input folder structure
 model_path = dir_path + "model/"
+if config.use_bpm_selection or config.use_mapper_selection == '' or config.use_mapper_selection is None:
+    model_path += "general/"
+else:
+    model_path += f"{config.use_mapper_selection}/"
 pred_path = dir_path + "prediction/"
 train_path = dir_path + "training/"
 temp_path = dir_path + "temp/"
