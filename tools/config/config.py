@@ -108,7 +108,7 @@ add_beat_max_bounds = [0.1, 0.5, 0.8, 1.6]
 # pitches_allowed = [40, 50]  # percentage of pitches to be over threshold
 
 
-"""Do not change"""
+"""Do not change unless you change the DNN models"""
 # Data Processing configuration
 general_diff = 'ExpertPlus'
 random_seed = 3
@@ -118,8 +118,11 @@ hop_size = 512
 window = 2.0  # window in seconds for each song to spectrum picture (from wav_to_pic)
 specgram_res = 24  # y resolution of the spectrogram (frequency subdivisions)
 
+
+use_bpm_selection = False   # use number of beats for selection of maps in training
 min_bps_limit = 7  # minimum beats_per_second value for training
 max_bps_limit = 10  # maximum beats_per_second value for training
+use_mapper_selection = 'Nuketime' # use level author for selection of maps in training, deactivated if use_bpm_selection=True
 
 # Model versions
 enc_version = 'tf_model_enc_16bneck_12_8__16_48.h5'

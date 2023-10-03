@@ -36,7 +36,7 @@ def main():
     ##############
     print("Gather input data:", end=' ')
 
-    ram_limit = int(11 * config.ram_limit)      # 100 songs ~9gb
+    # ram_limit = int(11 * config.ram_limit)      # 100 songs ~9gb
     name_ar, _ = filter_by_bps(config.min_bps_limit, config.max_bps_limit)
     # if len(name_ar) > ram_limit:
     #     print(f"Info: Loading reduced song number into generator to not overload the RAM "

@@ -80,6 +80,13 @@ def shift_bs_songs(allow_diff2=False):
                             # import dat file
                             dat_content = open(os.path.join(root, n_file)).readlines()
 
+                            search_string = '"_requirements":'
+                            for s in dat_content:
+                                if search_string in s:
+                                    if '[]' not in s:
+                                        print("Excluding maps with custom mod requirements.")
+                                        append_fail(os.path.basename(root))
+
                             search_string = '"_songName"'
                             # get name line
                             for s in dat_content:

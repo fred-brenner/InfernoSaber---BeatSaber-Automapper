@@ -57,7 +57,7 @@ def load_beat_data(name_ar: list, return_notes=False):
 def load_ml_data(train=True, name_ar=None):
 
     # get name array
-    name_ar, diff_ar = filter_by_bps(min_bps_limit, max_bps_limit)
+    name_ar, _ = filter_by_bps(min_bps_limit, max_bps_limit)
 
     # load beats (output)
     beat_ar, time_ar = load_beat_data(name_ar)
@@ -72,7 +72,7 @@ def load_ml_data(train=True, name_ar=None):
         if len(rm_idx) > 0:
             # remove invalid songs
             name_ar.pop(idx)
-            diff_ar.pop(idx)
+            # diff_ar.pop(idx)
             beat_ar.pop(idx)
             song_ar.pop(idx)
             time_ar.pop(idx)
