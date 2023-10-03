@@ -18,6 +18,7 @@ thresh_beat = 0.42  # minimum beat response required to trigger generator [0.3, 
 thresh_pitch = 0.90  # minimum beat for pitch check (0.8,low-1.5,high)
 threshold_end = 1.08  # factor for start and end threshold [1.0, 1.2]
 factor_pitch_certainty = 0.5  # select emphasis on first (>1) or second pitch method
+factor_pitch_meanmax = 3    # select pitch certainty for mean (>=3) or max (<3)
 random_note_map_factor = 0.3  # stick note map to random song/center (set to 0 to disable)
 random_note_map_change = 3  # change frequency for center (1-5)
 quick_start = 1.9  # map quick start mode (0 off, 1-3 on)

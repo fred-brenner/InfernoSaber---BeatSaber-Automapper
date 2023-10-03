@@ -32,7 +32,7 @@ def find_beats(name_ar, train_data=True):
         pit_mean_list = []
         while True:
             samples, read = src()
-            pit_mean = np.mean(np.abs(samples)) + np.max(np.abs(samples))
+            pit_mean = np.mean(np.abs(samples)) + np.max(np.abs(samples))/config.factor_pitch_meanmax
             pit = aubio_pitch(samples)
             samples_list.extend(samples)
             pitch_list.extend(pit)
