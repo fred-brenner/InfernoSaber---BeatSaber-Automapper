@@ -9,7 +9,7 @@ import numpy as np
 InfernoSaber_version = "1.4.2"  # coded into the info.dat file
 
 # select mapper style or leave empty for default
-use_mapper_selection = 'general_new'   # use level author for selection of maps in training, deactivated if use_bpm_selection=True
+use_mapper_selection = "general_new"   # use level author for selection of maps in training, deactivated if use_bpm_selection=True
 
 # Map creation model configuration
 """Do change"""
@@ -121,7 +121,8 @@ samplerate_music = 14800  # samplerate for the music import
 hop_size = 512
 window = 2.0  # window in seconds for each song to spectrum picture (from wav_to_pic)
 specgram_res = 24  # y resolution of the spectrogram (frequency subdivisions)
-ram_limit = 24  # free RAM in GB (+ about half of it as VRAM)
+ram_limit = 24      # free RAM in GB (unused?)
+vram_limit = 18     # free VRAM in GB (needed for lighting training)
 
 use_bpm_selection = True   # use number of beats for selection of maps in training
 min_bps_limit = 5  # minimum beats_per_second value for training
@@ -138,9 +139,9 @@ if use_mapper_selection == "" or use_mapper_selection is None:
     beat_gen_version = 'tf_beat_gen_7_10_1_29__19_39.h5'
     event_gen_version = 'tf_event_gen_7_10_1_29__19_44.h5'
 if use_mapper_selection == "general_new":
-    mapper_version = 'tf_model_mapper_7-10_1_29__19_34.h5'
-    beat_gen_version = 'tf_beat_gen_7_10_1_29__19_39.h5'
-    event_gen_version = 'tf_event_gen_7_10_1_29__19_44.h5'
+    mapper_version = 'tf_model_mapper_5-11_10_9__12_18.h5'
+    beat_gen_version = 'tf_beat_gen_5_11_10_9__12_50.h5'
+    event_gen_version = 'tf_event_gen_5_11_10_9__13_34.h5'
 if use_mapper_selection.lower == "nuketime":
     mapper_version = 'tf_model_mapper_7-10_10_3__12_37.h5'
     beat_gen_version = 'tf_beat_gen_7_10_10_3__12_43.h5'
