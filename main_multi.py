@@ -77,19 +77,29 @@ def main_multi_par(n_workers: int, diff_list: list, export_results_to_bs=True):
     for song in song_list_files:
         for diff in diff_list:
             song_list.append([song, diff])
-
     total_runs = int(np.ceil(len(song_list) / n_workers))
+    processed_count = 0
+    processed_count_real = 0
+
     # Divide the song_list into chunks for each worker
-    chunks = np.array_split(song_list, n_workers)
+    chunks = np.array_split(song_list, len(song_list))
     # Create a partial function with fixed arguments
     process_partial = partial(process_song, total_runs=total_runs)
     # Create a pool of workers to execute the process_song function in parallel
     with Pool(processes=n_workers) as pool:
-        for _ in pool.imap_unordered(process_partial, chunks):
-            pass
-        # pool.starmap(process_partial, zip(chunks))
+        for _ in pool.imap(process_partial, chunks):
+            # pass
+            processed_count += 1  # Increment the counter
+            if processed_count % len(diff_list) == 0:
+                combine_maps([song_list_files[processed_count_real]], diff_list, export_results_to_bs)
+                processed_count_real += 1
 
-    combine_maps(song_list_files, diff_list, export_results_to_bs)
+            # Check if there are remaining elements not processed in a batch of 5
+        if processed_count % len(diff_list) != 0:
+            print("Error: Found remaining maps which have not been combined.")
+            combine_maps([song_list_files[-1]], diff_list, export_results_to_bs)
+
+    # combine_maps(song_list_files, diff_list, export_results_to_bs)
 
 
 def main_multi(diff_list: list, export_results_to_bs=True):
@@ -137,6 +147,7 @@ def main_multi(diff_list: list, export_results_to_bs=True):
 
 
 def combine_maps(song_list, diff_list, export_results_to_bs):
+    # if len(song_list) > 1:
     print("Running map combination")
     for song_name in song_list:
         song_name = song_name[:-4]
@@ -183,7 +194,10 @@ def combine_maps(song_list, diff_list, export_results_to_bs):
         if export_results_to_bs:
             shutil_copy_maps(song_name, index="12345_")
             # print("Successfully exported full difficulty maps to BS")
-    print("Finished multi-map generator")
+    if len(song_list) == 1:
+        print(f"Finished map combination for {song_list[0]}")
+    else:
+        print("Finished multi-map generator")
 
 
 if __name__ == "__main__":
