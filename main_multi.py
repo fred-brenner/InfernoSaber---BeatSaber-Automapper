@@ -97,7 +97,7 @@ def main_multi_par(n_workers: int, diff_list: list, export_results_to_bs=True):
                 processed_count_real += 1
             new_time_per_run = (time.time() - start_time) / processed_count
             time_per_run = (time_per_run + new_time_per_run) / 2
-            print(f"### ETA: {(total_runs - processed_count) * time_per_run / 60:.1f} minutes. ###")
+            print(f"### ETA: {(len(song_list) - processed_count) * time_per_run / 60:.1f} minutes. ###")
 
             # Check if there are remaining elements not processed in a batch of 5
         if processed_count % len(diff_list) != 0:
