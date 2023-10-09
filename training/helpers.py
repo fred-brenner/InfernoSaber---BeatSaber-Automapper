@@ -37,7 +37,7 @@ def filter_by_bps(min_limit=None, max_limit=None):
         name_ar = get_maps_from_mapper(config.use_mapper_selection)
         diff_ar = np.ones_like(name_ar, dtype='float')*config.min_bps_limit
 
-        return list(name_ar), list(diff_ar)
+    return list(name_ar), list(diff_ar)
 
 
 def plot_autoenc_results(img_in, img_repr, img_out, n_samples, scale_repr=True, save=False):
