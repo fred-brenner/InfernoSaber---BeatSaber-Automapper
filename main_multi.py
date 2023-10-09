@@ -33,8 +33,8 @@ def process_song(song_list_worker, total_runs):
     sess = tf.compat.v1.Session(config=conf)
     tf.compat.v1.keras.backend.set_session(sess)
 
-    counter = 0
-    time_per_run = 20
+    # counter = 0
+    # time_per_run = 20
     for song_name in song_list_worker:
         diff = float(song_name[1])
         print(f"Running difficulty: {diff / 4:.1f}")
@@ -42,17 +42,17 @@ def process_song(song_list_worker, total_runs):
         config.max_speed_orig = diff
         song_name = song_name[0]
 
-        print(f"### ETA: {(total_runs - counter) * time_per_run / 60:.1f} minutes. ###")
-        counter += 1
-        start_time = time.time()
+        # print(f"### ETA: {(total_runs - counter) * time_per_run / 60:.1f} minutes. ###")
+        # counter += 1
+        # start_time = time.time()
         if song_name.endswith(".egg"):
             song_name = song_name[:-4]
         fail_flag = beat_generator.main([song_name])
         if fail_flag:
-            print("Continue with next song")
+            print("Unknown error in map generator. Continue with next song")
             continue
-        end_time = time.time()
-        time_per_run = (4 * time_per_run + (end_time - start_time)) / 5
+        # end_time = time.time()
+        # time_per_run = (4 * time_per_run + (end_time - start_time)) / 5
 
 
 def main_multi_par(n_workers: int, diff_list: list, export_results_to_bs=True):
@@ -80,12 +80,14 @@ def main_multi_par(n_workers: int, diff_list: list, export_results_to_bs=True):
     total_runs = int(np.ceil(len(song_list) / n_workers))
     processed_count = 0
     processed_count_real = 0
+    time_per_run = 20
 
     # Divide the song_list into chunks for each worker
     chunks = np.array_split(song_list, len(song_list))
     # Create a partial function with fixed arguments
     process_partial = partial(process_song, total_runs=total_runs)
     # Create a pool of workers to execute the process_song function in parallel
+    start_time = time.time()
     with Pool(processes=n_workers) as pool:
         for _ in pool.imap(process_partial, chunks):
             # pass
@@ -93,6 +95,9 @@ def main_multi_par(n_workers: int, diff_list: list, export_results_to_bs=True):
             if processed_count % len(diff_list) == 0:
                 combine_maps([song_list_files[processed_count_real]], diff_list, export_results_to_bs)
                 processed_count_real += 1
+            new_time_per_run = (time.time() - start_time) / processed_count
+            time_per_run = (time_per_run + new_time_per_run) / 2
+            print(f"### ETA: {(total_runs - processed_count) * time_per_run / 60:.1f} minutes. ###")
 
             # Check if there are remaining elements not processed in a batch of 5
         if processed_count % len(diff_list) != 0:
