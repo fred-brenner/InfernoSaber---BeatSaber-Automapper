@@ -19,7 +19,7 @@ expert_fact = 0.63  # expert plus to expert factor [0.6, 0.7]
 create_expert_flag = True  # create second expert map
 thresh_beat = 0.42  # minimum beat response required to trigger generator [0.3, 0.6]
 thresh_pitch = 0.90  # minimum beat for pitch check (0.8,low-1.5,high)
-threshold_end = 1.08  # factor for start and end threshold [1.0, 1.2]
+threshold_end = 1.0  # factor for start and end threshold [1.0, 1.2]
 factor_pitch_certainty = 0.5  # select emphasis on first (>1) or second pitch method
 factor_pitch_meanmax = 3    # select pitch certainty for mean (>=3) or max (<3)
 random_note_map_factor = 0.3  # stick note map to random song/center (set to 0 to disable)
@@ -38,7 +38,7 @@ jump_speed_offset = -0.4  # general offset for jump speed (range [-2, 2])
 map_filler_iters = 10  # max iterations for map filler
 add_dot_notes = 2  # add dot notes for fastest patterns in percent [0-10]
 add_breaks_flag = True  # add breaks after strong patterns
-silence_threshold = 0.17  # silence threshold quantile value [0.0, 0.3]
+silence_threshold = 0.2   # silence threshold quantile value [0.0, 0.3]
 silence_thresh_hard = 0.2  # add fixed threshold to dynamic value [0-2]
 add_silence_flag = True  # whether to apply silence threshold
 emphasize_beats_flag = True  # emphasize beats into double notes
