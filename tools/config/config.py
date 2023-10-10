@@ -10,7 +10,7 @@ InfernoSaber_version = "1.4.3"  # coded into the info.dat file
 
 # select mapper style or leave empty for default
 # use_mapper_selection = "general_new"   # use level author for selection of maps in training, deactivated if use_bpm_selection=True
-use_mapper_selection = "curated1"
+use_mapper_selection = "curated2"
 use_mapper_selection = use_mapper_selection.lower()
 
 # Map creation model configuration
@@ -151,7 +151,11 @@ if use_mapper_selection.lower == "nuketime":
 if use_mapper_selection.lower == "curated1":
     mapper_version = 'tf_model_mapper_5-11_10_10__10_33.h5'
     beat_gen_version = 'tf_beat_gen_5_11_10_10__10_45.h5'
-    event_gen_version = 'tf_event_gen_7_10_10_3__12_50.h5'
+    event_gen_version = 'tf_event_gen_5_11_10_10__11_20.h5'
+if use_mapper_selection.lower == "curated2":
+    mapper_version = 'tf_model_mapper_5-11_10_10__14_32.h5'
+    beat_gen_version = 'tf_beat_gen_5_11_10_10__14_39.h5'
+    event_gen_version = 'tf_event_gen_5_11_10_10__15_1.h5'
 
 # Autoencoder model configuration
 learning_rate = 3e-4  # model learning rate
