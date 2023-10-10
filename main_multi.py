@@ -211,8 +211,10 @@ if __name__ == "__main__":
         diff_list = [3.5, 4.5, 6.5, 7.5, 8.5]
     else:
         diff_list = json.loads(diff_list)
-    if len(diff_list) != 5:
-        print(f"Error: Did not get 5 difficulties: {diff_list}")
+    # if len(diff_list) != 5:
+    #     print(f"Warning: Did not get 5 difficulties: {diff_list}")
+
+    config.create_expert_flag = False
     print(f"Using difficulties: {diff_list}")
     # main_multi(diff_list, True)
 

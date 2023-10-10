@@ -191,6 +191,8 @@ def sliders_to_json(sliders, bpm):
     sliders = np.asarray(sliders)
     sliders[:, 1] = sliders[:, 1] * bpm / 60
     sliders[:, 6] = sliders[:, 6] * bpm / 60
+    # sort by first time value
+    sliders = sliders[sliders[:, 1].argsort()]
     note_json = ""
     for idx in range(len(sliders)):
         note_json += '{'
@@ -215,12 +217,12 @@ def sliders_to_json(sliders, bpm):
 
 
 def get_map_string(events='', notes='', obstacles='', sliders=''):
-    map_string = '{"_version":"2.6.0","_BPMChanges":[],'
-    map_string += f'"_events":[{events}],'
+    map_string = '{"_version":"2.6.0",'
     map_string += f'"_notes":[{notes}],'
     map_string += f'"_sliders":[{sliders}],'
     map_string += f'"_obstacles":[{obstacles}],'
-    map_string += f'"_bookmarks":[]'
+    map_string += f'"_events":[{events}],'
+    map_string += f'"_waypoints":[]'
     map_string += '}'
     return map_string
 
