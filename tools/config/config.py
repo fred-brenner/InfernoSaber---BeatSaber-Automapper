@@ -144,15 +144,15 @@ if use_mapper_selection == "general_new":
     mapper_version = 'tf_model_mapper_5-11_10_9__12_18.h5'
     beat_gen_version = 'tf_beat_gen_5_11_10_9__12_50.h5'
     event_gen_version = 'tf_event_gen_5_11_10_9__13_34.h5'
-if use_mapper_selection.lower == "nuketime":
+if use_mapper_selection == "nuketime":
     mapper_version = 'tf_model_mapper_7-10_10_3__12_37.h5'
     beat_gen_version = 'tf_beat_gen_7_10_10_3__12_43.h5'
     event_gen_version = 'tf_event_gen_7_10_10_3__12_50.h5'
-if use_mapper_selection.lower == "curated1":
+if use_mapper_selection == "curated1":
     mapper_version = 'tf_model_mapper_5-11_10_10__10_33.h5'
     beat_gen_version = 'tf_beat_gen_5_11_10_10__10_45.h5'
     event_gen_version = 'tf_event_gen_5_11_10_10__11_20.h5'
-if use_mapper_selection.lower == "curated2":
+if use_mapper_selection == "curated2":
     mapper_version = 'tf_model_mapper_5-11_10_10__14_32.h5'
     beat_gen_version = 'tf_beat_gen_5_11_10_10__14_39.h5'
     event_gen_version = 'tf_event_gen_5_11_10_10__15_1.h5'
