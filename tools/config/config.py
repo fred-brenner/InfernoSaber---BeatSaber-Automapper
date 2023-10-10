@@ -50,6 +50,11 @@ obstacle_time_gap = [0.3, 0.8]  # time gap before [0.2-1] after [0.5-2]
 obstacle_min_duration = 0.1  # minimum duration for each obstacle [0.1-2]
 obstacle_max_count = 2  # maximum appearance count for obstacles
 sporty_obstacles = False
+add_slider_flag = True  # add arcs between notes in free areas
+slider_time_gap = [0.8, 12.0]    # time gap in seconds
+slider_probability = 1.0    # [0.1-1.0] # unused for now!
+slider_radius_multiplier = 1.0  # [0.5-2.0]
+
 check_all_first_notes = True  # if False only change dot notes
 first_note_layer_threshold = 1  # Layer index from where first note should face up [0(all up)-3(all down)]
 allow_double_first_notes = False  # if False remove second note if necessary for first occurrence

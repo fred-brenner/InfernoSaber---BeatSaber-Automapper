@@ -7,6 +7,7 @@ import shutil
 
 from map_creation.sanity_check import sanity_check_notes, improve_timings
 from map_creation.gen_obstacles import calculate_obstacles
+from map_creation.gen_sliders import calculate_sliders
 from tools.config import config, paths
 
 
@@ -38,6 +39,8 @@ def create_map(y_class_num, timings, events, name, bpm, pitch_input, pitch_times
 
         if config.add_obstacle_flag:
             obstacles = calculate_obstacles(notes, timings)
+        if config.add_slider_flag:
+            sliders = calculate_sliders(notes, timings)
 
         # compensate bps
         timings = timings * bpm / 60
@@ -58,8 +61,12 @@ def create_map(y_class_num, timings, events, name, bpm, pitch_input, pitch_times
             obstacles_json = obstacles_to_json(obstacles, bpm)
         else:
             obstacles_json = ""
+        if config.add_slider_flag:
+            sliders_json = sliders_to_json(sliders, bpm)
+        else:
+            sliders_json = ""
         complete_map = get_map_string(notes=notes_json, events=events_json,
-                                      obstacles=obstacles_json)
+                                      obstacles=obstacles_json, sliders=sliders_json)
         with open(file, 'w') as f:
             f.write(complete_map)
 
@@ -180,7 +187,34 @@ def obstacles_to_json(obstacles, bpm):
     return note_json
 
 
-def get_map_string(events='', notes='', sliders='', obstacles=''):
+def sliders_to_json(sliders, bpm):
+    sliders = np.asarray(sliders)
+    sliders[:, 1] = sliders[:, 1] * bpm / 60
+    sliders[:, 6] = sliders[:, 6] * bpm / 60
+    note_json = ""
+    for idx in range(len(sliders)):
+        note_json += '{'
+        note_json += f'"_colorType":{sliders[idx][0]:.0f},' \
+                     f'"_headTime":{sliders[idx][1]:.5f},' \
+                     f'"_headLineIndex":{sliders[idx][2]:.0f},' \
+                     f'"_headLineLayer":{sliders[idx][3]:.0f},' \
+                     f'"_headControlPointLengthMultiplier":{sliders[idx][4]:.2f},' \
+                     f'"_headCutDirection":{sliders[idx][5]:.0f},' \
+                     f'"_tailTime":{sliders[idx][6]:.5f},' \
+                     f'"_tailLineIndex":{sliders[idx][7]:.0f},' \
+                     f'"_tailLineLayer":{sliders[idx][8]:.0f},' \
+                     f'"_tailControlPointLengthMultiplier":{sliders[idx][9]:.2f},' \
+                     f'"_tailCutDirection":{sliders[idx][10]:.0f},' \
+                     f'"_sliderMidAnchorMode":{sliders[idx][11]:.0f}'
+        note_json += '},'
+
+    # remove last comma
+    note_json = note_json[:-1]
+
+    return note_json
+
+
+def get_map_string(events='', notes='', obstacles='', sliders=''):
     map_string = '{"_version":"2.6.0","_BPMChanges":[],'
     map_string += f'"_events":[{events}],'
     map_string += f'"_notes":[{notes}],'
