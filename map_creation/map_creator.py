@@ -50,6 +50,7 @@ def create_map(y_class_num, timings, events, name, bpm, pitch_input, pitch_times
         new_map_folder = f"{paths.new_map_path}/1234_{config.max_speed_orig:.1f}_{name}/"
         os.makedirs(new_map_folder, exist_ok=True)
 
+        # write difficulty data
         file = f'{new_map_folder}{bs_diff}.dat'
         events_json = events_to_json(events, timings)
         notes_json = notes_to_json(notes, timings)
@@ -146,7 +147,8 @@ def events_to_json(notes, timings):
         note_json += '{'
         note_json += f'"_time":{timings[idx]:.4f},' \
                      f'"_type":{notes[idx][0]:.0f},' \
-                     f'"_value":{notes[idx][1]:.0f}'
+                     f'"_value":{notes[idx][1]:.0f},' \
+                     f'"_floatValue":1.0'
         note_json += '},'
         # "_events":[{"_time":4.1,"_type":3,"_value":1},
 
@@ -178,10 +180,11 @@ def obstacles_to_json(obstacles, bpm):
     return note_json
 
 
-def get_map_string(events='', notes='', obstacles=''):
-    map_string = '{"_version":"2.0.0","_BPMChanges":[],'
+def get_map_string(events='', notes='', sliders='', obstacles=''):
+    map_string = '{"_version":"2.6.0","_BPMChanges":[],'
     map_string += f'"_events":[{events}],'
     map_string += f'"_notes":[{notes}],'
+    map_string += f'"_sliders":[{sliders}],'
     map_string += f'"_obstacles":[{obstacles}],'
     map_string += f'"_bookmarks":[]'
     map_string += '}'
