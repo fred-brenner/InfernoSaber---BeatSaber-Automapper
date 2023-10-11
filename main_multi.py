@@ -169,6 +169,9 @@ def combine_maps(song_list, diff_list, export_results_to_bs):
         for i, diff in enumerate(diff_list):
             diff = f"{diff:.1f}"
             src = f"{paths.new_map_path}1234_{diff}_{song_name}/ExpertPlus.dat"
+            if not os.path.isfile(src):
+                print(f"Could not find all files for: 1234_{diff}_{song_name}")
+                return 0
             src_info = f"{paths.new_map_path}1234_{diff}_{song_name}/info.dat"
             with open(src_info) as fp:
                 content = fp.readlines()

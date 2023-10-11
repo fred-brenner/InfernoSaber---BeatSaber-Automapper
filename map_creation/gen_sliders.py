@@ -25,8 +25,8 @@ def get_side_time_gaps(sideL, notes, timings):
             if 3 in notes[i][2::4]:
                 b_flag = True
                 continue
-            if b_flag:
-                t0 = i
+            elif b_flag:
+                # t0 = -1
                 b_flag = False
                 continue
             # check note color
@@ -39,6 +39,8 @@ def get_side_time_gaps(sideL, notes, timings):
                 real_time_gap.append(timings[t1] - timings[t0])
                 real_time_gap_indices.append([t0, t1])
                 t0 = i
+                # if real_time_gap_indices[-1] == [286, 290]:
+                #     print("")
     return real_time_gap, real_time_gap_indices
 
 
