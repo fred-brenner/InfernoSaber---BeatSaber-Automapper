@@ -31,13 +31,14 @@ def add_obstacle(obstacles: list, position: int, first_time, last_time):
     # Add new obstacle
     rand_type = randint(0, len(config.obstacle_allowed_types) - 1)
     o_type = config.obstacle_allowed_types[rand_type]
+    o_height = randint(1, config.max_obstacle_height)
     first_time += config.obstacle_time_gap[0]
     last_time -= config.obstacle_time_gap[1]
 
     duration = last_time - first_time
     # _obstacles":[{"_time":64.39733123779297,"_lineIndex":0,
     #               "_type":0,"_duration":6.5,"_width":1}
-    cur_obstacle = [first_time, position, o_type, duration, config.obstacle_width]
+    cur_obstacle = [first_time, position, o_type, duration, config.obstacle_width, o_height]
     obstacles[position].append(cur_obstacle)
     return obstacles
 
@@ -53,10 +54,12 @@ def check_obstacle_times(first_time, last_time):
 def combine_obstacles(obstacles_all, times_empty):
     def found_obstacle(obst_temp, first_time, last_time, position, width=config.obstacle_width):
         if width > 2:
-            o_type = 1  # only allow ceiling type for crouch walls
+            o_type = 2  # only allow ceiling type for crouch walls
+            o_height = 3
         else:
             rand_type = randint(0, len(config.obstacle_allowed_types) - 1)
             o_type = config.obstacle_allowed_types[rand_type]
+            o_height = randint(1, config.max_obstacle_height)
 
         for t_empty in times_empty:
             if first_time >= t_empty:
@@ -64,14 +67,14 @@ def combine_obstacles(obstacles_all, times_empty):
             else:
                 if t_empty < last_time:
                     dur_temp = round(t_empty - first_time - 0.1, 1)
-                    cur_obstacle = [first_time, position, o_type, dur_temp, width]
+                    cur_obstacle = [first_time, position, o_type, dur_temp, width, o_height]
                     obst_temp.append(cur_obstacle)
                     first_time = t_empty
         dur_temp = round(last_time - first_time, 1)
         # if dur_temp < 0:
         #     print("Error. Encountered negative duration for obstacles! Exclude.")
         if dur_temp > 0:
-            cur_obstacle = [first_time, position, o_type, dur_temp, width]
+            cur_obstacle = [first_time, position, o_type, dur_temp, width, o_height]
             obst_temp.append(cur_obstacle)
         return obst_temp
 

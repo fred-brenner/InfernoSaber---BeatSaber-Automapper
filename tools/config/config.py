@@ -82,8 +82,9 @@ waveform_threshold = 4  # minimum number of notes applicable for waveform to sta
 """Caution on changes"""
 obstacle_crouch_width = 4
 obstacle_width = 1
+max_obstacle_height = 5     # <= 5
 # normal obstacles
-norm_obstacle_allowed_types = [0, 1]  # 0wall, 1ceiling, 2jump, 3onesaber
+norm_obstacle_allowed_types = [0, 1, 2]  # 0wall, 1ceiling, 2jump, 3onesaber
 norm_obstacle_positions = [[0], [3]]  # outside position of notes
 # sporty obstacles
 sport_obstacle_allowed_types = [0, 1]  # (ceiling walls for crouch are fixed)

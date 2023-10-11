@@ -65,8 +65,8 @@ def get_side_sliders(sideL, notes, timings, tg, tg_index):
             i1 = tg_index[idx][1]
             x0, y0, d0 = get_position_of_note(notes, i0, side_integer)
             x1, y1, d1 = get_position_of_note(notes, i1, side_integer)
-            sliders.append([side_integer, timings[i0], x0, y0, config.slider_radius_multiplier, d0,
-                            timings[i1], x1, y1, config.slider_radius_multiplier, d1, 0])
+            sliders.append([timings[i0], side_integer, x0, y0, d0, config.slider_radius_multiplier,
+                            timings[i1], x1, y1, d1, config.slider_radius_multiplier, 0])
     return sliders
 
 

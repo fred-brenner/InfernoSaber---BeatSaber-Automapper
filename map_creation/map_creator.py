@@ -56,7 +56,7 @@ def create_map(y_class_num, timings, events, name, bpm, pitch_input, pitch_times
         # write difficulty data
         file = f'{new_map_folder}{bs_diff}.dat'
         events_json = events_to_json(events, timings)
-        notes_json = notes_to_json(notes, timings)
+        notes_json, bombs_json = notes_to_json(notes, timings)
         if config.add_obstacle_flag:
             obstacles_json = obstacles_to_json(obstacles, bpm)
         else:
@@ -65,7 +65,7 @@ def create_map(y_class_num, timings, events, name, bpm, pitch_input, pitch_times
             sliders_json = sliders_to_json(sliders, bpm)
         else:
             sliders_json = ""
-        complete_map = get_map_string(notes=notes_json, events=events_json,
+        complete_map = get_map_string(notes=notes_json, events=events_json, bombs=bombs_json,
                                       obstacles=obstacles_json, sliders=sliders_json)
         with open(file, 'w') as f:
             f.write(complete_map)
@@ -120,15 +120,30 @@ def decode_class_keys(encoded):
 
 
 def notes_to_json(notes, timings):
+    # cast bombs extra
+    bomb_json = ""
+    for idx in range(len(notes)):
+        for n in range(int(len(notes[idx]) / 4)-1, -1, -1):
+            if notes[idx][2 + 4 * n] == 3:
+                # found it!
+                bomb_json += '{'
+                bomb_json += f'"b":{timings[idx]:.5f},' \
+                             f'"x":{notes[idx][0 + 4 * n]:.0f},' \
+                             f'"y":{notes[idx][1 + 4 * n]:.0f}'
+                bomb_json += '},'
+                for _ in range(4):
+                    notes[idx].pop(-1)
+
     note_json = ""
     for idx in range(len(notes)):
         for n in range(int(len(notes[idx]) / 4)):
             note_json += '{'
-            note_json += f'"_time":{timings[idx]:.5f},' \
-                         f'"_lineIndex":{notes[idx][0 + 4 * n]:.0f},' \
-                         f'"_lineLayer":{notes[idx][1 + 4 * n]:.0f},' \
-                         f'"_type":{notes[idx][2 + 4 * n]:.0f},' \
-                         f'"_cutDirection":{notes[idx][3 + 4 * n]:.0f}'
+            note_json += f'"b":{timings[idx]:.5f},' \
+                         f'"x":{notes[idx][0 + 4 * n]:.0f},' \
+                         f'"y":{notes[idx][1 + 4 * n]:.0f},' \
+                         f'"c":{notes[idx][2 + 4 * n]:.0f},' \
+                         f'"d":{notes[idx][3 + 4 * n]:.0f},' \
+                         f'"a":0'
             note_json += '},'
 
             # "_notes":[{"_time":4.116666793823242,
@@ -136,8 +151,10 @@ def notes_to_json(notes, timings):
 
     # remove last comma
     note_json = note_json[:-1]
+    if len(bomb_json) > 0:
+        bomb_json = bomb_json[:-1]
 
-    return note_json
+    return note_json, bomb_json
 
 
 def events_to_json(notes, timings):
@@ -152,10 +169,10 @@ def events_to_json(notes, timings):
     note_json = ""
     for idx in range(len(notes)):
         note_json += '{'
-        note_json += f'"_time":{timings[idx]:.4f},' \
-                     f'"_type":{notes[idx][0]:.0f},' \
-                     f'"_value":{notes[idx][1]:.0f},' \
-                     f'"_floatValue":1.0'
+        note_json += f'"b":{timings[idx]:.4f},' \
+                     f'"et":{notes[idx][0]:.0f},' \
+                     f'"i":{notes[idx][1]:.0f},' \
+                     f'"f":1.0'
         note_json += '},'
         # "_events":[{"_time":4.1,"_type":3,"_value":1},
 
@@ -172,11 +189,12 @@ def obstacles_to_json(obstacles, bpm):
     note_json = ""
     for idx in range(len(obstacles)):
         note_json += '{'
-        note_json += f'"_time":{obstacles[idx][0]:.4f},' \
-                     f'"_lineIndex":{obstacles[idx][1]:.0f},' \
-                     f'"_type":{obstacles[idx][2]:.0f},' \
-                     f'"_duration":{obstacles[idx][3]:.3f},' \
-                     f'"_width":{obstacles[idx][4]:.0f}'
+        note_json += f'"b":{obstacles[idx][0]:.4f},' \
+                     f'"x":{obstacles[idx][1]:.0f},' \
+                     f'"y":{obstacles[idx][2]:.0f},' \
+                     f'"d":{obstacles[idx][3]:.3f},' \
+                     f'"w":{obstacles[idx][4]:.0f},' \
+                     f'"h":{obstacles[idx][5]:.0f}'
         note_json += '},'
         # _obstacles":[{"_time":64.39733123779297,"_lineIndex":0,
         #               "_type":0,"_duration":6.5,"_width":1}
@@ -189,25 +207,25 @@ def obstacles_to_json(obstacles, bpm):
 
 def sliders_to_json(sliders, bpm):
     sliders = np.asarray(sliders)
-    sliders[:, 1] = sliders[:, 1] * bpm / 60
+    sliders[:, 0] = sliders[:, 0] * bpm / 60
     sliders[:, 6] = sliders[:, 6] * bpm / 60
     # sort by first time value
     sliders = sliders[sliders[:, 1].argsort()]
     note_json = ""
     for idx in range(len(sliders)):
         note_json += '{'
-        note_json += f'"_colorType":{sliders[idx][0]:.0f},' \
-                     f'"_headTime":{sliders[idx][1]:.5f},' \
-                     f'"_headLineIndex":{sliders[idx][2]:.0f},' \
-                     f'"_headLineLayer":{sliders[idx][3]:.0f},' \
-                     f'"_headControlPointLengthMultiplier":{sliders[idx][4]:.2f},' \
-                     f'"_headCutDirection":{sliders[idx][5]:.0f},' \
-                     f'"_tailTime":{sliders[idx][6]:.5f},' \
-                     f'"_tailLineIndex":{sliders[idx][7]:.0f},' \
-                     f'"_tailLineLayer":{sliders[idx][8]:.0f},' \
-                     f'"_tailControlPointLengthMultiplier":{sliders[idx][9]:.2f},' \
-                     f'"_tailCutDirection":{sliders[idx][10]:.0f},' \
-                     f'"_sliderMidAnchorMode":{sliders[idx][11]:.0f}'
+        note_json += f'"b":{sliders[idx][0]:.5f},' \
+                     f'"c":{sliders[idx][1]:.0f},' \
+                     f'"x":{sliders[idx][2]:.0f},' \
+                     f'"y":{sliders[idx][3]:.0f},' \
+                     f'"d":{sliders[idx][4]:.0f},' \
+                     f'"mu":{sliders[idx][5]:.2f},' \
+                     f'"tb":{sliders[idx][6]:.5f},' \
+                     f'"tx":{sliders[idx][7]:.0f},' \
+                     f'"ty":{sliders[idx][8]:.0f},' \
+                     f'"tc":{sliders[idx][9]:.0f},' \
+                     f'"tmu":{sliders[idx][10]:.2f},' \
+                     f'"m":{sliders[idx][11]:.0f}'
         note_json += '},'
 
     # remove last comma
@@ -216,13 +234,22 @@ def sliders_to_json(sliders, bpm):
     return note_json
 
 
-def get_map_string(events='', notes='', obstacles='', sliders=''):
-    map_string = '{"_version":"2.6.0",'
-    map_string += f'"_notes":[{notes}],'
-    map_string += f'"_sliders":[{sliders}],'
-    map_string += f'"_obstacles":[{obstacles}],'
-    map_string += f'"_events":[{events}],'
-    map_string += f'"_waypoints":[]'
+def get_map_string(events='', notes='', obstacles='', sliders='', bombs='',):
+    map_string = '{"_version":"3.2.0",'
+    map_string += '"bpmEvents":[],"rotationEvents":[],'
+    map_string += f'"colorNotes":[{notes}],'
+    map_string += f'"bombNotes":[{bombs}],'
+    map_string += f'"obstacles":[{obstacles}],'
+    map_string += f'"sliders":[{sliders}],'
+    map_string += '"burstSliders":[],'
+    map_string += '"waypoints":[],'
+    map_string += f'"basicBeatmapEvents":[{events}],'
+    map_string += '"colorBoostBeatmapEvents":[],'
+    map_string += '"lightColorEventBoxGroups":[],'
+    map_string += '"lightRotationEventBoxGroups":[],'
+    map_string += '"lightTranslationEventBoxGroups":[],'
+    map_string += '"basicEventTypesWithKeywords":{},'
+    map_string += '"useNormalEventsAsCompatibleEvents":false'
     map_string += '}'
     return map_string
 
