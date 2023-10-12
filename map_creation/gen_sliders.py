@@ -1,7 +1,8 @@
 import numpy as np
-from random import randint
+from random import randint, random
 
 from tools.config import config
+from map_creation.sanity_check import calc_note_speed
 
 
 def get_integer_note_color(sideL: bool):
@@ -18,7 +19,7 @@ def get_side_time_gaps(sideL, notes, timings):
     real_time_gap_indices = []
     b_flag = False
     t0 = -1
-    for i in range(1, len(timings)):
+    for i in range(0, len(timings)):
         # check for notes
         if len(notes[i]) > 0:
             # skip if bomb is found
@@ -33,6 +34,8 @@ def get_side_time_gaps(sideL, notes, timings):
             if side_integer in notes[i][2::4]:
                 if t0 < 0:
                     t0 = i
+                    real_time_gap.append(timings[t0])
+                    real_time_gap_indices.append([-1, i])
                     continue
                 # found it!
                 t1 = i
@@ -61,12 +64,40 @@ def get_side_sliders(sideL, notes, timings, tg, tg_index):
     side_integer = get_integer_note_color(sideL)
     sliders = []
     for idx, time_gap in enumerate(tg):
+        if idx == 0:
+            if config.slider_turbo_start:
+                i0 = tg_index[idx][0]
+                i1 = tg_index[idx][1]
+                if i0 < 0:
+                    x1, y1, d1 = get_position_of_note(notes, i1, side_integer)
+                    # d0 = 8
+                    d0 = d1
+                    if side_integer == 0:
+                        anchor_mode = 2
+                    else:
+                        anchor_mode = 1
+                    sliders.append([0.3*timings[i1], side_integer, x1, y1, d0, config.slider_radius_multiplier,
+                                    timings[i1], x1, y1, d1, config.slider_radius_multiplier, anchor_mode])
+            continue
+
         if config.slider_time_gap[0] < time_gap < config.slider_time_gap[1]:
             # get corresponding note position
             i0 = tg_index[idx][0]
             i1 = tg_index[idx][1]
             x0, y0, d0 = get_position_of_note(notes, i0, side_integer)
             x1, y1, d1 = get_position_of_note(notes, i1, side_integer)
+
+            if config.slider_movement_minimum > 0:
+                # delete some random sliders based on movement distance
+                nl_last = [x0, y0, 0, d0]
+                nl_new = [x1, y1, 0, d1]
+                speed = calc_note_speed(nl_last, nl_new, 1, config.cdf)
+                if speed < config.slider_movement_minimum:
+                    continue
+            if 0 <= config.slider_probability < 1:
+                if random() <= config.slider_probability:
+                    continue
+
             sliders.append([timings[i0], side_integer, x0, y0, d0, config.slider_radius_multiplier,
                             timings[i1], x1, y1, d1, config.slider_radius_multiplier, 0])
     return sliders
