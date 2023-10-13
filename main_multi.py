@@ -191,7 +191,7 @@ def combine_maps(song_list, diff_list, export_results_to_bs):
                 new_info_file = stack_info_data(new_info_file, content, "ExpertPlus", 9)
             shutil.copy(src, dst)
         # write info file
-        new_info_file.extend(content[33:])
+        new_info_file.extend(content[-3:])
         with open(f"{overall_folder}/info.dat", 'w') as fp:
             fp.writelines(new_info_file)
         # create zip archive for online viewer

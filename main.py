@@ -167,42 +167,27 @@ if __name__ == "__main__":
     # sliders
     asf = os.environ.get('add_slider_flag')
     if asf is not None:
-        if asf == 'True':
-            asf = True
-        else:
-            asf = False
+        asf = float(asf)
         print(f"Set add_slider_flag to {asf}")
 
     sst = os.environ.get('slider_start_time')
     if sst is not None:
-        if sst == 'True':
-            sst = True
-        else:
-            sst = False
+        sst = float(sst)
         print(f"Set slider_start_time to {sst}")
 
     se = os.environ.get('slider_end_time')
     if se is not None:
-        if se == 'True':
-            se = True
-        else:
-            se = False
+        se = float(se)
         print(f"Set slider_end_time to {se}")
 
     sp = os.environ.get('slider_probability')
     if sp is not None:
-        if sp == 'True':
-            sp = True
-        else:
-            sp = False
+        sp = float(sp)
         print(f"Set slider_probability to {sp}")
 
     smm = os.environ.get('slider_movement_min')
     if smm is not None:
-        if smm == 'True':
-            smm = True
-        else:
-            smm = False
+        smm = float(smm)
         print(f"Set slider_movement_min to {smm}")
 
     export_results_to_bs = True
