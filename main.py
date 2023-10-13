@@ -16,7 +16,10 @@ import tensorflow as tf
 def main(diff: float, export_results_to_bs=True, quick_start=None,
          beat_intensity=None, random_factor=None, js_offset=None,
          allow_no_dir_flag=None, silence_factor=None,
-         add_obstacles=None, sporty_obstacles=None):
+         add_obstacles=None, sporty_obstacles=None,
+         add_sliders=None, slider_start_time=None,
+         slider_end_time=None, slider_probability=None,
+         slider_movement_min=None):
 
     # change difficulty
     if diff is not None:
@@ -41,6 +44,16 @@ def main(diff: float, export_results_to_bs=True, quick_start=None,
         config.add_obstacle_flag = add_obstacles
     if sporty_obstacles is not None:
         config.sporty_obstacles = sporty_obstacles
+    if add_sliders is not None:
+        config.add_slider_flag = add_sliders
+    if slider_start_time is not None:
+        config.slider_time_gap[0] = slider_start_time
+    if slider_end_time is not None:
+        config.slider_time_gap[1] = slider_end_time
+    if slider_probability is not None:
+        config.slider_probability = slider_probability
+    if slider_movement_min is not None:
+        config.slider_movement_minimum = slider_movement_min
 
     # limit gpu ram usage
     conf = tf.compat.v1.ConfigProto()

@@ -1,13 +1,14 @@
-import os
-import time
-import numpy as np
 import json
+import numpy as np
+import os
+import sys
 import tensorflow as tf
-from multiprocessing import Pool
+import time
 from functools import partial
+from multiprocessing import Pool
 
-from tools.config import paths, config
 import map_creation.gen_beats as beat_generator
+from tools.config import paths, config
 from bs_shift.export_map import *
 
 
@@ -219,9 +220,13 @@ if __name__ == "__main__":
 
     config.create_expert_flag = False
     print(f"Using difficulties: {diff_list}")
-    # main_multi(diff_list, True)
-
-    # each worker needs ~5gb of ram memory (15gb / 3)
-    # each worker needs ~4gb of gpu memory (11gb / 3)
-    n_workers = 3
-    main_multi_par(n_workers, diff_list, True)
+    if 'google.colab' in sys.modules:
+        print("Multi-processing on colab notebook not supported :|\n"
+              "Running single process.")
+        main_multi(diff_list, False)
+    else:
+        # main_multi(diff_list, True)
+        # each worker needs ~5gb of ram memory (15gb / 3)
+        # each worker needs ~4gb of gpu memory (11gb / 3)
+        n_workers = 3
+        main_multi_par(n_workers, diff_list, True)
