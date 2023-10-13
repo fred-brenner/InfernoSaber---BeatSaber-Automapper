@@ -86,3 +86,11 @@ notes_classify_dict_file = f"{model_path}notes_class_dict.pkl"
 beats_classify_encoder_file = model_path + "onehot_encoder_beats.pkl"
 events_classify_encoder_file = model_path + "onehot_encoder_events.pkl"
 ############################
+
+# check runtime environment
+try:
+    import google.colab
+
+    IN_COLAB = True
+except:
+    IN_COLAB = False

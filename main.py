@@ -164,4 +164,7 @@ if __name__ == "__main__":
         print(f"Set sporty_obstacle_flag to {sof}")
 
     export_results_to_bs = True
+    if paths.IN_COLAB:
+        export_results_to_bs = False
+
     main(diff, export_results_to_bs, qs, bi, rf, jso, ndf, sf, aof, sof)

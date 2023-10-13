@@ -19,6 +19,8 @@ use_mapper_selection = use_mapper_selection.lower()
 """Do change"""
 max_speed = 4 * 7.5  # set around 5-40 (normal-expert++)
 add_beat_intensity = 105  # try to match bps by x% [80, 120]
+cdf = 1.2  # cut director factor (to calculate speed, [0.5, 1.5])
+cdf_lr = 1.1  # speed addition factor for left right movement
 expert_fact = 0.63  # expert plus to expert factor [0.6, 0.7]
 create_expert_flag = True  # create second expert map
 thresh_beat = 0.42  # minimum beat response required to trigger generator [0.3, 0.6]
@@ -54,7 +56,7 @@ sporty_obstacles = False
 add_slider_flag = True  # add arcs between notes in free areas
 slider_time_gap = [0.5, 10.0]    # time gap in seconds
 slider_probability = 0.8    # [0.1-1.0] with 1 meaning all on
-slider_movement_minimum = 2.5    # minimum movement between notes [0-10]
+slider_movement_minimum = 2.2   # minimum movement between notes [0-10]
 slider_radius_multiplier = 1.0  # [0.5-2.0]
 slider_turbo_start = True   # start slider towards first note
 
@@ -107,7 +109,6 @@ reaction_time = 1.1  # reaction time (0.5-2)
 reaction_time_fact = 0.013  # factor including max_speed
 jump_speed = 12.4  # jump speed from beat saber (10-15)
 jump_speed_fact = 0.310  # factor including max_speed
-cdf = 1.2  # cut director factor (to calculate speed, [0.5, 1.5])
 min_beat_time = 1 / 16  # in seconds (first sanity check)
 beat_spacing = 5587 / 196  # 5587/196s = 28.5051 steps/s
 # favor_last_class = 0.15     # set factor to favor the next beat class (0.0-0.3)

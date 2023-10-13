@@ -897,8 +897,7 @@ def correct_notes(notes, timings):
 
             # calculate movement speed (of first element)
             new_time = timings[idx]
-            speed = calc_note_speed(nl_last, notes[idx], new_time - last_time,
-                                    config.cdf)
+            speed = calc_note_speed(nl_last, notes[idx], new_time - last_time)
 
             # remove too fast elements
             if idx in decrease_range:
@@ -1011,7 +1010,8 @@ def check_note_movement(notes_last, notes_new):
     return notes_new
 
 
-def calc_note_speed(notes_last, notes_new, time_diff, cdf, react=True):
+def calc_note_speed(notes_last, notes_new, time_diff,
+                    cdf=config.cdf, cdf_lr=config.cdf_lr, react=True):
     if notes_last is None:
         return 0
 
@@ -1026,6 +1026,7 @@ def calc_note_speed(notes_last, notes_new, time_diff, cdf, react=True):
     # x direction
     dist += np.abs((notes_last[0] - cdf * cut_x_last) -
                    (notes_new[0] + cdf * cut_x_new))
+    dist *= cdf_lr
     # y direction
     dist += np.abs((notes_last[1] - cdf * cut_y_last) -
                    (notes_new[1] + cdf * cut_y_new))

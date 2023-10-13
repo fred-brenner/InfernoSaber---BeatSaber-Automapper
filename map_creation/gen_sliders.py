@@ -72,10 +72,13 @@ def get_side_sliders(sideL, notes, timings, tg, tg_index):
                     x1, y1, d1 = get_position_of_note(notes, i1, side_integer)
                     # d0 = 8
                     d0 = d1
+                    anchor_mode = 1
                     if side_integer == 0:
-                        anchor_mode = 2
+                        if d1 in [4, 0, 5]:     # left side up
+                            anchor_mode = 2
                     else:
-                        anchor_mode = 1
+                        if d1 in [6, 1, 7]:     # right side down
+                            anchor_mode = 2
                     sliders.append([0.3*timings[i1], side_integer, x1, y1, d0, config.slider_radius_multiplier,
                                     timings[i1], x1, y1, d1, config.slider_radius_multiplier, anchor_mode])
             continue
@@ -91,7 +94,8 @@ def get_side_sliders(sideL, notes, timings, tg, tg_index):
                 # delete some random sliders based on movement distance
                 nl_last = [x0, y0, 0, d0]
                 nl_new = [x1, y1, 0, d1]
-                speed = calc_note_speed(nl_last, nl_new, 1, config.cdf)
+                speed = calc_note_speed(nl_last, nl_new, 1,
+                                        cdf_lr=1.5)
                 if speed < config.slider_movement_minimum:
                     continue
             if 0 <= config.slider_probability < 1:
