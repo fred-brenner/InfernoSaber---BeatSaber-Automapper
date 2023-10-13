@@ -1,7 +1,5 @@
 import json
 import numpy as np
-import os
-import sys
 import tensorflow as tf
 import time
 from functools import partial
@@ -220,7 +218,15 @@ if __name__ == "__main__":
 
     config.create_expert_flag = False
     print(f"Using difficulties: {diff_list}")
-    if 'google.colab' in sys.modules:
+
+    try:
+        import google.colab
+
+        IN_COLAB = True
+    except:
+        IN_COLAB = False
+
+    if IN_COLAB:
         print("Multi-processing on colab notebook not supported :|\n"
               "Running single process.")
         main_multi(diff_list, False)
