@@ -13,7 +13,7 @@ from bs_shift.export_map import *
 import tensorflow as tf
 
 
-def main(diff: float, export_results_to_bs=True, quick_start=None,
+def main(diff=None, export_results_to_bs=True, quick_start=None,
          beat_intensity=None, random_factor=None, js_offset=None,
          allow_no_dir_flag=None, silence_factor=None,
          add_obstacles=None, sporty_obstacles=None,
@@ -147,6 +147,7 @@ if __name__ == "__main__":
         sf = float(sf)
         print(f"Set silence factor to {sf}")
 
+    # obstacles
     aof = os.environ.get('add_obstacle_flag')
     if aof is not None:
         if aof == 'True':
@@ -163,8 +164,50 @@ if __name__ == "__main__":
             sof = False
         print(f"Set sporty_obstacle_flag to {sof}")
 
+    # sliders
+    asf = os.environ.get('add_slider_flag')
+    if asf is not None:
+        if asf == 'True':
+            asf = True
+        else:
+            asf = False
+        print(f"Set add_slider_flag to {asf}")
+
+    sst = os.environ.get('slider_start_time')
+    if sst is not None:
+        if sst == 'True':
+            sst = True
+        else:
+            sst = False
+        print(f"Set slider_start_time to {sst}")
+
+    se = os.environ.get('slider_end_time')
+    if se is not None:
+        if se == 'True':
+            se = True
+        else:
+            se = False
+        print(f"Set slider_end_time to {se}")
+
+    sp = os.environ.get('slider_probability')
+    if sp is not None:
+        if sp == 'True':
+            sp = True
+        else:
+            sp = False
+        print(f"Set slider_probability to {sp}")
+
+    smm = os.environ.get('slider_movement_min')
+    if smm is not None:
+        if smm == 'True':
+            smm = True
+        else:
+            smm = False
+        print(f"Set slider_movement_min to {smm}")
+
     export_results_to_bs = True
     if paths.IN_COLAB:
         export_results_to_bs = False
 
-    main(diff, export_results_to_bs, qs, bi, rf, jso, ndf, sf, aof, sof)
+    main(diff, export_results_to_bs, qs, bi, rf, jso,
+         ndf, sf, aof, sof, asf, sst, se, sp, smm)

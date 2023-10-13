@@ -56,7 +56,7 @@ sporty_obstacles = False
 add_slider_flag = True  # add arcs between notes in free areas
 slider_time_gap = [0.5, 10.0]    # time gap in seconds
 slider_probability = 0.9    # [0.1-1.0] with 1 meaning all on
-slider_movement_minimum = 2   # minimum movement between notes [0-10]
+slider_movement_minimum = 1.5   # minimum movement between notes [0-5]
 slider_radius_multiplier = 1.0  # [0.5-2.0]
 slider_turbo_start = True   # start slider towards first note
 
