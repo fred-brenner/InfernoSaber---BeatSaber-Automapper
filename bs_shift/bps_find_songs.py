@@ -26,7 +26,7 @@ def bps_find_songs(info_flag=True) -> None:
             name_array.append(i[:-10])
 
     if info_flag:
-        print("\nInfo: Max avg song cut_per_second found: " + str(max(diff_array)))
+        print(f"\nInfo: Highest avg cut_per_second found in one song: {max(diff_array)}")
 
     # save arrays
     diff_array = np.asarray(diff_array)

@@ -43,6 +43,10 @@ main_path += '/'
 ########################
 # input folder structure
 model_path = dir_path + "model/"
+if config.use_mapper_selection == '' or config.use_mapper_selection is None:
+    model_path += "general/"
+else:
+    model_path += f"{config.use_mapper_selection.lower()}/"
 pred_path = dir_path + "prediction/"
 train_path = dir_path + "training/"
 temp_path = dir_path + "temp/"
@@ -77,8 +81,16 @@ ml_input_song_file = ml_input_path + "song_ar.npy"
 
 black_list_file = fail_path + "black_list.txt"
 
-notes_classify_dict_file = f"{pred_path}notes_class_dict_{config.min_bps_limit}-{config.max_bps_limit}.pkl"
+notes_classify_dict_file = f"{model_path}notes_class_dict.pkl"
 # beats_classify_encoder_file = pred_path + f"onehot_encoder_beats_{config.min_bps_limit}-{config.max_bps_limit}.pkl"
-beats_classify_encoder_file = pred_path + f"onehot_encoder_beats.pkl"
-events_classify_encoder_file = pred_path + f"onehot_encoder_events.pkl"
+beats_classify_encoder_file = model_path + "onehot_encoder_beats.pkl"
+events_classify_encoder_file = model_path + "onehot_encoder_events.pkl"
 ############################
+
+# check runtime environment
+try:
+    import google.colab
+
+    IN_COLAB = True
+except:
+    IN_COLAB = False

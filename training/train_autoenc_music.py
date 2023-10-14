@@ -34,7 +34,7 @@ np.random.seed(3)
 # Data Preprocessing
 ####################
 # get name array
-name_ar, diff_ar = filter_by_bps(min_bps_limit, max_bps_limit)
+name_ar, _ = filter_by_bps(min_bps_limit, max_bps_limit)
 # print(f"Importing {len(name_ar)} songs")
 
 # load song input
@@ -50,7 +50,7 @@ while i == 0:
         time.sleep(0.1)
         bps_find_songs(info_flag=False)
         time.sleep(0.1)
-        name_ar, diff_ar = filter_by_bps(min_bps_limit, max_bps_limit)
+        name_ar, _ = filter_by_bps(min_bps_limit, max_bps_limit)
         time.sleep(0.1)
         i -= 1
 
@@ -110,7 +110,7 @@ run_plot_autoenc(encoder, auto_encoder, ds_test, save=True)
 
 # Save Model
 ############
-print(f"Saving model at: {paths.model_path}")
+print(f"Saving model: {save_model_name} at: {paths.model_path}")
 auto_encoder.save(paths.model_path + save_model_name)
 encoder.save(paths.model_path + save_enc_name)
 

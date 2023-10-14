@@ -124,7 +124,7 @@ def start_training():
     print("Gather input data:", end=' ')
 
     name_ar, _ = filter_by_bps(config.min_bps_limit, config.max_bps_limit)
-    ram_limit = int(9 * config.ram_limit)
+    ram_limit = int(7.3 * config.vram_limit)
     if len(name_ar) > ram_limit:
         random.shuffle(name_ar)
         print(f"Info: Loading reduced song number into generator to not overload the VRAM (from {len(name_ar)})")

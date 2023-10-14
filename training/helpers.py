@@ -7,6 +7,8 @@ from keras.models import load_model
 
 from tools.utils.load_and_save import load_npy
 from tools.config import paths, config
+from tools.config.mapper_selection import return_mapper_list
+from preprocessing.map_info_processing import get_maps_from_mapper
 
 
 def ai_encode_song(song):
@@ -19,18 +21,25 @@ def ai_encode_song(song):
 
 
 def filter_by_bps(min_limit=None, max_limit=None):
-    # return songs in difficulty range
-    diff_ar = load_npy(paths.diff_ar_file)
-    name_ar = load_npy(paths.name_ar_file)
+    if config.use_bpm_selection:
+        print("Importing maps by BPM")
+        # return songs in difficulty range
+        diff_ar = load_npy(paths.diff_ar_file)
+        name_ar = load_npy(paths.name_ar_file)
 
-    if min_limit is not None:
-        selection = diff_ar > min_limit
-        name_ar = name_ar[selection]
-        diff_ar = diff_ar[selection]
-    if max_limit is not None:
-        selection = diff_ar < max_limit
-        name_ar = name_ar[selection]
-        diff_ar = diff_ar[selection]
+        if min_limit is not None:
+            selection = diff_ar > min_limit
+            name_ar = name_ar[selection]
+            diff_ar = diff_ar[selection]
+        if max_limit is not None:
+            selection = diff_ar < max_limit
+            name_ar = name_ar[selection]
+            diff_ar = diff_ar[selection]
+    else:
+        print(f"Importing maps by mapper: {config.use_mapper_selection}")
+        mapper_name = return_mapper_list(config.use_mapper_selection)
+        name_ar = get_maps_from_mapper(mapper_name)
+        diff_ar = np.ones_like(name_ar, dtype='float')*config.min_bps_limit
 
     return list(name_ar), list(diff_ar)
 

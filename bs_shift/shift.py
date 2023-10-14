@@ -10,9 +10,9 @@ from tools.fail_list.black_list import append_fail, delete_fails
 from tools.utils.index_find_str import return_find_str
 
 # set folder paths
-import tools.config.paths as paths
+from tools.config import paths, config
 # import exclusion names
-import tools.config.exclusion as exclusion
+from tools.config import exclusion
 
 from bps_find_songs import bps_find_songs
 from map_to_dict_all import map_to_dict_all
@@ -79,6 +79,14 @@ def shift_bs_songs(allow_diff2=False):
                             bar.update(num_cur)
                             # import dat file
                             dat_content = open(os.path.join(root, n_file)).readlines()
+
+                            if config.exclude_requirements:
+                                search_string = '"_requirements":'
+                                for s in dat_content:
+                                    if search_string in s:
+                                        if '[]' not in s:
+                                            print("Excluding maps with custom mod requirements.")
+                                            append_fail(os.path.basename(root))
 
                             search_string = '"_songName"'
                             # get name line

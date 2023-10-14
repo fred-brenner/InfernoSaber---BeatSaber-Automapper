@@ -14,7 +14,7 @@ np.random.seed(3)
 # Data Preprocessing
 ####################
 # get name array
-name_ar, diff_ar = filter_by_bps(min_bps_limit, max_bps_limit)
+name_ar, _ = filter_by_bps(min_bps_limit, max_bps_limit)
 name_ar = [name_ar[0]]
 print(f"Importing {len(name_ar)} song")
 

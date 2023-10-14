@@ -1,14 +1,17 @@
-import numpy as np
-import aubio
-from progressbar import ProgressBar
-import matplotlib.pyplot as plt
-from scipy import signal
 from PIL import Image, ImageFilter
+from progressbar import ProgressBar
+from scipy import signal
+import aubio
+import matplotlib.pyplot as plt
+import numpy as np
 
-from tools.utils.load_and_save import save_npy
-from tools.utils import numpy_shorts
+from bs_shift.bps_find_songs import bps_find_songs
 from tools.config import paths, config
 from tools.fail_list.black_list import append_fail, delete_fails
+from tools.utils import numpy_shorts
+from tools.utils.load_and_save import save_npy
+
+# from line_profiler_pycharm import profile
 
 
 def load_song(data_path: str, time_ar: list, return_raw=False) -> np.array:
@@ -114,6 +117,7 @@ def run_music_preprocessing(names_ar: list, time_ar=None, save_file=True, song_c
     ending = ".egg"
     song_ar = []
     rm_index_ar = []
+    errors_appeared = 0
 
     # bar = ProgressBar(max_value=len(names_ar))
 
@@ -134,7 +138,7 @@ def run_music_preprocessing(names_ar: list, time_ar=None, save_file=True, song_c
         except:
             print(f"Problem with song: {n}")
             append_fail(n[:-4])
-            raise
+            errors_appeared += 1
         rm_index_ar.append(remove_idx)
 
         ml_input_song = process_song(song)
@@ -143,7 +147,11 @@ def run_music_preprocessing(names_ar: list, time_ar=None, save_file=True, song_c
         #     song_ar.extend(ml_input_song)
         # else:
         song_ar.append(ml_input_song)
-
+    if errors_appeared > 0:
+        delete_fails()
+        bps_find_songs()
+        print("Deleted failed maps, please re-run!")
+        exit()
     # scale song to 0-1
     # if len(np.asarray(song_ar).shape) > 1:
     #     song_ar = np.asarray(song_ar)
