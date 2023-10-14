@@ -167,7 +167,10 @@ if __name__ == "__main__":
     # sliders
     asf = os.environ.get('add_slider_flag')
     if asf is not None:
-        asf = float(asf)
+        if asf == 'True':
+            asf = True
+        else:
+            asf = False
         print(f"Set add_slider_flag to {asf}")
 
     sst = os.environ.get('slider_start_time')
