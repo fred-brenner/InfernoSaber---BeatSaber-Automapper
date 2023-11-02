@@ -5,7 +5,7 @@ to improve the note generation output
 
 import numpy as np
 import aubio
-import matplotlib.pyplot as plt
+# import matplotlib.pyplot as plt
 from scipy.signal import savgol_filter
 
 from tools.config import config, paths
@@ -296,11 +296,11 @@ def add_breaks(notes_single, timings):
     if len(real_timings) > 50:
         # apply window filter to diffs
         real_diffs_filt = savgol_filter(real_diffs, window_length=31, polyorder=4)
-        if False:
-            plt.figure()
-            plt.plot(real_diffs)
-            plt.plot(real_diffs_filt)
-            plt.show()
+        # if False:
+        #     plt.figure()
+        #     plt.plot(real_diffs)
+        #     plt.plot(real_diffs_filt)
+        #     plt.show()
 
         thresh_diffs = np.quantile(real_diffs_filt, 0.37)
         strong_counter = 0

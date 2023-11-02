@@ -10,6 +10,7 @@ import time
 
 from bs_shift.bps_find_songs import bps_find_songs
 from helpers import *
+from plot_model import run_plot_autoenc
 from tensorflow_models import *
 from preprocessing.music_processing import run_music_preprocessing
 from tools.config import config, paths

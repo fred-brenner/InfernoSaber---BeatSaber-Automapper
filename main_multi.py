@@ -210,7 +210,7 @@ def combine_maps(song_list, diff_list, export_results_to_bs):
 if __name__ == "__main__":
     diff_list = os.environ.get('diff_list')
     if diff_list is None:
-        diff_list = [3.5, 4.5, 6.5, 7.5, 8.5]
+        diff_list = [3.5, 4.5, 6.5, 7.7, 9]
     else:
         diff_list = json.loads(diff_list)
     # if len(diff_list) != 5:
