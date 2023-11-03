@@ -229,3 +229,6 @@ if __name__ == "__main__":
         # each worker needs ~4gb of gpu memory (11gb / 3)
         n_workers = 3
         main_multi_par(n_workers, diff_list, True)
+
+
+# C:\Users\frede\anaconda3\pkgs
