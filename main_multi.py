@@ -3,7 +3,7 @@ import numpy as np
 import tensorflow as tf
 import time
 from functools import partial
-from multiprocessing import Pool
+from multiprocessing import Pool, freeze_support
 
 import map_creation.gen_beats as beat_generator
 from tools.config import paths, config
@@ -208,6 +208,7 @@ def combine_maps(song_list, diff_list, export_results_to_bs):
 
 
 if __name__ == "__main__":
+    freeze_support()  # required for pyinstaller packaging
     diff_list = os.environ.get('diff_list')
     if diff_list is None:
         diff_list = [3.5, 4.5, 6.5, 7.7, 9]
