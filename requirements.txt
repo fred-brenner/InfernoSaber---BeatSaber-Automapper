@@ -9,3 +9,7 @@ aubio~=0.4.9
 pillow~=10.0.1
 joblib~=1.2.0
 scikit-learn~=1.0.2
+future~=0.18.3
+darkdetect~=0.8.0
+packaging~=23.2
+customtkinter~=5.2.1
