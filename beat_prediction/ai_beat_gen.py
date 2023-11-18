@@ -2,7 +2,7 @@ import gc
 from datetime import datetime
 from keras.optimizers import adam_v2
 from PIL import Image
-# import matplotlib.pyplot as plt
+import matplotlib.pyplot as plt
 
 from beat_prediction.find_beats import *
 from beat_prediction.beat_to_lstm import *

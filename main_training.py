@@ -17,6 +17,7 @@ input("Adapted the mapper_selection and use_bpm_selection in the config file?\n"
 # run bs_shift / shift.py
 input("Did you run shift.py?")
 
+# you can skip this step
 # run training / train_autoenc_music.py
 # os.system("training/train_autoenc_music.py")
 

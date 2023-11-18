@@ -135,12 +135,12 @@ samplerate_music = 14800  # samplerate for the music import
 hop_size = 512
 window = 2.0  # window in seconds for each song to spectrum picture (from wav_to_pic)
 specgram_res = 24  # y resolution of the spectrogram (frequency subdivisions)
-ram_limit = 24      # free RAM in GB (unused?)
+ram_limit = 24      # free RAM in GB (unused currently)
 vram_limit = 20     # free VRAM in GB (needed for lighting training)
 
-use_bpm_selection = False   # use number of beats for selection of maps in training
+use_bpm_selection = True   # use number of beats for selection of maps in training
 min_bps_limit = 5  # minimum beats_per_second value for training
-max_bps_limit = 11  # maximum beats_per_second value for training
+max_bps_limit = 15  # maximum beats_per_second value for training
 
 # Model versions
 enc_version = 'tf_model_enc_16bneck_12_8__16_48.h5'
@@ -168,6 +168,10 @@ if use_mapper_selection == "curated2":
     mapper_version = 'tf_model_mapper_5-11_10_10__14_32.h5'
     beat_gen_version = 'tf_beat_gen_5_11_10_10__14_39.h5'
     event_gen_version = 'tf_event_gen_5_11_10_10__15_1.h5'
+if use_mapper_selection == "pp1":
+    mapper_version = 'tf_model_mapper_5-15_11_18__18_46.h5'
+    beat_gen_version = 'tf_beat_gen_5_15_11_18__18_57.h5'
+    event_gen_version = 'tf_event_gen_5_15_11_18__19_2.h5'
 
 # Autoencoder model configuration
 learning_rate = 3e-4  # model learning rate
