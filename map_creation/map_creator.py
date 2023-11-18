@@ -269,8 +269,8 @@ def get_info_map_string(name, bpm, bs_diff):
         diff_list = ['ExpertPlus']
 
     for i in range(len(jump_speed)):
-        if jump_speed[i] > (config.max_njs - 2 * i):
-            jump_speed[i] = config.max_njs - 2 * i
+        if jump_speed[i] > (config.max_njs - 2.5 * i):
+            jump_speed[i] = config.max_njs - 2.5 * i
         jump_speed[i] += config.jump_speed_offset
     jump_speed.reverse()  # Set in order Expert (low), ExpertPlus (high)
 
