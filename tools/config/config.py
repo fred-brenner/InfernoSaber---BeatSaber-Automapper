@@ -10,9 +10,10 @@ InfernoSaber_version = "1.5.0"  # coded into the info.dat file
 
 # select mapper style or leave empty for default
 # use_mapper_selection = ""   # use level author for selection of maps in training, deactivated if use_bpm_selection=True
-use_mapper_selection = "general_new"  # <-- only one included online
+# use_mapper_selection = "general_new"  # <-- only one included online
 # use_mapper_selection = "curated1"
 # use_mapper_selection = "curated2"
+use_mapper_selection = "pp1"
 use_mapper_selection = use_mapper_selection.lower()
 
 # Map creation model configuration
