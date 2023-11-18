@@ -21,13 +21,31 @@ def get_difficulty_file_names(info_file_path: str) -> (str, str):
     # import dat file
     dat_content = read_json_content_file(info_file_path)
 
-    beatmap_dict = dat_content['_difficultyBeatmapSets'][0]['_difficultyBeatmaps']
-    expert_plus_dict = beatmap_dict[-1]
+    beatmap_set_dict = dat_content['_difficultyBeatmapSets']
+    i = -1
+    beatmap_dict = beatmap_set_dict[i]
+    while not beatmap_dict['_beatmapCharacteristicName'] == 'Standard':
+        i -= 1
+        if abs(i) > len(beatmap_set_dict):
+            print(f"Error: Could not find Standard beatmap key in {info_file_path}")
+            exit()
+        beatmap_dict = beatmap_set_dict[i]
+
+    beatmap_dict = beatmap_dict['_difficultyBeatmaps']
+    i = -1
+    expert_plus_dict = beatmap_dict[i]
     expert_plus_name = expert_plus_dict['_beatmapFilename']
-    # expert_name = ""
+
     # if len(beatmap_dict) > 1:
-    #     expert_dict = beatmap_dict[1]
-    #     expert_name = expert_dict['_beatmapFilename']
+    #     while 'lightshow' in expert_plus_name.lower():
+    #         i -= 1
+    #         print(f"Skipped beatmap due to lightshow name: {expert_plus_name}")
+    #         if abs(i) > len(beatmap_dict):
+    #             print(f"Error: Could not find beatmap for song: {info_file_path}"
+    #                   "\nDelete manually and restart!")
+    #             exit()
+    #         expert_plus_dict = beatmap_dict[i]
+    #         expert_plus_name = expert_plus_dict['_beatmapFilename']
 
     return expert_plus_name
 
@@ -67,6 +85,7 @@ def check_info_content(bs_song_path):
             dat_content = read_json_content_file(info_file)
             with open(info_file, "w") as f:
                 json.dump(dat_content, f, indent=9)
+
 
 def clean_songs():
     bs_song_path = paths.bs_input_path

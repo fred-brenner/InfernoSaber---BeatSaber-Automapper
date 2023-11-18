@@ -47,32 +47,6 @@ def read_json_content_file(file_path: str, filename="") -> list[str]:
     return dat_content
 
 
-def get_difficulty_file_names(info_file_path: str) -> (str, str):
-    # import dat file
-    dat_content = read_json_content_file(info_file_path)
-    names = []
-    for expert_diff in ['ExpertPlus', 'Expert']:
-        search_string1 = f'"_difficulty": "{expert_diff}",'
-        search_string2 = '"_beatmapFilename":'
-        found = False
-        for s in dat_content:
-            # s = s.replace(" ", "")
-            if not found:
-                if search_string1 in s.strip():
-                    found = True
-                    continue
-            else:
-                if search_string2 in s.strip():
-                    # found difficulty file name
-                    file_name = s.split('": "')[1]
-                    file_name = file_name.strip('",\n')
-                    names.append(file_name)
-                    break
-        expert_plus_name = names[0]
-        expert_name = names[1] if len(names) > 1 else ""
-    return expert_plus_name, expert_name
-
-
 def delete_old_files():
     # delete old files
     print("Delete old files")
@@ -107,11 +81,8 @@ def shift_bs_songs(allow_diff2=False):
         if excl_true:
             continue
 
-        if len(files) > 2:
-            exp_plus_name, exp_name = get_difficulty_file_names(f"{root}/info.dat")
-        else:
-            continue
-
+        exp_plus_name = "ExpertPlus.dat"
+        exp_name = "Expert.dat"
         for file in files:
             # get only ExpertPlus (or Expert for allow_diff2 == True)
             # if file.endswith(diff + ".dat") or (allow_diff2 and not both and file.endswith(diff2 + ".dat")):
@@ -128,7 +99,7 @@ def shift_bs_songs(allow_diff2=False):
                             num_cur += 1
                             bar.update(num_cur)
                             # import dat file
-                            dat_content = open(os.path.join(root, n_file)).readlines()
+                            dat_content = read_dat_file(os.path.join(root, n_file))
 
                             if config.exclude_requirements:
                                 search_string = '"_requirements":'
