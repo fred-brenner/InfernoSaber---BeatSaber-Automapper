@@ -8,6 +8,7 @@ import shutil
 from map_creation.sanity_check import sanity_check_notes, improve_timings
 from map_creation.gen_obstacles import calculate_obstacles
 from map_creation.gen_sliders import calculate_sliders
+from map_creation.artificial_mod import gimme_more_notes
 from tools.config import config, paths
 
 
@@ -103,6 +104,9 @@ def decode_beats(y_class_num, class_keys):
         y = int(y_class_num[idx])
         encoded = class_keys[y]
         notes.append(decode_class_keys(encoded))
+
+    if config.gimme_more_notes_flag:
+        notes = gimme_more_notes(notes)
     return notes
 
 

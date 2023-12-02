@@ -211,7 +211,7 @@ if __name__ == "__main__":
     freeze_support()  # required for pyinstaller packaging
     diff_list = os.environ.get('diff_list')
     if diff_list is None:
-        diff_list = [3.5, 4.5, 6.5, 7.7, 9]
+        diff_list = [4, 5, 6, 7, 8]
     else:
         diff_list = json.loads(diff_list)
     # if len(diff_list) != 5:

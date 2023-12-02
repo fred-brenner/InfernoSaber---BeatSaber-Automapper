@@ -20,13 +20,15 @@ use_mapper_selection = use_mapper_selection.lower()
 """Do change"""
 max_speed = 4 * 7.5  # set around 5-40 (normal-expert++)
 add_beat_intensity = 105  # try to match bps by x% [80, 120]
+gimme_more_notes_flag = True   # try to always use notes on both sides
+gimme_more_notes_prob = 0.5     # probability to activate [0.0-1.0]
 cdf = 1.2  # cut director factor (to calculate speed, [0.5, 1.5])
 cdf_lr = 1.15  # speed addition factor for left right movement
 expert_fact = 0.63  # expert plus to expert factor [0.6, 0.7]
 create_expert_flag = True  # create second expert map
 thresh_beat = 0.42  # minimum beat response required to trigger generator [0.3, 0.6]
 thresh_pitch = 0.90  # minimum beat for pitch check (0.8,low-1.5,high)
-threshold_end = 0.95  # factor for start and end threshold [1.0, 1.2]
+threshold_end = 0.75  # factor for start and end threshold [1.0, 1.2]
 factor_pitch_certainty = 0.5  # select emphasis on first (>1) or second pitch method
 factor_pitch_meanmax = 3    # select pitch certainty for mean (>=3) or max (<3)
 random_note_map_factor = 0.3  # stick note map to random song/center (set to 0 to disable)
