@@ -13,18 +13,23 @@ from bs_shift.export_map import *
 import tensorflow as tf
 
 
-def main(diff=None, export_results_to_bs=True, quick_start=None,
-         beat_intensity=None, random_factor=None, js_offset=None,
+def main(use_model=None, diff=None, export_results_to_bs=True,
+         gimme_more=None, quick_start=None, beat_intensity=None,
+         random_factor=None, js_offset=None,
          allow_no_dir_flag=None, silence_factor=None,
          add_obstacles=None, sporty_obstacles=None,
          add_sliders=None, slider_start_time=None,
          slider_end_time=None, slider_probability=None,
          slider_movement_min=None):
 
+    if use_model is not None:
+        config.use_mapper_selection = use_model
     # change difficulty
     if diff is not None:
         config.max_speed = diff
         config.max_speed_orig = diff
+    if gimme_more is not None:
+        config.gimme_more_notes_prob = gimme_more
     if quick_start is not None:
         config.quick_start = quick_start
     if beat_intensity is not None:
@@ -106,6 +111,8 @@ def main(diff=None, export_results_to_bs=True, quick_start=None,
 # run lighting_prediction / train_lighting.py
 
 if __name__ == "__main__":
+    use_model = os.environ.get('inferno_model')
+
     diff = os.environ.get('max_speed')
     if diff is not None:
         diff = float(diff)
@@ -113,6 +120,11 @@ if __name__ == "__main__":
         diff = diff * 4  # calculate bps to max_speed
     else:
         print("Use default difficulty values")
+
+    gm = os.environ.get('gimme_more')
+    if gm is not None:
+        gm = float(gm)
+        print(f"Set density to {gm}")
 
     qs = os.environ.get('quick_start')
     if qs is not None:
@@ -197,5 +209,5 @@ if __name__ == "__main__":
     if paths.IN_COLAB:
         export_results_to_bs = False
 
-    main(diff, export_results_to_bs, qs, bi, rf, jso,
+    main(use_model, diff, export_results_to_bs, gm, qs, bi, rf, jso,
          ndf, sf, aof, sof, asf, sst, se, sp, smm)
