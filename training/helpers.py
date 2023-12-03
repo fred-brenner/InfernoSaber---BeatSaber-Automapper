@@ -6,13 +6,13 @@ from keras.models import load_model
 
 from tools.utils.load_and_save import load_npy
 from tools.config import paths, config
-from tools.config.mapper_selection import return_mapper_list
+from tools.config.mapper_selection import return_mapper_list, get_full_model_path
 from preprocessing.map_info_processing import get_maps_from_mapper
 
 
 def ai_encode_song(song):
     # Load pretrained model
-    encoder_path = paths.model_path + config.enc_version
+    encoder_path = get_full_model_path(config.enc_version)
     encoder = load_model(encoder_path)
     # apply autoencoder to input
     in_song_l = encoder.predict(song, verbose=0)
@@ -59,7 +59,10 @@ def load_keras_model(save_model_name, lr=None):
         keras_models = glob.glob(paths.model_path + "*.h5")
         latest_file = max(keras_models, key=os.path.getctime)
     else:
-        latest_file = paths.model_path + save_model_name
+        if not save_model_name.startswith(paths.model_path):
+            latest_file = paths.model_path + save_model_name
+        else:
+            latest_file = save_model_name
         if not latest_file.endswith('.h5'):
             latest_file += '.h5'
 

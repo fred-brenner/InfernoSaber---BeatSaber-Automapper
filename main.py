@@ -1,7 +1,7 @@
 ###################################################
 # This file is needed to find the working directory
 ###################################################
-# import os
+import os
 # import shutil
 import time
 # import sys
@@ -112,6 +112,7 @@ def main(use_model=None, diff=None, export_results_to_bs=True,
 
 if __name__ == "__main__":
     use_model = os.environ.get('inferno_model')
+    print(f"Running model: {use_model}")
 
     diff = os.environ.get('max_speed')
     if diff is not None:

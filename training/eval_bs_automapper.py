@@ -9,6 +9,7 @@ from lighting_prediction.train_lighting import lstm_shift_events_half
 from tensorflow_models import *
 from preprocessing.bs_mapper_pre import load_ml_data, lstm_shift
 from tools.config import config, paths
+from tools.config.mapper_selection import get_full_model_path
 
 # Check Cuda compatible GPU
 if not test_gpu_tf():
@@ -75,7 +76,7 @@ gc.collect()
 
 # Create model
 ##############
-save_model_name = config.mapper_version
+save_model_name = get_full_model_path(config.mapper_version)
 # load model
 mapper_model, save_model_name = load_keras_model(save_model_name)
 # create model

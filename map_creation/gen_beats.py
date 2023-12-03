@@ -22,6 +22,7 @@ from lighting_prediction.generate_lighting import generate
 
 from tools.config import config, paths
 from tools.utils import numpy_shorts
+from tools.config.mapper_selection import get_full_model_path
 
 
 # @profile
@@ -94,7 +95,7 @@ def main(name_ar: list) -> bool:
     x_input = [x_song, x_volume, x_onset]
 
     # load pretrained generator model
-    model_path = paths.model_path + config.beat_gen_version
+    model_path = get_full_model_path(config.beat_gen_version)
     beat_model = load_model(model_path, custom_objects={'TCN': TCN})
 
     # apply beat generator
@@ -168,11 +169,12 @@ def main(name_ar: list) -> bool:
         map_times = np.delete(map_times, rm_idx)
 
     # Load pretrained encoder model
-    model_path = paths.model_path + config.enc_version
+    model_path = get_full_model_path(config.enc_version)
     enc_model = load_model(model_path)
     in_song_l = enc_model.predict(song_ar[0], verbose=0)
 
-    y_class_map = generate(in_song_l, map_times, config.mapper_version, config.lstm_len,
+    mapper_model = get_full_model_path(config.mapper_version)
+    y_class_map = generate(in_song_l, map_times, mapper_model, config.lstm_len,
                            paths.beats_classify_encoder_file)  # 45.2
 
     ############
@@ -186,7 +188,8 @@ def main(name_ar: list) -> bool:
     ############
     if True:
         # (TODO: add furious_lighting to increase effect frequency)
-        events = generate(in_song_l, map_times, config.event_gen_version, config.event_lstm_len,
+        event_model = get_full_model_path(config.event_gen_version)
+        events = generate(in_song_l, map_times, event_model, config.event_lstm_len,
                           paths.events_classify_encoder_file)  # 23.7 (47.0 -> 3.8)
     else:
         events = []

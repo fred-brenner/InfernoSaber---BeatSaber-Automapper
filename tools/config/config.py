@@ -145,35 +145,38 @@ min_bps_limit = 5  # minimum beats_per_second value for training
 max_bps_limit = 15  # maximum beats_per_second value for training
 
 # Model versions
-enc_version = 'tf_model_enc_16bneck_12_8__16_48.h5'
-autoenc_version = 'tf_model_autoenc_16bneck_12_8__16_48.h5'
-# mapper_version = 'tf_model_mapper_5-10_1_21__13_26.h5'
-# beat_gen_version = 'tf_beat_gen_7.5_10_1_21__16_27.h5'
-# event_gen_version = 'tf_event_gen_7.5_10_1_21__16_6.h5'
-if use_mapper_selection == "" or use_mapper_selection is None:
-    mapper_version = 'tf_model_mapper_7-10_1_29__19_34.h5'
-    beat_gen_version = 'tf_beat_gen_7_10_1_29__19_39.h5'
-    event_gen_version = 'tf_event_gen_7_10_1_29__19_44.h5'
-if use_mapper_selection == "general_new":
-    mapper_version = 'tf_model_mapper_5-11_10_9__12_18.h5'
-    beat_gen_version = 'tf_beat_gen_5_11_10_9__12_50.h5'
-    event_gen_version = 'tf_event_gen_5_11_10_9__13_34.h5'
-if use_mapper_selection == "nuketime":
-    mapper_version = 'tf_model_mapper_7-10_10_3__12_37.h5'
-    beat_gen_version = 'tf_beat_gen_7_10_10_3__12_43.h5'
-    event_gen_version = 'tf_event_gen_7_10_10_3__12_50.h5'
-if use_mapper_selection == "curated1":
-    mapper_version = 'tf_model_mapper_5-11_10_10__10_33.h5'
-    beat_gen_version = 'tf_beat_gen_5_11_10_10__10_45.h5'
-    event_gen_version = 'tf_event_gen_5_11_10_10__11_20.h5'
-if use_mapper_selection == "curated2":
-    mapper_version = 'tf_model_mapper_5-11_10_10__14_32.h5'
-    beat_gen_version = 'tf_beat_gen_5_11_10_10__14_39.h5'
-    event_gen_version = 'tf_event_gen_5_11_10_10__15_1.h5'
-if use_mapper_selection == "pp1":
-    mapper_version = 'tf_model_mapper_5-15_11_18__18_46.h5'
-    beat_gen_version = 'tf_beat_gen_5_15_11_18__18_57.h5'
-    event_gen_version = 'tf_event_gen_5_15_11_18__19_2.h5'
+enc_version = 'tf_model_enc_'
+autoenc_version = 'tf_model_autoenc_'
+mapper_version = 'tf_model_mapper_'
+beat_gen_version = 'tf_beat_gen_'
+event_gen_version = 'tf_event_gen_'
+
+# enc_version = 'tf_model_enc_16bneck_12_8__16_48.h5'
+# autoenc_version = 'tf_model_autoenc_16bneck_12_8__16_48.h5'
+# if use_mapper_selection == "" or use_mapper_selection is None:
+#     mapper_version = 'tf_model_mapper_7-10_1_29__19_34.h5'
+#     beat_gen_version = 'tf_beat_gen_7_10_1_29__19_39.h5'
+#     event_gen_version = 'tf_event_gen_7_10_1_29__19_44.h5'
+# if use_mapper_selection == "general_new":
+#     mapper_version = 'tf_model_mapper_5-11_10_9__12_18.h5'
+#     beat_gen_version = 'tf_beat_gen_5_11_10_9__12_50.h5'
+#     event_gen_version = 'tf_event_gen_5_11_10_9__13_34.h5'
+# if use_mapper_selection == "nuketime":
+#     mapper_version = 'tf_model_mapper_7-10_10_3__12_37.h5'
+#     beat_gen_version = 'tf_beat_gen_7_10_10_3__12_43.h5'
+#     event_gen_version = 'tf_event_gen_7_10_10_3__12_50.h5'
+# if use_mapper_selection == "curated1":
+#     mapper_version = 'tf_model_mapper_5-11_10_10__10_33.h5'
+#     beat_gen_version = 'tf_beat_gen_5_11_10_10__10_45.h5'
+#     event_gen_version = 'tf_event_gen_5_11_10_10__11_20.h5'
+# if use_mapper_selection == "curated2":
+#     mapper_version = 'tf_model_mapper_5-11_10_10__14_32.h5'
+#     beat_gen_version = 'tf_beat_gen_5_11_10_10__14_39.h5'
+#     event_gen_version = 'tf_event_gen_5_11_10_10__15_1.h5'
+# if use_mapper_selection == "pp1":
+#     mapper_version = 'tf_model_mapper_5-15_11_18__18_46.h5'
+#     beat_gen_version = 'tf_beat_gen_5_15_11_18__18_57.h5'
+#     event_gen_version = 'tf_event_gen_5_15_11_18__19_2.h5'
 
 # Autoencoder model configuration
 learning_rate = 3e-4  # model learning rate
