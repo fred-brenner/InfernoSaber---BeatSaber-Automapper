@@ -6,7 +6,7 @@ import numpy as np
 # config file for all important values 
 # used in multiple codes
 ########################################
-InfernoSaber_version = "1.5.0"  # coded into the info.dat file
+InfernoSaber_version = "1.5.1"  # coded into the info.dat file
 
 # select mapper style or leave empty for default
 # use_mapper_selection = ""   # use level author for selection of maps in training, deactivated if use_bpm_selection=True
@@ -21,7 +21,7 @@ use_mapper_selection = use_mapper_selection.lower()
 max_speed = 4 * 7.5  # set around 5-40 (normal-expert++)
 add_beat_intensity = 105  # try to match bps by x% [80, 120]
 gimme_more_notes_flag = True   # try to always use notes on both sides
-gimme_more_notes_prob = 0.5     # probability to activate [0.0-1.0]
+gimme_more_notes_prob = 0.4     # probability to activate [0.0-1.0]
 cdf = 1.2  # cut director factor (to calculate speed, [0.5, 1.5])
 cdf_lr = 1.15  # speed addition factor for left right movement
 expert_fact = 0.63  # expert plus to expert factor [0.6, 0.7]

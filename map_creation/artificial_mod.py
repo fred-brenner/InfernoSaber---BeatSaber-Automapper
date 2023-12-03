@@ -44,10 +44,15 @@ def mirror_notes(n):
 
 
 def gimme_more_notes(notes: list):
-    if config.gimme_more_notes_prob > 0:
+    more_note_probability = config.gimme_more_notes_prob
+    more_note_prob_increase_diff = 5    # increase the probability linearly after this threshold
+    if more_note_probability > 0:
+        extra_note_prob = config.max_speed/4 - more_note_prob_increase_diff
+        if extra_note_prob > 0:
+            more_note_probability += 0.2 * 0.1*extra_note_prob
         # take list of notes and search for single ones
         for i, section in enumerate(notes):
-            if config.gimme_more_notes_prob >= random():
+            if more_note_probability >= random():
                 # skip in case of empty notes
                 if len(section) < 4:
                     continue
