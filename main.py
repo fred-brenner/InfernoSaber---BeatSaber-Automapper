@@ -2,15 +2,16 @@
 # This file is needed to find the working directory
 ###################################################
 import os
-# import shutil
+import shutil
 import time
+import tensorflow as tf
 # import sys
 
 from tools.config import paths, config
 import map_creation.gen_beats as beat_generator
-from bs_shift.export_map import *
+from bs_shift.export_map import check_music_files, shutil_copy_maps
 
-import tensorflow as tf
+from tools.config.mapper_selection import update_model_file_paths
 
 
 def main(use_model=None, diff=None, export_results_to_bs=True,
@@ -59,6 +60,7 @@ def main(use_model=None, diff=None, export_results_to_bs=True,
         config.slider_probability = slider_probability
     if slider_movement_min is not None:
         config.slider_movement_minimum = slider_movement_min
+    update_model_file_paths()
 
     # limit gpu ram usage
     conf = tf.compat.v1.ConfigProto()

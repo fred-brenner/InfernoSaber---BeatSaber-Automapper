@@ -45,7 +45,7 @@ main_path += '/'
 # input folder structure
 model_path = dir_path + "model/"
 if config.use_mapper_selection == '' or config.use_mapper_selection is None:
-    model_path += "general/"
+    model_path += "general_new/"
 else:
     model_path += f"{config.use_mapper_selection.lower()}/"
 pred_path = dir_path + "prediction/"
