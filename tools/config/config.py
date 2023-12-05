@@ -8,20 +8,21 @@ import numpy as np
 ########################################
 InfernoSaber_version = "1.5.1"  # coded into the info.dat file
 
+
+"""Do change"""
 # select mapper style or leave empty for default
 # use_mapper_selection = ""   # use level author for selection of maps in training, deactivated if use_bpm_selection=True
-# use_mapper_selection = "general_new"  # <-- only one included online
+# use_mapper_selection = "general_new"
 # use_mapper_selection = "curated1"
 # use_mapper_selection = "curated2"
 use_mapper_selection = "pp1"
 use_mapper_selection = use_mapper_selection.lower()
 
 # Map creation model configuration
-"""Do change"""
 max_speed = 4 * 7.5  # set around 5-40 (normal-expert++)
-add_beat_intensity = 105  # try to match bps by x% [80, 120]
+add_beat_intensity = 90  # try to match bps by x% [80, 120]
 gimme_more_notes_flag = True   # try to always use notes on both sides
-gimme_more_notes_prob = 0.4     # probability to activate [0.0-1.0]
+gimme_more_notes_prob = 0.35     # probability to activate [0.0-1.0]
 cdf = 1.2  # cut director factor (to calculate speed, [0.5, 1.5])
 cdf_lr = 1.15  # speed addition factor for left right movement
 expert_fact = 0.63  # expert plus to expert factor [0.6, 0.7]
@@ -150,33 +151,6 @@ autoenc_version = 'tf_model_autoenc_'
 mapper_version = 'tf_model_mapper_'
 beat_gen_version = 'tf_beat_gen_'
 event_gen_version = 'tf_event_gen_'
-
-# enc_version = 'tf_model_enc_16bneck_12_8__16_48.h5'
-# autoenc_version = 'tf_model_autoenc_16bneck_12_8__16_48.h5'
-# if use_mapper_selection == "" or use_mapper_selection is None:
-#     mapper_version = 'tf_model_mapper_7-10_1_29__19_34.h5'
-#     beat_gen_version = 'tf_beat_gen_7_10_1_29__19_39.h5'
-#     event_gen_version = 'tf_event_gen_7_10_1_29__19_44.h5'
-# if use_mapper_selection == "general_new":
-#     mapper_version = 'tf_model_mapper_5-11_10_9__12_18.h5'
-#     beat_gen_version = 'tf_beat_gen_5_11_10_9__12_50.h5'
-#     event_gen_version = 'tf_event_gen_5_11_10_9__13_34.h5'
-# if use_mapper_selection == "nuketime":
-#     mapper_version = 'tf_model_mapper_7-10_10_3__12_37.h5'
-#     beat_gen_version = 'tf_beat_gen_7_10_10_3__12_43.h5'
-#     event_gen_version = 'tf_event_gen_7_10_10_3__12_50.h5'
-# if use_mapper_selection == "curated1":
-#     mapper_version = 'tf_model_mapper_5-11_10_10__10_33.h5'
-#     beat_gen_version = 'tf_beat_gen_5_11_10_10__10_45.h5'
-#     event_gen_version = 'tf_event_gen_5_11_10_10__11_20.h5'
-# if use_mapper_selection == "curated2":
-#     mapper_version = 'tf_model_mapper_5-11_10_10__14_32.h5'
-#     beat_gen_version = 'tf_beat_gen_5_11_10_10__14_39.h5'
-#     event_gen_version = 'tf_event_gen_5_11_10_10__15_1.h5'
-# if use_mapper_selection == "pp1":
-#     mapper_version = 'tf_model_mapper_5-15_11_18__18_46.h5'
-#     beat_gen_version = 'tf_beat_gen_5_15_11_18__18_57.h5'
-#     event_gen_version = 'tf_event_gen_5_15_11_18__19_2.h5'
 
 # Autoencoder model configuration
 learning_rate = 3e-4  # model learning rate
