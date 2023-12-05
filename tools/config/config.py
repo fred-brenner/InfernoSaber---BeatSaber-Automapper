@@ -6,26 +6,30 @@ import numpy as np
 # config file for all important values 
 # used in multiple codes
 ########################################
-InfernoSaber_version = "1.5.0"  # coded into the info.dat file
+InfernoSaber_version = "1.5.1"  # coded into the info.dat file
 
+
+"""Do change"""
 # select mapper style or leave empty for default
 # use_mapper_selection = ""   # use level author for selection of maps in training, deactivated if use_bpm_selection=True
-use_mapper_selection = "general_new"  # <-- only one included online
+# use_mapper_selection = "general_new"
 # use_mapper_selection = "curated1"
 # use_mapper_selection = "curated2"
+use_mapper_selection = "pp1"
 use_mapper_selection = use_mapper_selection.lower()
 
 # Map creation model configuration
-"""Do change"""
 max_speed = 4 * 7.5  # set around 5-40 (normal-expert++)
-add_beat_intensity = 105  # try to match bps by x% [80, 120]
+add_beat_intensity = 90  # try to match bps by x% [80, 120]
+gimme_more_notes_flag = True   # try to always use notes on both sides
+gimme_more_notes_prob = 0.35     # probability to activate [0.0-1.0]
 cdf = 1.2  # cut director factor (to calculate speed, [0.5, 1.5])
-cdf_lr = 1.1  # speed addition factor for left right movement
+cdf_lr = 1.15  # speed addition factor for left right movement
 expert_fact = 0.63  # expert plus to expert factor [0.6, 0.7]
 create_expert_flag = True  # create second expert map
 thresh_beat = 0.42  # minimum beat response required to trigger generator [0.3, 0.6]
 thresh_pitch = 0.90  # minimum beat for pitch check (0.8,low-1.5,high)
-threshold_end = 1.0  # factor for start and end threshold [1.0, 1.2]
+threshold_end = 0.75  # factor for start and end threshold [1.0, 1.2]
 factor_pitch_certainty = 0.5  # select emphasis on first (>1) or second pitch method
 factor_pitch_meanmax = 3    # select pitch certainty for mean (>=3) or max (<3)
 random_note_map_factor = 0.3  # stick note map to random song/center (set to 0 to disable)
@@ -55,7 +59,7 @@ obstacle_max_count = 2  # maximum appearance count for obstacles
 sporty_obstacles = False
 add_slider_flag = True  # add arcs between notes in free areas
 slider_time_gap = [0.5, 10.0]    # time gap in seconds
-slider_probability = 0.9    # [0.1-1.0] with 1 meaning all on
+slider_probability = 0.85    # [0.1-1.0] with 1 meaning all on
 slider_movement_minimum = 1.5   # minimum movement between notes [0-5]
 slider_radius_multiplier = 1.0  # [0.5-2.0]
 slider_turbo_start = True   # start slider towards first note
@@ -102,7 +106,7 @@ jsb_offset = [0.21, 0.15]  # note jump speed offset for Expert, Expert+ (range [
 jsb_offset_min = [-0.2, -0.4]  # minimum allowed values (expert, expert+)
 jsb_offset_factor = 0.011  # note jump factor for high difficulties
 use_fixed_bpm = 100  # use fixed bpm or set to None for the song bpm
-max_njs = 24.5  # maximum Note Jump Speed allowed
+max_njs = 26  # maximum Note Jump Speed allowed
 decr_speed_range = 20  # range for start and end (n first and last notes)
 decr_speed_val = 0.28  # decrease max speed at start
 reaction_time = 1.1  # reaction time (0.5-2)
@@ -134,39 +138,19 @@ samplerate_music = 14800  # samplerate for the music import
 hop_size = 512
 window = 2.0  # window in seconds for each song to spectrum picture (from wav_to_pic)
 specgram_res = 24  # y resolution of the spectrogram (frequency subdivisions)
-ram_limit = 24      # free RAM in GB (unused?)
+ram_limit = 24      # free RAM in GB (unused currently)
 vram_limit = 20     # free VRAM in GB (needed for lighting training)
 
-use_bpm_selection = False   # use number of beats for selection of maps in training
+use_bpm_selection = True   # use number of beats for selection of maps in training
 min_bps_limit = 5  # minimum beats_per_second value for training
-max_bps_limit = 11  # maximum beats_per_second value for training
+max_bps_limit = 15  # maximum beats_per_second value for training
 
 # Model versions
-enc_version = 'tf_model_enc_16bneck_12_8__16_48.h5'
-autoenc_version = 'tf_model_autoenc_16bneck_12_8__16_48.h5'
-# mapper_version = 'tf_model_mapper_5-10_1_21__13_26.h5'
-# beat_gen_version = 'tf_beat_gen_7.5_10_1_21__16_27.h5'
-# event_gen_version = 'tf_event_gen_7.5_10_1_21__16_6.h5'
-if use_mapper_selection == "" or use_mapper_selection is None:
-    mapper_version = 'tf_model_mapper_7-10_1_29__19_34.h5'
-    beat_gen_version = 'tf_beat_gen_7_10_1_29__19_39.h5'
-    event_gen_version = 'tf_event_gen_7_10_1_29__19_44.h5'
-if use_mapper_selection == "general_new":
-    mapper_version = 'tf_model_mapper_5-11_10_9__12_18.h5'
-    beat_gen_version = 'tf_beat_gen_5_11_10_9__12_50.h5'
-    event_gen_version = 'tf_event_gen_5_11_10_9__13_34.h5'
-if use_mapper_selection == "nuketime":
-    mapper_version = 'tf_model_mapper_7-10_10_3__12_37.h5'
-    beat_gen_version = 'tf_beat_gen_7_10_10_3__12_43.h5'
-    event_gen_version = 'tf_event_gen_7_10_10_3__12_50.h5'
-if use_mapper_selection == "curated1":
-    mapper_version = 'tf_model_mapper_5-11_10_10__10_33.h5'
-    beat_gen_version = 'tf_beat_gen_5_11_10_10__10_45.h5'
-    event_gen_version = 'tf_event_gen_5_11_10_10__11_20.h5'
-if use_mapper_selection == "curated2":
-    mapper_version = 'tf_model_mapper_5-11_10_10__14_32.h5'
-    beat_gen_version = 'tf_beat_gen_5_11_10_10__14_39.h5'
-    event_gen_version = 'tf_event_gen_5_11_10_10__15_1.h5'
+enc_version = 'tf_model_enc_'
+autoenc_version = 'tf_model_autoenc_'
+mapper_version = 'tf_model_mapper_'
+beat_gen_version = 'tf_beat_gen_'
+event_gen_version = 'tf_event_gen_'
 
 # Autoencoder model configuration
 learning_rate = 3e-4  # model learning rate

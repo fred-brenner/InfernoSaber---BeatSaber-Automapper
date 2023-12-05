@@ -1,0 +1,11 @@
+scipy~=1.11.3
+numpy~=1.22.3
+tensorflow~=2.6.0
+tensorflow-gpu~=2.6.0
+pydub~=0.25.1
+keras~=2.6.0
+tabulate~=0.8.10
+aubio~=0.4.9
+pillow~=10.0.1
+joblib~=1.2.0
+scikit-learn~=1.0.2

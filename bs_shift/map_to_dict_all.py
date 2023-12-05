@@ -69,6 +69,7 @@ def map_to_dict_all():
     title_list = os.listdir(paths.copy_path_map)
     title_list.reverse()
     for title in title_list:
+        print(title)
         num_cur += 1
         bar.update(num_cur)
         if title.endswith("_info.dat"):

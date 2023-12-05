@@ -23,6 +23,10 @@ def append_fail(name):
 
 
 def delete_fails():
+    if not os.path.isfile(paths.black_list_file):
+        print("No fails noted so far.")
+        return
+
     with open(paths.black_list_file, 'r') as f:
         black_list = f.readlines()
 

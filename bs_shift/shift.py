@@ -1,7 +1,9 @@
 # import glob
+import json
 import os
 import shutil
 import sys
+
 from progressbar import ProgressBar
 
 # sys.path.insert(1, os.path.join(sys.path[0], '..'))
@@ -21,12 +23,28 @@ from map_to_dict_all import map_to_dict_all
 copy_path_map = paths.copy_path_map
 copy_path_song = paths.copy_path_song
 
-if not os.path.isdir(paths.bs_song_path):
+if not os.path.isdir(paths.bs_input_path):
     print("Could not find Beat Saber path! Exit")
     exit()
 if not os.path.isdir(copy_path_map) or not os.path.isdir(copy_path_song):
     print("Could not find copy path! Exit")
     exit()
+
+
+def read_dat_file(file_path: str, filename="") -> list[str]:
+    if filename != "":
+        file_path = os.path.join(file_path, filename)
+    with open(file_path) as f:
+        dat_content = f.readlines()
+    return dat_content
+
+
+def read_json_content_file(file_path: str, filename="") -> list[str]:
+    if filename != "":
+        file_path = os.path.join(file_path, filename)
+    with open(file_path) as f:
+        dat_content = json.load(f)
+    return dat_content
 
 
 def delete_old_files():
@@ -47,7 +65,7 @@ def shift_bs_songs(allow_diff2=False):
 
     # variables setup
     num_cur = 0
-    num_all = len(os.listdir(paths.bs_song_path)) + 1
+    num_all = len(os.listdir(paths.bs_input_path)) + 1
     print("Check songs - may take a while")
     count = 0
     song_name_list = []
@@ -56,16 +74,19 @@ def shift_bs_songs(allow_diff2=False):
     bar = ProgressBar(max_value=num_all)
 
     # walk through bs directory
-    for root, dirs, files in os.walk(paths.bs_song_path):
+    for root, dirs, files in os.walk(paths.bs_input_path):
         both = False
         excl_true = str_compare(str=os.path.basename(root), str_list=exclusion.exclusion, return_str=False,
                                 silent=False)
         if excl_true:
             continue
+
+        exp_plus_name = "ExpertPlus.dat"
+        exp_name = "Expert.dat"
         for file in files:
             # get only ExpertPlus (or Expert for allow_diff2 == True)
-            if file.endswith(diff + ".dat") or (allow_diff2 and not both and file.endswith(diff2 + ".dat")):
-                # or ( file.endswith(diff + ".dat") and allow_diff2 is False):
+            # if file.endswith(diff + ".dat") or (allow_diff2 and not both and file.endswith(diff2 + ".dat")):
+            if file == exp_plus_name or (allow_diff2 and not both and file == exp_name):
                 both = True
                 # print(os.path.join(root, file))
                 # print(files)
@@ -74,11 +95,11 @@ def shift_bs_songs(allow_diff2=False):
                 info_file = False
                 try:
                     for n_file in files:
-                        if n_file == "info.dat":
+                        if n_file.lower() == "info.dat":
                             num_cur += 1
                             bar.update(num_cur)
                             # import dat file
-                            dat_content = open(os.path.join(root, n_file)).readlines()
+                            dat_content = read_dat_file(os.path.join(root, n_file))
 
                             if config.exclude_requirements:
                                 search_string = '"_requirements":'
@@ -118,16 +139,17 @@ def shift_bs_songs(allow_diff2=False):
                     if copy_file.endswith(".egg"):
                         shutil.copyfile(root + "/" + copy_file, copy_path_song + song_name + copy_file[-4:])
                         test_copy += 2
-                    elif copy_file.endswith("Expert.dat") and allow_diff2:
+                    elif copy_file.endswith(exp_name) and allow_diff2:
                         shutil.copyfile(root + "/" + copy_file, copy_path_map + song_name + copy_file[-4:])
                         test_copy += 1
-                    elif copy_file.endswith("info.dat"):
+                    elif copy_file.lower().endswith("info.dat"):
+                        copy_file = "info.dat"
                         shutil.copyfile(root + "/" + copy_file, copy_path_map + song_name + "_" + copy_file)
                         test_copy += 2
 
                 # Overwrite Expert with ExpertPlus if available
                 for copy_file in files:
-                    if copy_file.endswith("ExpertPlus.dat"):
+                    if copy_file.endswith(exp_plus_name):
                         shutil.copyfile(root + "/" + copy_file, copy_path_map + song_name + copy_file[-4:])
                         test_copy += 1
                         break

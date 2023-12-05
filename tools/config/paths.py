@@ -15,6 +15,7 @@ from tools.config import config
 dir_path = "C:/Users/frede/Desktop/BS_Automapper/Data/"
 
 bs_song_path = "E:/SteamLibrary/steamapps/common/Beat Saber/Beat Saber_Data/CustomLevels/"
+bs_input_path = r"C:\Users\frede\Desktop\BS_Automapper\Data\training\custom_bs_input"
 
 ############################# (no need to change)
 # main workspace path
@@ -44,7 +45,7 @@ main_path += '/'
 # input folder structure
 model_path = dir_path + "model/"
 if config.use_mapper_selection == '' or config.use_mapper_selection is None:
-    model_path += "general/"
+    model_path += "general_new/"
 else:
     model_path += f"{config.use_mapper_selection.lower()}/"
 pred_path = dir_path + "prediction/"

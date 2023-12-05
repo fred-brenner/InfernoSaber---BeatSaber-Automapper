@@ -5,7 +5,7 @@ to improve the note generation output
 
 import numpy as np
 import aubio
-import matplotlib.pyplot as plt
+# import matplotlib.pyplot as plt
 from scipy.signal import savgol_filter
 
 from tools.config import config, paths
@@ -296,11 +296,11 @@ def add_breaks(notes_single, timings):
     if len(real_timings) > 50:
         # apply window filter to diffs
         real_diffs_filt = savgol_filter(real_diffs, window_length=31, polyorder=4)
-        if False:
-            plt.figure()
-            plt.plot(real_diffs)
-            plt.plot(real_diffs_filt)
-            plt.show()
+        # if False:
+        #     plt.figure()
+        #     plt.plot(real_diffs)
+        #     plt.plot(real_diffs_filt)
+        #     plt.show()
 
         thresh_diffs = np.quantile(real_diffs_filt, 0.37)
         strong_counter = 0
@@ -889,7 +889,7 @@ def correct_notes(notes, timings):
             continue
         # elif len(notes[idx]) == 4:
         elif len(notes[idx]) >= 4:
-            # check cut direction movement (of first element)
+            # check cut direction movement (of first element in each time step)
             notes[idx] = check_note_movement(nl_last, notes[idx])
 
             # # notes[idx] = optimize_note_movement(nl_last, notes[idx])
@@ -994,18 +994,18 @@ def check_note_movement(notes_last, notes_new):
     if notes_last is None:
         return notes_new
 
-    cut_x_last, cut_y_last = get_cut_dir_xy(notes_last[3])
-    cut_x_new, cut_y_new = get_cut_dir_xy(notes_new[3])
-    dist_x = int(np.abs(cut_x_last - cut_x_new))
-    dist_y = int(np.abs(cut_y_last - cut_y_new))
+    # cut_x_last, cut_y_last = get_cut_dir_xy(notes_last[3])
+    # cut_x_new, cut_y_new = get_cut_dir_xy(notes_new[3])
+    # dist_x = int(np.abs(cut_x_last - cut_x_new))
+    # dist_y = int(np.abs(cut_y_last - cut_y_new))
+    #
+    # if dist_x != 2 and dist_y != 2:
+    #     if dist_x == dist_y == 1:
+    #         return notes_new
 
-    if dist_x != 2 and dist_y != 2:
-        if dist_x == dist_y == 1:
-            return notes_new
-
-        # change cut direction
-        new_cut = reverse_cut_dir_xy(notes_last[3])
-        notes_new[3] = new_cut
+    # change cut direction
+    new_cut = reverse_cut_dir_xy(notes_last[3])
+    notes_new[3] = new_cut
 
     return notes_new
 

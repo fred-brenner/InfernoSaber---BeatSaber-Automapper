@@ -99,7 +99,7 @@ def get_side_sliders(sideL, notes, timings, tg, tg_index):
                 if speed < config.slider_movement_minimum:
                     continue
             if 0 <= config.slider_probability < 1:
-                if random() <= config.slider_probability:
+                if random() > config.slider_probability:
                     continue
 
             sliders.append([timings[i0], side_integer, x0, y0, d0, config.slider_radius_multiplier,

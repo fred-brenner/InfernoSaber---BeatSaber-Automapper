@@ -1,8 +1,7 @@
 from PIL import Image, ImageFilter
-from progressbar import ProgressBar
+# from progressbar import ProgressBar
 from scipy import signal
 import aubio
-import matplotlib.pyplot as plt
 import numpy as np
 
 from bs_shift.bps_find_songs import bps_find_songs

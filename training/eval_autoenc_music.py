@@ -1,8 +1,9 @@
 from helpers import *
+from plot_model import run_plot_autoenc
 from tensorflow_models import *
 from preprocessing.music_processing import run_music_preprocessing
 from tools.config import config, paths
-
+from tools.config.mapper_selection import get_full_model_path
 
 # Setup configuration
 #####################
@@ -27,9 +28,10 @@ ds_test = song_ar[:test_samples]
 
 # Model Building
 ################
-auto_encoder, _ = load_keras_model(config.autoenc_version)
 
-encoder, _ = load_keras_model(config.enc_version)
+auto_encoder, _ = load_keras_model(get_full_model_path(config.autoenc_version))
+
+encoder, _ = load_keras_model(get_full_model_path(config.enc_version))
 
 # create model
 # if auto_encoder is None:
