@@ -92,6 +92,7 @@ def main_multi_par(n_workers: int, diff_list: list, export_results_to_bs=True):
             # pass
             processed_count += 1  # Increment the counter
             if processed_count % len(diff_list) == 0:
+                # TODO: may have a bug where time difference between counts is too small?
                 combine_maps([song_list_files[processed_count_real]], diff_list, export_results_to_bs)
                 processed_count_real += 1
             new_time_per_run = (time.time() - start_time) / processed_count
@@ -117,6 +118,22 @@ def main_multi(diff_list: list, export_results_to_bs=True):
     sess = tf.compat.v1.Session(config=conf)
     tf.compat.v1.keras.backend.set_session(sess)
 
+    # TODO: check limit
+    """ 
+    gpus = tf.config.list_physical_devices('GPU')
+    if gpus:
+        # Restrict TensorFlow to only allocate 1GB of memory on the first GPU
+        try:
+            tf.config.set_logical_device_configuration(
+                gpus[0],
+                [tf.config.LogicalDeviceConfiguration(memory_limit=1024)])
+            logical_gpus = tf.config.list_logical_devices('GPU')
+            print(len(gpus), "Physical GPUs,", len(logical_gpus), "Logical GPUs")
+        except RuntimeError as e:
+            # Virtual devices must be set before GPUs have been initialized
+            print(e)
+    """
+
     counter = 0
     # MAP GENERATOR
     ###############
@@ -134,7 +151,7 @@ def main_multi(diff_list: list, export_results_to_bs=True):
             config.max_speed = diff
             config.max_speed_orig = diff
 
-        time_per_run = 15  # time needed in seconds (first guess)
+        time_per_run = 20  # time needed in seconds (first guess)
         for song_name in song_list:
             print(f"### ETA: {(total_runs - counter) * time_per_run / 60:.1f} minutes. ###")
             counter += 1
@@ -228,7 +245,7 @@ if __name__ == "__main__":
         # main_multi(diff_list, True)
         # each worker needs ~5gb of ram memory (15gb / 3)
         # each worker needs ~4gb of gpu memory (11gb / 3)
-        n_workers = 3
+        n_workers = 4
         main_multi_par(n_workers, diff_list, True)
 
 
