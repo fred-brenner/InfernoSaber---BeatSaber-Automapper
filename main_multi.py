@@ -64,6 +64,22 @@ def main_multi_par(n_workers: int, diff_list: list, export_results_to_bs=True):
     sess = tf.compat.v1.Session(config=conf)
     tf.compat.v1.keras.backend.set_session(sess)
 
+    # TODO: check limit
+    """ 
+    gpus = tf.config.list_physical_devices('GPU')
+    if gpus:
+        # Restrict TensorFlow to only allocate 1GB of memory on the first GPU
+        try:
+            tf.config.set_logical_device_configuration(
+                gpus[0],
+                [tf.config.LogicalDeviceConfiguration(memory_limit=1024)])
+            logical_gpus = tf.config.list_logical_devices('GPU')
+            print(len(gpus), "Physical GPUs,", len(logical_gpus), "Logical GPUs")
+        except RuntimeError as e:
+            # Virtual devices must be set before GPUs have been initialized
+            print(e)
+    """
+
     # MAP GENERATOR
     ###############
     song_list_files = os.listdir(paths.songs_pred)
@@ -79,7 +95,7 @@ def main_multi_par(n_workers: int, diff_list: list, export_results_to_bs=True):
     total_runs = int(np.ceil(len(song_list) / n_workers))
     processed_count = 0
     processed_count_real = 0
-    time_per_run = 20
+    time_per_run = 15
 
     # Divide the song_list into chunks for each worker
     chunks = np.array_split(song_list, len(song_list))
@@ -117,22 +133,6 @@ def main_multi(diff_list: list, export_results_to_bs=True):
     conf.gpu_options.allow_growth = True
     sess = tf.compat.v1.Session(config=conf)
     tf.compat.v1.keras.backend.set_session(sess)
-
-    # TODO: check limit
-    """ 
-    gpus = tf.config.list_physical_devices('GPU')
-    if gpus:
-        # Restrict TensorFlow to only allocate 1GB of memory on the first GPU
-        try:
-            tf.config.set_logical_device_configuration(
-                gpus[0],
-                [tf.config.LogicalDeviceConfiguration(memory_limit=1024)])
-            logical_gpus = tf.config.list_logical_devices('GPU')
-            print(len(gpus), "Physical GPUs,", len(logical_gpus), "Logical GPUs")
-        except RuntimeError as e:
-            # Virtual devices must be set before GPUs have been initialized
-            print(e)
-    """
 
     counter = 0
     # MAP GENERATOR
