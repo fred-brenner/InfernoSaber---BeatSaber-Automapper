@@ -20,7 +20,7 @@ use_mapper_selection = use_mapper_selection.lower()
 
 # Map creation model configuration
 max_speed = 4 * 7.5  # set around 5-40 (normal-expert++)
-add_beat_intensity = 90  # try to match bps by x% [80, 120]
+add_beat_intensity = 100  # try to match bps by x% [80, 120]
 gimme_more_notes_flag = True   # try to always use notes on both sides
 gimme_more_notes_prob = 0.30     # probability to activate [0.0-1.0]
 cdf = 1.2  # cut director factor (to calculate speed, [0.5, 1.5])

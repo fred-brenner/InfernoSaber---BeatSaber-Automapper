@@ -1,4 +1,6 @@
 import numpy as np
+import gc
+from keras import backend as K
 from PIL import Image
 # from line_profiler_pycharm import profile
 
@@ -101,6 +103,10 @@ def main(name_ar: list) -> bool:
     # apply beat generator
     y_beat = beat_model.predict(x_input, verbose=0)
 
+    K.clear_session()
+    gc.collect()
+    del beat_model
+
     y_beat[y_beat > config.thresh_beat] = 1
     y_beat[y_beat <= config.thresh_beat] = 0
 
@@ -177,6 +183,10 @@ def main(name_ar: list) -> bool:
     y_class_map = generate(in_song_l, map_times, mapper_model, config.lstm_len,
                            paths.beats_classify_encoder_file)  # 45.2
 
+    K.clear_session()
+    gc.collect()
+    del mapper_model, enc_model
+
     ############
     # create map
     ############
@@ -191,6 +201,10 @@ def main(name_ar: list) -> bool:
         event_model = get_full_model_path(config.event_gen_version)
         events = generate(in_song_l, map_times, event_model, config.event_lstm_len,
                           paths.events_classify_encoder_file)  # 23.7 (47.0 -> 3.8)
+
+        K.clear_session()
+        gc.collect()
+        del event_model
     else:
         events = []
 

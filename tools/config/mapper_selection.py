@@ -1,7 +1,7 @@
 import os
 
-
 from tools.config import paths, config
+
 
 def return_mapper_list(mapper_shortcut):
     if mapper_shortcut == 'curated1':
@@ -9,7 +9,7 @@ def return_mapper_list(mapper_shortcut):
                        'Joetastic', 'BennyDaBeast', 'Hexagonial',
                        'Ryger', 'Skyler Wallace', 'Uninstaller',
                        'Teuflum', 'GreatYazer', 'puds'
-                       'Moriik', 'Ab', 'DE125', 'Skeelie',
+                                                'Moriik', 'Ab', 'DE125', 'Skeelie',
                        'Psyc0pathic', 'Hexagonial', 'Electrostats',
                        'DankruptMemer', 'StyngMe', 'Rustic',
                        'Souk', 'Oddloop', 'Chroma', 'Pendulum',
@@ -29,7 +29,7 @@ def return_mapper_list(mapper_shortcut):
 def get_full_model_path(model_name_partial, full_path=True):
     model_folder = paths.model_path
     files = os.listdir(model_folder)
-    if not (7 < len(files) < 10):     # allow some extra files, e.g. extra zip file
+    if not (7 < len(files) < 10):  # allow some extra files, e.g. extra zip file
         raise FileNotFoundError(f"Model save files missing or corrupt. Check content of:  {model_folder}")
     for f in files:
         if f.startswith(model_name_partial):
