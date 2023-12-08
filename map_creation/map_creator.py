@@ -95,7 +95,8 @@ def create_map(y_class_num, timings, events, name, bpm, pitch_input, pitch_times
     shutil.copy(src, new_map_folder)
     src = f"{paths.songs_pred}{name}.egg"
     shutil.copy(src, new_map_folder)
-    print(f"Finished song: {name}")
+    if config.verbose_level > 1:
+        print(f"Finished song: {name}")
 
 
 def decode_beats(y_class_num, class_keys):

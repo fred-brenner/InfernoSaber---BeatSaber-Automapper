@@ -150,7 +150,8 @@ def main(name_ar: list) -> bool:
             break
         map_times = fill_map_times_scale(map_times, scale_idx)
         scale_idx += 1
-    print(f"Map filler iterated {scale_idx}/{config.map_filler_iters} times.")
+    if config.verbose_level > 3:
+        print(f"Map filler iterated {scale_idx}/{config.map_filler_iters} times.")
     if config.add_silence_flag:
         # remove silent parts
         map_times = remove_silent_times(map_times, silent_times[0])

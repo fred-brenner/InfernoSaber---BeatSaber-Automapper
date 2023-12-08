@@ -2,6 +2,7 @@ import json
 import numpy as np
 import tensorflow as tf
 import time
+import shutil
 from functools import partial
 from multiprocessing import Pool, freeze_support
 
@@ -31,12 +32,14 @@ def process_song(song_list_worker, total_runs):
     conf.gpu_options.allow_growth = True
     sess = tf.compat.v1.Session(config=conf)
     tf.compat.v1.keras.backend.set_session(sess)
+    # TODO: try VRAM limitation here again!
 
     # counter = 0
     # time_per_run = 20
     for song_name in song_list_worker:
         diff = float(song_name[1])
-        print(f"Running difficulty: {diff / 4:.1f}")
+        if config.verbose_level > 2:
+            print(f"Running difficulty: {diff / 4:.1f}")
         config.max_speed = diff
         config.max_speed_orig = diff
         song_name = song_name[0]
@@ -57,7 +60,6 @@ def process_song(song_list_worker, total_runs):
 def main_multi_par(n_workers: int, diff_list: list, export_results_to_bs=True):
     diff_list = np.sort(diff_list)
     diff_list *= 4
-
     print("Starting multi map generator.")
     conf = tf.compat.v1.ConfigProto()
     conf.gpu_options.allow_growth = True
@@ -78,8 +80,10 @@ def main_multi_par(n_workers: int, diff_list: list, export_results_to_bs=True):
             song_list.append([song, diff])
     total_runs = int(np.ceil(len(song_list) / n_workers))
     processed_count = 0
-    processed_count_real = 0
+    combine_map_interval = 5
+    uncombined_count = 0
     time_per_run = 15
+    song_list_run = []
 
     # Divide the song_list into chunks for each worker
     chunks = np.array_split(song_list, len(song_list))
@@ -89,22 +93,26 @@ def main_multi_par(n_workers: int, diff_list: list, export_results_to_bs=True):
     start_time = time.time()
     with Pool(processes=n_workers) as pool:
         for _ in pool.imap(process_partial, chunks):
-            # pass
             processed_count += 1  # Increment the counter
-            if processed_count % len(diff_list) == 0:
-                # TODO: may have a bug where time difference between counts is too small?
-                combine_maps(song_list_files, diff_list, export_results_to_bs)
-                processed_count_real += 1
+            uncombined_count += 1
+            if uncombined_count >= combine_map_interval:
+                try:
+                    song_list_run = combine_maps(song_list_files, song_list_run,
+                                                 diff_list, export_results_to_bs)
+                except Exception as e:
+                    print(f"Error: {type(e).__name__}")
+                    print(f"Error message: {e}")
+                uncombined_count = 0
             new_time_per_run = (time.time() - start_time) / processed_count
-            time_per_run = (time_per_run + new_time_per_run) / 2
+            time_per_run = (time_per_run*3 + new_time_per_run) / 4
             print(f"### ETA: {(len(song_list) - processed_count) * time_per_run / 60:.1f} minutes. ###")
 
-            # Check if there are remaining elements not processed in a batch of 5
-        if processed_count % len(diff_list) != 0:
-            print("Error: Found remaining maps which have not been combined.")
-            combine_maps(song_list_files, diff_list, export_results_to_bs)
-
-    combine_maps(song_list_files, diff_list, export_results_to_bs)
+    song_list_run = combine_maps(song_list_files, song_list_run,
+                                 diff_list, export_results_to_bs)
+    song_list_run = combine_maps(song_list_files, song_list_run,
+                                 diff_list, export_results_to_bs)
+    if len(song_list_run) != 0:
+        print(f"Error: Remaining songs in song_list for combination: {song_list_run}")
 
 
 def main_multi(diff_list: list, export_results_to_bs=True):
@@ -148,29 +156,32 @@ def main_multi(diff_list: list, export_results_to_bs=True):
                 continue
             end_time = time.time()
             time_per_run = (4 * time_per_run + (end_time - start_time)) / 5
-    combine_maps(song_list, diff_list, export_results_to_bs)
+    combine_maps(song_list, song_list, diff_list, export_results_to_bs)
 
 
-def combine_maps(song_list_potential, diff_list, export_results_to_bs):
-    # check number of already processed maps
+def combine_maps(song_list_potential, song_list_run, diff_list, export_results_to_bs):
+    # check number of already processed maps and return them for next run
+    # this way resolves that some maps are still generated while packaged
     song_list = []
     delete_folder = []
-
-    for song_name in song_list_potential:
-        missing = False
-        for diff in diff_list:
-            search_folder = f"{paths.new_map_path}1234_{diff:.1f}_{song_name[:-4]}"
-            if not os.path.isdir(search_folder):
-                missing = True
-        if not missing:
-            song_list.append(song_name)
+    if len(song_list_run) == 0:
+        for song_name in song_list_potential:
+            missing = False
             for diff in diff_list:
-                delete_folder.append(f"{paths.new_map_path}1234_{diff:.1f}_{song_name[:-4]}")
-    if len(song_list) == 0:
-        return
+                search_folder = f"{paths.new_map_path}1234_{diff:.1f}_{song_name[:-4]}"
+                if not os.path.isdir(search_folder):
+                    missing = True
+            if not missing:
+                song_list.append(song_name)
+                for diff in diff_list:
+                    delete_folder.append(f"{paths.new_map_path}1234_{diff:.1f}_{song_name[:-4]}")
+        return song_list
 
+    else:
+        song_list = song_list_run
     # run combination
-    print("Running map combination")
+    if config.verbose_level > 2:
+        print("Running map combination")
     for song_name in song_list:
         song_name = song_name[:-4]
         overall_folder = f"{paths.new_map_path}12345_{song_name}"
@@ -188,7 +199,8 @@ def combine_maps(song_list_potential, diff_list, export_results_to_bs):
             src = f"{paths.new_map_path}1234_{diff}_{song_name}/ExpertPlus.dat"
             if not os.path.isfile(src):
                 print(f"Could not find all files for: 1234_{diff}_{song_name}")
-                raise FileNotFoundError("See last print")
+                return []
+                # raise FileNotFoundError("See last print")
             src_info = f"{paths.new_map_path}1234_{diff}_{song_name}/info.dat"
             with open(src_info) as fp:
                 content = fp.readlines()
@@ -219,17 +231,24 @@ def combine_maps(song_list_potential, diff_list, export_results_to_bs):
         if export_results_to_bs:
             shutil_copy_maps(song_name, index="12345_")
             # print("Successfully exported full difficulty maps to BS")
-    if len(song_list) < 10:
-        for sl in song_list:
+
+    # if len(song_list) < 10:
+    for sl in song_list:
+        if config.verbose_level > 0:
             print(f"Finished map combination for {sl}")
-    else:
-        print("Finished multi-map generator")
+        for diff in diff_list:
+            delete_folder = f"{paths.new_map_path}1234_{diff:.1f}_{sl[:-4]}"
+            shutil.rmtree(delete_folder)
 
-    # Delete old files
-    for del_folder in delete_folder:
-        shutil.rmtree(del_folder)
-
-    return song_list
+    if not paths.IN_COLAB:
+        folder_finished = os.path.join(paths.songs_pred, "y_done")
+        if not os.path.isdir(folder_finished):
+            os.mkdir(folder_finished)
+        for song_name in song_list:
+            src = os.path.join(paths.songs_pred, song_name)
+            dst = os.path.join(folder_finished, song_name)
+            shutil.move(src=src, dst=dst)
+    return []
 
 
 if __name__ == "__main__":
@@ -253,7 +272,7 @@ if __name__ == "__main__":
         # main_multi(diff_list, True)
         # each worker needs ~5gb of ram memory (15gb / 3)
         # each worker needs ~4gb of gpu memory (11gb / 3)
-        n_workers = 6
+        n_workers = 5
         main_multi_par(n_workers, diff_list, True)
 
 # C:\Users\frede\anaconda3\pkgs

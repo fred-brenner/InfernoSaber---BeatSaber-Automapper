@@ -69,7 +69,8 @@ def load_keras_model(save_model_name, lr=None):
     if os.path.isfile(latest_file):
         model = load_model(latest_file)
         latest_file = os.path.basename(latest_file)
-        print("Keras model loaded: " + latest_file)
+        if config.verbose_level > 4:
+            print("Keras model loaded: " + latest_file)
     else:
         print(f"Could not find model on disk: {latest_file}")
         print("Creating new model...")

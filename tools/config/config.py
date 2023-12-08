@@ -89,6 +89,7 @@ waveform_pattern_length = 25   # pattern length in sampling rate [10-200]
 waveform_threshold = 4  # minimum number of notes applicable for waveform to start
 
 """Caution on changes"""
+verbose_level = 1       # verbose level from 0 (only ETA) to 5 (all messages)
 obstacle_crouch_width = 4
 obstacle_width = 1
 max_obstacle_height = 5     # <= 5

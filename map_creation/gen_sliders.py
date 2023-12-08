@@ -116,5 +116,6 @@ def calculate_sliders(notes, timings):
     slidersR = get_side_sliders(False, notes, timings, tg, tg_index)
     sliders_combined.extend(slidersL)
     sliders_combined.extend(slidersR)
-    print(f"Generated {len(sliders_combined)} arc sliders.")
+    if config.verbose_level > 3:
+        print(f"Generated {len(sliders_combined)} arc sliders.")
     return sliders_combined
