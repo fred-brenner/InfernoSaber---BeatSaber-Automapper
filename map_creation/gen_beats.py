@@ -208,11 +208,16 @@ def main(name_ar: list) -> bool:
         del event_model
     else:
         events = []
+    if config.bs_mapping_version != "v3":
+        print(f"Warning: Using deprecated mapping version: {config.bs_mapping_version}")
+        from map_creation.map_creator_deprecated import create_map_depr
+        create_map_depr(y_class_map, map_times, events, name_ar[0], bpm,
+                        pitch_input[-1], pitch_times[-1])
+    else:
+        create_map(y_class_map, map_times, events, name_ar[0], bpm,
+                   pitch_input[-1], pitch_times[-1])
 
-    create_map(y_class_map, map_times, events, name_ar[0], bpm,
-               pitch_input[-1], pitch_times[-1])
-
-    return 0  # success
+    return False  # success
 
 
 if __name__ == '__main__':

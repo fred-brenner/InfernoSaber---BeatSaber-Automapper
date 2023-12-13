@@ -73,6 +73,7 @@ def main_multi_par(n_workers: int, diff_list: list, export_results_to_bs=True):
     print(f"Found {len(song_list_files)} songs. Iterating...")
     if len(song_list_files) == 0:
         print("No songs found!")
+        return
 
     song_list = []
     for song in song_list_files:
@@ -82,7 +83,7 @@ def main_multi_par(n_workers: int, diff_list: list, export_results_to_bs=True):
     processed_count = 0
     combine_map_interval = 5
     uncombined_count = 0
-    time_per_run = 15
+    time_per_run = 10
     song_list_run = []
 
     # Divide the song_list into chunks for each worker
@@ -104,7 +105,7 @@ def main_multi_par(n_workers: int, diff_list: list, export_results_to_bs=True):
                     print(f"Error message: {e}")
                 uncombined_count = 0
             new_time_per_run = (time.time() - start_time) / processed_count
-            time_per_run = (time_per_run*3 + new_time_per_run) / 4
+            time_per_run = (time_per_run*5 + new_time_per_run) / 6
             print(f"### ETA: {(len(song_list) - processed_count) * time_per_run / 60:.1f} minutes. ###")
 
     song_list_run = combine_maps(song_list_files, song_list_run,
@@ -240,7 +241,7 @@ def combine_maps(song_list_potential, song_list_run, diff_list, export_results_t
             delete_folder = f"{paths.new_map_path}1234_{diff:.1f}_{sl[:-4]}"
             shutil.rmtree(delete_folder)
 
-    if not paths.IN_COLAB:
+    if not paths.IN_COLAB and export_results_to_bs:
         folder_finished = os.path.join(paths.songs_pred, "y_done")
         if not os.path.isdir(folder_finished):
             os.mkdir(folder_finished)
@@ -262,6 +263,7 @@ if __name__ == "__main__":
     #     print(f"Warning: Did not get 5 difficulties: {diff_list}")
 
     config.create_expert_flag = False
+    export_results_to_bs = False
     print(f"Using difficulties: {diff_list}")
 
     if paths.IN_COLAB:
@@ -273,6 +275,6 @@ if __name__ == "__main__":
         # each worker needs ~5gb of ram memory (15gb / 3)
         # each worker needs ~4gb of gpu memory (11gb / 3)
         n_workers = 5
-        main_multi_par(n_workers, diff_list, True)
+        main_multi_par(n_workers, diff_list, export_results_to_bs)
 
 # C:\Users\frede\anaconda3\pkgs
