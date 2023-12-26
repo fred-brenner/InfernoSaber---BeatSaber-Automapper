@@ -29,7 +29,9 @@ def return_mapper_list(mapper_shortcut):
 def get_full_model_path(model_name_partial, full_path=True):
     model_folder = paths.model_path
     files = os.listdir(model_folder)
-    if not (7 < len(files) < 10):  # allow some extra files, e.g. extra zip file
+    if 0 < len(files) < 7:
+        print(f"Warning: Check content of:  {model_folder}. Not enough models found (yet).")
+    if not (0 < len(files) < 10):  # allow some extra files, e.g. extra zip file
         raise FileNotFoundError(f"Model save files missing or corrupt. Check content of:  {model_folder}")
     for f in files:
         if f.startswith(model_name_partial):
