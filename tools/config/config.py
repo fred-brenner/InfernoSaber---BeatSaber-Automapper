@@ -17,7 +17,7 @@ bs_mapping_version = "v2"  # legacy mode, may be deprecated in future
 # use_mapper_selection = "general_new"
 # use_mapper_selection = "curated1"
 # use_mapper_selection = "curated2"
-use_mapper_selection = "pp1"
+use_mapper_selection = "pp1_15"
 use_mapper_selection = use_mapper_selection.lower()
 
 # Map creation model configuration
