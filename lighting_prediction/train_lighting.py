@@ -59,8 +59,8 @@ def lstm_shift_events(song_in, time_in, ml_out):
 
     for idx in range(start, n_samples):
         if ml_out is not None:
-            l_out_in.append(ml_out[idx-start:idx-1])
-        l_time_in.append(time_in[idx-start:idx-1])
+            l_out_in.append(ml_out[idx - start:idx - 1])
+        l_time_in.append(time_in[idx - start:idx - 1])
 
     l_time_in = np.asarray(l_time_in).reshape((-1, lstm_len, 1))
 
@@ -171,7 +171,7 @@ def start_training():
     ################
     model = create_tf_model('lstm_half', x_input_shape, y_out.shape)
     adam = Adam(learning_rate=config.event_learning_rate,
-                        decay=config.event_learning_rate * 2 / config.event_n_epochs)
+                weight_decay=config.event_learning_rate * 2 / config.event_n_epochs)
     model.compile(loss='binary_crossentropy', optimizer=adam,
                   metrics=['accuracy'])
 

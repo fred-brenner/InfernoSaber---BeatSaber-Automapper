@@ -124,7 +124,7 @@ def main():
     ################
     model = create_music_model('tcn', song_input[0].shape[0], config.tcn_len)
     adam = Adam(learning_rate=config.beat_learning_rate,
-                        decay=config.beat_learning_rate * 2 / config.beat_n_epochs)
+                        weight_decay=config.beat_learning_rate * 2 / config.beat_n_epochs)
     model.compile(loss='binary_crossentropy', optimizer=adam,
                   metrics=['accuracy'])
 

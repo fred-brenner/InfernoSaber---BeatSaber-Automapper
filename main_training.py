@@ -5,6 +5,7 @@ import sys
 import subprocess
 
 from tools.config import paths, config
+
 # import map_creation.gen_beats as beat_generator
 # from bs_shift.export_map import *
 #
@@ -18,11 +19,20 @@ input("Adapted the mapper_selection and use_bpm_selection in the config file?\n"
 # run bs_shift / shift.py
 input("Did you run shift.py?")
 
+# create folder if required
+if not os.path.isdir(paths.model_path):
+    print(f"Creating model folder: {config.use_mapper_selection}")
+    os.makedirs(paths.model_path)
+
+else:
+    if len(os.listdir(paths.model_path)) > 1:
+        print("Model folder already available. Exit to change folder in config.")
+        input("Continue with same model folder?")
+
 # you can skip this step
 # run training / train_autoenc_music.py
 # os.system("training/train_autoenc_music.py")
 subprocess.call(['python', './training/train_autoenc_music.py'])
-# TODO: subprocess this bitch
 
 # run training / train_bs_automapper.py
 # os.system(f"{paths.main_path}training/train_bs_automapper.py")
@@ -30,5 +40,3 @@ subprocess.call(['python', './training/train_autoenc_music.py'])
 # run beat_prediction / ai_beat_gen.py
 
 # run lighting_prediction / train_lighting.py
-
-

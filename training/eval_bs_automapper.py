@@ -82,7 +82,7 @@ mapper_model, save_model_name = load_keras_model(save_model_name)
 # create model
 if mapper_model is None:
     mapper_model = create_keras_model('lstm1', dim_in, dim_out)
-    adam = Adam(learning_rate=learning_rate, decay=learning_rate / n_epochs)
+    adam = Adam(learning_rate=learning_rate, weight_decay=learning_rate / n_epochs)
     # mapper_model.compile(loss='mean_squared_error', optimizer=adam, metrics=['accuracy'])
     mapper_model.compile(loss='categorical_crossentropy', optimizer=adam, metrics=['accuracy'])
 
