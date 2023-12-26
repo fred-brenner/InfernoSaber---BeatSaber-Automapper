@@ -20,7 +20,8 @@ if not test_gpu_tf():
 min_bps_limit = config.min_bps_limit
 max_bps_limit = config.max_bps_limit
 learning_rate = config.map_learning_rate
-n_epochs = config.map_n_epochs
+# n_epochs = config.map_n_epochs
+n_epochs = 1
 batch_size = config.map_batch_size
 test_samples = config.map_test_samples
 np.random.seed(3)
@@ -110,12 +111,10 @@ try:
     pred_class = categorical_to_class(pred_result)
     real_class = categorical_to_class(out_class_test)
 
-    if test_samples % command_len == 0:
-        pred_class = pred_class.reshape(-1, command_len)
-        real_class = real_class.reshape(-1, command_len)
+    pred_class = pred_class.flatten().tolist()
+    real_class = real_class.flatten().tolist()
 
-    print(tabulate([['Pred', pred_class], ['Real', real_class]],
-                   headers=['Type', 'Result (test data)']))
+    print(tabulate([['Pred', pred_class], ['Real', real_class]], headers=['Type', 'Result (test data)']))
 
     print("Validate model with train data...")
     validation = mapper_model.evaluate(x=ds_train_sample, y=out_class_train[:test_samples])
@@ -124,12 +123,11 @@ try:
     pred_class = categorical_to_class(pred_result)
     real_class = categorical_to_class(out_class_train[:test_samples])
 
-    if test_samples % command_len == 0:
-        pred_class = pred_class.reshape(-1, command_len)
-        real_class = real_class.reshape(-1, command_len)
+    pred_class = pred_class.flatten().tolist()
+    real_class = real_class.flatten().tolist()
 
-    print(tabulate([['Pred', pred_class], ['Real', real_class]],
-                   headers=['Type', 'Result (train data)']))
+    print(tabulate([['Pred', pred_class], ['Real', real_class]], headers=['Type', 'Result (train data)']))
+
 except Exception as e:
     print(f"Error: {type(e).__name__}")
     print(f"Error message: {e}")
