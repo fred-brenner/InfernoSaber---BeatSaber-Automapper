@@ -101,34 +101,39 @@ training = mapper_model.fit(x=ds_train, y=out_class_train,
 
 # Evaluate model
 ################
-command_len = 10
-print("Validate model with test data...")
-validation = mapper_model.evaluate(x=ds_test, y=out_class_test)
-pred_result = mapper_model.predict(x=ds_test, verbose=0)
+try:
+    command_len = 10
+    print("Validate model with test data...")
+    validation = mapper_model.evaluate(x=ds_test, y=out_class_test)
+    pred_result = mapper_model.predict(x=ds_test, verbose=0)
 
-pred_class = categorical_to_class(pred_result)
-real_class = categorical_to_class(out_class_test)
+    pred_class = categorical_to_class(pred_result)
+    real_class = categorical_to_class(out_class_test)
 
-if test_samples % command_len == 0:
-    pred_class = pred_class.reshape(-1, command_len)
-    real_class = real_class.reshape(-1, command_len)
+    if test_samples % command_len == 0:
+        pred_class = pred_class.reshape(-1, command_len)
+        real_class = real_class.reshape(-1, command_len)
 
-print(tabulate([['Pred', pred_class], ['Real', real_class]],
-               headers=['Type', 'Result (test data)']))
+    print(tabulate([['Pred', pred_class], ['Real', real_class]],
+                   headers=['Type', 'Result (test data)']))
 
-print("Validate model with train data...")
-validation = mapper_model.evaluate(x=ds_train_sample, y=out_class_train[:test_samples])
+    print("Validate model with train data...")
+    validation = mapper_model.evaluate(x=ds_train_sample, y=out_class_train[:test_samples])
 
-pred_result = mapper_model.predict(x=ds_train_sample, verbose=0)
-pred_class = categorical_to_class(pred_result)
-real_class = categorical_to_class(out_class_train[:test_samples])
+    pred_result = mapper_model.predict(x=ds_train_sample, verbose=0)
+    pred_class = categorical_to_class(pred_result)
+    real_class = categorical_to_class(out_class_train[:test_samples])
 
-if test_samples % command_len == 0:
-    pred_class = pred_class.reshape(-1, command_len)
-    real_class = real_class.reshape(-1, command_len)
+    if test_samples % command_len == 0:
+        pred_class = pred_class.reshape(-1, command_len)
+        real_class = real_class.reshape(-1, command_len)
 
-print(tabulate([['Pred', pred_class], ['Real', real_class]],
-               headers=['Type', 'Result (train data)']))
+    print(tabulate([['Pred', pred_class], ['Real', real_class]],
+                   headers=['Type', 'Result (train data)']))
+except Exception as e:
+    print(f"Error: {type(e).__name__}")
+    print(f"Error message: {e}")
+    input("Error in evaluation. Press Enter to save model or exit to discard.")
 
 # Save Model
 ############
