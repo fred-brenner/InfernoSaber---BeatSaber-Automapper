@@ -5,7 +5,7 @@ import random
 import pickle
 
 from datetime import datetime
-from keras.optimizers import adam_v2
+from keras.optimizers import Adam
 from sklearn.preprocessing import OneHotEncoder
 from tabulate import tabulate
 
@@ -170,7 +170,7 @@ def start_training():
     # setup ML model
     ################
     model = create_tf_model('lstm_half', x_input_shape, y_out.shape)
-    adam = adam_v2.Adam(learning_rate=config.event_learning_rate,
+    adam = Adam(learning_rate=config.event_learning_rate,
                         decay=config.event_learning_rate * 2 / config.event_n_epochs)
     model.compile(loss='binary_crossentropy', optimizer=adam,
                   metrics=['accuracy'])

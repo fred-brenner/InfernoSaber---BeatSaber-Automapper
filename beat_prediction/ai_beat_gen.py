@@ -1,6 +1,6 @@
 import gc
 from datetime import datetime
-from keras.optimizers import adam_v2
+from keras.optimizers import Adam
 from PIL import Image
 import matplotlib.pyplot as plt
 
@@ -123,7 +123,7 @@ def main():
     # setup ML model
     ################
     model = create_music_model('tcn', song_input[0].shape[0], config.tcn_len)
-    adam = adam_v2.Adam(learning_rate=config.beat_learning_rate,
+    adam = Adam(learning_rate=config.beat_learning_rate,
                         decay=config.beat_learning_rate * 2 / config.beat_n_epochs)
     model.compile(loss='binary_crossentropy', optimizer=adam,
                   metrics=['accuracy'])

@@ -1,6 +1,6 @@
 from keras.layers import Dense, Input, LSTM, Flatten, Dropout, \
     MaxPooling2D, Conv2D, BatchNormalization, SpatialDropout2D, concatenate, \
-    Reshape, Conv2DTranspose, UpSampling2D, CuDNNLSTM
+    Reshape, Conv2DTranspose, UpSampling2D
 from tcn import TCN  # pip install keras-tcn
 from keras.models import Model
 import numpy as np
@@ -16,11 +16,11 @@ def create_keras_model(model_type, dim_in=[], dim_out=None):
         input_b = Input(shape=(dim_in[1]), name='input_time_lstm')
         input_c = Input(shape=(dim_in[2]), name='input_class_lstm')
 
-        lstm_b = CuDNNLSTM(32, return_sequences=True)(input_b)
-        lstm_c = CuDNNLSTM(256, return_sequences=True)(input_c)
+        lstm_b = LSTM(32, return_sequences=True)(input_b)
+        lstm_c = LSTM(256, return_sequences=True)(input_c)
 
         lstm_in = concatenate([lstm_b, lstm_c])
-        lstm_out = CuDNNLSTM(64, return_sequences=False)(lstm_in)
+        lstm_out = LSTM(64, return_sequences=False)(lstm_in)
 
         x = concatenate([input_a, lstm_out])
         x = Dense(256, activation='relu')(x)
@@ -40,11 +40,11 @@ def create_keras_model(model_type, dim_in=[], dim_out=None):
 
         conv = Conv2D(32, kernel_size=3, activation='relu')(input_a)
         conv = Flatten('channels_last')(conv)
-        lstm_b = CuDNNLSTM(32, return_sequences=True)(input_b)
-        lstm_c = CuDNNLSTM(64, return_sequences=True)(input_c)
+        lstm_b = LSTM(32, return_sequences=True)(input_b)
+        lstm_c = LSTM(64, return_sequences=True)(input_c)
 
         lstm_in = concatenate([lstm_b, lstm_c])
-        lstm_out = CuDNNLSTM(64, return_sequences=False)(lstm_in)
+        lstm_out = LSTM(64, return_sequences=False)(lstm_in)
 
         x = concatenate([conv, lstm_out])
         x = Dense(1024, activation='relu')(x)
@@ -137,8 +137,8 @@ def create_music_model(model_type, dim_in, tcn_len):
                 activation='relu'
                 )(input_a)
 
-        b = CuDNNLSTM(4, return_sequences=False)(input_b)
-        c = CuDNNLSTM(4, return_sequences=False)(input_c)
+        b = LSTM(4, return_sequences=False)(input_b)
+        c = LSTM(4, return_sequences=False)(input_c)
 
         x = concatenate([a, b, c])
         x = Dense(256, activation='relu')(x)
@@ -155,13 +155,13 @@ def create_music_model(model_type, dim_in, tcn_len):
     #     # input beat (batch_size, time_steps, 1)
     #     input_b = Input(shape=(tcn_len, 1), name='input_beat_prop')
     #
-    #     a = CuDNNLSTM(256, return_sequences=True)(input_a)
-    #     a = CuDNNLSTM(128, return_sequences=True)(a)
+    #     a = LSTM(256, return_sequences=True)(input_a)
+    #     a = LSTM(128, return_sequences=True)(a)
     #
-    #     b = CuDNNLSTM(8, return_sequences=True)(input_b)
+    #     b = LSTM(8, return_sequences=True)(input_b)
     #
     #     ab = concatenate([a, b])
-    #     x = CuDNNLSTM(64, return_sequences=False)(ab)
+    #     x = LSTM(64, return_sequences=False)(ab)
     #     x = Dense(32, activation='relu')(x)
     #     x = Dense(32, activation='relu')(x)
     #
@@ -179,11 +179,11 @@ def create_post_model(model_type, lstm_len: int, dim_out=2):
         # input_b = Input(shape=(dim_in[1]), name='input_note_cut_lstm')
         # input_c = Input(shape=(dim_in[2]), name='input_time_diff_lstm')
 
-        lstm_a = CuDNNLSTM(256, return_sequences=True)(input_a)
-        # lstm_c = CuDNNLSTM(128, return_sequences=True)(input_c)
+        lstm_a = LSTM(256, return_sequences=True)(input_a)
+        # lstm_c = LSTM(128, return_sequences=True)(input_c)
 
         # lstm_in = concatenate([lstm_b, lstm_c])
-        lstm_out = CuDNNLSTM(128, return_sequences=False)(lstm_a)
+        lstm_out = LSTM(128, return_sequences=False)(lstm_a)
 
         # x = concatenate([input_a, lstm_out])
         x = Dense(512, activation='relu')(lstm_out)

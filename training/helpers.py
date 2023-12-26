@@ -49,6 +49,8 @@ def test_gpu_tf():
         return True
     else:
         print('No GPU found')
+        # tf.test.is_built_with_cuda()
+        print(tf.config.list_physical_devices())
     return False
 
 

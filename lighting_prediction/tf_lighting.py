@@ -1,6 +1,6 @@
 from keras.layers import Dense, Input, LSTM, Flatten, Dropout, \
     MaxPooling2D, Conv2D, BatchNormalization, SpatialDropout2D, concatenate, \
-    Reshape, Conv2DTranspose, UpSampling2D, CuDNNLSTM
+    Reshape, Conv2DTranspose, UpSampling2D
 from keras.models import Model
 # import numpy as np
 
@@ -12,7 +12,7 @@ def create_tf_model(model_type, dim_in, dim_out, nr=128):
         input_a = Input(shape=(dim_in[0][1]), name='input_song_enc')
         input_b = Input(shape=(dim_in[1][1:]), name='input_time_lstm')
 
-        lstm_out = CuDNNLSTM(32, return_sequences=False)(input_b)
+        lstm_out = LSTM(32, return_sequences=False)(input_b)
 
         x = concatenate([input_a, lstm_out])
         x = Dense(512, activation='relu')(x)
@@ -30,11 +30,11 @@ def create_tf_model(model_type, dim_in, dim_out, nr=128):
         input_b = Input(shape=(dim_in[1][1:]), name='input_time_lstm')
         input_c = Input(shape=(dim_in[2][1:]), name='input_class_lstm')
 
-        lstm_b = CuDNNLSTM(32, return_sequences=True)(input_b)
-        lstm_c = CuDNNLSTM(256, return_sequences=True)(input_c)
+        lstm_b = LSTM(32, return_sequences=True)(input_b)
+        lstm_c = LSTM(256, return_sequences=True)(input_c)
 
         lstm_in = concatenate([lstm_b, lstm_c])
-        lstm_out = CuDNNLSTM(64, return_sequences=False)(lstm_in)
+        lstm_out = LSTM(64, return_sequences=False)(lstm_in)
 
         x = concatenate([input_a, lstm_out])
         x = Dense(512, activation='relu')(x)
@@ -54,11 +54,11 @@ def create_tf_model(model_type, dim_in, dim_out, nr=128):
 
         conv = Conv2D(32, kernel_size=3, activation='relu')(input_a)
         conv = Flatten('channels_last')(conv)
-        lstm_b = CuDNNLSTM(32, return_sequences=True)(input_b)
-        lstm_c = CuDNNLSTM(64, return_sequences=True)(input_c)
+        lstm_b = LSTM(32, return_sequences=True)(input_b)
+        lstm_c = LSTM(64, return_sequences=True)(input_c)
 
         lstm_in = concatenate([lstm_b, lstm_c])
-        lstm_out = CuDNNLSTM(64, return_sequences=False)(lstm_in)
+        lstm_out = LSTM(64, return_sequences=False)(lstm_in)
 
         x = concatenate([conv, lstm_out])
         x = Dense(1024, activation='relu')(x)
