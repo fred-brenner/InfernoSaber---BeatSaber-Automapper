@@ -1,17 +1,17 @@
 import numpy as np
-import matplotlib.pyplot as plt
-
-import tensorflow as tf
-from keras.models import Model
-from keras.optimizers import Adam
+# import matplotlib.pyplot as plt
+import time
+# import tensorflow as tf
 
 from datetime import datetime
-import time
+from keras.models import Model
+from keras.optimizers import Adam
+from keras.layers import Input
 
 from bs_shift.bps_find_songs import bps_find_songs
-from helpers import *
+from helpers import test_gpu_tf, filter_by_bps, load_keras_model
 from plot_model import run_plot_autoenc
-from tensorflow_models import *
+from tensorflow_models import create_keras_model
 from preprocessing.music_processing import run_music_preprocessing
 from tools.config import config, paths
 from tools.fail_list.black_list import delete_fails
@@ -106,8 +106,12 @@ training = auto_encoder.fit(x=ds_train, y=ds_train, validation_data=(ds_val, ds_
 print("\nEvaluating test data...")
 eval = auto_encoder.evaluate(ds_test, ds_test)
 # print(f"Test loss: {eval[0]:.4f}, test accuracy: {eval[1]:.4f}")
-
-run_plot_autoenc(encoder, auto_encoder, ds_test, save=True)
+try:
+    run_plot_autoenc(encoder, auto_encoder, ds_test, save=True)
+except Exception as e:
+    print(f"Error: {type(e).__name__}")
+    print(f"Error message: {e}")
+    print("Error in music autoencoder plotting. Continue with saving.")
 
 # Save Model
 ############

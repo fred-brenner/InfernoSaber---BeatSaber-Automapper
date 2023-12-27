@@ -4,21 +4,20 @@ from keras.optimizers import Adam
 from PIL import Image
 import matplotlib.pyplot as plt
 
-from beat_prediction.find_beats import *
+from beat_prediction.find_beats import find_beats, get_pitch_times, samplerate_beats
 from beat_prediction.beat_to_lstm import *
-from beat_prediction.beat_prop import *
+from beat_prediction.beat_prop import get_beat_prop, delete_offbeats
 
 from preprocessing.bs_mapper_pre import load_beat_data
 
-from training.helpers import *
-from training.tensorflow_models import *
+from training.helpers import test_gpu_tf, filter_by_bps, calc_class_weight
+from training.tensorflow_models import create_music_model
 
 from tools.config import config, paths
 from tools.utils import numpy_shorts
 
 
 def main():
-
     # Setup configuration
     #####################
     # Check Cuda compatible GPU
@@ -94,7 +93,7 @@ def main():
             elif len(song.shape) == 1 and not y:
                 song = song.reshape(-1, tcn_len, 1)
             elif len(song.shape) == 1 and y:
-                song = song[tcn_len-1::tcn_len]
+                song = song[tcn_len - 1::tcn_len]
             song_ar = numpy_shorts.np_append(song_ar, song, axis=0)
         return song_ar
 
@@ -124,7 +123,7 @@ def main():
     ################
     model = create_music_model('tcn', song_input[0].shape[0], config.tcn_len)
     adam = Adam(learning_rate=config.beat_learning_rate,
-                        weight_decay=config.beat_learning_rate * 2 / config.beat_n_epochs)
+                weight_decay=config.beat_learning_rate * 2 / config.beat_n_epochs)
     model.compile(loss='binary_crossentropy', optimizer=adam,
                   metrics=['accuracy'])
 
@@ -141,21 +140,26 @@ def main():
     # plot test result
     ##################
     if True:
-        y_pred = model.predict(x_part, verbose=0)
-        # bound prediction to 0 or 1
-        thresh = 0.5
-        y_pred[y_pred > thresh] = 1
-        y_pred[y_pred <= thresh] = 0
+        try:
+            y_pred = model.predict(x_part, verbose=0)
+            # bound prediction to 0 or 1
+            thresh = 0.5
+            y_pred[y_pred > thresh] = 1
+            y_pred[y_pred <= thresh] = 0
 
-        fig = plt.figure()
-        # plt.plot(y, 'b-', label='original')
-        y_count = np.arange(0, len(y_part), 1)
-        y_count = y_part * y_count
+            fig = plt.figure()
+            # plt.plot(y, 'b-', label='original')
+            y_count = np.arange(0, len(y_part), 1)
+            y_count = y_part * y_count
 
-        plt.vlines(y_count, ymin=-0.1, ymax=1.1, colors='k', label='original', linewidth=2)
-        plt.plot(y_pred, 'b-', label='prediction', linewidth=1)
-        plt.legend()
-        plt.show()
+            plt.vlines(y_count, ymin=-0.1, ymax=1.1, colors='k', label='original', linewidth=2)
+            plt.plot(y_pred, 'b-', label='prediction', linewidth=1)
+            plt.legend()
+            plt.show()
+        except Exception as e:
+            print(f"Error: {type(e).__name__}")
+            print(f"Error message: {e}")
+            print("Error in plotting beat generator evaluation. Continue.")
 
     print("Finished beat generator training")
 

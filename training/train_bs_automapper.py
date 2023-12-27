@@ -1,11 +1,12 @@
 import gc
+import numpy as np
 from datetime import datetime
-from tensorflow import keras
+# from tensorflow import keras
 from keras.optimizers import Adam
 from tabulate import tabulate
 
-from helpers import *
-from tensorflow_models import *
+from helpers import test_gpu_tf, ai_encode_song, load_keras_model, categorical_to_class
+from tensorflow_models import create_keras_model
 from preprocessing.bs_mapper_pre import load_ml_data, lstm_shift
 from tools.config import config, paths
 from lighting_prediction.train_lighting import lstm_shift_events_half
@@ -20,8 +21,7 @@ if not test_gpu_tf():
 min_bps_limit = config.min_bps_limit
 max_bps_limit = config.max_bps_limit
 learning_rate = config.map_learning_rate
-# n_epochs = config.map_n_epochs
-n_epochs = 1
+n_epochs = config.map_n_epochs
 batch_size = config.map_batch_size
 test_samples = config.map_test_samples
 np.random.seed(3)
@@ -131,7 +131,7 @@ try:
 except Exception as e:
     print(f"Error: {type(e).__name__}")
     print(f"Error message: {e}")
-    input("Error in evaluation. Press Enter to save model or exit to discard.")
+    print("Error in displaying mapper evaluation. Continue with saving.")
 
 # Save Model
 ############
