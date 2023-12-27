@@ -16,9 +16,9 @@ from preprocessing.music_processing import run_music_preprocessing
 from tools.config import config, paths
 from tools.fail_list.black_list import delete_fails
 
-# Check Cuda compatible GPU
-if not test_gpu_tf():
-    exit()
+# # Check Cuda compatible GPU
+# if not test_gpu_tf():
+#     exit()
 
 # Setup configuration
 #####################

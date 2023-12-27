@@ -17,7 +17,7 @@ from preprocessing.music_processing import run_music_preprocessing
 from tools.config import config, paths
 # from tools.utils import numpy_shorts
 
-from training.helpers import *
+from training.helpers import test_gpu_tf, filter_by_bps, ai_encode_song, categorical_to_class
 
 
 def lstm_shift_events_half(song_in, time_in, ml_out, lstm_len):
@@ -108,9 +108,9 @@ def get_time_from_events(events, diff=False):
 def start_training():
     # Setup configuration
     #####################
-    # Check Cuda compatible GPU
-    if not test_gpu_tf():
-        exit()
+    # # Check Cuda compatible GPU
+    # if not test_gpu_tf():
+    #     exit()
 
     # model name setup
     ##################

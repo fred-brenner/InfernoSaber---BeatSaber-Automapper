@@ -1,11 +1,12 @@
 import gc
+import numpy as np
 from datetime import datetime
 from keras.optimizers import Adam
 from PIL import Image
 import matplotlib.pyplot as plt
 
 from beat_prediction.find_beats import find_beats, get_pitch_times, samplerate_beats
-from beat_prediction.beat_to_lstm import *
+# from beat_prediction.beat_to_lstm import beat_to_lstm
 from beat_prediction.beat_prop import get_beat_prop, delete_offbeats
 
 from preprocessing.bs_mapper_pre import load_beat_data
@@ -20,9 +21,9 @@ from tools.utils import numpy_shorts
 def main():
     # Setup configuration
     #####################
-    # Check Cuda compatible GPU
-    if not test_gpu_tf():
-        exit()
+    # # Check Cuda compatible GPU
+    # if not test_gpu_tf():
+    #     exit()
 
     # model name setup
     ##################
