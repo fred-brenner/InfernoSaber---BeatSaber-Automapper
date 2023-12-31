@@ -256,7 +256,8 @@ if __name__ == "__main__":
     # freeze_support()  # required for pyinstaller packaging
     diff_list = os.environ.get('diff_list')
     if diff_list is None:
-        diff_list = [4, 5, 6, 7, 8]
+        # diff_list = [4, 5, 6, 7, 8]
+        diff_list = [1, 5, 10, 100, 1e4]
     else:
         diff_list = json.loads(diff_list)
     # if len(diff_list) != 5:
@@ -274,7 +275,7 @@ if __name__ == "__main__":
         # main_multi(diff_list, True)
         # each worker needs ~5gb of ram memory (15gb / 3)
         # each worker needs ~4gb of gpu memory (11gb / 3)
-        n_workers = 5
+        n_workers = 4
         main_multi_par(n_workers, diff_list, export_results_to_bs)
 
 # C:\Users\frede\anaconda3\pkgs

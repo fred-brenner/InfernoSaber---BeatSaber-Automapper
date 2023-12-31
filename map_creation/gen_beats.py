@@ -209,7 +209,7 @@ def main(name_ar: list) -> bool:
     else:
         events = []
     if config.bs_mapping_version != "v3":
-        print(f"Warning: Using deprecated mapping version: {config.bs_mapping_version}")
+        print(f"Warning: Using old mapping version: {config.bs_mapping_version}")
         from map_creation.map_creator_deprecated import create_map_depr
         create_map_depr(y_class_map, map_times, events, name_ar[0], bpm,
                         pitch_input[-1], pitch_times[-1])

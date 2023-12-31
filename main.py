@@ -21,7 +21,7 @@ def main(use_model=None, diff=None, export_results_to_bs=True,
          add_obstacles=None, sporty_obstacles=None,
          add_sliders=None, slider_start_time=None,
          slider_end_time=None, slider_probability=None,
-         slider_movement_min=None):
+         slider_movement_min=None, legacy_mode=None):
 
     if use_model is not None:
         config.use_mapper_selection = use_model
@@ -60,6 +60,11 @@ def main(use_model=None, diff=None, export_results_to_bs=True,
         config.slider_probability = slider_probability
     if slider_movement_min is not None:
         config.slider_movement_minimum = slider_movement_min
+    if legacy_mode is not None:
+        if legacy_mode:
+            config.bs_mapping_version = 'v2'
+        else:
+            config.bs_mapping_version = 'v3'
     update_model_file_paths()
 
     # limit gpu ram usage
@@ -208,9 +213,12 @@ if __name__ == "__main__":
         smm = float(smm)
         print(f"Set slider_movement_min to {smm}")
 
+    lm = os.environ.get('legacy_mode')
+    # if lm is not None:
+
     export_results_to_bs = True
     if paths.IN_COLAB:
         export_results_to_bs = False
 
     main(use_model, diff, export_results_to_bs, gm, qs, bi, rf, jso,
-         ndf, sf, aof, sof, asf, sst, se, sp, smm)
+         ndf, sf, aof, sof, asf, sst, se, sp, smm, lm)

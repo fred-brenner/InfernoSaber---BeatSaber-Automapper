@@ -21,16 +21,6 @@ print(f"use_bpm_selection value: {config.use_bpm_selection}")
 input("Adapted the mapper_selection and use_bpm_selection in the config file?\n"
       "Press enter to continue...")
 
-# TRAINING
-##########
-# run bs_shift / shift.py
-input("Did you run shift.py?")
-
-print("Which trainings do you want to start? Reply with y or n for each model.")
-run_list = input("1. music autoencoder | 2. song mapper | 3. beat generator | 4. lights generator | ")
-if len(run_list) != 4:
-    print("Wrong input format. Exit")
-    exit()
 # create folder if required
 if not os.path.isdir(paths.model_path):
     print(f"Creating model folder: {config.use_mapper_selection}")
@@ -41,20 +31,33 @@ else:
         print("Model folder already available. Exit manually to change folder in config.")
         input("Continue with same model folder?")
 
+# TRAINING
+##########
+print("Which trainings do you want to start? Reply with y or n for each model.")
+run_list = input("1. shift music | 2. music autoencoder | 3. song mapper | 4. beat generator | 5. lights generator | ")
+if len(run_list) != 5:
+    print("Wrong input format. Exit")
+    exit()
+
+# run bs_shift / shift.py
+if run_list[0].lower() == 'y':
+    print(f"Analyzing BS music files from folder: {paths.bs_input_path}")
+    subprocess.call(['python', './bs_shift/shift.py'])
+
 # you can skip this step
 # run training / train_autoenc_music.py
 # os.system("training/train_autoenc_music.py")
-if run_list[0].lower() == 'y':
+if run_list[1].lower() == 'y':
     subprocess.call(['python', './training/train_autoenc_music.py'])
 
 # run training / train_bs_automapper.py
-if run_list[1].lower() == 'y':
+if run_list[2].lower() == 'y':
     subprocess.call(['python', './training/train_bs_automapper.py'])
 
 # run beat_prediction / ai_beat_gen.py
-if run_list[2].lower() == 'y':
+if run_list[3].lower() == 'y':
     subprocess.call(['python', './beat_prediction/ai_beat_gen.py'])
 
 # run lighting_prediction / train_lighting.py
-if run_list[3].lower() == 'y':
+if run_list[4].lower() == 'y':
     subprocess.call(['python', './lighting_prediction/train_lighting.py'])
