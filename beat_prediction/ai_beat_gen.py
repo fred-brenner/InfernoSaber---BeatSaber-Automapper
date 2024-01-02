@@ -128,7 +128,7 @@ def main():
     model.compile(loss='binary_crossentropy', optimizer=adam,
                   metrics=['accuracy'])
 
-    print(model.summary())
+    model.summary()
 
     model.fit(x=x_input, y=y, epochs=config.beat_n_epochs, shuffle=True,
               batch_size=config.beat_batch_size, verbose=1, class_weight=cw)

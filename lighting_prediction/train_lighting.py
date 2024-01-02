@@ -175,7 +175,7 @@ def start_training():
     model.compile(loss='binary_crossentropy', optimizer=adam,
                   metrics=['accuracy'])
 
-    print(model.summary())
+    model.summary()
 
     model.fit(x=x_input, y=y_out, epochs=config.event_n_epochs, shuffle=True,
               batch_size=config.event_batch_size, verbose=1)

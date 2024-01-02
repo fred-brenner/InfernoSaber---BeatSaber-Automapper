@@ -94,6 +94,8 @@ if mapper_model is None:
     # mapper_model.compile(loss='mean_squared_error', optimizer=adam, metrics=['accuracy'])
     mapper_model.compile(loss='categorical_crossentropy', optimizer=adam, metrics=['accuracy'])
 
+mapper_model.summary()
+
 # Model training
 ################
 training = mapper_model.fit(x=ds_train, y=out_class_train,

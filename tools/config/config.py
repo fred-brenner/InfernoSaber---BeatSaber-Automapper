@@ -7,7 +7,7 @@ import numpy as np
 # used in multiple codes
 ########################################
 InfernoSaber_version = "1.6.0"  # coded into the info.dat file
-bs_mapping_version = "v2"  # allows to generate advanced features like arcs
+bs_mapping_version = "v3"  # allows to generate advanced features like arcs
 # bs_mapping_version = "v2"  # legacy mode, may be deprecated in future
 
 
@@ -17,7 +17,7 @@ bs_mapping_version = "v2"  # allows to generate advanced features like arcs
 # use_mapper_selection = "general_new"
 # use_mapper_selection = "curated1"
 # use_mapper_selection = "curated2"
-use_mapper_selection = "pp1_15"
+use_mapper_selection = "pp2_15"
 use_mapper_selection = use_mapper_selection.lower()
 
 # Map creation model configuration
@@ -141,7 +141,7 @@ samplerate_music = 14800  # samplerate for the music import
 hop_size = 512
 window = 2.0  # window in seconds for each song to spectrum picture (from wav_to_pic)
 specgram_res = 24  # y resolution of the spectrogram (frequency subdivisions)
-ram_limit = 24      # free RAM in GB (unused currently)
+# ram_limit = 24      # free RAM in GB (unused currently)
 vram_limit = 20     # free VRAM in GB (needed for lighting training)
 
 use_bpm_selection = True   # use number of beats for selection of maps in training
@@ -168,6 +168,7 @@ map_n_epochs = 180  # number of total epochs
 map_batch_size = 128  # batch size
 map_test_samples = 10  # number of test files to plot (excluded from training)
 lstm_len = 16
+remove_double_notes = False
 
 # Beat prediction model configuration
 beat_learning_rate = 5e-4
