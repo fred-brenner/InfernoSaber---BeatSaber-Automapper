@@ -214,7 +214,11 @@ if __name__ == "__main__":
         print(f"Set slider_movement_min to {smm}")
 
     lm = os.environ.get('legacy_mode')
-    # if lm is not None:
+    if isinstance(lm, str):
+        if lm == 'True':
+            lm = True
+        else:
+            lm = False
 
     export_results_to_bs = True
     if paths.IN_COLAB:
