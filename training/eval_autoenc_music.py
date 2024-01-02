@@ -42,7 +42,7 @@ encoder, _ = load_keras_model(get_full_model_path(config.enc_version))
 #     decoded = decoder(encoded)
 #     auto_encoder = Model(auto_input, decoded)
 #
-#     adam = adam_v2.Adam(learning_rate=learning_rate, decay=learning_rate/n_epochs)
+#     adam = Adam(learning_rate=learning_rate, weight_decay=learning_rate/n_epochs)
 #     auto_encoder.compile(loss='mean_squared_error', optimizer=adam, metrics=['accuracy'])
 #     encoder.compile(loss='mean_squared_error', optimizer=adam, metrics=['accuracy'])
 

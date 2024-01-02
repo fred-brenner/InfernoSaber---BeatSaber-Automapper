@@ -48,7 +48,11 @@ def test_gpu_tf():
         print('Default GPU Device: {}'.format(tf.test.gpu_device_name()))
         return True
     else:
-        print('No GPU found')
+        print('Warning: No GPU found')
+        input('Continue with CPU?')
+        return True
+        # tf.test.is_built_with_cuda()
+        # print(tf.config.list_physical_devices())
     return False
 
 
@@ -69,7 +73,8 @@ def load_keras_model(save_model_name, lr=None):
     if os.path.isfile(latest_file):
         model = load_model(latest_file)
         latest_file = os.path.basename(latest_file)
-        print("Keras model loaded: " + latest_file)
+        if config.verbose_level > 4:
+            print("Keras model loaded: " + latest_file)
     else:
         print(f"Could not find model on disk: {latest_file}")
         print("Creating new model...")

@@ -40,7 +40,7 @@ def sort_beats_by_time(song_ar: list):
                     new_map_ar.append(cur_map)
                     last_time = cur_time
                     timeline.append(cur_time)
-                else:   # time unchanged
+                else:  # time unchanged
                     # check if position changed
                     if pos_changed(new_map_ar[-1], cur_map):
                         # add notes to last beat
@@ -88,7 +88,7 @@ def pos_changed(last_map, cur_map):
 
 
 def cluster_notes_in_classes(notes_ar):
-    notes_flattened = [item for sublist in notes_ar for item in sublist]
+    # notes_flattened = [item for sublist in notes_ar for item in sublist]
     # create classify dictionary
     class_key = []
     idx = -1
@@ -119,6 +119,19 @@ def cluster_notes_in_classes(notes_ar):
 
 
 def encode_beat_ar(beat):
+
+    # Remove all double notes
+    if config.remove_double_notes:
+        if len(beat.shape) > 1:
+            new_beat = []
+            notes_done = []
+            for idx in range(len(beat)):
+                cur_note = beat[idx, 2]
+                if cur_note not in notes_done:
+                    new_beat.append(beat[idx])
+                    notes_done.append(cur_note)
+            beat = np.asarray(new_beat)
+
     beat = list(beat.reshape(-1))
     beat_f = ""
     for el in beat:

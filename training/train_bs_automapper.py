@@ -1,19 +1,20 @@
 import gc
+import numpy as np
 from datetime import datetime
-from tensorflow import keras
-from keras.optimizers import adam_v2
+# from tensorflow import keras
+from keras.optimizers import Adam
 from tabulate import tabulate
 
-from helpers import *
-from tensorflow_models import *
+from helpers import test_gpu_tf, ai_encode_song, load_keras_model, categorical_to_class
+from tensorflow_models import create_keras_model
 from preprocessing.bs_mapper_pre import load_ml_data, lstm_shift
 from tools.config import config, paths
 from lighting_prediction.train_lighting import lstm_shift_events_half
 
 
-# Check Cuda compatible GPU
-if not test_gpu_tf():
-    exit()
+# # Check Cuda compatible GPU
+# if not test_gpu_tf():
+#     exit()
 
 # Setup configuration
 #####################
@@ -89,9 +90,11 @@ mapper_model, save_model_name = load_keras_model(save_model_name)
 # create model
 if mapper_model is None:
     mapper_model = create_keras_model('lstm_half', dim_in, dim_out)
-    adam = adam_v2.Adam(learning_rate=learning_rate, decay=2*learning_rate / n_epochs)
+    adam = Adam(learning_rate=learning_rate, weight_decay=2*learning_rate / n_epochs)
     # mapper_model.compile(loss='mean_squared_error', optimizer=adam, metrics=['accuracy'])
     mapper_model.compile(loss='categorical_crossentropy', optimizer=adam, metrics=['accuracy'])
+
+mapper_model.summary()
 
 # Model training
 ################
@@ -101,34 +104,36 @@ training = mapper_model.fit(x=ds_train, y=out_class_train,
 
 # Evaluate model
 ################
-command_len = 10
-print("Validate model with test data...")
-validation = mapper_model.evaluate(x=ds_test, y=out_class_test)
-pred_result = mapper_model.predict(x=ds_test, verbose=0)
+try:
+    command_len = 10
+    print("Validate model with test data...")
+    validation = mapper_model.evaluate(x=ds_test, y=out_class_test)
+    pred_result = mapper_model.predict(x=ds_test, verbose=0)
 
-pred_class = categorical_to_class(pred_result)
-real_class = categorical_to_class(out_class_test)
+    pred_class = categorical_to_class(pred_result)
+    real_class = categorical_to_class(out_class_test)
 
-if test_samples % command_len == 0:
-    pred_class = pred_class.reshape(-1, command_len)
-    real_class = real_class.reshape(-1, command_len)
+    pred_class = pred_class.flatten().tolist()
+    real_class = real_class.flatten().tolist()
 
-print(tabulate([['Pred', pred_class], ['Real', real_class]],
-               headers=['Type', 'Result (test data)']))
+    print(tabulate([['Pred', pred_class], ['Real', real_class]], headers=['Type', 'Result (test data)']))
 
-print("Validate model with train data...")
-validation = mapper_model.evaluate(x=ds_train_sample, y=out_class_train[:test_samples])
+    print("Validate model with train data...")
+    validation = mapper_model.evaluate(x=ds_train_sample, y=out_class_train[:test_samples])
 
-pred_result = mapper_model.predict(x=ds_train_sample, verbose=0)
-pred_class = categorical_to_class(pred_result)
-real_class = categorical_to_class(out_class_train[:test_samples])
+    pred_result = mapper_model.predict(x=ds_train_sample, verbose=0)
+    pred_class = categorical_to_class(pred_result)
+    real_class = categorical_to_class(out_class_train[:test_samples])
 
-if test_samples % command_len == 0:
-    pred_class = pred_class.reshape(-1, command_len)
-    real_class = real_class.reshape(-1, command_len)
+    pred_class = pred_class.flatten().tolist()
+    real_class = real_class.flatten().tolist()
 
-print(tabulate([['Pred', pred_class], ['Real', real_class]],
-               headers=['Type', 'Result (train data)']))
+    print(tabulate([['Pred', pred_class], ['Real', real_class]], headers=['Type', 'Result (train data)']))
+
+except Exception as e:
+    print(f"Error: {type(e).__name__}")
+    print(f"Error message: {e}")
+    print("Error in displaying mapper evaluation. Continue with saving.")
 
 # Save Model
 ############

@@ -5,7 +5,7 @@ import random
 import pickle
 
 from datetime import datetime
-from keras.optimizers import adam_v2
+from keras.optimizers import Adam
 from sklearn.preprocessing import OneHotEncoder
 from tabulate import tabulate
 
@@ -17,7 +17,7 @@ from preprocessing.music_processing import run_music_preprocessing
 from tools.config import config, paths
 # from tools.utils import numpy_shorts
 
-from training.helpers import *
+from training.helpers import test_gpu_tf, filter_by_bps, ai_encode_song, categorical_to_class
 
 
 def lstm_shift_events_half(song_in, time_in, ml_out, lstm_len):
@@ -59,8 +59,8 @@ def lstm_shift_events(song_in, time_in, ml_out):
 
     for idx in range(start, n_samples):
         if ml_out is not None:
-            l_out_in.append(ml_out[idx-start:idx-1])
-        l_time_in.append(time_in[idx-start:idx-1])
+            l_out_in.append(ml_out[idx - start:idx - 1])
+        l_time_in.append(time_in[idx - start:idx - 1])
 
     l_time_in = np.asarray(l_time_in).reshape((-1, lstm_len, 1))
 
@@ -108,9 +108,9 @@ def get_time_from_events(events, diff=False):
 def start_training():
     # Setup configuration
     #####################
-    # Check Cuda compatible GPU
-    if not test_gpu_tf():
-        exit()
+    # # Check Cuda compatible GPU
+    # if not test_gpu_tf():
+    #     exit()
 
     # model name setup
     ##################
@@ -170,12 +170,12 @@ def start_training():
     # setup ML model
     ################
     model = create_tf_model('lstm_half', x_input_shape, y_out.shape)
-    adam = adam_v2.Adam(learning_rate=config.event_learning_rate,
-                        decay=config.event_learning_rate * 2 / config.event_n_epochs)
+    adam = Adam(learning_rate=config.event_learning_rate,
+                weight_decay=config.event_learning_rate * 2 / config.event_n_epochs)
     model.compile(loss='binary_crossentropy', optimizer=adam,
                   metrics=['accuracy'])
 
-    print(model.summary())
+    model.summary()
 
     model.fit(x=x_input, y=y_out, epochs=config.event_n_epochs, shuffle=True,
               batch_size=config.event_batch_size, verbose=1)
@@ -189,21 +189,26 @@ def start_training():
     ################
     test_samples = 10
     command_len = 10
-    x_test = [x[:test_samples] for x in x_input]
-    y_test = y_out[:test_samples]
-    print("Validate model...")
-    validation = model.evaluate(x=x_test, y=y_test)
-    pred_result = model.predict(x=x_test, verbose=0)
+    try:
+        x_test = [x[:test_samples] for x in x_input]
+        y_test = y_out[:test_samples]
+        print("Validate model...")
+        # validation = model.evaluate(x=x_test, y=y_test)
+        pred_result = model.predict(x=x_test, verbose=0)
 
-    pred_class = categorical_to_class(pred_result)
-    real_class = categorical_to_class(y_test)
+        pred_class = categorical_to_class(pred_result)
+        real_class = categorical_to_class(y_test)
 
-    if test_samples % command_len == 0:
-        pred_class = pred_class.reshape(-1, command_len)
-        real_class = real_class.reshape(-1, command_len)
+        pred_class = pred_class.flatten().tolist()
+        real_class = real_class.flatten().tolist()
 
-    print(tabulate([['Pred', pred_class], ['Real', real_class]],
-                   headers=['Type', 'Result (test data)']))
+        print(tabulate([['Pred', pred_class], ['Real', real_class]],
+                       headers=['Type', 'Result (test data)']))
+
+    except Exception as e:
+        print(f"Error: {type(e).__name__}")
+        print(f"Error message: {e}")
+        print("Error in displaying lighting evaluation. Continue.")
 
     print("Finished lighting generator training")
 

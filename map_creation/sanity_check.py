@@ -1083,7 +1083,8 @@ def unpslit_notes(notes_r, notes_l, notes_b):
             bomb_counter += int(len(notes_b[idx]) / 4)
 
         notes.append(temp)
-    print(f"Generating map with {note_counter} notes and {bomb_counter} bombs")
+    if config.verbose_level > 2:
+        print(f"Generating map with {note_counter} notes and {bomb_counter} bombs")
     return notes
 
 

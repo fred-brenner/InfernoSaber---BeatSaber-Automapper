@@ -6,7 +6,9 @@ import numpy as np
 # config file for all important values 
 # used in multiple codes
 ########################################
-InfernoSaber_version = "1.5.1"  # coded into the info.dat file
+InfernoSaber_version = "1.6.0"  # coded into the info.dat file
+bs_mapping_version = "v3"  # allows to generate advanced features like arcs
+# bs_mapping_version = "v2"  # legacy mode, may be deprecated in future
 
 
 """Do change"""
@@ -15,14 +17,14 @@ InfernoSaber_version = "1.5.1"  # coded into the info.dat file
 # use_mapper_selection = "general_new"
 # use_mapper_selection = "curated1"
 # use_mapper_selection = "curated2"
-use_mapper_selection = "pp1"
+use_mapper_selection = "pp2_15"
 use_mapper_selection = use_mapper_selection.lower()
 
 # Map creation model configuration
 max_speed = 4 * 7.5  # set around 5-40 (normal-expert++)
-add_beat_intensity = 90  # try to match bps by x% [80, 120]
+add_beat_intensity = 100  # try to match bps by x% [80, 120]
 gimme_more_notes_flag = True   # try to always use notes on both sides
-gimme_more_notes_prob = 0.35     # probability to activate [0.0-1.0]
+gimme_more_notes_prob = 0.30     # probability to activate [0.0-1.0]
 cdf = 1.2  # cut director factor (to calculate speed, [0.5, 1.5])
 cdf_lr = 1.15  # speed addition factor for left right movement
 expert_fact = 0.63  # expert plus to expert factor [0.6, 0.7]
@@ -89,6 +91,7 @@ waveform_pattern_length = 25   # pattern length in sampling rate [10-200]
 waveform_threshold = 4  # minimum number of notes applicable for waveform to start
 
 """Caution on changes"""
+verbose_level = 1       # verbose level from 0 (only ETA) to 5 (all messages)
 obstacle_crouch_width = 4
 obstacle_width = 1
 max_obstacle_height = 5     # <= 5
@@ -138,7 +141,7 @@ samplerate_music = 14800  # samplerate for the music import
 hop_size = 512
 window = 2.0  # window in seconds for each song to spectrum picture (from wav_to_pic)
 specgram_res = 24  # y resolution of the spectrogram (frequency subdivisions)
-ram_limit = 24      # free RAM in GB (unused currently)
+# ram_limit = 24      # free RAM in GB (unused currently)
 vram_limit = 20     # free VRAM in GB (needed for lighting training)
 
 use_bpm_selection = True   # use number of beats for selection of maps in training
@@ -165,6 +168,7 @@ map_n_epochs = 180  # number of total epochs
 map_batch_size = 128  # batch size
 map_test_samples = 10  # number of test files to plot (excluded from training)
 lstm_len = 16
+remove_double_notes = False
 
 # Beat prediction model configuration
 beat_learning_rate = 5e-4

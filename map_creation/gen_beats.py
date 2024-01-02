@@ -1,4 +1,6 @@
 import numpy as np
+import gc
+from keras import backend as K
 from PIL import Image
 # from line_profiler_pycharm import profile
 
@@ -101,6 +103,10 @@ def main(name_ar: list) -> bool:
     # apply beat generator
     y_beat = beat_model.predict(x_input, verbose=0)
 
+    K.clear_session()
+    gc.collect()
+    del beat_model
+
     y_beat[y_beat > config.thresh_beat] = 1
     y_beat[y_beat <= config.thresh_beat] = 0
 
@@ -144,7 +150,8 @@ def main(name_ar: list) -> bool:
             break
         map_times = fill_map_times_scale(map_times, scale_idx)
         scale_idx += 1
-    print(f"Map filler iterated {scale_idx}/{config.map_filler_iters} times.")
+    if config.verbose_level > 3:
+        print(f"Map filler iterated {scale_idx}/{config.map_filler_iters} times.")
     if config.add_silence_flag:
         # remove silent parts
         map_times = remove_silent_times(map_times, silent_times[0])
@@ -177,6 +184,10 @@ def main(name_ar: list) -> bool:
     y_class_map = generate(in_song_l, map_times, mapper_model, config.lstm_len,
                            paths.beats_classify_encoder_file)  # 45.2
 
+    K.clear_session()
+    gc.collect()
+    del mapper_model, enc_model
+
     ############
     # create map
     ############
@@ -191,13 +202,22 @@ def main(name_ar: list) -> bool:
         event_model = get_full_model_path(config.event_gen_version)
         events = generate(in_song_l, map_times, event_model, config.event_lstm_len,
                           paths.events_classify_encoder_file)  # 23.7 (47.0 -> 3.8)
+
+        K.clear_session()
+        gc.collect()
+        del event_model
     else:
         events = []
+    if config.bs_mapping_version != "v3":
+        print(f"Warning: Using old mapping version: {config.bs_mapping_version}")
+        from map_creation.map_creator_deprecated import create_map_depr
+        create_map_depr(y_class_map, map_times, events, name_ar[0], bpm,
+                        pitch_input[-1], pitch_times[-1])
+    else:
+        create_map(y_class_map, map_times, events, name_ar[0], bpm,
+                   pitch_input[-1], pitch_times[-1])
 
-    create_map(y_class_map, map_times, events, name_ar[0], bpm,
-               pitch_input[-1], pitch_times[-1])
-
-    return 0  # success
+    return False  # success
 
 
 if __name__ == '__main__':

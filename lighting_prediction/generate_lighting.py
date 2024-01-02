@@ -4,7 +4,6 @@
 # import pickle
 
 # from datetime import datetime
-# from keras.optimizers import adam_v2
 # from sklearn.preprocessing import OneHotEncoder
 
 # from lighting_prediction.tf_lighting import create_tf_model
