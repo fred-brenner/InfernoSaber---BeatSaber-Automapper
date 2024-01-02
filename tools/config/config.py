@@ -7,7 +7,7 @@ import numpy as np
 # used in multiple codes
 ########################################
 InfernoSaber_version = "1.6.0"  # coded into the info.dat file
-bs_mapping_version = "v3"  # allows to generate advanced features like arcs
+bs_mapping_version = "v2"  # allows to generate advanced features like arcs
 # bs_mapping_version = "v2"  # legacy mode, may be deprecated in future
 
 
