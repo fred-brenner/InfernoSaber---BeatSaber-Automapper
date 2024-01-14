@@ -6,6 +6,8 @@
 # !!! Always end with "/"
 ##########################################
 
+# /mnt/c/Users/frede/Desktop/BS_Automapper/InfernoSaber---BeatSaber-Automapper
+
 import os
 from tools.config import config
 
@@ -15,7 +17,7 @@ from tools.config import config
 dir_path = "C:/Users/frede/Desktop/BS_Automapper/Data/"
 
 bs_song_path = "E:/SteamLibrary/steamapps/common/Beat Saber/Beat Saber_Data/CustomLevels/"
-bs_input_path = r"C:\Users\frede\Desktop\BS_Automapper\Data\training\custom_bs_input"
+bs_input_path = "C:/Users/frede/Desktop/BS_Automapper/Data/training/custom_bs_input"
 
 ############################# (no need to change)
 # main workspace path
@@ -28,7 +30,13 @@ for i in range(0, max_tries):
     else:
         # found main folder
         break
-# dir_path = main_path + "model_data/Data/"
+
+# linux wsl2
+if main_path.startswith('/mnt/'):
+    dir_path = os.path.dirname(main_path) + '/Data/'
+    bs_input_path = os.path.join('/mnt/', bs_input_path.replace('C:', 'c'))
+    # import sys
+    # sys.path.append(main_path + '/tools/')
 
 # try Google Drive path
 if not os.path.isdir(dir_path):
@@ -37,6 +45,8 @@ if not os.path.isdir(dir_path):
 
 
 if not os.path.isfile(main_path + '/main.py'):
+    print(f"dir_path={dir_path}")
+    print(f"main_path={main_path}")
     print("Could not find root directory. Exit")
     exit()
 main_path += '/'

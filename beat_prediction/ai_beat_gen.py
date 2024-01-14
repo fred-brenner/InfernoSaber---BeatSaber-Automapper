@@ -5,6 +5,12 @@ from keras.optimizers import Adam
 from PIL import Image
 import matplotlib.pyplot as plt
 
+# Get the main script's directory
+import sys, os
+script_dir = os.path.dirname(os.path.realpath(__file__))
+parent_dir = os.path.abspath(os.path.join(script_dir, ".."))
+sys.path.append(parent_dir)
+
 from beat_prediction.find_beats import find_beats, get_pitch_times, samplerate_beats
 # from beat_prediction.beat_to_lstm import beat_to_lstm
 from beat_prediction.beat_prop import get_beat_prop, delete_offbeats

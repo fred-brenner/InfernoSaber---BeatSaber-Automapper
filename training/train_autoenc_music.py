@@ -8,6 +8,12 @@ from keras.models import Model
 from keras.optimizers import Adam
 from keras.layers import Input
 
+# Get the main script's directory
+import sys, os
+script_dir = os.path.dirname(os.path.realpath(__file__))
+parent_dir = os.path.abspath(os.path.join(script_dir, ".."))
+sys.path.append(parent_dir)
+
 from bs_shift.bps_find_songs import bps_find_songs
 from helpers import test_gpu_tf, filter_by_bps, load_keras_model
 from plot_model import run_plot_autoenc

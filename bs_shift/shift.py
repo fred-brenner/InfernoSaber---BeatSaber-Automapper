@@ -3,8 +3,14 @@ import json
 import os
 import shutil
 import sys
-
 from progressbar import ProgressBar
+
+# Get the main script's directory
+import sys, os
+script_dir = os.path.dirname(os.path.realpath(__file__))
+parent_dir = os.path.abspath(os.path.join(script_dir, ".."))
+sys.path.append(parent_dir)
+
 
 # sys.path.insert(1, os.path.join(sys.path[0], '..'))
 from tools.utils.str_compare import str_compare
