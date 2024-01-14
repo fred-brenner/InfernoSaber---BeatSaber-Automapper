@@ -106,7 +106,7 @@ def main_multi_par(n_workers: int, diff_list: list, export_results_to_bs=True):
                 uncombined_count = 0
             new_time_per_run = (time.time() - start_time) / processed_count
             time_per_run = (time_per_run*5 + new_time_per_run) / 6
-            print(f"### ETA: {(len(song_list) - processed_count) * time_per_run / 60:.1f} minutes. ###")
+            print(f"### ETA: {(len(song_list) - processed_count) * time_per_run / 60:.1f} minutes. Time per run: {time_per_run:.0f} s ###")
 
     song_list_run = combine_maps(song_list_files, song_list_run,
                                  diff_list, export_results_to_bs)
@@ -256,15 +256,15 @@ if __name__ == "__main__":
     # freeze_support()  # required for pyinstaller packaging
     diff_list = os.environ.get('diff_list')
     if diff_list is None:
-        # diff_list = [4, 5, 6, 7, 8]
-        diff_list = [1, 5, 10, 100, 1e4]
+        diff_list = [4, 5, 6, 7, 8]
+        # diff_list = [1, 5, 10, 100, 1e4]
     else:
         diff_list = json.loads(diff_list)
     # if len(diff_list) != 5:
     #     print(f"Warning: Did not get 5 difficulties: {diff_list}")
 
     config.create_expert_flag = False
-    export_results_to_bs = False
+    export_results_to_bs = True
     print(f"Using difficulties: {diff_list}")
 
     if paths.IN_COLAB:
@@ -275,7 +275,7 @@ if __name__ == "__main__":
         # main_multi(diff_list, True)
         # each worker needs ~5gb of ram memory (15gb / 3)
         # each worker needs ~4gb of gpu memory (11gb / 3)
-        n_workers = 4
+        n_workers = 10
         main_multi_par(n_workers, diff_list, export_results_to_bs)
 
 # C:\Users\frede\anaconda3\pkgs
