@@ -83,7 +83,7 @@ def main_multi_par(n_workers: int, diff_list: list, export_results_to_bs=True):
     processed_count = 0
     combine_map_interval = 5
     uncombined_count = 0
-    time_per_run = 10
+    time_per_run = 0.1
     song_list_run = []
 
     # Divide the song_list into chunks for each worker
