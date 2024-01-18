@@ -35,6 +35,7 @@ for i in range(0, max_tries):
 if main_path.startswith('/mnt/'):
     dir_path = os.path.dirname(main_path) + '/Data/'
     bs_input_path = os.path.join('/mnt/', bs_input_path.replace('C:', 'c'))
+    bs_song_path = os.path.join('/mnt/', bs_input_path.replace('E:', 'e'))
     # import sys
     # sys.path.append(main_path + '/tools/')
 

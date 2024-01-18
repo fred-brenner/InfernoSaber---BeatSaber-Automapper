@@ -61,10 +61,10 @@ def main_multi_par(n_workers: int, diff_list: list, export_results_to_bs=True):
     diff_list = np.sort(diff_list)
     diff_list *= 4
     print("Starting multi map generator.")
-    conf = tf.compat.v1.ConfigProto()
-    conf.gpu_options.allow_growth = True
-    sess = tf.compat.v1.Session(config=conf)
-    tf.compat.v1.keras.backend.set_session(sess)
+    # conf = tf.compat.v1.ConfigProto()
+    # conf.gpu_options.allow_growth = True
+    # sess = tf.compat.v1.Session(config=conf)
+    # tf.compat.v1.keras.backend.set_session(sess)
 
     # MAP GENERATOR
     ###############
@@ -83,7 +83,7 @@ def main_multi_par(n_workers: int, diff_list: list, export_results_to_bs=True):
     processed_count = 0
     combine_map_interval = 5
     uncombined_count = 0
-    time_per_run = 0.1
+    time_per_run = 5
     song_list_run = []
 
     # Divide the song_list into chunks for each worker
@@ -275,7 +275,7 @@ if __name__ == "__main__":
         # main_multi(diff_list, True)
         # each worker needs ~5gb of ram memory (15gb / 3)
         # each worker needs ~4gb of gpu memory (11gb / 3)
-        n_workers = 10
+        n_workers = 8
         main_multi_par(n_workers, diff_list, export_results_to_bs)
 
 # C:\Users\frede\anaconda3\pkgs
