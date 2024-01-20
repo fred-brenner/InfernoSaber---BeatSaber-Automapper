@@ -10,17 +10,25 @@ InfernoSaber_version = "1.6.0"  # coded into the info.dat file
 bs_mapping_version = "v3"  # allows to generate advanced features like arcs
 # bs_mapping_version = "v2"  # legacy mode, may be deprecated in future
 
-
 """Do change"""
 # select mapper style or leave empty for default
 # use_mapper_selection = ""   # use level author for selection of maps in training, deactivated if use_bpm_selection=True
 # use_mapper_selection = "general_new"
 # use_mapper_selection = "curated1"
 # use_mapper_selection = "curated2"
-# use_mapper_selection = "pp3_15"
-use_mapper_selection = "easy_15"
-use_mapper_selection = use_mapper_selection.lower()
 
+# use_mapper_selection = "pp3_15"
+# use_mapper_selection = "easy_15"
+use_mapper_selection = "hard_15"
+# use_mapper_selection = "expert_15"
+
+"""Change only for new training"""
+use_mapper_selection = use_mapper_selection.lower()
+use_bpm_selection = True   # use number of beats for selection of maps in training
+min_bps_limit = 7  # minimum beats_per_second value for training
+max_bps_limit = 12  # maximum beats_per_second value for training
+
+"""Change for application"""
 # Map creation model configuration
 max_speed = 4 * 7.5  # set around 5-40 (normal-expert++)
 add_beat_intensity = 100  # try to match bps by x% [80, 120]
@@ -134,9 +142,9 @@ add_beat_max_bounds = [0.1, 0.5, 0.8, 1.6]
 
 """Do not change unless you change the DNN models"""
 # Data Processing configuration
-training_songs_diff = 'Hard'
+training_songs_diff = 'ExpertPlus'
 allow_training_diff2 = True
-training_songs_diff2 = 'Expert'
+training_songs_diff2 = 'Expert'  # second try if first one is not available
 
 general_diff = 'ExpertPlus'
 exclude_requirements = False    # exclude all maps which have any kind of requirement noted
@@ -148,10 +156,6 @@ window = 2.0  # window in seconds for each song to spectrum picture (from wav_to
 specgram_res = 24  # y resolution of the spectrogram (frequency subdivisions)
 # ram_limit = 24      # free RAM in GB (unused currently)
 vram_limit = 20     # free VRAM in GB (needed for lighting training)
-
-use_bpm_selection = True   # use number of beats for selection of maps in training
-min_bps_limit = 2  # minimum beats_per_second value for training
-max_bps_limit = 5  # maximum beats_per_second value for training
 
 # Model versions
 enc_version = 'tf_model_enc_'
