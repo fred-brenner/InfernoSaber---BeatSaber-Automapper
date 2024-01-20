@@ -17,7 +17,7 @@ from tools.config import config
 dir_path = "C:/Users/frede/Desktop/BS_Automapper/Data/"
 
 bs_song_path = "E:/SteamLibrary/steamapps/common/Beat Saber/Beat Saber_Data/CustomLevels/"
-bs_input_path = "C:/Users/frede/Desktop/BS_Automapper/Data/training/custom_bs_input"
+bs_input_path = "C:/Users/frede/Desktop/BS_Automapper/Data/training/custom_bs_input/"
 
 ############################# (no need to change)
 # main workspace path
@@ -34,8 +34,8 @@ for i in range(0, max_tries):
 # linux wsl2
 if main_path.startswith('/mnt/'):
     dir_path = os.path.dirname(main_path) + '/Data/'
-    bs_input_path = os.path.join('/mnt/', bs_input_path.replace('C:', 'c'))
-    bs_song_path = os.path.join('/mnt/', bs_input_path.replace('E:', 'e'))
+    bs_input_path = os.path.join('/mnt/', bs_input_path)
+    bs_song_path = os.path.join('/mnt/', bs_song_path)
     # import sys
     # sys.path.append(main_path + '/tools/')
 

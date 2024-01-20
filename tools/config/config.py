@@ -17,7 +17,8 @@ bs_mapping_version = "v3"  # allows to generate advanced features like arcs
 # use_mapper_selection = "general_new"
 # use_mapper_selection = "curated1"
 # use_mapper_selection = "curated2"
-use_mapper_selection = "pp3_15"
+# use_mapper_selection = "pp3_15"
+use_mapper_selection = "easy_15"
 use_mapper_selection = use_mapper_selection.lower()
 
 # Map creation model configuration
@@ -145,8 +146,8 @@ specgram_res = 24  # y resolution of the spectrogram (frequency subdivisions)
 vram_limit = 20     # free VRAM in GB (needed for lighting training)
 
 use_bpm_selection = True   # use number of beats for selection of maps in training
-min_bps_limit = 3  # minimum beats_per_second value for training
-max_bps_limit = 20  # maximum beats_per_second value for training
+min_bps_limit = 2  # minimum beats_per_second value for training
+max_bps_limit = 5  # maximum beats_per_second value for training
 
 # Model versions
 enc_version = 'tf_model_enc_'
