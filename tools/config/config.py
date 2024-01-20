@@ -134,6 +134,10 @@ add_beat_max_bounds = [0.1, 0.5, 0.8, 1.6]
 
 """Do not change unless you change the DNN models"""
 # Data Processing configuration
+training_songs_diff = 'Hard'
+allow_training_diff2 = True
+training_songs_diff2 = 'Expert'
+
 general_diff = 'ExpertPlus'
 exclude_requirements = False    # exclude all maps which have any kind of requirement noted
 random_seed = 3
@@ -162,6 +166,7 @@ n_epochs = 50  # number of total epochs
 batch_size = 128  # batch size
 test_samples = 10  # number of test files to plot (excluded from training)
 bottleneck_len = 16  # size of bottleneck distribution (1D array)
+autoenc_song_limit = 120    # maximum number of songs used for training, to not overload RAM
 
 # Mapper model configuration
 map_learning_rate = 4e-4  # model learning rate
@@ -170,6 +175,7 @@ map_batch_size = 128  # batch size
 map_test_samples = 10  # number of test files to plot (excluded from training)
 lstm_len = 16
 remove_double_notes = False
+mapper_song_limit = 240    # maximum number of songs used for training, to not overload RAM
 
 # Beat prediction model configuration
 beat_learning_rate = 5e-4
@@ -179,12 +185,14 @@ tcn_len = 24
 tcn_test_samples = 350
 delete_offbeats = 0.6  # < 1 delete non-beats to free ram
 # tcn_skip = 10
+beat_song_limit = 240    # maximum number of songs used for training, to not overload RAM
 
 # Event prediction model configuration
 event_learning_rate = 1e-3
 event_n_epochs = 180
 event_lstm_len = 16
 event_batch_size = 128
+# event_song_limit covered by vram_limit
 
 # needed for reset
 max_speed_orig = max_speed

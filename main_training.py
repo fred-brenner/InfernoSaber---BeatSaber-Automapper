@@ -46,7 +46,6 @@ if run_list[0].lower() == 'y':
     print(f"Analyzing BS music files from folder: {paths.bs_input_path}")
     subprocess.call(['python3', './bs_shift/shift.py'])
 
-# you can skip this step
 # run training / train_autoenc_music.py
 # os.system("training/train_autoenc_music.py")
 if run_list[1].lower() == 'y':

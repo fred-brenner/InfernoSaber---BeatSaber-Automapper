@@ -64,10 +64,11 @@ def delete_old_files():
         os.remove(copy_path_map + de)
 
 
-def shift_bs_songs(allow_diff2=False):
+def shift_bs_songs():
     # difficulty setup
-    diff = "ExpertPlus"
-    diff2 = "Expert"
+    diff = config.training_songs_diff
+    allow_diff2 = config.allow_training_diff2  # TODO: check implementation
+    diff2 = config.training_songs_diff2
 
     # variables setup
     num_cur = 0
@@ -87,8 +88,8 @@ def shift_bs_songs(allow_diff2=False):
         if excl_true:
             continue
 
-        exp_plus_name = "ExpertPlus.dat"
-        exp_name = "Expert.dat"
+        exp_plus_name = f"{diff}.dat"
+        exp_name = f"{diff2}.dat"
         for file in files:
             # get only ExpertPlus (or Expert for allow_diff2 == True)
             # if file.endswith(diff + ".dat") or (allow_diff2 and not both and file.endswith(diff2 + ".dat")):
@@ -190,7 +191,7 @@ def shift_bs_songs(allow_diff2=False):
 if __name__ == '__main__':
     delete_old_files()
 
-    shift_bs_songs(allow_diff2=False)
+    shift_bs_songs()
 
     # Start casting to dictionary (notes, events, etc)
     map_to_dict_all()

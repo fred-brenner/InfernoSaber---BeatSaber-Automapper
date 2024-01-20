@@ -21,6 +21,7 @@ from tensorflow_models import create_keras_model
 from preprocessing.music_processing import run_music_preprocessing
 from tools.config import config, paths
 from tools.fail_list.black_list import delete_fails
+from tools.utils.numpy_shorts import reduce_number_of_songs
 
 # # Check Cuda compatible GPU
 # if not test_gpu_tf():
@@ -42,7 +43,9 @@ np.random.seed(3)
 ####################
 # get name array
 name_ar, _ = filter_by_bps(min_bps_limit, max_bps_limit)
-# print(f"Importing {len(name_ar)} songs")
+
+# Reduce amount of songs
+name_ar = reduce_number_of_songs(name_ar, hard_limit=config.autoenc_song_limit)
 
 # load song input
 i = 0
