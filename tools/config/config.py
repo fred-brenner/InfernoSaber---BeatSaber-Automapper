@@ -12,7 +12,7 @@ bs_mapping_version = "v3"  # allows to generate advanced features like arcs
 
 """Do change"""
 # select mapper style or leave empty for default
-# use_mapper_selection = ""   # use level author for selection of maps in training, deactivated if use_bpm_selection=True
+# use_mapper_selection = ""   # use level author for selection of maps in training, deactivated if use_bpm_selection
 # use_mapper_selection = "general_new"
 # use_mapper_selection = "curated1"
 # use_mapper_selection = "curated2"
@@ -30,7 +30,7 @@ max_bps_limit = 12  # maximum beats_per_second value for training
 
 """Change for application"""
 # Map creation model configuration
-max_speed = 4 * 7.5  # set around 5-40 (normal-expert++)
+max_speed = 4 * 6.5  # set around 5-40 (normal-expert++)
 add_beat_intensity = 100  # try to match bps by x% [80, 120]
 gimme_more_notes_flag = True   # try to always use notes on both sides
 gimme_more_notes_prob = 0.30     # probability to activate [0.0-1.0]
