@@ -5,7 +5,7 @@
 
 import os
 import numpy as np
-from progressbar import ProgressBar
+# from progressbar import ProgressBar
 
 from tools.config import paths
 from tools.utils.index_find_str import return_find_str
@@ -65,13 +65,13 @@ def map_to_dict_all():
     print("\nStart casting to dictionary")
     num_cur = 0
     num_all = len(os.listdir(paths.copy_path_map)) + 1
-    bar = ProgressBar(max_value=num_all)
+    # bar = ProgressBar(max_value=num_all)
     title_list = os.listdir(paths.copy_path_map)
     title_list.reverse()
     for title in title_list:
         print(title)
         num_cur += 1
-        bar.update(num_cur)
+        # bar.update(num_cur)
         if title.endswith("_info.dat"):
             with open(paths.copy_path_map + title, 'r') as f:
                 for line in f:

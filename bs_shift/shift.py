@@ -3,7 +3,7 @@ import json
 import os
 import shutil
 import sys
-from progressbar import ProgressBar
+# from progressbar import ProgressBar
 
 # Get the main script's directory
 import sys, os
@@ -22,8 +22,8 @@ from tools.config import paths, config
 # import exclusion names
 from tools.config import exclusion
 
-from bps_find_songs import bps_find_songs
-from map_to_dict_all import map_to_dict_all
+from bs_shift.bps_find_songs import bps_find_songs
+from bs_shift.map_to_dict_all import map_to_dict_all
 
 # paths
 copy_path_map = paths.copy_path_map
@@ -72,13 +72,15 @@ def shift_bs_songs():
 
     # variables setup
     num_cur = 0
-    num_all = len(os.listdir(paths.bs_input_path)) + 1
-    print("Check songs - may take a while")
+    num_all = len(os.listdir(paths.bs_input_path))
+    print(f"Check {num_all} songs - may take a while")
     count = 0
     song_name_list = []
     song_name = None
 
-    bar = ProgressBar(max_value=num_all)
+    # bar = ProgressBar(max_value=num_all+1)
+    exp_plus_name = f"{diff}.dat"
+    exp_name = f"{diff2}.dat"
 
     # walk through bs directory
     for root, dirs, files in os.walk(paths.bs_input_path):
@@ -88,12 +90,10 @@ def shift_bs_songs():
         if excl_true:
             continue
 
-        exp_plus_name = f"{diff}.dat"
-        exp_name = f"{diff2}.dat"
         for file in files:
             # get only ExpertPlus (or Expert for allow_diff2 == True)
             # if file.endswith(diff + ".dat") or (allow_diff2 and not both and file.endswith(diff2 + ".dat")):
-            if file == exp_plus_name or (allow_diff2 and not both and file == exp_name):
+            if (allow_diff2 and not both) and file == exp_plus_name or (allow_diff2 and not both and file == exp_name):
                 both = True
                 # print(os.path.join(root, file))
                 # print(files)
@@ -104,7 +104,7 @@ def shift_bs_songs():
                     for n_file in files:
                         if n_file.lower() == "info.dat":
                             num_cur += 1
-                            bar.update(num_cur)
+                            # bar.update(num_cur)
                             # import dat file
                             dat_content = read_dat_file(os.path.join(root, n_file))
 
@@ -176,10 +176,10 @@ def shift_bs_songs():
                     exit()
 
                 if len(os.listdir(copy_path_map)) / 2 != count:
-                    print("Count {} vs directory: {}".format(count, len(os.listdir(copy_path_map)) / 2))
+                    print(f"Count {count} maps vs directory: {len(os.listdir(copy_path_map)) / 2}")
                     exit()
                 if len(os.listdir(copy_path_song)) != count:
-                    print("Count {} vs directory: {}".format(count, len(os.listdir(copy_path_song))))
+                    print(f"Count {count} songs vs directory: {len(os.listdir(copy_path_song))}")
                     exit()
 
     print("\nFinished Shift from BS directory to project")

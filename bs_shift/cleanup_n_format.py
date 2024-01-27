@@ -17,7 +17,7 @@ def read_json_content_file(file_path: str, filename="") -> list[str]:
     return dat_content
 
 
-def get_difficulty_file_names(info_file_path: str) -> (str, str):
+def get_difficulty_file_names(info_file_path: str) -> dict:
     # import dat file
     dat_content = read_json_content_file(info_file_path)
 
@@ -32,22 +32,14 @@ def get_difficulty_file_names(info_file_path: str) -> (str, str):
         beatmap_dict = beatmap_set_dict[i]
 
     beatmap_dict = beatmap_dict['_difficultyBeatmaps']
-    i = -1
-    expert_plus_dict = beatmap_dict[i]
-    expert_plus_name = expert_plus_dict['_beatmapFilename']
+    diff_file_names = {}
+    for diff_dict in beatmap_dict:
+        diff_file_names[diff_dict['_difficulty']] = diff_dict['_beatmapFilename']
+    return diff_file_names
 
-    # if len(beatmap_dict) > 1:
-    #     while 'lightshow' in expert_plus_name.lower():
-    #         i -= 1
-    #         print(f"Skipped beatmap due to lightshow name: {expert_plus_name}")
-    #         if abs(i) > len(beatmap_dict):
-    #             print(f"Error: Could not find beatmap for song: {info_file_path}"
-    #                   "\nDelete manually and restart!")
-    #             exit()
-    #         expert_plus_dict = beatmap_dict[i]
-    #         expert_plus_name = expert_plus_dict['_beatmapFilename']
-
-    return expert_plus_name
+    # expert_plus_dict = beatmap_dict[-1]
+    # expert_plus_name = expert_plus_dict['_beatmapFilename']
+    # return expert_plus_name
 
 
 def check_info_name(bs_song_path):
@@ -61,19 +53,29 @@ def check_info_name(bs_song_path):
 
 
 def check_beatmap_name(bs_song_path):
-    expected_name = "ExpertPlus.dat"
+    expected_name = "ExpertPlus.dat"        # TODO: use naming from info file and do all diffs
     for root, dirs, files in os.walk(bs_song_path):
 
-        if len(files) > 2:
-            exp_plus_name = get_difficulty_file_names(f"{root}/info.dat")
-        else:
+        if len(files) <= 2:
             continue
-        if exp_plus_name != expected_name:
-            src_path = os.path.join(root, exp_plus_name)
-            if os.path.isfile(src_path):
-                dst_path = os.path.join(root, expected_name)
-                os.rename(src_path, dst_path)
-            # else: already renamed
+        diff_file_names = get_difficulty_file_names(f"{root}/info.dat")
+        for key, file_name in diff_file_names.items():
+            src_path = os.path.join(root, file_name)
+            if not os.path.isfile(src_path):
+                # print(f"Error: Missing map file: {src_path}. Skipping")
+                continue
+            dst_path = os.path.join(root, f"{key}.dat")
+            os.rename(src_path, dst_path)
+
+        # exp_plus_name = get_difficulty_file_names(f"{root}/info.dat")
+        # else:
+        #     continue
+        # if exp_plus_name != expected_name:
+        #     src_path = os.path.join(root, exp_plus_name)
+        #     if os.path.isfile(src_path):
+        #         dst_path = os.path.join(root, expected_name)
+        #         os.rename(src_path, dst_path)
+        #     # else: already renamed
 
 
 def check_info_content(bs_song_path):
@@ -81,7 +83,7 @@ def check_info_content(bs_song_path):
     for folders in os.listdir(bs_song_path):
         info_file = os.path.join(bs_song_path, folders, expected_name)
         if os.path.isfile(info_file):
-            # read ExpertPlus beatmap
+            # pretty print / overwrite info data to allow line search
             dat_content = read_json_content_file(info_file)
             with open(info_file, "w") as f:
                 json.dump(dat_content, f, indent=9)
@@ -90,7 +92,7 @@ def check_info_content(bs_song_path):
 def clean_songs():
     bs_song_path = paths.bs_input_path
     print("Warning: This script is not fully tested and might break some song files.\n"
-          "Do not use on your original beatsaber folder!")
+          "Do not use on your original beat saber folder!")
     print(f"Cleanup folder: {bs_song_path}")
     input("Continue with Enter")
 
