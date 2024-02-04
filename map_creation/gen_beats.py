@@ -28,7 +28,7 @@ from tools.config.mapper_selection import get_full_model_path
 
 
 # @profile
-def main(name_ar: list) -> bool:
+def main(name_ar: list, debug_beats=False) -> bool:
     if len(name_ar) > 1:
         print("Multi-core song generation currently not implemented!")
         exit()
@@ -56,6 +56,8 @@ def main(name_ar: list) -> bool:
             config.add_beat_intensity -= 5
         else:
             config.add_beat_intensity = config.add_beat_intensity_orig - 5
+
+    # print(f"Beat intensity: {config.add_beat_intensity}")
 
     # load song data
     song_input, pitch_input = find_beats(name_ar, train_data=False)
@@ -155,6 +157,9 @@ def main(name_ar: list) -> bool:
     if config.add_silence_flag:
         # remove silent parts
         map_times = remove_silent_times(map_times, silent_times[0])
+
+    if debug_beats:
+        return map_times
     # compensate for lstm cutoff
     map_times = add_lstm_prerun(map_times)
 
@@ -208,6 +213,7 @@ def main(name_ar: list) -> bool:
         del event_model
     else:
         events = []
+
     if config.bs_mapping_version != "v3":
         print(f"Warning: Using old mapping version: {config.bs_mapping_version}")
         from map_creation.map_creator_deprecated import create_map_depr

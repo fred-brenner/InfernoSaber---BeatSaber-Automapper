@@ -3,14 +3,14 @@ import matplotlib.pyplot as plt
 import os
 
 from preprocessing.bs_mapper_pre import load_beat_data
-from find_beats import find_beats
+from beat_prediction.find_beats import find_beats
 from tools.config import paths
 
 
 def plot_beat_vs_real(beat_pred, beat_real):
     plt.figure()
     plt.vlines(beat_pred, 0, 1, colors='k', linestyles='solid', linewidth=0.2)
-    plt.scatter(beat_real, [0.5] * len(real_beats[idx]))
+    plt.scatter(beat_real, [0.5] * len(beat_real))
     plt.show()
 
 
