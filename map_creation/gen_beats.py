@@ -124,10 +124,12 @@ def main(name_ar: list, debug_beats=False) -> bool:
     timing_ar = timing_ar[timing_ar > config.window]
     # add beats between far beats
     if config.max_speed >= 5.5 * 4:
-        fill_map_times_scale(timing_ar, scale_index=int(config.map_filler_iters / 2) + 1)
+        timing_ar = fill_map_times_scale(timing_ar, scale_index=int(config.map_filler_iters / 2) + 1)
     if config.max_speed >= 8 * 4:
-        fill_map_times_scale(timing_ar, scale_index=int(config.map_filler_iters - 1))
-    time_input = [timing_ar]
+        timing_ar = fill_map_times_scale(timing_ar, scale_index=int(config.map_filler_iters - 1))
+    # time_input = [timing_ar]
+
+    # return timing_ar
 
     # calculate bpm
     file = paths.songs_pred + name_ar[0] + '.egg'

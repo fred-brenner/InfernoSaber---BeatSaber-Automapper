@@ -81,7 +81,7 @@ def sanity_check_notes(notes: list, timings: list):
 
 def sanity_check_beat(beat):
     beat = beat.reshape(len(beat))
-    beat_counts = beat.sum()
+    # beat_counts = beat.sum()
     min_count = config.beat_spacing * config.min_beat_time
     min_count = int(np.round(min_count, 0))
 

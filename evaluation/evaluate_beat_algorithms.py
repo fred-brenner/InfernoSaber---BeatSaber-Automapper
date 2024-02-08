@@ -89,14 +89,18 @@ real_beats = real_beats[0]
 
 # Set tuning parameters
 #######################
-bool_options = [True, False]
-float_1_options = np.arange(60, 120, 10).tolist()
+bool_options = [True]
+# float_1_options = np.arange(60, 120, 10).tolist()
+float_1_options = [0.22]
 # float_2_options = np.arange(0, 0.51, 0.03).tolist()
-float_2_options = [0.2, 0.4]
+float_2_options = [0.4]
 # float_3_options = np.arange(0.15, 0.81, 0.05).tolist()
-float_3_options = [0.3, 0.4]
+float_3_options = [0.4, 0.7, 1]
+float_4_options = [0.3, 0.45, 0.6]
+float_5_options = [1]
+float_6_options = [None]
 # int_1_options = list(range(1, 50))
-int_1_options = [8, 12]
+int_1_options = [None]
 
 # Set Tuning function
 #####################
@@ -104,7 +108,16 @@ int_1_options = [8, 12]
 best_accuracy = 0.0
 best_parameters = None
 
-# TODO: add ETA
+total_iterations = len(bool_options)
+total_iterations *= len(float_1_options)
+total_iterations *= len(float_2_options)
+total_iterations *= len(float_3_options)
+total_iterations *= len(float_4_options)
+total_iterations *= len(float_5_options)
+total_iterations *= len(float_6_options)
+total_iterations *= len(int_1_options)
+
+iteration = 0
 
 # Run analysis
 ##############
@@ -112,40 +125,55 @@ for (bool_1,
      float_1,
      float_2,
      float_3,
+     float_4,
+     float_5,
+     float_6,
      int_1) in product(bool_options,
                        float_1_options,
                        float_2_options,
                        float_3_options,
+                       float_4_options,
+                       float_5_options,
+                       float_6_options,
                        int_1_options):
-    print(float_1)
+    iteration += 1
+    print(f"Iteration {iteration} of {total_iterations}")
     # overwrite parameters
     config.add_silence_flag = bool_1
-    config.add_beat_intensity_orig = float_1
-    config.silence_threshold_orig = float_2
-    config.thresh_beat = float_3
-    config.map_filler_iters = int_1
+    config.add_beat_intensity_orig = 50
+    config.silence_threshold_orig = float_1
+    config.thresh_beat = float_2
+    # config.map_filler_iters = int_1
+    config.thresh_pitch = float_3
+    config.factor_pitch_certainty = float_4
+    config.factor_pitch_meanmax = float_5
 
     # Call your beat algorithm with the current parameter values and calculate accuracy
     beats_algo = gen_beats_main(name_ar, debug_beats=True)
     # Calculate accuracy
     precision, recall, f_measure = calculate_beat_accuracy(beats_algo, real_beats, tolerance)
-    accuracy = (precision + recall) / 2
+    # accuracy = (precision + recall) / 2
+    accuracy = f_measure
 
     # Update the best parameters if the current combination performs better
-    if accuracy > best_accuracy:
+    parameters = (bool_1, float_1, float_2, float_3, float_4, float_5, float_6, int_1)
+    if accuracy >= best_accuracy:
         best_accuracy = accuracy
-        best_parameters = (bool_1, float_1, float_2, float_3, int_1)
-
-    print("Current Accuracy:", accuracy)
+        best_parameters = parameters
+        print("Current Parameters:", best_parameters)
+        print("Current Accuracy:", best_accuracy)
+    else:
+        print("Bad Parameters:", parameters)
 
 print("Best Parameters:", best_parameters)
 print("Best Accuracy:", best_accuracy)
 
-# # Compare results
-# #################
-# precision, recall, f_measure = calculate_beat_accuracy(beats_algo, real_beats, tolerance=tolerance)
-# print("Precision: ", precision)
-# print("Recall: ", recall)
-# print("F-measure: ", f_measure)
-#
-# plot_beat_vs_real(beats_algo, real_beats)
+if False:
+    # Compare results
+    #################
+    precision, recall, f_measure = calculate_beat_accuracy(beats_algo, real_beats, tolerance=tolerance)
+    print("Precision: ", precision)
+    print("Recall: ", recall)
+    print("F-measure: ", f_measure)
+
+    plot_beat_vs_real(beats_algo, real_beats)
