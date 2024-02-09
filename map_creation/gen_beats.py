@@ -131,17 +131,18 @@ def main(name_ar: list, debug_beats=False) -> bool:
 
     # return timing_ar
 
-    # calculate bpm
-    file = paths.songs_pred + name_ar[0] + '.egg'
-    bpm, song_duration = get_file_bpm(file)  # 1.6
-    # average bpm for songs to make more similar (jump) speeds
-    if config.use_fixed_bpm is None:
-        bpm = int((bpm + 120) / 2)
-    else:
-        bpm = config.use_fixed_bpm
+    # # calculate bpm
+    # file = paths.songs_pred + name_ar[0] + '.egg'
+    # bpm, song_duration = get_file_bpm(file)  # 1.6
+    # # average bpm for songs to make more similar (jump) speeds
+    # if config.use_fixed_bpm is None:
+    #     bpm = int((bpm + 120) / 2)
+    # else:
+    bpm = config.use_fixed_bpm
 
     # sanity check timings
-    map_times, pitch_algo = sanity_check_timing(name_ar[0], timing_ar, song_duration)  # 3.9
+    # map_times, pitch_algo = sanity_check_timing(name_ar[0], timing_ar, song_duration)  # 3.9
+    map_times = sanity_check_timing2(name_ar[0], timing_ar)
     map_times = map_times[map_times > 0]
     if len(map_times) < 3 * config.lstm_len:
         print(f"Could not match enough beats for song {name_ar[0]}")

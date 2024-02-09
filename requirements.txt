@@ -1,4 +1,4 @@
-scipy~=1.11.4
+scipy~=1.12.0
 numpy~=1.26.2
 tensorflow~=2.15.0
 pydub~=0.25.1
@@ -11,3 +11,4 @@ matplotlib~=3.8.2
 keras~=2.15.0
 keras-tcn~=3.5
 progressbar2~=4.3.2
+librosa~=0.10.1

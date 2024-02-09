@@ -34,7 +34,7 @@ from map_creation.gen_beats import main as gen_beats_main
 
 
 # allowed time difference in seconds
-tolerance = 0.05
+tolerance = 0.02
 
 
 def calculate_beat_accuracy(beat_pred, beat_real, tolerance=0.05):
@@ -62,6 +62,7 @@ def calculate_beat_accuracy(beat_pred, beat_real, tolerance=0.05):
     return precision, recall, f_measure
 
 
+# if True:
 if False:
     # Shift stuff
     #############
@@ -91,13 +92,14 @@ real_beats = real_beats[0]
 #######################
 bool_options = [True]
 # float_1_options = np.arange(60, 120, 10).tolist()
+# float_1_options = np.arange(0, 0.9, 0.1).tolist()
 float_1_options = [0.22]
 # float_2_options = np.arange(0, 0.51, 0.03).tolist()
-float_2_options = [0.4]
+float_2_options = [0.1]
 # float_3_options = np.arange(0.15, 0.81, 0.05).tolist()
-float_3_options = [0.4, 0.7, 1]
-float_4_options = [0.3, 0.45, 0.6]
-float_5_options = [1]
+float_3_options = [0.3]
+float_4_options = [2]
+float_5_options = [3]
 float_6_options = [None]
 # int_1_options = list(range(1, 50))
 int_1_options = [None]
@@ -143,7 +145,7 @@ for (bool_1,
     config.add_beat_intensity_orig = 50
     config.silence_threshold_orig = float_1
     config.thresh_beat = float_2
-    # config.map_filler_iters = int_1
+    config.map_filler_iters = 0
     config.thresh_pitch = float_3
     config.factor_pitch_certainty = float_4
     config.factor_pitch_meanmax = float_5
@@ -157,18 +159,18 @@ for (bool_1,
 
     # Update the best parameters if the current combination performs better
     parameters = (bool_1, float_1, float_2, float_3, float_4, float_5, float_6, int_1)
+    print(f"Current Accuracy: {accuracy}, Precision: {precision}, Recall: {recall}")
     if accuracy >= best_accuracy:
         best_accuracy = accuracy
         best_parameters = parameters
-        print("Current Parameters:", best_parameters)
-        print("Current Accuracy:", best_accuracy)
+        print("New best Parameters:", best_parameters)
     else:
         print("Bad Parameters:", parameters)
 
 print("Best Parameters:", best_parameters)
 print("Best Accuracy:", best_accuracy)
 
-if False:
+if total_iterations == 1:
     # Compare results
     #################
     precision, recall, f_measure = calculate_beat_accuracy(beats_algo, real_beats, tolerance=tolerance)

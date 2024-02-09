@@ -19,8 +19,8 @@ bs_mapping_version = "v3"  # allows to generate advanced features like arcs
 
 # use_mapper_selection = "pp3_15"
 # use_mapper_selection = "easy_15"
-use_mapper_selection = "hard_15"
-# use_mapper_selection = "expert_15"
+# use_mapper_selection = "hard_15"
+use_mapper_selection = "expert_15"
 
 """Change only for new training"""
 use_mapper_selection = use_mapper_selection.lower()
