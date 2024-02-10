@@ -15,6 +15,7 @@ from map_creation.find_bpm import get_file_bpm
 
 from preprocessing.music_processing import run_music_preprocessing
 from preprocessing.bs_mapper_pre import calc_time_between_beats
+from tools.utils.numpy_shorts import get_factor_from_max_speed
 # from preprocessing.bs_mapper_pre import lstm_shift
 
 from training.helpers import *
@@ -56,6 +57,11 @@ def main(name_ar: list, debug_beats=False) -> bool:
             config.add_beat_intensity -= 5
         else:
             config.add_beat_intensity = config.add_beat_intensity_orig - 5
+
+    factor = get_factor_from_max_speed(config.max_speed, 1.5, 0.5)
+    config.thresh_beat = config.thresh_beat_orig * factor
+    factor = get_factor_from_max_speed(config.max_speed, 1.3, 0.1)
+    config.thresh_onbeat = config.thresh_onbeat_orig * factor
 
     # print(f"Beat intensity: {config.add_beat_intensity}")
 

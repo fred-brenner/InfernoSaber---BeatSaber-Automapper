@@ -23,3 +23,17 @@ def reduce_number_of_songs(name_ar, hard_limit=50):
         name_ar = name_ar[:hard_limit]
     print(f"Importing {len(name_ar)} songs")
     return name_ar
+
+
+def get_factor_from_max_speed(max_speed, lb=0.5, ub=1.5):
+    max_speed = max_speed/4
+    ls = 0
+    us = 10
+
+    if max_speed <= ls:
+        return lb
+    elif max_speed >= us:
+        return ub
+    else:
+        factor = lb + (ub - lb) * (max_speed / us)
+        return factor

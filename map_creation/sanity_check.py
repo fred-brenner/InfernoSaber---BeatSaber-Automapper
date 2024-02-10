@@ -10,6 +10,7 @@ import librosa
 from scipy.signal import savgol_filter
 
 from tools.config import config, paths
+from tools.utils.numpy_shorts import get_factor_from_max_speed
 
 
 def sanity_check_notes(notes: list, timings: list):
@@ -105,8 +106,13 @@ def sanity_check_beat(beat):
 
 def sanity_check_timing2(name, timings):
     samplerate_music = 44100
-    peak_offset = 0.1
-    wait = 5
+    factor = config.thresh_onbeat / config.thresh_onbeat_orig
+    pre_max = int(4 * factor)
+    post_max = int(4 * factor)
+    pre_avg = int(6 * factor)
+    post_avg = int(7 * factor)
+    delta = config.thresh_onbeat
+    wait = int(8 * factor)
     max_time_diff = 1.0
 
     file = paths.songs_pred + name + ".egg"
@@ -118,8 +124,8 @@ def sanity_check_timing2(name, timings):
 
     # Detect onsets using amplitude thresholding
     onsets = librosa.onset.onset_detect(onset_envelope=onset_env, sr=sr, hop_length=512,
-                                        backtrack=False, pre_max=3, post_max=3,
-                                        pre_avg=4, post_avg=5, delta=peak_offset, wait=wait)
+                                        backtrack=False, pre_max=pre_max, post_max=post_max,
+                                        pre_avg=pre_avg, post_avg=post_avg, delta=delta, wait=wait)
 
     # Convert frame indices to time (in seconds)
     onsets_sec = librosa.frames_to_time(onsets, sr=sr, hop_length=512)
@@ -410,7 +416,7 @@ def emphasize_beats(notes, timings, notes_second):
         return notes
 
     for n in range(start_end_idx, len(notes)):
-        if timings[n:n + 1].max() >= emphasize_beats_wait:
+        if timings[n:n + 1].max() >= emphasize_beats_wait:  # TODO: maybe increase timing window to before+after
             note = notes[n]
             if len(note) > 0:
                 rd = np.random.random()
@@ -935,6 +941,10 @@ def correct_notes(notes, timings):
                 mx_speed = config.max_speed * decrease_val
             else:
                 mx_speed = config.max_speed
+
+            factor = get_factor_from_max_speed(mx_speed, 0.5, 1)
+            mx_speed *= factor
+
             if speed > mx_speed:
                 # remove notes at this point
                 rm_counter += int(len(notes[idx]) / 4)
