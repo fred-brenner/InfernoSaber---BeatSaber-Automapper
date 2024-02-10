@@ -24,10 +24,10 @@ paths.name_ar_file = r'C:\Users\frede\Desktop\BS_Automapper\Data\training\evalua
 paths.songs_pred = paths.copy_path_song
 
 from beat_prediction.validate_find_beats import plot_beat_vs_real
-from bs_shift.shift import shift_bs_songs, delete_old_files
-from bs_shift.bps_find_songs import bps_find_songs
-from bs_shift.map_to_dict_all import map_to_dict_all
-from bs_shift.cleanup_n_format import clean_songs
+# from bs_shift.shift import shift_bs_songs, delete_old_files
+# from bs_shift.bps_find_songs import bps_find_songs
+# from bs_shift.map_to_dict_all import map_to_dict_all
+# from bs_shift.cleanup_n_format import clean_songs
 from training.helpers import filter_by_bps
 from preprocessing.bs_mapper_pre import load_beat_data
 from map_creation.gen_beats import main as gen_beats_main
@@ -84,7 +84,7 @@ if False:
 # Import map data
 #################
 name_ar, _ = filter_by_bps(0.1, 50)
-_, real_beats = load_beat_data(name_ar)
+_, real_beats = load_beat_data(name_ar, return_notes=True)
 name_ar = [name_ar[0]]
 real_beats = real_beats[0]
 

@@ -36,7 +36,7 @@ def main(name_ar: list, debug_beats=False) -> bool:
     # update configuration
     if config.add_silence_flag:
         config.add_beat_intensity = config.add_beat_intensity_orig + 10
-        config.silence_threshold = (1 - 0.4 * (config.max_speed_orig / 40)) * \
+        config.silence_threshold = (1 - 0.5 * (config.max_speed_orig / 40)) * \
                                    config.silence_threshold_orig
         if config.silence_threshold < 0.02:
             config.silence_threshold = 0.02

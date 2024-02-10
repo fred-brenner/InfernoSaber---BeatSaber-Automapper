@@ -28,11 +28,10 @@ def stack_info_data(new_info_file: list, content: list, diff_str: str, diff_num:
 
 
 def process_song(song_list_worker, total_runs):
-    conf = tf.compat.v1.ConfigProto()
-    conf.gpu_options.allow_growth = True
-    sess = tf.compat.v1.Session(config=conf)
-    tf.compat.v1.keras.backend.set_session(sess)
-    # TODO: try VRAM limitation here again!
+    # conf = tf.compat.v1.ConfigProto()
+    # conf.gpu_options.allow_growth = True
+    # sess = tf.compat.v1.Session(config=conf)
+    # tf.compat.v1.keras.backend.set_session(sess)
 
     # counter = 0
     # time_per_run = 20
@@ -121,11 +120,11 @@ def main_multi(diff_list: list, export_results_to_bs=True):
     diff_list *= 4
 
     print("Starting multi map generator.")
-    # limit gpu ram usage
-    conf = tf.compat.v1.ConfigProto()
-    conf.gpu_options.allow_growth = True
-    sess = tf.compat.v1.Session(config=conf)
-    tf.compat.v1.keras.backend.set_session(sess)
+    # # limit gpu ram usage
+    # conf = tf.compat.v1.ConfigProto()
+    # conf.gpu_options.allow_growth = True
+    # sess = tf.compat.v1.Session(config=conf)
+    # tf.compat.v1.keras.backend.set_session(sess)
 
     counter = 0
     # MAP GENERATOR

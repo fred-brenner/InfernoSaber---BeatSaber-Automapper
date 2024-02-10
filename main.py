@@ -67,11 +67,11 @@ def main(use_model=None, diff=None, export_results_to_bs=True,
             config.bs_mapping_version = 'v3'
     update_model_file_paths()
 
-    # limit gpu ram usage
-    conf = tf.compat.v1.ConfigProto()
-    conf.gpu_options.allow_growth = True
-    sess = tf.compat.v1.Session(config=conf)
-    tf.compat.v1.keras.backend.set_session(sess)
+    # # limit gpu ram usage
+    # conf = tf.compat.v1.ConfigProto()
+    # conf.gpu_options.allow_growth = True
+    # sess = tf.compat.v1.Session(config=conf)
+    # tf.compat.v1.keras.backend.set_session(sess)
 
     # MAP GENERATOR
     ###############
