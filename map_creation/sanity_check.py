@@ -64,9 +64,10 @@ def sanity_check_notes(notes: list, timings: list):
         notes_l = add_breaks(notes_l, timings)
         notes_r = add_breaks(notes_r, timings)
 
-    # emphasize some beats randomly
-    notes_l = emphasize_beats(notes_l, time_diffs, notes_r)
-    notes_r = emphasize_beats(notes_r, time_diffs, notes_l)
+    if config.emphasize_beats_flag:
+        # emphasize some beats randomly
+        notes_l = emphasize_beats(notes_l, time_diffs, notes_r)
+        notes_r = emphasize_beats(notes_r, time_diffs, notes_l)
 
     if config.allow_dot_notes:
         notes_l = apply_dots(notes_l, dot_idx_l)
