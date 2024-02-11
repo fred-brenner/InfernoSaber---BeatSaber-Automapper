@@ -130,6 +130,7 @@ def sanity_check_timing2(name, timings):
     # Convert frame indices to time (in seconds)
     onsets_sec = librosa.frames_to_time(onsets, sr=sr, hop_length=512)
 
+    # TODO: make two loops, first using original timings, second with added half steps
     tim_old = 0
     for idx, tim in enumerate(timings):
         diff_ar = np.abs(onsets_sec - tim)
@@ -1072,7 +1073,7 @@ def calc_note_speed(notes_last, notes_new, time_diff,
     dist += np.abs((notes_last[1] - cdf * cut_y_last) -
                    (notes_new[1] + cdf * cut_y_new))
     if time_diff > 0:
-        speed = dist / time_diff    # TODO: check why time_diff can get 0
+        speed = dist / time_diff  # TODO: check why time_diff can get 0
     else:
         speed = 1e9
 
