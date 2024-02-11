@@ -26,7 +26,7 @@ def reduce_number_of_songs(name_ar, hard_limit=50):
 
 
 def get_factor_from_max_speed(max_speed, lb=0.5, ub=1.5):
-    max_speed = max_speed/4
+    max_speed = max_speed / 4
     ls = 0
     us = 10
 
@@ -37,3 +37,15 @@ def get_factor_from_max_speed(max_speed, lb=0.5, ub=1.5):
     else:
         factor = lb + (ub - lb) * (max_speed / us)
         return factor
+
+
+def add_onset_half_times(times, min_time=0.1, max_time=1.5):
+    diff = times[1:] - times[:-1]
+    new_times = list(times)
+    for idx, d in enumerate(diff):
+        if min_time <= d <= max_time:
+            new_times.append(times[idx] + (d / 2))
+
+    new_times = np.asarray(new_times)
+    new_times = np.sort(new_times)
+    return new_times

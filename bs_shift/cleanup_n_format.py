@@ -53,7 +53,7 @@ def check_info_name(bs_song_path):
 
 
 def check_beatmap_name(bs_song_path):
-    expected_name = "ExpertPlus.dat"        # TODO: use naming from info file and do all diffs
+    # expected_name = "ExpertPlus.dat"
     for root, dirs, files in os.walk(bs_song_path):
 
         if len(files) <= 2:

@@ -67,7 +67,7 @@ def delete_old_files():
 def shift_bs_songs():
     # difficulty setup
     diff = config.training_songs_diff
-    allow_diff2 = config.allow_training_diff2  # TODO: check implementation
+    allow_diff2 = config.allow_training_diff2  # (TODO: check implementation)
     diff2 = config.training_songs_diff2
 
     # variables setup

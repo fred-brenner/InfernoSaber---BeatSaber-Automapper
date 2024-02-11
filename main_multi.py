@@ -19,7 +19,15 @@ def stack_info_data(new_info_file: list, content: list, diff_str: str, diff_num:
     new_info_file.append(f'"_difficulty": "{diff_str}",\n')
     new_info_file.append(f'"_difficultyRank": {diff_num},\n')
     new_info_file.append(f'"_beatmapFilename": "{diff_str}.dat",\n')
-    new_info_file.extend(content[30:32])
+    target_prefix = '"_noteJumpMovementSpeed":'
+    last_matching_idx = None
+    for idx, item in enumerate(content):
+        if item.startswith(target_prefix):
+            last_matching_idx = idx
+    if last_matching_idx is None:
+        print(f"Error: Could not find {target_prefix} in map.")
+        exit()
+    new_info_file.extend(content[last_matching_idx:last_matching_idx+2])
     if diff_str != "ExpertPlus":
         new_info_file.append('},\n')
     else:
@@ -57,6 +65,7 @@ def process_song(song_list_worker, total_runs):
 
 
 def main_multi_par(n_workers: int, diff_list: list, export_results_to_bs=True):
+    config.create_expert_flag = False
     diff_list = np.sort(diff_list)
     diff_list *= 4
     print("Starting multi map generator.")
@@ -263,7 +272,8 @@ if __name__ == "__main__":
     #     print(f"Warning: Did not get 5 difficulties: {diff_list}")
 
     config.create_expert_flag = False
-    export_results_to_bs = True
+    # export_results_to_bs = True
+    export_results_to_bs = False
     print(f"Using difficulties: {diff_list}")
 
     if paths.IN_COLAB:
@@ -274,7 +284,7 @@ if __name__ == "__main__":
         # main_multi(diff_list, True)
         # each worker needs ~5gb of ram memory (15gb / 3)
         # each worker needs ~4gb of gpu memory (11gb / 3)
-        n_workers = 5
+        n_workers = 7
         main_multi_par(n_workers, diff_list, export_results_to_bs)
 
 # C:\Users\frede\anaconda3\pkgs

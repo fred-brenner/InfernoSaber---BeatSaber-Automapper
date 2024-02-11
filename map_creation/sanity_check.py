@@ -10,7 +10,7 @@ import librosa
 from scipy.signal import savgol_filter
 
 from tools.config import config, paths
-from tools.utils.numpy_shorts import get_factor_from_max_speed
+from tools.utils.numpy_shorts import get_factor_from_max_speed, add_onset_half_times
 
 
 def sanity_check_notes(notes: list, timings: list):
@@ -131,16 +131,32 @@ def sanity_check_timing2(name, timings):
     onsets_sec = librosa.frames_to_time(onsets, sr=sr, hop_length=512)
 
     # TODO: make two loops, first using original timings, second with added half steps
-    tim_old = 0
-    for idx, tim in enumerate(timings):
-        diff_ar = np.abs(onsets_sec - tim)
-        if np.min(diff_ar) < max_time_diff and tim_old != tim:
-            tim_old = tim
-            # set new time
-            timings[idx] = onsets_sec[np.argmin(diff_ar)]
-        else:
-            # delete old time
-            timings[idx] = 0
+    onsets_sec_temp = np.copy(onsets_sec)
+    iterations = int(config.max_speed / 9)
+    if iterations < 1:
+        iterations = 1
+    elif iterations > 5:
+        iterations = 5
+    for iteration in range(iterations):
+        del_times = []  # only keep delete field from last iteration
+        if iteration > 0:
+            min_time = 0.1 / iteration
+            max_time = 1 * iteration
+            onsets_sec_temp = add_onset_half_times(onsets_sec_temp, min_time, max_time)
+        tim_old = 0
+        for idx, tim in enumerate(timings):
+            diff_ar = np.abs(onsets_sec_temp - tim)
+            if np.min(diff_ar) < max_time_diff and tim_old != tim:
+                tim_old = tim
+                # set new time
+                timings[idx] = onsets_sec_temp[np.argmin(diff_ar)]
+            else:
+                # delete old time
+                del_times.append(idx)
+                # timings[idx] = 0
+
+    for del_t in del_times:
+        timings[del_t] = 0
     return timings
 
 
