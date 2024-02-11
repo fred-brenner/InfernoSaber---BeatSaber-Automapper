@@ -15,6 +15,7 @@ from map_creation.find_bpm import get_file_bpm
 
 from preprocessing.music_processing import run_music_preprocessing
 from preprocessing.bs_mapper_pre import calc_time_between_beats
+from tools.utils.numpy_shorts import get_factor_from_max_speed
 # from preprocessing.bs_mapper_pre import lstm_shift
 
 from training.helpers import *
@@ -28,7 +29,7 @@ from tools.config.mapper_selection import get_full_model_path
 
 
 # @profile
-def main(name_ar: list) -> bool:
+def main(name_ar: list, debug_beats=False) -> bool:
     if len(name_ar) > 1:
         print("Multi-core song generation currently not implemented!")
         exit()
@@ -36,7 +37,7 @@ def main(name_ar: list) -> bool:
     # update configuration
     if config.add_silence_flag:
         config.add_beat_intensity = config.add_beat_intensity_orig + 10
-        config.silence_threshold = (1 - 0.4 * (config.max_speed_orig / 40)) * \
+        config.silence_threshold = (1 - 0.5 * (config.max_speed_orig / 40)) * \
                                    config.silence_threshold_orig
         if config.silence_threshold < 0.02:
             config.silence_threshold = 0.02
@@ -56,6 +57,13 @@ def main(name_ar: list) -> bool:
             config.add_beat_intensity -= 5
         else:
             config.add_beat_intensity = config.add_beat_intensity_orig - 5
+
+    factor = get_factor_from_max_speed(config.max_speed, 1.5, 0.5)
+    config.thresh_beat = config.thresh_beat_orig * factor
+    factor = get_factor_from_max_speed(config.max_speed, 1.3, 0.1)
+    config.thresh_onbeat = config.thresh_onbeat_orig * factor
+
+    # print(f"Beat intensity: {config.add_beat_intensity}")
 
     # load song data
     song_input, pitch_input = find_beats(name_ar, train_data=False)
@@ -122,22 +130,25 @@ def main(name_ar: list) -> bool:
     timing_ar = timing_ar[timing_ar > config.window]
     # add beats between far beats
     if config.max_speed >= 5.5 * 4:
-        fill_map_times_scale(timing_ar, scale_index=int(config.map_filler_iters / 2) + 1)
+        timing_ar = fill_map_times_scale(timing_ar, scale_index=int(config.map_filler_iters / 2) + 1)
     if config.max_speed >= 8 * 4:
-        fill_map_times_scale(timing_ar, scale_index=int(config.map_filler_iters - 1))
-    time_input = [timing_ar]
+        timing_ar = fill_map_times_scale(timing_ar, scale_index=int(config.map_filler_iters - 1))
+    # time_input = [timing_ar]
 
-    # calculate bpm
-    file = paths.songs_pred + name_ar[0] + '.egg'
-    bpm, song_duration = get_file_bpm(file)  # 1.6
-    # average bpm for songs to make more similar (jump) speeds
-    if config.use_fixed_bpm is None:
-        bpm = int((bpm + 120) / 2)
-    else:
-        bpm = config.use_fixed_bpm
+    # return timing_ar
+
+    # # calculate bpm
+    # file = paths.songs_pred + name_ar[0] + '.egg'
+    # bpm, song_duration = get_file_bpm(file)  # 1.6
+    # # average bpm for songs to make more similar (jump) speeds
+    # if config.use_fixed_bpm is None:
+    #     bpm = int((bpm + 120) / 2)
+    # else:
+    bpm = config.use_fixed_bpm
 
     # sanity check timings
-    map_times, pitch_algo = sanity_check_timing(name_ar[0], timing_ar, song_duration)  # 3.9
+    # map_times, pitch_algo = sanity_check_timing(name_ar[0], timing_ar, song_duration)  # 3.9
+    map_times = sanity_check_timing2(name_ar[0], timing_ar)
     map_times = map_times[map_times > 0]
     if len(map_times) < 3 * config.lstm_len:
         print(f"Could not match enough beats for song {name_ar[0]}")
@@ -155,6 +166,9 @@ def main(name_ar: list) -> bool:
     if config.add_silence_flag:
         # remove silent parts
         map_times = remove_silent_times(map_times, silent_times[0])
+
+    if debug_beats:
+        return map_times
     # compensate for lstm cutoff
     map_times = add_lstm_prerun(map_times)
 
@@ -208,6 +222,7 @@ def main(name_ar: list) -> bool:
         del event_model
     else:
         events = []
+
     if config.bs_mapping_version != "v3":
         print(f"Warning: Using old mapping version: {config.bs_mapping_version}")
         from map_creation.map_creator_deprecated import create_map_depr

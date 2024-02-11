@@ -62,8 +62,20 @@ def find_beats(name_ar, train_data=True):
         spect = spect.T
         song_ar.append(spect)
         # # test spectogram
+        # import matplotlib.pyplot as plt
         # plt.imshow(spect)
         # plt.show()
+
+    for idx in range(len(song_ar)):
+        pitch_len = len(pitch_times_ar[idx])
+        song_ar_len = song_ar[0].shape[1]
+        diff = abs(pitch_len - song_ar_len)
+        if diff > 10:
+            print(f"! Error: Mismatched pitch input: {song_ar[0].shape[1]} vs {len(pitch_times_ar[0])}")
+        if song_ar_len > pitch_len:
+            song_ar[idx] = song_ar[idx][:, :-diff]
+        elif song_ar_len < pitch_len:
+            pitch_times_ar[idx] = pitch_times_ar[idx][:-diff]
 
     return song_ar, pitch_times_ar
 

@@ -5,10 +5,12 @@ to improve the note generation output
 
 import numpy as np
 import aubio
+import librosa
 # import matplotlib.pyplot as plt
 from scipy.signal import savgol_filter
 
 from tools.config import config, paths
+from tools.utils.numpy_shorts import get_factor_from_max_speed, add_onset_half_times
 
 
 def sanity_check_notes(notes: list, timings: list):
@@ -63,9 +65,10 @@ def sanity_check_notes(notes: list, timings: list):
         notes_l = add_breaks(notes_l, timings)
         notes_r = add_breaks(notes_r, timings)
 
-    # emphasize some beats randomly
-    notes_l = emphasize_beats(notes_l, time_diffs, notes_r)
-    notes_r = emphasize_beats(notes_r, time_diffs, notes_l)
+    if config.emphasize_beats_flag:
+        # emphasize some beats randomly
+        notes_l = emphasize_beats(notes_l, time_diffs, notes_r)
+        notes_r = emphasize_beats(notes_r, time_diffs, notes_l)
 
     if config.allow_dot_notes:
         notes_l = apply_dots(notes_l, dot_idx_l)
@@ -81,7 +84,7 @@ def sanity_check_notes(notes: list, timings: list):
 
 def sanity_check_beat(beat):
     beat = beat.reshape(len(beat))
-    beat_counts = beat.sum()
+    # beat_counts = beat.sum()
     min_count = config.beat_spacing * config.min_beat_time
     min_count = int(np.round(min_count, 0))
 
@@ -101,98 +104,149 @@ def sanity_check_beat(beat):
     return beat
 
 
-def sanity_check_timing(name, timings, song_duration):
+def sanity_check_timing2(name, timings):
     samplerate_music = 44100
-
-    #####################################
-    # import song to analyze volume peaks
-    #####################################
-    file = paths.songs_pred + name + ".egg"
-
-    # analyze song pitches
-    total_read = 0
-    pitch_list = []
-    tempo_list = []
-    samples_list = []
-    src = aubio.source(file, channels=1, samplerate=samplerate_music)
-    aubio_pitch = aubio.pitch(samplerate=samplerate_music)
-    aubio_tempo = aubio.tempo(samplerate=samplerate_music)
-    while True:
-        samples, read = src()
-        pit = aubio_pitch(samples)
-        tempo = aubio_tempo(samples)
-        samples_list.extend(samples)
-        pitch_list.extend(pit)
-        tempo_list.extend(tempo)
-        total_read += read
-        if read < src.hop_size:
-            break
-
-    # calc volume peaks
-    pitches = np.asarray(pitch_list)
-    # len(pitch_list) * 512 / samplerate_music = time in seconds
-    # plt.plot(pitches)
-    # plt.show()
-
-    last_pitch = 0
-    threshold = np.quantile(pitches, 0.6) * config.thresh_pitch
-    if threshold < 100:
-        if np.mean(pitches) > threshold:
-            threshold = np.mean(pitches)
-    # threshold = 80 + 0.6 * pitches.mean() * config.thresh_pitch
-    # pitch_median = np.median(pitch_list)
-    # if pitch_median < 100:
-    #     pitch_median = pitches.mean()
-    # threshold += 0.7 * pitch_median * config.thresh_pitch
-    # threshold += 0.2 * pitches.max() * config.thresh_pitch
-    # th_count = 100 * sum(pitches > threshold) / len(pitches)
-    # if True:
-    #     # print debug info on threshold percentage
-    #     print(f"Percentage of pitches over threshold: {th_count:.0f}%")
-    threshold_end = config.threshold_end * threshold
-    idx_end = int(len(pitches) / 30)
-    idx_end_list = list(range(idx_end))
-    idx_end_list.extend(list(range(len(pitches) - idx_end, len(pitches))))
-    beat_flag = False
-    beat_pos = np.zeros_like(pitches)
-    for idx in range(len(pitches)):
-        if idx in idx_end_list:
-            cur_thresh = threshold_end
-        else:
-            cur_thresh = threshold
-        if pitches[idx] > last_pitch and pitches[idx] > cur_thresh:
-            beat_flag = True
-        else:
-            if beat_flag:
-                beat_pos[idx - 1] = 1
-                beat_flag = False
-        last_pitch = pitches[idx]
-
-    # plt.plot(beat_pos)
-    # plt.show()
-
-    allowed_timings = beat_pos * np.arange(0, len(beat_pos), 1)
-    allowed_timings *= 512 / samplerate_music
-    allowed_timings = allowed_timings[allowed_timings > 0]
-
-    # match timing from beat generator
+    factor = config.thresh_onbeat / config.thresh_onbeat_orig
+    pre_max = int(4 * factor)
+    post_max = int(4 * factor)
+    pre_avg = int(6 * factor)
+    post_avg = int(7 * factor)
+    delta = config.thresh_onbeat
+    wait = int(8 * factor)
     max_time_diff = 1.0
-    early_start = 0.5
-    last_beat = 1
-    for i in range(len(timings)):
-        diff = np.abs(allowed_timings - timings[i] - early_start)
-        min_diff = diff.min()
-        if min_diff < max_time_diff:
-            cur_beat = allowed_timings[np.argmin(diff)]
-            if last_beat < cur_beat < song_duration:
-                timings[i] = cur_beat
-                last_beat = cur_beat
-            else:
-                timings[i] = 0
-        else:
-            timings[i] = 0
 
-    return timings, allowed_timings
+    file = paths.songs_pred + name + ".egg"
+    # Load the audio file
+    y, sr = librosa.load(file, sr=samplerate_music)
+
+    # Compute the onset envelope
+    onset_env = librosa.onset.onset_strength(y=y, sr=sr, hop_length=512)
+
+    # Detect onsets using amplitude thresholding
+    onsets = librosa.onset.onset_detect(onset_envelope=onset_env, sr=sr, hop_length=512,
+                                        backtrack=False, pre_max=pre_max, post_max=post_max,
+                                        pre_avg=pre_avg, post_avg=post_avg, delta=delta, wait=wait)
+
+    # Convert frame indices to time (in seconds)
+    onsets_sec = librosa.frames_to_time(onsets, sr=sr, hop_length=512)
+
+    # TODO: make two loops, first using original timings, second with added half steps
+    onsets_sec_temp = np.copy(onsets_sec)
+    iterations = int(config.max_speed / 9)
+    if iterations < 1:
+        iterations = 1
+    elif iterations > 5:
+        iterations = 5
+    for iteration in range(iterations):
+        del_times = []  # only keep delete field from last iteration
+        if iteration > 0:
+            min_time = 0.1 / iteration
+            max_time = 1 * iteration
+            onsets_sec_temp = add_onset_half_times(onsets_sec_temp, min_time, max_time)
+        tim_old = 0
+        for idx, tim in enumerate(timings):
+            diff_ar = np.abs(onsets_sec_temp - tim)
+            if np.min(diff_ar) < max_time_diff and tim_old != tim:
+                tim_old = tim
+                # set new time
+                timings[idx] = onsets_sec_temp[np.argmin(diff_ar)]
+            else:
+                # delete old time
+                del_times.append(idx)
+                # timings[idx] = 0
+
+    for del_t in del_times:
+        timings[del_t] = 0
+    return timings
+
+
+# def sanity_check_timing(name, timings, song_duration):
+#     samplerate_music = 44100
+#
+#     #####################################
+#     # import song to analyze volume peaks
+#     #####################################
+#     file = paths.songs_pred + name + ".egg"
+#
+#     # analyze song pitches
+#     total_read = 0
+#     onset_list = []
+#     tempo_list = []
+#     notes_list = []
+#     # samples_list = []
+#     src = aubio.source(file, channels=1, samplerate=samplerate_music)
+#     aubio_tempo = aubio.tempo(samplerate=samplerate_music)
+#     aubio_onset = aubio.onset(samplerate=samplerate_music)
+#     aubio_notes = aubio.notes(samplerate=samplerate_music)
+#     while True:
+#         samples, read = src()
+#         onset = aubio_onset(samples)
+#         tempo = aubio_tempo(samples)
+#         notes = aubio_notes(samples)
+#         # samples_list.extend(samples)
+#         onset_list.extend(onset)
+#         tempo_list.extend(tempo)
+#         notes_list.extend(notes)
+#         total_read += read
+#         if read < src.hop_size:
+#             break
+#
+#     # calc volume peaks
+#     pitches = np.asarray(notes_list)
+#     # len(pitch_list) * 512 / samplerate_music = time in seconds
+#     # plt.plot(pitches)
+#     # plt.show()
+#
+#     last_pitch = 0
+#     threshold = np.quantile(pitches[pitches > 0], config.thresh_pitch) * config.thresh_pitch
+#     # if threshold < 100:
+#     #     if np.mean(pitches) > threshold:
+#     #         threshold = np.mean(pitches)
+#
+#     threshold_end = config.threshold_end * threshold
+#     idx_end = int(len(pitches) / 30)
+#     idx_end_list = list(range(idx_end))
+#     idx_end_list.extend(list(range(len(pitches) - idx_end, len(pitches))))
+#     beat_flag = False
+#     beat_pos = np.zeros_like(pitches)
+#     for idx in range(len(pitches)):
+#         if idx in idx_end_list:
+#             cur_thresh = threshold_end
+#         else:
+#             cur_thresh = threshold
+#         if pitches[idx] > last_pitch and pitches[idx] > cur_thresh:
+#             beat_flag = True
+#         else:
+#             if beat_flag:
+#                 beat_pos[idx - 1] = 1
+#                 beat_flag = False
+#         last_pitch = pitches[idx]
+#
+#     # plt.plot(beat_pos)
+#     # plt.show()
+#
+#     allowed_timings = beat_pos * np.arange(0, len(beat_pos), 1)
+#     allowed_timings *= 512 / samplerate_music
+#     allowed_timings = allowed_timings[allowed_timings > 0]
+#
+#     # match timing from beat generator
+#     max_time_diff = 1.0
+#     early_start = 0
+#     last_beat = 1
+#     for i in range(len(timings)):
+#         diff = np.abs(allowed_timings - timings[i] - early_start)
+#         min_diff = diff.min()
+#         if min_diff < max_time_diff:
+#             cur_beat = allowed_timings[np.argmin(diff)]
+#             if last_beat < cur_beat < song_duration:
+#                 timings[i] = cur_beat
+#                 last_beat = cur_beat
+#             else:
+#                 timings[i] = 0
+#         else:
+#             timings[i] = 0
+#
+#     return timings, allowed_timings
 
 
 def improve_timings(new_notes, timings, pitch_input, pitch_times):
@@ -205,7 +259,7 @@ def improve_timings(new_notes, timings, pitch_input, pitch_times):
     activation_time_index = np.where(pitch_times >= activation_time)[0][0]
 
     def check_for_notes(new_notes, idx):
-        if idx > len(new_notes)-2 or idx < 1:
+        if idx > len(new_notes) - 2 or idx < 1:
             return 1
         if len(new_notes[idx]) > 0:
             return 1
@@ -379,7 +433,7 @@ def emphasize_beats(notes, timings, notes_second):
         return notes
 
     for n in range(start_end_idx, len(notes)):
-        if timings[n:n + 1].max() >= emphasize_beats_wait:
+        if timings[n:n + 1].max() >= emphasize_beats_wait:  # TODO: maybe increase timing window to before+after
             note = notes[n]
             if len(note) > 0:
                 rd = np.random.random()
@@ -904,6 +958,10 @@ def correct_notes(notes, timings):
                 mx_speed = config.max_speed * decrease_val
             else:
                 mx_speed = config.max_speed
+
+            factor = get_factor_from_max_speed(mx_speed, 0.5, 1)
+            mx_speed *= factor
+
             if speed > mx_speed:
                 # remove notes at this point
                 rm_counter += int(len(notes[idx]) / 4)
@@ -1030,8 +1088,10 @@ def calc_note_speed(notes_last, notes_new, time_diff,
     # y direction
     dist += np.abs((notes_last[1] - cdf * cut_y_last) -
                    (notes_new[1] + cdf * cut_y_new))
-
-    speed = dist / time_diff
+    if time_diff > 0:
+        speed = dist / time_diff  # TODO: check why time_diff can get 0
+    else:
+        speed = 1e9
 
     return speed
 

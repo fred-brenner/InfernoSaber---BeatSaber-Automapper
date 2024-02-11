@@ -67,11 +67,11 @@ def main(use_model=None, diff=None, export_results_to_bs=True,
             config.bs_mapping_version = 'v3'
     update_model_file_paths()
 
-    # limit gpu ram usage
-    conf = tf.compat.v1.ConfigProto()
-    conf.gpu_options.allow_growth = True
-    sess = tf.compat.v1.Session(config=conf)
-    tf.compat.v1.keras.backend.set_session(sess)
+    # # limit gpu ram usage
+    # conf = tf.compat.v1.ConfigProto()
+    # conf.gpu_options.allow_growth = True
+    # sess = tf.compat.v1.Session(config=conf)
+    # tf.compat.v1.keras.backend.set_session(sess)
 
     # MAP GENERATOR
     ###############
@@ -214,7 +214,11 @@ if __name__ == "__main__":
         print(f"Set slider_movement_min to {smm}")
 
     lm = os.environ.get('legacy_mode')
-    # if lm is not None:
+    if isinstance(lm, str):
+        if lm == 'True':
+            lm = True
+        else:
+            lm = False
 
     export_results_to_bs = True
     if paths.IN_COLAB:

@@ -4,6 +4,7 @@ import pickle
 
 from preprocessing.beat_data_helper import *
 from tools.config import paths, config
+from tools.utils.numpy_shorts import reduce_number_of_songs
 from training.helpers import filter_by_bps
 from preprocessing.music_processing import run_music_preprocessing
 from tools.utils import numpy_shorts
@@ -54,10 +55,13 @@ def load_beat_data(name_ar: list, return_notes=False):
     return beat_class, time_ar
 
 
-def load_ml_data(train=True, name_ar=None):
+def load_ml_data(train=True):
 
     # get name array
     name_ar, _ = filter_by_bps(min_bps_limit, max_bps_limit)
+
+    # Reduce amount of songs
+    name_ar = reduce_number_of_songs(name_ar, hard_limit=config.mapper_song_limit)
 
     # load beats (output)
     beat_ar, time_ar = load_beat_data(name_ar)

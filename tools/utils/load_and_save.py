@@ -4,7 +4,6 @@ Import and Export of numpy arrays into npy files
 
 import numpy as np
 import pickle
-import tools.config.config as config
 
 
 def load_npy(data_path: str) -> np.array:

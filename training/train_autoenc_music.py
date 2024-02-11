@@ -8,6 +8,12 @@ from keras.models import Model
 from keras.optimizers import Adam
 from keras.layers import Input
 
+# Get the main script's directory
+import sys, os
+script_dir = os.path.dirname(os.path.realpath(__file__))
+parent_dir = os.path.abspath(os.path.join(script_dir, ".."))
+sys.path.append(parent_dir)
+
 from bs_shift.bps_find_songs import bps_find_songs
 from helpers import test_gpu_tf, filter_by_bps, load_keras_model
 from plot_model import run_plot_autoenc
@@ -15,6 +21,7 @@ from tensorflow_models import create_keras_model
 from preprocessing.music_processing import run_music_preprocessing
 from tools.config import config, paths
 from tools.fail_list.black_list import delete_fails
+from tools.utils.numpy_shorts import reduce_number_of_songs
 
 # # Check Cuda compatible GPU
 # if not test_gpu_tf():
@@ -36,7 +43,9 @@ np.random.seed(3)
 ####################
 # get name array
 name_ar, _ = filter_by_bps(min_bps_limit, max_bps_limit)
-# print(f"Importing {len(name_ar)} songs")
+
+# Reduce amount of songs
+name_ar = reduce_number_of_songs(name_ar, hard_limit=config.autoenc_song_limit)
 
 # load song input
 i = 0

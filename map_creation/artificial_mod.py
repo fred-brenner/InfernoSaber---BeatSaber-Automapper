@@ -49,7 +49,7 @@ def gimme_more_notes(notes: list):
     if more_note_probability > 0:
         extra_note_prob = config.max_speed/4 - more_note_prob_increase_diff
         if extra_note_prob > 0:
-            more_note_probability += 0.2 * 0.1*extra_note_prob
+            more_note_probability += 0.1 * 0.1*extra_note_prob
         # take list of notes and search for single ones
         for i, section in enumerate(notes):
             if more_note_probability >= random():

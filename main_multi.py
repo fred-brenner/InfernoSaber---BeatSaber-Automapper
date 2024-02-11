@@ -19,7 +19,15 @@ def stack_info_data(new_info_file: list, content: list, diff_str: str, diff_num:
     new_info_file.append(f'"_difficulty": "{diff_str}",\n')
     new_info_file.append(f'"_difficultyRank": {diff_num},\n')
     new_info_file.append(f'"_beatmapFilename": "{diff_str}.dat",\n')
-    new_info_file.extend(content[30:32])
+    target_prefix = '"_noteJumpMovementSpeed":'
+    last_matching_idx = None
+    for idx, item in enumerate(content):
+        if item.startswith(target_prefix):
+            last_matching_idx = idx
+    if last_matching_idx is None:
+        print(f"Error: Could not find {target_prefix} in map.")
+        exit()
+    new_info_file.extend(content[last_matching_idx:last_matching_idx+2])
     if diff_str != "ExpertPlus":
         new_info_file.append('},\n')
     else:
@@ -32,7 +40,6 @@ def process_song(song_list_worker, total_runs):
     conf.gpu_options.allow_growth = True
     sess = tf.compat.v1.Session(config=conf)
     tf.compat.v1.keras.backend.set_session(sess)
-    # TODO: try VRAM limitation here again!
 
     # counter = 0
     # time_per_run = 20
@@ -58,13 +65,14 @@ def process_song(song_list_worker, total_runs):
 
 
 def main_multi_par(n_workers: int, diff_list: list, export_results_to_bs=True):
+    config.create_expert_flag = False
     diff_list = np.sort(diff_list)
     diff_list *= 4
     print("Starting multi map generator.")
-    conf = tf.compat.v1.ConfigProto()
-    conf.gpu_options.allow_growth = True
-    sess = tf.compat.v1.Session(config=conf)
-    tf.compat.v1.keras.backend.set_session(sess)
+    # conf = tf.compat.v1.ConfigProto()
+    # conf.gpu_options.allow_growth = True
+    # sess = tf.compat.v1.Session(config=conf)
+    # tf.compat.v1.keras.backend.set_session(sess)
 
     # MAP GENERATOR
     ###############
@@ -83,7 +91,7 @@ def main_multi_par(n_workers: int, diff_list: list, export_results_to_bs=True):
     processed_count = 0
     combine_map_interval = 5
     uncombined_count = 0
-    time_per_run = 10
+    time_per_run = 5
     song_list_run = []
 
     # Divide the song_list into chunks for each worker
@@ -106,7 +114,7 @@ def main_multi_par(n_workers: int, diff_list: list, export_results_to_bs=True):
                 uncombined_count = 0
             new_time_per_run = (time.time() - start_time) / processed_count
             time_per_run = (time_per_run*5 + new_time_per_run) / 6
-            print(f"### ETA: {(len(song_list) - processed_count) * time_per_run / 60:.1f} minutes. ###")
+            print(f"### ETA: {(len(song_list) - processed_count) * time_per_run / 60:.1f} minutes. Time per run: {time_per_run:.0f} s ###")
 
     song_list_run = combine_maps(song_list_files, song_list_run,
                                  diff_list, export_results_to_bs)
@@ -121,11 +129,11 @@ def main_multi(diff_list: list, export_results_to_bs=True):
     diff_list *= 4
 
     print("Starting multi map generator.")
-    # limit gpu ram usage
-    conf = tf.compat.v1.ConfigProto()
-    conf.gpu_options.allow_growth = True
-    sess = tf.compat.v1.Session(config=conf)
-    tf.compat.v1.keras.backend.set_session(sess)
+    # # limit gpu ram usage
+    # conf = tf.compat.v1.ConfigProto()
+    # conf.gpu_options.allow_growth = True
+    # sess = tf.compat.v1.Session(config=conf)
+    # tf.compat.v1.keras.backend.set_session(sess)
 
     counter = 0
     # MAP GENERATOR
@@ -256,14 +264,15 @@ if __name__ == "__main__":
     # freeze_support()  # required for pyinstaller packaging
     diff_list = os.environ.get('diff_list')
     if diff_list is None:
-        # diff_list = [4, 5, 6, 7, 8]
-        diff_list = [1, 5, 10, 100, 1e4]
+        diff_list = [4, 5, 6, 7, 8]
+        # diff_list = [1, 5, 10, 100, 1e4]
     else:
         diff_list = json.loads(diff_list)
     # if len(diff_list) != 5:
     #     print(f"Warning: Did not get 5 difficulties: {diff_list}")
 
     config.create_expert_flag = False
+    # export_results_to_bs = True
     export_results_to_bs = False
     print(f"Using difficulties: {diff_list}")
 
@@ -275,7 +284,8 @@ if __name__ == "__main__":
         # main_multi(diff_list, True)
         # each worker needs ~5gb of ram memory (15gb / 3)
         # each worker needs ~4gb of gpu memory (11gb / 3)
-        n_workers = 4
+        n_workers = 7
         main_multi_par(n_workers, diff_list, export_results_to_bs)
 
 # C:\Users\frede\anaconda3\pkgs
+# TODO: check why wsl maps have wrong jump speed

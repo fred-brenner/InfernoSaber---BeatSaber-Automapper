@@ -117,6 +117,7 @@ def run_music_preprocessing(names_ar: list, time_ar=None, save_file=True, song_c
     song_ar = []
     rm_index_ar = []
     errors_appeared = 0
+    rm_index = None
 
     # bar = ProgressBar(max_value=len(names_ar))
 
@@ -134,12 +135,16 @@ def run_music_preprocessing(names_ar: list, time_ar=None, save_file=True, song_c
                 song, remove_idx = load_song(paths.songs_pred + n, time_ar=time)
             else:
                 song, remove_idx = load_song(paths.copy_path_song + n, time_ar=time)
-        except:
+        except Exception as e:
             print(f"Problem with song: {n}")
+            print(f"Exception details: {str(e)}")
+            # print(paths.copy_path_song)
+            # exit()
             append_fail(n[:-4])
             errors_appeared += 1
-        rm_index_ar.append(remove_idx)
+            continue
 
+        rm_index_ar.append(remove_idx)
         ml_input_song = process_song(song)
 
         # if song_combined:   # does not work

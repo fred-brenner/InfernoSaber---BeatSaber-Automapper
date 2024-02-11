@@ -9,6 +9,12 @@ from keras.optimizers import Adam
 from sklearn.preprocessing import OneHotEncoder
 from tabulate import tabulate
 
+# Get the main script's directory
+import sys, os
+script_dir = os.path.dirname(os.path.realpath(__file__))
+parent_dir = os.path.abspath(os.path.join(script_dir, ".."))
+sys.path.append(parent_dir)
+
 from lighting_prediction.tf_lighting import create_tf_model
 
 from preprocessing.beat_data_helper import load_raw_beat_data
@@ -124,7 +130,7 @@ def start_training():
     print("Gather input data:", end=' ')
 
     name_ar, _ = filter_by_bps(config.min_bps_limit, config.max_bps_limit)
-    ram_limit = int(7.0 * config.vram_limit)
+    ram_limit = int(2.75 * config.vram_limit)
     if len(name_ar) > ram_limit:
         random.shuffle(name_ar)
         print(f"Info: Loading reduced song number into generator to not overload the VRAM (from {len(name_ar)})")

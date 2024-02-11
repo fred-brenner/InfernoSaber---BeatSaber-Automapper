@@ -5,6 +5,12 @@ from keras.optimizers import Adam
 from PIL import Image
 import matplotlib.pyplot as plt
 
+# Get the main script's directory
+import sys, os
+script_dir = os.path.dirname(os.path.realpath(__file__))
+parent_dir = os.path.abspath(os.path.join(script_dir, ".."))
+sys.path.append(parent_dir)
+
 from beat_prediction.find_beats import find_beats, get_pitch_times, samplerate_beats
 # from beat_prediction.beat_to_lstm import beat_to_lstm
 from beat_prediction.beat_prop import get_beat_prop, delete_offbeats
@@ -16,6 +22,7 @@ from training.tensorflow_models import create_music_model
 
 from tools.config import config, paths
 from tools.utils import numpy_shorts
+from tools.utils.numpy_shorts import reduce_number_of_songs
 
 
 def main():
@@ -38,12 +45,16 @@ def main():
 
     # ram_limit = int(11 * config.ram_limit)      # 100 songs ~9gb
     name_ar, _ = filter_by_bps(config.min_bps_limit, config.max_bps_limit)
+
+    # Reduce amount of songs
+    name_ar = reduce_number_of_songs(name_ar, hard_limit=config.beat_song_limit)
+
     # if len(name_ar) > ram_limit:
     #     print(f"Info: Loading reduced song number into generator to not overload the RAM "
     #           f"(previous {len(name_ar)}")
     #     name_ar = name_ar[:ram_limit]
 
-    print(f"Importing {len(name_ar)} songs")
+    # print(f"Importing {len(name_ar)} songs")
     song_input, pitch_input = find_beats(name_ar, train_data=True)
 
     # calculate discrete timings
