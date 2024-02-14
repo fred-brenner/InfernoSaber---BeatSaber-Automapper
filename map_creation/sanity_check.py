@@ -107,10 +107,11 @@ def sanity_check_beat(beat):
 def sanity_check_timing2(name, timings):
     samplerate_music = 44100
     factor = config.thresh_onbeat / config.thresh_onbeat_orig
-    pre_max = int(4 * factor)
-    post_max = int(4 * factor)
-    pre_avg = int(6 * factor)
-    post_avg = int(7 * factor)
+    pre_max = 1 if int(5 * factor) <= 0 else int(5 * factor)
+    post_max = 1 if int(5 * factor) <= 0 else int(5 * factor)
+    pre_avg = 1 if int(7 * factor) <= 0 else int(7 * factor)
+    post_avg = 1 if int(8 * factor) <= 0 else int(8 * factor)
+
     delta = config.thresh_onbeat
     wait = int(8 * factor)
     max_time_diff = 1.0
@@ -123,7 +124,7 @@ def sanity_check_timing2(name, timings):
     onset_env = librosa.onset.onset_strength(y=y, sr=sr, hop_length=512)
 
     # Detect onsets using amplitude thresholding
-    try:    # TODO: error for local song file Alan Walker - Hero
+    try:
         onsets = librosa.onset.onset_detect(onset_envelope=onset_env, sr=sr, hop_length=512,
                                             backtrack=False, pre_max=pre_max, post_max=post_max,
                                             pre_avg=pre_avg, post_avg=post_avg, delta=delta, wait=wait)
