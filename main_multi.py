@@ -1,6 +1,11 @@
 import json
 import numpy as np
+# import logging
+import os
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
+import logging
 import tensorflow as tf
+tf.get_logger().setLevel(logging.ERROR)
 import time
 import shutil
 from functools import partial
@@ -283,7 +288,7 @@ if __name__ == "__main__":
         # main_multi(diff_list, True)
         # each worker needs ~5gb of ram memory (15gb / 3)
         # each worker needs ~4gb of gpu memory (11gb / 3)
-        n_workers = 8
+        n_workers = 3
         main_multi_par(n_workers, diff_list, export_results_to_bs)
 
 # C:\Users\frede\anaconda3\pkgs
