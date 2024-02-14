@@ -123,9 +123,15 @@ def sanity_check_timing2(name, timings):
     onset_env = librosa.onset.onset_strength(y=y, sr=sr, hop_length=512)
 
     # Detect onsets using amplitude thresholding
-    onsets = librosa.onset.onset_detect(onset_envelope=onset_env, sr=sr, hop_length=512,
-                                        backtrack=False, pre_max=pre_max, post_max=post_max,
-                                        pre_avg=pre_avg, post_avg=post_avg, delta=delta, wait=wait)
+    try:    # TODO: error for local song file Alan Walker - Hero
+        onsets = librosa.onset.onset_detect(onset_envelope=onset_env, sr=sr, hop_length=512,
+                                            backtrack=False, pre_max=pre_max, post_max=post_max,
+                                            pre_avg=pre_avg, post_avg=post_avg, delta=delta, wait=wait)
+    except Exception as e:
+        print(f"Error: {type(e).__name__}")
+        print(f"Error message: {e}")
+        print(f"Error in onset detection for song: {file}\nPlease remove song and restart.")
+        exit()
 
     # Convert frame indices to time (in seconds)
     onsets_sec = librosa.frames_to_time(onsets, sr=sr, hop_length=512)
