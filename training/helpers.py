@@ -54,8 +54,8 @@ def test_gpu_tf():
         print('Default GPU Device: {}'.format(tf.test.gpu_device_name()))
         return True
     else:
-        print('Warning: No GPU found')
-        input('Continue with CPU?')
+        print('Warning: No GPU found.\n Continue with CPU')
+        # input('Continue with CPU?')
         return True
         # tf.test.is_built_with_cuda()
         # print(tf.config.list_physical_devices())
