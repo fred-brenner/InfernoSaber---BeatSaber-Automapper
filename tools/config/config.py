@@ -11,12 +11,7 @@ bs_mapping_version = "v3"  # allows to generate advanced features like arcs
 # bs_mapping_version = "v2"  # legacy mode, may be deprecated in future
 
 """Do change"""
-# select mapper style or leave empty for default
-# use_mapper_selection = ""   # use level author for selection of maps in training, deactivated if use_bpm_selection
-# use_mapper_selection = "general_new"
-# use_mapper_selection = "curated1"
-# use_mapper_selection = "curated2"
-
+# select mapper style
 # use_mapper_selection = "pp3_15"
 # use_mapper_selection = "easy_15"
 # use_mapper_selection = "hard_15"

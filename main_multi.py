@@ -1,7 +1,7 @@
 import json
 import numpy as np
-# import logging
 import os
+
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 import logging
 import tensorflow as tf
@@ -13,7 +13,9 @@ from multiprocessing import Pool, freeze_support
 
 import map_creation.gen_beats as beat_generator
 from tools.config import paths, config
+from tools.utils.huggingface import model_download
 from bs_shift.export_map import *
+# from training.helpers import test_gpu_tf
 
 
 def stack_info_data(new_info_file: list, content: list, diff_str: str, diff_num: int) -> list:
@@ -41,10 +43,16 @@ def stack_info_data(new_info_file: list, content: list, diff_str: str, diff_num:
 
 
 def process_song(song_list_worker, total_runs):
-    conf = tf.compat.v1.ConfigProto()
-    conf.gpu_options.allow_growth = True
-    sess = tf.compat.v1.Session(config=conf)
-    tf.compat.v1.keras.backend.set_session(sess)
+    # conf = tf.compat.v1.ConfigProto()
+    # conf.gpu_options.allow_growth = True
+    # sess = tf.compat.v1.Session(config=conf)
+    # tf.compat.v1.keras.backend.set_session(sess)
+    physical_devices = tf.config.list_physical_devices('GPU')
+    try:
+        tf.config.experimental.set_memory_growth(physical_devices[0], True)
+    except:
+        # Invalid device or cannot modify virtual devices once initialized.
+        pass
 
     # counter = 0
     # time_per_run = 20
@@ -74,10 +82,6 @@ def main_multi_par(n_workers: int, diff_list: list, export_results_to_bs=True):
     diff_list = np.sort(diff_list)
     diff_list *= 4
     print("Starting multi map generator.")
-    # conf = tf.compat.v1.ConfigProto()
-    # conf.gpu_options.allow_growth = True
-    # sess = tf.compat.v1.Session(config=conf)
-    # tf.compat.v1.keras.backend.set_session(sess)
 
     # MAP GENERATOR
     ###############
@@ -119,7 +123,8 @@ def main_multi_par(n_workers: int, diff_list: list, export_results_to_bs=True):
                 uncombined_count = 0
             new_time_per_run = (time.time() - start_time) / processed_count
             time_per_run = (time_per_run*5 + new_time_per_run) / 6
-            print(f"### ETA: {(len(song_list) - processed_count) * time_per_run / 60:.1f} minutes. Time per run: {time_per_run:.0f} s ###")
+            print(f"### ETA: {(len(song_list) - processed_count) * time_per_run / 60:.1f} minutes. "
+                  f"Time per song: {time_per_run * len(diff_list):.0f} s ###")
 
     song_list_run = combine_maps(song_list_files, song_list_run,
                                  diff_list, export_results_to_bs)
@@ -280,16 +285,19 @@ if __name__ == "__main__":
     export_results_to_bs = True
     print(f"Using difficulties: {diff_list}")
 
+    # Download AI Model from huggingface
+    model_download()
+
     if paths.IN_COLAB:
         print("Multi-processing on colab notebook not supported :|\n"
               "Running single process.")
         main_multi(diff_list, False)
     else:
         # main_multi(diff_list, True)
-        # each worker needs ~5gb of ram memory (15gb / 3)
-        # each worker needs ~4gb of gpu memory (11gb / 3)
+        # each worker needs 2-5gb of ram memory
+        # each worker needs 2-4gb of gpu memory (if not Win and GPU available)
         n_workers = 3
+        if paths.main_path.startswith('/mnt/'):
+            # use GPU in linux
+            n_workers = 7
         main_multi_par(n_workers, diff_list, export_results_to_bs)
-
-# C:\Users\frede\anaconda3\pkgs
-# TODO: check why wsl maps have wrong jump speed

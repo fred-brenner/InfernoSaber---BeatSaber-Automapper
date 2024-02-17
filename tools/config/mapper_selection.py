@@ -28,6 +28,8 @@ def return_mapper_list(mapper_shortcut):
 
 def get_full_model_path(model_name_partial, full_path=True):
     model_folder = paths.model_path
+    if not os.path.isdir(model_folder):
+        raise FileNotFoundError(f"Model folder not set up: {model_folder}")
     files = os.listdir(model_folder)
     if 0 < len(files) < 7:
         print(f"Warning: Check content of:  {model_folder}. Not enough models found (yet).")
@@ -43,7 +45,7 @@ def get_full_model_path(model_name_partial, full_path=True):
     raise FileNotFoundError(f"Could not find model {model_name_partial} in {model_folder}")
 
 
-def update_model_file_paths():
+def update_model_file_paths(check_model_exists=True):
     # update the file paths for the models if the folder is changed
     paths.model_path = paths.dir_path + "model/"
     if config.use_mapper_selection == '' or config.use_mapper_selection is None:
@@ -54,6 +56,7 @@ def update_model_file_paths():
     paths.beats_classify_encoder_file = os.path.join(paths.model_path, "onehot_encoder_beats.pkl")
     paths.events_classify_encoder_file = os.path.join(paths.model_path, "onehot_encoder_events.pkl")
 
-    # check that model exists on the example of event generator
-    _ = get_full_model_path(config.event_gen_version)
+    if check_model_exists:
+        # check that model exists on the example of event generator
+        _ = get_full_model_path(config.event_gen_version)
     print(f"Using model: {config.use_mapper_selection}")
