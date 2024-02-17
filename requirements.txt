@@ -12,3 +12,4 @@ keras~=2.15.0
 keras-tcn~=3.5
 progressbar2~=4.3.2
 librosa~=0.10.1
+huggingface_hub~=0.20.3

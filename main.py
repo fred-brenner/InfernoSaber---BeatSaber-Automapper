@@ -12,6 +12,7 @@ import map_creation.gen_beats as beat_generator
 from bs_shift.export_map import check_music_files, shutil_copy_maps
 
 from tools.config.mapper_selection import update_model_file_paths
+from tools.utils.huggingface import model_download
 
 
 def main(use_model=None, diff=None, export_results_to_bs=True,
@@ -65,7 +66,10 @@ def main(use_model=None, diff=None, export_results_to_bs=True,
             config.bs_mapping_version = 'v2'
         else:
             config.bs_mapping_version = 'v3'
-    update_model_file_paths()
+    update_model_file_paths(check_model_exists=False)
+
+    # Download AI Model from huggingface
+    model_download()
 
     # # limit gpu ram usage
     # conf = tf.compat.v1.ConfigProto()

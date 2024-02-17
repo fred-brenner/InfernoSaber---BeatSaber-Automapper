@@ -13,6 +13,7 @@ from multiprocessing import Pool, freeze_support
 
 import map_creation.gen_beats as beat_generator
 from tools.config import paths, config
+from tools.utils.huggingface import model_download
 from bs_shift.export_map import *
 # from training.helpers import test_gpu_tf
 
@@ -284,6 +285,9 @@ if __name__ == "__main__":
     export_results_to_bs = True
     print(f"Using difficulties: {diff_list}")
 
+    # Download AI Model from huggingface
+    model_download()
+
     if paths.IN_COLAB:
         print("Multi-processing on colab notebook not supported :|\n"
               "Running single process.")
@@ -291,7 +295,7 @@ if __name__ == "__main__":
     else:
         # main_multi(diff_list, True)
         # each worker needs 2-5gb of ram memory
-        # each worker needs 2-4gb of gpu memory
+        # each worker needs 2-4gb of gpu memory (if not Win and GPU available)
         n_workers = 3
         if paths.main_path.startswith('/mnt/'):
             # use GPU in linux
