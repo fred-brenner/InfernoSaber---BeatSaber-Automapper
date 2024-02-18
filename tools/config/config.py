@@ -13,9 +13,9 @@ bs_mapping_version = "v3"  # allows to generate advanced features like arcs
 """Do change"""
 # select mapper style
 # use_mapper_selection = "pp3_15"
-# use_mapper_selection = "easy_15"
+use_mapper_selection = "easy_15"
 # use_mapper_selection = "hard_15"
-use_mapper_selection = "expert_15"
+# use_mapper_selection = "expert_15"
 
 """Change only for new training"""
 use_mapper_selection = use_mapper_selection.lower()
@@ -33,10 +33,11 @@ cdf = 1.2  # cut director factor (to calculate speed, [0.5, 1.5])
 cdf_lr = 1.15  # speed addition factor for left right movement
 expert_fact = 0.63  # expert plus to expert factor [0.6, 0.7]
 create_expert_flag = True  # create second expert map
-thresh_beat = 0.42  # minimum beat response required to trigger generator [0.3, 0.6]
-thresh_onbeat = 0.1
+thresh_beat = 0.37  # minimum beat response required to trigger generator [0.3, 0.6]
+thresh_onbeat = 0.09
 # thresh_pitch = 0.90  # minimum beat for pitch check (0.8,low-1.5,high)
-# threshold_end = 0.75  # factor for start and end threshold [1.0, 1.2]
+# threshold_start = 0.8  # factor for start and end threshold [0.5, 1.5]
+# threshold_end = 0.7    # factor for start and end threshold [0.5, 1.5]
 factor_pitch_certainty = 0.5  # select emphasis on first (>1) or second pitch method
 factor_pitch_meanmax = 3    # select pitch certainty for mean (>=3) or max (<3)
 random_note_map_factor = 0.3  # stick note map to random song/center (set to 0 to disable)
@@ -55,7 +56,7 @@ jump_speed_offset = -0.4  # general offset for jump speed (range [-2, 2])
 map_filler_iters = 10  # max iterations for map filler
 add_dot_notes = 2  # add dot notes for fastest patterns in percent [0-10]
 add_breaks_flag = True  # add breaks after strong patterns
-silence_threshold = 0.22   # silence threshold quantile value [0.0, 0.3]
+silence_threshold = 0.20   # silence threshold quantile value [0.0, 0.3]
 silence_thresh_hard = 0.25  # add fixed threshold to dynamic value [0-2]
 add_silence_flag = True  # whether to apply silence threshold
 emphasize_beats_flag = True  # emphasize beats into double notes #TODO
@@ -75,9 +76,9 @@ check_all_first_notes = True  # if False only change dot notes
 first_note_layer_threshold = 1  # Layer index from where first note should face up [0(all up)-3(all down)]
 allow_double_first_notes = False  # if False remove second note if necessary for first occurrence
 # improve timings
-improve_timings_mcfactor = 2.5  # max change bandwidth (2 wide, 4+ narrow)
-improve_timings_mcchange = 1.2   # max change time in seconds
-improve_timings_act_time = 0.35  # min time gap to activate
+# improve_timings_mcfactor = 2.5  # max change bandwidth (2 wide, 4+ narrow)
+# improve_timings_mcchange = 1.2   # max change time in seconds
+# improve_timings_act_time = 0.35  # min time gap to activate
 
 add_waveform_pattern_flag = 0   # [0: off, 1: on, 2: double on]
 waveform_pattern = [
@@ -115,8 +116,8 @@ jsb_offset_min = [-0.2, -0.4]  # minimum allowed values (expert, expert+)
 jsb_offset_factor = 0.011  # note jump factor for high difficulties
 use_fixed_bpm = 100  # use fixed bpm or set to None for the song bpm
 max_njs = 26  # maximum Note Jump Speed allowed
-decr_speed_range = 20  # range for start and end (n first and last notes)
-decr_speed_val = 0.25  # decrease max speed at start
+decr_speed_range = 30  # range for start and end (n first and last notes)
+decr_speed_val = 0.35  # decrease max speed at start
 reaction_time = 1.1  # reaction time (0.5-2)
 reaction_time_fact = 0.013  # factor including max_speed
 jump_speed = 12.4  # jump speed from beat saber (10-15)

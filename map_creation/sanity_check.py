@@ -943,7 +943,10 @@ def correct_notes(notes, timings):
     se_idx_start = se_idx + int(0.3 * config.quick_start * config.lstm_len + 1.0 * config.lstm_len)
     decrease_range = list(range(se_idx_start))
     decrease_range.extend(list(range(len(notes) - se_idx, len(notes))))
-    decrease_val = config.decr_speed_val
+    # decrease_val = config.decr_speed_val
+    decrease_val = np.ones(len(notes))
+    decrease_val[:se_idx_start] = np.linspace(config.decr_speed_val, 1, se_idx_start)
+    decrease_val[-se_idx:] = np.linspace(1, config.decr_speed_val, se_idx)
 
     for idx in range(len(notes)):
         if len(notes[idx]) == 0:
@@ -962,7 +965,7 @@ def correct_notes(notes, timings):
 
             # remove too fast elements
             if idx in decrease_range:
-                mx_speed = config.max_speed * decrease_val
+                mx_speed = config.max_speed * decrease_val[idx]
             else:
                 mx_speed = config.max_speed
 
