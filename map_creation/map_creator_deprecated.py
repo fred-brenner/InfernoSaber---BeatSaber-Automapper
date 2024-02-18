@@ -36,7 +36,7 @@ def create_map_depr(y_class_num, timings, events, name, bpm, pitch_input, pitch_
 
         # run all beat and note sanity checks
         notes = sanity_check_notes(notes, timings)
-        timings = improve_timings(notes, timings, pitch_input, pitch_times)
+        # timings = improve_timings(notes, timings, pitch_input, pitch_times)
 
         if config.add_obstacle_flag:
             obstacles = calculate_obstacles(notes, timings)
