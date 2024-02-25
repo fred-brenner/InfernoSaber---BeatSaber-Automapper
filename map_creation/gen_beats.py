@@ -115,8 +115,7 @@ def main(name_ar: list, debug_beats=False) -> bool:
     gc.collect()
     del beat_model
 
-    y_beat[y_beat > config.thresh_beat] = 1
-    y_beat[y_beat <= config.thresh_beat] = 0
+    y_beat = apply_first_beat_thresholding(y_beat)
 
     # apply beat sanity check (min time diff)
     y_beat = sanity_check_beat(y_beat)
@@ -126,7 +125,7 @@ def main(name_ar: list, debug_beats=False) -> bool:
     ######################
     # get beat times
     timing_ar = y_beat * np.arange(0, len(y_beat), 1)
-    timing_ar /= config.beat_spacing
+    timing_ar = timing_ar.astype(float) / config.beat_spacing
     timing_ar = timing_ar[timing_ar > config.window]
     # add beats between far beats
     if config.max_speed >= 5.5 * 4:
@@ -233,6 +232,26 @@ def main(name_ar: list, debug_beats=False) -> bool:
                    pitch_input[-1], pitch_times[-1])
 
     return False  # success
+
+
+def apply_first_beat_thresholding(y_beat):
+    lenni = len(y_beat)
+    thresh_ar = np.ones(lenni) * config.thresh_beat
+
+    # change threshold for start
+    # thresh_ar[:int(lenni/5)] *= config.threshold_start
+    thresh_ar[:int(lenni/10)] *= config.threshold_start
+
+    # change threshold for end
+    thresh_ar[-int(lenni/5):] *= config.threshold_end
+    thresh_ar[-int(lenni/10):] *= config.threshold_end
+
+    # run thresholding
+    y_beat = y_beat.reshape(-1)
+    result = (y_beat > thresh_ar).astype(int)
+    result = result.reshape((-1, 1))
+
+    return result
 
 
 if __name__ == '__main__':

@@ -10,7 +10,6 @@ from tools.config import paths, config
 from training.helpers import test_gpu_tf
 # import map_creation.gen_beats as beat_generator
 # from bs_shift.export_map import *
-#
 
 # Check Cuda compatible GPU
 if not test_gpu_tf():

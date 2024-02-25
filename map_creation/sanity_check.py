@@ -105,7 +105,6 @@ def sanity_check_beat(beat):
 
 
 def sanity_check_timing2(name, timings):
-    # TODO: add threshold end implementation
     samplerate_music = 44100
     factor = config.thresh_onbeat / config.thresh_onbeat_orig
     pre_max = 1 if int(5 * factor) <= 0 else int(5 * factor)
@@ -138,7 +137,7 @@ def sanity_check_timing2(name, timings):
     # Convert frame indices to time (in seconds)
     onsets_sec = librosa.frames_to_time(onsets, sr=sr, hop_length=512)
 
-    # TODO: make two loops, first using original timings, second with added half steps
+    # two loops, first using original timings, second with added half steps
     onsets_sec_temp = np.copy(onsets_sec)
     iterations = int(config.max_speed / 9)
     if iterations < 1:
