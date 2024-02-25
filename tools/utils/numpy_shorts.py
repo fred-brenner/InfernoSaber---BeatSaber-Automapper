@@ -28,7 +28,7 @@ def reduce_number_of_songs(name_ar, hard_limit=50):
 def get_factor_from_max_speed(max_speed, lb=0.5, ub=1.5):
     max_speed = max_speed / 4
     ls = 0
-    us = 10
+    us = 15
 
     if max_speed <= ls:
         return lb

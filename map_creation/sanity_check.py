@@ -105,6 +105,7 @@ def sanity_check_beat(beat):
 
 
 def sanity_check_timing2(name, timings):
+    # TODO: add threshold end implementation
     samplerate_music = 44100
     factor = config.thresh_onbeat / config.thresh_onbeat_orig
     pre_max = 1 if int(5 * factor) <= 0 else int(5 * factor)
