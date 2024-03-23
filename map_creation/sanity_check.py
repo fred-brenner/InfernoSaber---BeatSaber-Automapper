@@ -940,7 +940,7 @@ def correct_notes(notes, timings):
     # reduce note difficulty at start and end of song
     se_idx = config.decr_speed_range  # start_end_index
     # compensate quick start behavior
-    se_idx_start = se_idx + int(0.3 * config.quick_start * config.lstm_len + 1.0 * config.lstm_len)
+    se_idx_start = se_idx + int(1.5 * config.lstm_len)
     decrease_range = list(range(se_idx_start))
     decrease_range.extend(list(range(len(notes) - se_idx, len(notes))))
     # decrease_val = config.decr_speed_val
@@ -1236,14 +1236,14 @@ def fill_map_times_scale(map_times, scale_index=5):
     return map_times
 
 
-def add_lstm_prerun(map_times):
-    # add cutoff map times to compensate for lstm reshape
-    qs = config.quick_start
-    if qs > 0:
-        new_map_times = np.linspace(0, qs, int(config.lstm_len * qs))
-        map_times = np.hstack((new_map_times, map_times))
-        # map_times = np.sort(map_times)
-    return map_times
+# def add_lstm_prerun(map_times):
+#     # add cutoff map times to compensate for lstm reshape
+#     qs = config.quick_start
+#     if qs > 0:
+#         new_map_times = np.linspace(0, qs, int(config.lstm_len * qs))
+#         map_times = np.hstack((new_map_times, map_times))
+#         # map_times = np.sort(map_times)
+#     return map_times
 
 
 def shift_blocks_up_down(notes: list, time_diffs: np.array):

@@ -168,8 +168,9 @@ def main(name_ar: list, debug_beats=False) -> bool:
 
     if debug_beats:
         return map_times
-    # compensate for lstm cutoff
-    map_times = add_lstm_prerun(map_times)
+
+    # # compensate for lstm cutoff
+    # map_times = add_lstm_prerun(map_times)
 
     # # calculate time between beats
     # timing_diff_ar = calc_time_between_beats([map_times])
@@ -194,6 +195,7 @@ def main(name_ar: list, debug_beats=False) -> bool:
     in_song_l = enc_model.predict(song_ar[0], verbose=0)
 
     mapper_model = get_full_model_path(config.mapper_version)
+    # section into len(lstm) batches and calculate mapping for each batch
     y_class_map = generate(in_song_l, map_times, mapper_model, config.lstm_len,
                            paths.beats_classify_encoder_file)  # 45.2
 
@@ -204,8 +206,9 @@ def main(name_ar: list, debug_beats=False) -> bool:
     ############
     # create map
     ############
-    map_times = map_times[config.lstm_len:]
-    map_times = map_times[:len(y_class_map)]
+    # TODO: replace with default content instead of deletion
+    map_times = map_times[config.lstm_len:]     # required by lstm start-up
+    map_times = map_times[:len(y_class_map)]    # rest from sectioning into lstm len batches
 
     ############
     # add events

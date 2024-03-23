@@ -117,7 +117,7 @@ def run_music_preprocessing(names_ar: list, time_ar=None, save_file=True, song_c
     song_ar = []
     rm_index_ar = []
     errors_appeared = 0
-    rm_index = None
+    # rm_index = None
 
     # bar = ProgressBar(max_value=len(names_ar))
 

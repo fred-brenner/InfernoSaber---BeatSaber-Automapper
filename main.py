@@ -224,7 +224,7 @@ if __name__ == "__main__":
         else:
             lm = False
 
-    export_results_to_bs = True
+    export_results_to_bs = False
     if paths.IN_COLAB:
         export_results_to_bs = False
 
