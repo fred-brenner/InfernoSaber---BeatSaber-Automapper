@@ -17,6 +17,8 @@ def sanity_check_notes(notes: list, timings: list):
     # last sanity check for notes,
     # result is written to map
 
+    # TODO: emphasize last notes of patterns (on notesR+L)
+
     [notes_r, notes_l, notes_b] = split_notes_rl(notes)
 
     notes_r = set_first_note_dir(notes_r)
@@ -26,9 +28,9 @@ def sanity_check_notes(notes: list, timings: list):
     # notes_l = correct_cut_dir(notes_l, timings)
 
     # print("Right notes:", end=' ')
-    notes_r = correct_notes(notes_r, timings)
+    notes_r = correct_notes_backwards(notes_r, timings)
     # print("Left notes: ", end=' ')
-    notes_l = correct_notes(notes_l, timings)
+    notes_l = correct_notes_backwards(notes_l, timings)
 
     time_diffs = np.concatenate((np.ones(1), np.diff(timings)), axis=0)
 
@@ -953,6 +955,135 @@ def correct_notes(notes, timings):
             continue
         # elif len(notes[idx]) == 4:
         elif len(notes[idx]) >= 4:
+            # check cut direction movement (of first element in each time step)
+            notes[idx] = check_note_movement(nl_last, notes[idx])
+
+            # # notes[idx] = optimize_note_movement(nl_last, notes[idx])
+            # notes[idx] = check_border_notes(notes, timings, idx)
+
+            # calculate movement speed (of first element)
+            new_time = timings[idx]
+            speed = calc_note_speed(nl_last, notes[idx], new_time - last_time)
+
+            # remove too fast elements
+            if idx in decrease_range:
+                mx_speed = config.max_speed * decrease_val[idx]
+            else:
+                mx_speed = config.max_speed
+
+            factor = get_factor_from_max_speed(mx_speed, 0.5, 1)
+            mx_speed *= factor
+
+            if speed > mx_speed:
+                # remove notes at this point
+                rm_counter += int(len(notes[idx]) / 4)
+                notes[idx] = []
+                continue
+            # update last correct note
+            else:
+                last_time = new_time
+                nl_last = notes[idx]
+
+            # check double notes
+            if len(notes[idx]) > 4:
+                rm_temp = np.zeros_like(notes[idx])
+                cut_dir = notes[idx][3]
+                for n in range(int(len(notes[idx]) / 4) - 1):
+                    # check if cut direction is same
+                    if notes[idx][(n + 1) * 4 + 3] != cut_dir:
+                        notes[idx][(n + 1) * 4 + 3] = 8
+                    n *= 4
+                    speed1 = calc_note_speed(notes[idx][n:n + 4],
+                                             notes[idx][n + 4:n + 8],
+                                             time_diff=0.08, cdf=1.1, react=False)
+                    speed2 = calc_note_speed(notes[idx][n + 4:n + 8],
+                                             notes[idx][n:n + 4],
+                                             time_diff=0.08, cdf=1.1, react=False)
+                    speed = np.min([speed1, speed2])
+                    if speed > config.max_double_note_speed:
+                        # try to fix second notes
+                        try_notes = notes[idx][n + 4:n + 8]
+                        try_notes[3] = notes[idx][n:n + 4][3]
+                        speed1 = calc_note_speed(notes[idx][n:n + 4],
+                                                 try_notes,
+                                                 time_diff=0.05, cdf=0.65)
+                        speed2 = calc_note_speed(try_notes,
+                                                 notes[idx][n:n + 4],
+                                                 time_diff=0.05, cdf=0.65)
+                        speed = np.min([speed1, speed2])
+                        if speed > config.max_double_note_speed:
+                            # remove sec notes
+                            rm_temp[n + 4:n + 8] = 1
+                        else:
+                            # include try notes
+                            notes[idx][n + 4:n + 8] = try_notes
+
+                # remove unsuited notes
+                if rm_temp.sum() > 0:
+                    rm_counter += int(rm_temp.sum() / 4)
+                    for rm in range(len(rm_temp))[::-1]:
+                        if rm_temp[rm]:
+                            notes[idx].pop(rm)
+
+    # print(f"Sanity check note speed removed {rm_counter} elements")
+    return notes
+
+
+def correct_notes_backwards(notes, timings):
+    # calculate movement speed and remove too fast notes
+    nl_last = None
+    last_time = 0
+    rm_counter = 0
+
+    # reduce note difficulty at start and end of song
+    se_idx = config.decr_speed_range  # start_end_index
+    # compensate quick start behavior
+    se_idx_start = se_idx + int(1.5 * config.lstm_len)
+    decrease_range = list(range(se_idx_start))
+    decrease_range.extend(list(range(len(notes) - se_idx, len(notes))))
+    # decrease_val = config.decr_speed_val
+    decrease_val = np.ones(len(notes))
+    decrease_val[:se_idx_start] = np.linspace(config.decr_speed_val, 1, se_idx_start)
+    decrease_val[-se_idx:] = np.linspace(1, config.decr_speed_val, se_idx)
+
+    for idx in range(len(notes)-1, -1, -1):
+        if len(notes[idx]) == 0:
+            continue
+        # elif len(notes[idx]) == 4:
+        elif len(notes[idx]) >= 4:
+            if nl_last is None:
+                nl_last = notes[idx]
+                last_time = timings[idx]
+                continue
+
+            # correct note direction to a certain probability
+            if np.random.random() < config.correct_note_direction_prob:
+                notes[idx] = check_note_movement(nl_last, notes[idx])
+
+            # calculate movement speed
+            new_time = timings[idx]
+            speed = calc_note_speed(notes[idx], nl_last, last_time - new_time)
+
+            # remove too fast elements
+            if idx in decrease_range:
+                mx_speed = config.max_speed * decrease_val[idx]
+            else:
+                mx_speed = config.max_speed
+
+            factor = get_factor_from_max_speed(mx_speed, 0.5, 1)
+            mx_speed *= factor
+
+            # TODO: WIP!!!
+            if speed > mx_speed:
+                # need to change until it fits
+                speed
+
+            if speed < 0.3 * mx_speed:
+                # check if can make it more difficult
+                speed
+
+
+
             # check cut direction movement (of first element in each time step)
             notes[idx] = check_note_movement(nl_last, notes[idx])
 

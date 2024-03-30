@@ -171,6 +171,8 @@ def main(name_ar: list, debug_beats=False) -> bool:
 
     # # compensate for lstm cutoff
     # map_times = add_lstm_prerun(map_times)
+    # TODO: check if this is not filtered out automatically by run_music_processing
+    # TODO: check if only integer quick_start values work
 
     # # calculate time between beats
     # timing_diff_ar = calc_time_between_beats([map_times])

@@ -26,9 +26,10 @@ max_bps_limit = 12  # maximum beats_per_second value for training
 """Change for application"""
 # Map creation model configuration
 max_speed = 4 * 8.0  # set around 5-40 (normal-expert++)
-add_beat_intensity = 95  # try to match bps by x% [80, 120]
+add_beat_intensity = 80  # try to match bps by x% [80, 120]
 gimme_more_notes_flag = True   # try to always use notes on both sides
 gimme_more_notes_prob = 0.25     # probability to activate [0.0-1.0]
+correct_note_direction_prob = 0.0   # probability to force note direction in first iteration [0-1]
 cdf = 1.2  # cut director factor (to calculate speed, [0.5, 1.5])
 cdf_lr = 1.15  # speed addition factor for left right movement
 expert_fact = 0.63  # expert plus to expert factor [0.6, 0.7]
