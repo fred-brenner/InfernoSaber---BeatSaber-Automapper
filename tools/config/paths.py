@@ -13,7 +13,7 @@ from tools.config import config
 
 
 ################################# (change this for your pc)
-# setup folder for input data (automatically determined if inside this project)
+# setup folder for input data
 dir_path = "C:/Users/frede/Desktop/BS_Automapper/Data/"
 
 bs_song_path = "E:/SteamLibrary/steamapps/common/Beat Saber/Beat Saber_Data/CustomLevels/"

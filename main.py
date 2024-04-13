@@ -4,7 +4,7 @@
 import os
 import shutil
 import time
-import tensorflow as tf
+# import tensorflow as tf
 # import sys
 
 from tools.config import paths, config

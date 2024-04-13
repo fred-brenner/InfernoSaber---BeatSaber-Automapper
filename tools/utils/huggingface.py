@@ -19,10 +19,10 @@ def model_download(model_branch=None):
     if len(os.listdir(model_folder)) > 5:
         print("Model is already setup. Skipping download")
     else:
-        print(f"Download model: {model_branch} from huggingface...")
-        snapshot_download(repo_id=model_name, revision=model_branch,
+        print(f"Downloading model: {model_branch} from huggingface...")
+        snapshot_download(repo_id=model_name, revision=model_branch, repo_type='model',
                           local_dir=model_folder, local_dir_use_symlinks=False,
-                          ignore_patterns=["Readme.md", ".git*"])
+                          ignore_patterns=['.gitignore', '.gitattributes'])
 
     # check that model exists on the example of event generator
     _ = get_full_model_path(config.event_gen_version)
