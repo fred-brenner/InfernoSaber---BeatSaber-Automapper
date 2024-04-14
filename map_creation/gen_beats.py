@@ -1,6 +1,6 @@
 import numpy as np
 import gc
-from keras import backend as K
+# from keras import backend as K
 from PIL import Image
 # from line_profiler_pycharm import profile
 
@@ -8,18 +8,19 @@ from beat_prediction.find_beats import find_beats, get_pitch_times, get_silent_t
 from beat_prediction.beat_to_lstm import beat_to_lstm
 from beat_prediction.beat_prop import get_beat_prop, tcn_reshape
 
-from map_creation.sanity_check import *
+from map_creation.sanity_check import (sanity_check_beat, fill_map_times_scale, sanity_check_timing2,
+                                       remove_silent_times)
 # from map_creation.class_helpers import *
 from map_creation.map_creator import create_map
-from map_creation.find_bpm import get_file_bpm
+# from map_creation.find_bpm import get_file_bpm
 
 from preprocessing.music_processing import run_music_preprocessing
-from preprocessing.bs_mapper_pre import calc_time_between_beats
+# from preprocessing.bs_mapper_pre import calc_time_between_beats
 from tools.utils.numpy_shorts import get_factor_from_max_speed
 # from preprocessing.bs_mapper_pre import lstm_shift
 
-from training.helpers import *
-from training.tensorflow_models import *
+from training.helpers import load_model, filter_by_bps
+from training.tensorflow_models import TCN
 
 from lighting_prediction.generate_lighting import generate
 
@@ -111,7 +112,7 @@ def main(name_ar: list, debug_beats=False) -> bool:
     # apply beat generator
     y_beat = beat_model.predict(x_input, verbose=0)
 
-    K.clear_session()
+    # K.clear_session()
     gc.collect()
     del beat_model
 
@@ -151,7 +152,7 @@ def main(name_ar: list, debug_beats=False) -> bool:
     map_times = map_times[map_times > 0]
     if len(map_times) < 3 * config.lstm_len:
         print(f"Could not match enough beats for song {name_ar[0]}")
-        return 1
+        return True
     # map_times = fill_map_times(map_times)
     add_beats_min_bps = config.max_speed * 10 / 40  # max_speed=40 -> min_bps = 10
     scale_idx = 0
@@ -201,7 +202,7 @@ def main(name_ar: list, debug_beats=False) -> bool:
     y_class_map = generate(in_song_l, map_times, mapper_model, config.lstm_len,
                            paths.beats_classify_encoder_file)  # 45.2
 
-    K.clear_session()
+    # K.clear_session()
     gc.collect()
     del mapper_model, enc_model
 
@@ -209,8 +210,8 @@ def main(name_ar: list, debug_beats=False) -> bool:
     # create map
     ############
     # TODO: replace with default content instead of deletion
-    map_times = map_times[config.lstm_len:]     # required by lstm start-up
-    map_times = map_times[:len(y_class_map)]    # rest from sectioning into lstm len batches
+    map_times = map_times[config.lstm_len:]  # required by lstm start-up
+    map_times = map_times[:len(y_class_map)]  # rest from sectioning into lstm len batches
 
     ############
     # add events
@@ -221,7 +222,7 @@ def main(name_ar: list, debug_beats=False) -> bool:
         events = generate(in_song_l, map_times, event_model, config.event_lstm_len,
                           paths.events_classify_encoder_file)  # 23.7 (47.0 -> 3.8)
 
-        K.clear_session()
+        # K.clear_session()
         gc.collect()
         del event_model
     else:
@@ -245,11 +246,11 @@ def apply_first_beat_thresholding(y_beat):
 
     # change threshold for start
     # thresh_ar[:int(lenni/5)] *= config.threshold_start
-    thresh_ar[:int(lenni/10)] *= config.threshold_start
+    thresh_ar[:int(lenni / 10)] *= config.threshold_start
 
     # change threshold for end
-    thresh_ar[-int(lenni/5):] *= config.threshold_end
-    thresh_ar[-int(lenni/10):] *= config.threshold_end
+    thresh_ar[-int(lenni / 5):] *= config.threshold_end
+    thresh_ar[-int(lenni / 10):] *= config.threshold_end
 
     # run thresholding
     y_beat = y_beat.reshape(-1)

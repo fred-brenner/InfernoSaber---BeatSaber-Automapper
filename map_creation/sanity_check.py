@@ -27,10 +27,13 @@ def sanity_check_notes(notes: list, timings: list):
     # notes_r = correct_cut_dir(notes_r, timings)
     # notes_l = correct_cut_dir(notes_l, timings)
 
+    notes_r = correct_notes_pre(notes_r, timings)
+    notes_l = correct_notes_pre(notes_l, timings)
+
     # print("Right notes:", end=' ')
-    notes_r = correct_notes_backwards(notes_r, timings)
+    notes_r = correct_notes(notes_r, timings)
     # print("Left notes: ", end=' ')
-    notes_l = correct_notes_backwards(notes_l, timings)
+    notes_l = correct_notes(notes_l, timings)
 
     time_diffs = np.concatenate((np.ones(1), np.diff(timings)), axis=0)
 
@@ -509,9 +512,9 @@ def calc_note_pos(n, add_cut=True, inv=None):
                     # cut_pos = [pos[0] - int(cut_x), pos[1] - int(cut_y)]
                     # cut_pos.append([pos[0] + int(cut_x), pos[1] + int(cut_y)])
                     if not inv:
-                        cut_pos = [pos[0] - int(cut_x), pos[1] - int(cut_y)]
+                        cut_pos = [pos[0] - cut_x, pos[1] - cut_y]
                     else:
-                        cut_pos = [pos[0] + int(cut_x), pos[1] + int(cut_y)]
+                        cut_pos = [pos[0] + cut_x, pos[1] + cut_y]
                     if 0 <= cut_pos[0] < 4:  # x axis
                         if 0 <= cut_pos[1] < 3:  # y axis
                             return cut_pos
@@ -1029,9 +1032,10 @@ def correct_notes(notes, timings):
     return notes
 
 
-def correct_notes_backwards(notes, timings):
-    # calculate movement speed and remove too fast notes
+def correct_notes_pre(notes, timings):
+    # calculate movement speed and try to refit too fast ones
     nl_last = None
+    nl_last_index = 0
     last_time = 0
     rm_counter = 0
 
@@ -1046,115 +1050,118 @@ def correct_notes_backwards(notes, timings):
     decrease_val[:se_idx_start] = np.linspace(config.decr_speed_val, 1, se_idx_start)
     decrease_val[-se_idx:] = np.linspace(1, config.decr_speed_val, se_idx)
 
-    for idx in range(len(notes)-1, -1, -1):
+    for idx in range(len(notes)):
         if len(notes[idx]) == 0:
             continue
-        # elif len(notes[idx]) == 4:
-        elif len(notes[idx]) >= 4:
-            if nl_last is None:
-                nl_last = notes[idx]
-                last_time = timings[idx]
-                continue
 
-            # correct note direction to a certain probability
-            if np.random.random() < config.correct_note_direction_prob:
-                notes[idx] = check_note_movement(nl_last, notes[idx])
+        # skip first iteration
+        if nl_last is None:
+            nl_last = notes[idx].copy()
+            nl_last_index = idx
+            last_time = timings[idx]
+            continue
 
-            # calculate movement speed
-            new_time = timings[idx]
-            speed = calc_note_speed(notes[idx], nl_last, last_time - new_time)
+        # # correct note direction to a certain probability
+        # if np.random.random() < config.correct_note_direction_prob:
+        #     notes[idx] = check_note_movement(nl_last, notes[idx])
 
-            # remove too fast elements
-            if idx in decrease_range:
-                mx_speed = config.max_speed * decrease_val[idx]
-            else:
-                mx_speed = config.max_speed
+        # calculate movement speed
+        new_time = timings[idx]
+        t_diff = new_time - last_time
+        speed = calc_note_speed(nl_last, notes[idx], t_diff)
 
-            factor = get_factor_from_max_speed(mx_speed, 0.5, 1)
-            mx_speed *= factor
+        # remove too fast elements
+        if idx in decrease_range:
+            mx_speed = config.max_speed * decrease_val[idx]
+        else:
+            mx_speed = config.max_speed
 
-            # TODO: WIP!!!
+        factor = get_factor_from_max_speed(mx_speed, 0.5, 1)
+        mx_speed *= factor
+
+        def check_note_second_cut_dir(note, n_idx):
+            real_idx = int(4 + n_idx * 4)
+            previous_note = note[real_idx-4:real_idx]
+            second_note = note[real_idx:real_idx+4]
+            note[real_idx+3] = previous_note[3]
+            # TODO: implement logic for double notes
+            return note
+
+        def change_cut_dir_multi(note: list, nl_last) -> list:
+            last_cut_dir = nl_last[3]
+            new_cut_dir = reverse_cut_dir_xy(last_cut_dir)
+            x_last, y_last = get_cut_dir_xy(note[3])
+            x_new, y_new = get_cut_dir_xy(last_cut_dir)
+            # allow small deviations from exact up and down directions
+            if abs(x_last - x_new) + abs(y_last - y_new) > 1:
+                note[3] = new_cut_dir
+                if len(note) > 4:
+                    for idx_note_sec in range(int((len(note)-4)/4)):
+                        note = check_note_second_cut_dir(note, idx_note_sec)
+            return note
+
+        def move_note_by_cutdir(n: list, reverse=False) -> list:
+            note = n.copy()
+            x, y = get_cut_dir_xy(note[3])
+            changed = False
+            if reverse:
+                x *= -1
+                y *= -1
+            if 0 <= note[0] + x <= 3:
+                note[0] += x
+                changed = True
+            if 0 <= note[1] + y <= 2:
+                note[1] += y
+                changed = True
+            if changed:
+                if len(note) > 4:
+                    # remove second notes
+                    note = note[:4]
+            return note
+
+        # need to change until it fits
+        if speed > mx_speed:
+            # first, fit direction
+
+            notes[idx] = change_cut_dir_multi(notes[idx], nl_last)
+            speed = calc_note_speed(nl_last, notes[idx], t_diff)
+
             if speed > mx_speed:
-                # need to change until it fits
-                speed
+                # second, fit position
+                # target_position = move_note_by_cutdir(nl_last, False)
+                target_position = nl_last[:2]
+                # check if can make it more easy
+                if notes[idx][:2] != target_position:
+                    # TODO: intelligent shifting
+                    note_prob = nl_last
+                    note_prob[0] = notes[idx][0]
+                    note_prob[1] = notes[idx][1]
+                    speed = calc_note_speed(note_prob, notes[idx], t_diff)
+                    if speed < mx_speed:
+                        notes[idx] = note_prob
 
-            if speed < 0.3 * mx_speed:
+        if speed > mx_speed:
+            # third, remove and fill up with 3 no-direction-same-notes
+            # TODO: create own timeline for events first
+            notes[idx] = []
+            continue    # do not update nl_last
+
+        if speed < 0.3 * mx_speed:
+            # fourth, check if can make it more difficult
+            note_prob = move_note_by_cutdir(notes[idx], True)
+            speed = calc_note_speed(note_prob, notes[idx], t_diff)
+            if speed < mx_speed and note_prob != notes[idx]:
+                notes[idx] = note_prob
                 # check if can make it more difficult
-                speed
+                note_prob = move_note_by_cutdir(notes[idx], True)
+                speed = calc_note_speed(note_prob, notes[idx], t_diff)
+                if speed < mx_speed:
+                    notes[idx] = note_prob
 
+        nl_last = notes[idx]
+        nl_last_index = idx
+        last_time = timings[idx]
 
-
-            # check cut direction movement (of first element in each time step)
-            notes[idx] = check_note_movement(nl_last, notes[idx])
-
-            # # notes[idx] = optimize_note_movement(nl_last, notes[idx])
-            # notes[idx] = check_border_notes(notes, timings, idx)
-
-            # calculate movement speed (of first element)
-            new_time = timings[idx]
-            speed = calc_note_speed(nl_last, notes[idx], new_time - last_time)
-
-            # remove too fast elements
-            if idx in decrease_range:
-                mx_speed = config.max_speed * decrease_val[idx]
-            else:
-                mx_speed = config.max_speed
-
-            factor = get_factor_from_max_speed(mx_speed, 0.5, 1)
-            mx_speed *= factor
-
-            if speed > mx_speed:
-                # remove notes at this point
-                rm_counter += int(len(notes[idx]) / 4)
-                notes[idx] = []
-                continue
-            # update last correct note
-            else:
-                last_time = new_time
-                nl_last = notes[idx]
-
-            # check double notes
-            if len(notes[idx]) > 4:
-                rm_temp = np.zeros_like(notes[idx])
-                cut_dir = notes[idx][3]
-                for n in range(int(len(notes[idx]) / 4) - 1):
-                    # check if cut direction is same
-                    if notes[idx][(n + 1) * 4 + 3] != cut_dir:
-                        notes[idx][(n + 1) * 4 + 3] = 8
-                    n *= 4
-                    speed1 = calc_note_speed(notes[idx][n:n + 4],
-                                             notes[idx][n + 4:n + 8],
-                                             time_diff=0.08, cdf=1.1, react=False)
-                    speed2 = calc_note_speed(notes[idx][n + 4:n + 8],
-                                             notes[idx][n:n + 4],
-                                             time_diff=0.08, cdf=1.1, react=False)
-                    speed = np.min([speed1, speed2])
-                    if speed > config.max_double_note_speed:
-                        # try to fix second notes
-                        try_notes = notes[idx][n + 4:n + 8]
-                        try_notes[3] = notes[idx][n:n + 4][3]
-                        speed1 = calc_note_speed(notes[idx][n:n + 4],
-                                                 try_notes,
-                                                 time_diff=0.05, cdf=0.65)
-                        speed2 = calc_note_speed(try_notes,
-                                                 notes[idx][n:n + 4],
-                                                 time_diff=0.05, cdf=0.65)
-                        speed = np.min([speed1, speed2])
-                        if speed > config.max_double_note_speed:
-                            # remove sec notes
-                            rm_temp[n + 4:n + 8] = 1
-                        else:
-                            # include try notes
-                            notes[idx][n + 4:n + 8] = try_notes
-
-                # remove unsuited notes
-                if rm_temp.sum() > 0:
-                    rm_counter += int(rm_temp.sum() / 4)
-                    for rm in range(len(rm_temp))[::-1]:
-                        if rm_temp[rm]:
-                            notes[idx].pop(rm)
-
-    # print(f"Sanity check note speed removed {rm_counter} elements")
     return notes
 
 
@@ -1289,14 +1296,14 @@ def unpslit_notes(notes_r, notes_l, notes_b):
     return notes
 
 
-def get_cut_dir_xy(cut_dir):
+def get_cut_dir_xy(cut_dir: int) -> [int, int]:
     cut_dir_x = np.asarray([[1, 0, -1]] * 3).flatten()
     cut_dir_y = np.asarray([[-1] * 3, [0] * 3, [1] * 3]).flatten()
     cut_dir_order = np.asarray([[4, 0, 5], [2, 8, 3], [6, 1, 7]]).flatten()
     mov_x = cut_dir_x[cut_dir_order == cut_dir]
     mov_y = cut_dir_y[cut_dir_order == cut_dir]
 
-    return mov_x, mov_y
+    return int(mov_x), int(mov_y)
 
 
 def reverse_cut_dir_xy(old_cut):
