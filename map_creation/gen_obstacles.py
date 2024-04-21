@@ -187,7 +187,7 @@ def combine_obstacles(obstacles_all, times_empty):
     return obstacles
 
 
-def calculate_obstacles(notes, timings):
+def calculate_obstacles(notes, timings):    # TODO: change config to obstacle_mode with 0 None and up to3 for full
     obstacles_all = [[], [], [], []]
     rows_last = [2, 2, 2, 2]
     times_empty = [0]

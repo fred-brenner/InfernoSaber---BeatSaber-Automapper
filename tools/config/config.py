@@ -13,9 +13,9 @@ bs_mapping_version = "v3"  # allows to generate advanced features like arcs
 """Do change"""
 # select mapper style
 # use_mapper_selection = "pp3_15"
-use_mapper_selection = "easy_15"
+# use_mapper_selection = "easy_15"
 # use_mapper_selection = "hard_15"
-# use_mapper_selection = "expert_15"
+use_mapper_selection = "expert_15"
 
 """Change only for new training"""
 use_mapper_selection = use_mapper_selection.lower()
@@ -25,7 +25,7 @@ max_bps_limit = 12  # maximum beats_per_second value for training
 
 """Change for application"""
 # Map creation model configuration
-max_speed = 4 * 5.0  # set around 5-40 (normal-expert++)
+max_speed = 4 * 8.0  # set around 5-40 (normal-expert++)
 add_beat_intensity = 95  # try to match bps by x% [80, 120]
 gimme_more_notes_flag = True   # try to always use notes on both sides
 gimme_more_notes_prob = 0.25     # probability to activate [0.0-1.0]
@@ -33,16 +33,16 @@ cdf = 1.2  # cut director factor (to calculate speed, [0.5, 1.5])
 cdf_lr = 1.15  # speed addition factor for left right movement
 expert_fact = 0.63  # expert plus to expert factor [0.6, 0.7]
 create_expert_flag = True  # create second expert map
-thresh_beat = 0.37  # minimum beat response required to trigger generator [0.3, 0.6]
+thresh_beat = 0.45  # minimum beat response required to trigger generator [0.3, 0.6]
 thresh_onbeat = 0.09
 # thresh_pitch = 0.90  # minimum beat for pitch check (0.8,low-1.5,high)
-# threshold_start = 0.8  # factor for start and end threshold [0.5, 1.5]
-# threshold_end = 0.7    # factor for start and end threshold [0.5, 1.5]
+threshold_start = 1.1  # factor for start and end threshold [0.8, 1.2]
+threshold_end = 0.7    # factor for start and end threshold (squared) [0.6, 1.1]
 factor_pitch_certainty = 0.5  # select emphasis on first (>1) or second pitch method
 factor_pitch_meanmax = 3    # select pitch certainty for mean (>=3) or max (<3)
 random_note_map_factor = 0.3  # stick note map to random song/center (set to 0 to disable)
 random_note_map_change = 3  # change frequency for center (1-5)
-quick_start = 2     # map quick start mode (0 off, 1-3 on)
+# quick_start = 0     # map quick start mode (0 off, 1-3 on)    # TODO: rework
 t_diff_bomb = 1.5   # minimum time between notes to add bomb
 t_diff_bomb_react = 0.3  # minimum time between finished added bombs
 allow_mismatch_flag = False  # if True, wrong turned notes won't be removed
@@ -118,7 +118,7 @@ use_fixed_bpm = 100  # use fixed bpm or set to None for the song bpm
 max_njs = 26  # maximum Note Jump Speed allowed
 decr_speed_range = 30  # range for start and end (n first and last notes)
 decr_speed_val = 0.35  # decrease max speed at start
-reaction_time = 1.1  # reaction time (0.5-2)
+reaction_time = 1.15   # reaction time (0.5-2)
 reaction_time_fact = 0.013  # factor including max_speed
 jump_speed = 12.4  # jump speed from beat saber (10-15)
 jump_speed_fact = 0.310  # factor including max_speed

@@ -7,7 +7,7 @@ from tools.config import paths, config
 from tools.utils.numpy_shorts import reduce_number_of_songs
 from training.helpers import filter_by_bps
 from preprocessing.music_processing import run_music_preprocessing
-from tools.utils import numpy_shorts
+# from tools.utils import numpy_shorts
 
 
 # Setup configuration
