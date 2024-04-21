@@ -240,7 +240,7 @@ def sliders_to_json(sliders, bpm):
 
 
 def get_map_string(events='', notes='', obstacles='', sliders='', bombs='',):
-    map_string = '{"_version":"3.2.0",'
+    map_string = '{"version":"3.2.0",'
     map_string += '"bpmEvents":[],"rotationEvents":[],'
     map_string += f'"colorNotes":[{notes}],'
     map_string += f'"bombNotes":[{bombs}],'
