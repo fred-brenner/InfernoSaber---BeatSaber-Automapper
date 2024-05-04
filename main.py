@@ -94,7 +94,7 @@ def main(use_model=None, diff=None, export_results_to_bs=True,
             print("Continue with next song")
             continue
         end_time = time.time()
-        print(f"Time needed: {end_time - start_time}s")
+        print(f"Time needed: {end_time - start_time:.1f}s")
 
         # create zip archive for online viewer
         shutil.make_archive(f'{paths.new_map_path}{config.max_speed_orig:.1f}_{song_name}',
