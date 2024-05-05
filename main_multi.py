@@ -295,7 +295,7 @@ if __name__ == "__main__":
     else:
         # main_multi(diff_list, True)
         # each worker needs 2-5gb of ram memory
-        # each worker needs 2-4gb of gpu memory (if not Win and GPU available)
+        # each worker needs 2-4gb of gpu memory (if GPU available)
         n_workers = 3
         if paths.main_path.startswith('/mnt/'):
             # use GPU in linux
