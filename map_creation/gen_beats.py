@@ -210,7 +210,7 @@ def main(name_ar: list, debug_beats=False) -> bool:
     # # calculate time between beats
     # timing_diff_ar = calc_time_between_beats([map_times])
 
-    map_times = add_start_end_beats(map_times, x_volume, x_onset)
+    # map_times = add_start_end_beats(map_times, x_volume, x_onset)
 
     #####################
     # apply map generator
