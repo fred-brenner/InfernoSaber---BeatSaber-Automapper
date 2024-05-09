@@ -1,5 +1,6 @@
 import pickle
 import numpy as np
+import copy
 
 from tools.config import paths, config
 
@@ -51,6 +52,91 @@ def sort_beats_by_time(song_ar: list):
     return new_song_ar, new_time_ar
 
 
+def remove_duplicate_notes(notes_ar_all):
+    for idx_naa, notes_ar in enumerate(notes_ar_all):
+
+        # get all notes with multiple simultaneous entries
+        mask = [True if len(n_idx.shape) > 1 else False for n_idx in notes_ar]
+        mask = np.arange(1, len(mask) + 1) * mask
+        mask = np.asarray(mask[mask != 0], dtype=int) - 1
+        # iterate through duplicate notes and use only first occurrence
+        for idx in mask:
+            changed_notes = False
+            notes = notes_ar[idx]
+            # split left and right notes
+            nl = []
+            nr = []
+            # TODO: what to do about boms?
+            for note in notes:
+                if note[2] == 0:
+                    nl.append(note)
+                elif note[2] == 1:
+                    nr.append(note)
+            if len(nl) > 0:
+                # remove secondary left notes
+                if len(nl) > 1:
+                    changed_notes = True
+                nl = get_first_note_lr(nl)
+            if len(nr) > 0:
+                # remove secondary right notes
+                if len(nr) > 1:
+                    changed_notes = True
+                nr = get_first_note_lr(nr)
+
+            if changed_notes:
+                # stack notes back together
+                if len(nl) > 1:
+                    if len(nr) > 1:
+                        nl = np.stack([nl, nr])
+                elif len(nr) > 1:
+                    nl = nr
+                else:
+                    nl = np.array([], dtype=int)
+                notes_ar[idx] = nl
+        notes_ar_all[idx_naa] = notes_ar
+
+    return notes_ar_all
+
+
+def get_pos_and_dir_from_notes(pos_ar):
+    dir_ar = copy.deepcopy(pos_ar)
+    for idx0, notes_song in enumerate(dir_ar):
+        for idx1 in range(len(notes_song)):
+            if len(notes_song[idx1]) < 1:
+                # skip empty notes
+                continue
+            if len(notes_song[idx1].shape) == 1:
+                pos_ar[idx0][idx1] = notes_song[idx1][:3]
+                dir_ar[idx0][idx1] = notes_song[idx1][3:4]
+            elif len(notes_song[idx1].shape) == 2:
+                pos_ar[idx0][idx1] = notes_song[idx1][:, :3]
+                dir_ar[idx0][idx1] = notes_song[idx1][:, 3]
+            else:
+                print("Error in beat_data_helper: forbidden notes length")
+    return pos_ar, dir_ar
+
+
+def get_first_note_lr(notes_lr):
+    if len(notes_lr) == 1:
+        return notes_lr[0]
+    elif len(notes_lr) < 1:
+        return notes_lr
+
+    notes_ar = np.asarray(notes_lr)
+    directions, dir_counts = np.unique(notes_ar[:, 3], return_counts=True)
+    directions = directions[dir_counts.argsort()][::-1]
+    for direction in directions:
+        if direction != 8:
+            break
+
+    # build note
+    posx = notes_lr[0][0]
+    posy = notes_lr[0][1]
+    # TODO: intelligent choice of position based on direction
+    single_note = [posx, posy, notes_lr[0][2], direction]
+    return np.asarray(single_note, dtype=int)
+
+
 def run_notes_sanity_check(beat_matrix, verbose=True):
     # check data types for notes
     if beat_matrix[0] < 0:
@@ -81,7 +167,7 @@ def pos_changed(last_map, cur_map):
     if len(last_map.shape) > 1:
         last_map = last_map[-1]
     # check lineindex or linelayer changed
-    if last_map[1-1] != cur_map[1-1] or last_map[2-1] != cur_map[2-1]:
+    if last_map[1 - 1] != cur_map[1 - 1] or last_map[2 - 1] != cur_map[2 - 1]:
         return True
     # else
     return False
@@ -119,7 +205,6 @@ def cluster_notes_in_classes(notes_ar):
 
 
 def encode_beat_ar(beat):
-
     # Remove all double notes
     if config.remove_double_notes:
         if len(beat.shape) > 1:

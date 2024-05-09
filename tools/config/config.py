@@ -6,7 +6,7 @@ import numpy as np
 # config file for all important values 
 # used in multiple codes
 ########################################
-InfernoSaber_version = "1.7.0"  # coded into the info.dat file
+InfernoSaber_version = "2.0.0"  # coded into the info.dat file
 bs_mapping_version = "v3"  # allows to generate advanced features like arcs
 # bs_mapping_version = "v2"  # legacy mode, may be deprecated in future
 
@@ -16,7 +16,7 @@ bs_mapping_version = "v3"  # allows to generate advanced features like arcs
 # use_mapper_selection = "easy_15"
 # use_mapper_selection = "hard_15"
 # use_mapper_selection = "expert_15"
-use_mapper_selection = "fav_15"
+use_mapper_selection = "v2_fav"
 
 """Change only for new training"""
 use_mapper_selection = use_mapper_selection.lower()
@@ -65,7 +65,7 @@ add_obstacle_flag = True  # add obstacles in free areas
 obstacle_time_gap = [0.3, 0.8]  # time gap before [0.2-1] after [0.5-2]
 obstacle_min_duration = 0.1  # minimum duration for each obstacle [0.1-2]
 obstacle_max_count = 2  # maximum appearance count for obstacles
-sporty_obstacles = False
+sporty_obstacles = True
 add_slider_flag = True  # add arcs between notes in free areas
 slider_time_gap = [0.5, 10.0]    # time gap in seconds
 slider_probability = 0.8    # [0.1-1.0] with 1 meaning all on

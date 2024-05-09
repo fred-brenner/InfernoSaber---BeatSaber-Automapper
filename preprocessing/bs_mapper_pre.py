@@ -2,7 +2,8 @@ import numpy as np
 from sklearn.preprocessing import OneHotEncoder
 import pickle
 
-from preprocessing.beat_data_helper import *
+from preprocessing.beat_data_helper import (sort_beats_by_time, remove_duplicate_notes,
+                                            cluster_notes_in_classes, load_raw_beat_data, get_pos_and_dir_from_notes)
 from tools.config import paths, config
 from tools.utils.numpy_shorts import reduce_number_of_songs
 from training.helpers import filter_by_bps
@@ -45,13 +46,19 @@ def lstm_shift(song_in, time_in, ml_out):
     return [song_in, l_time_in, l_out_in], l_ml_out
 
 
-def load_beat_data(name_ar: list, return_notes=False):
+def load_beat_data(name_ar: list, return_notes=False, v2=True):
     print("Loading maps input data")
     map_dict_notes, _, _ = load_raw_beat_data(name_ar)
     notes_ar, time_ar = sort_beats_by_time(map_dict_notes)
     if return_notes:
         return notes_ar, time_ar
-    beat_class = cluster_notes_in_classes(notes_ar)
+    if v2:
+        notes_ar = remove_duplicate_notes(notes_ar)
+        # get positions only
+        beats_ar, _ = get_pos_and_dir_from_notes(notes_ar)
+        beat_class = cluster_notes_in_classes(beats_ar)
+    else:
+        beat_class = cluster_notes_in_classes(notes_ar)
     return beat_class, time_ar
 
 

@@ -539,8 +539,8 @@ def cut_dir_values(notes):
 
 def offset_notes(notes_l, idx, offset, rm_counter):
     for i in range(int(len(notes_l[idx]) / 4)):
-        if i > 1:
-            print("")
+        # if i > 1:
+        #     print("")
         pos_before = np.asarray(notes_l[idx][i * 4:i * 4 + 2])
         new_pos = list(pos_before - [offset, 0])
         if 0 <= new_pos[0] < 4 and 0 <= new_pos[1] < 3:
