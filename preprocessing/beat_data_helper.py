@@ -100,6 +100,7 @@ def remove_duplicate_notes(notes_ar_all):
 
 def get_pos_and_dir_from_notes(pos_ar):
     dir_ar = copy.deepcopy(pos_ar)
+    note_ar = copy.deepcopy(pos_ar)
     for idx0, notes_song in enumerate(dir_ar):
         for idx1 in range(len(notes_song)):
             if len(notes_song[idx1]) < 1:
@@ -107,13 +108,15 @@ def get_pos_and_dir_from_notes(pos_ar):
                 continue
             if len(notes_song[idx1].shape) == 1:
                 pos_ar[idx0][idx1] = notes_song[idx1][:3]
+                note_ar[idx0][idx1] = notes_song[idx1][:4]
                 dir_ar[idx0][idx1] = notes_song[idx1][3:4]
             elif len(notes_song[idx1].shape) == 2:
                 pos_ar[idx0][idx1] = notes_song[idx1][:, :3]
+                note_ar[idx0][idx1] = notes_song[idx1][:, :4].reshape(-1)
                 dir_ar[idx0][idx1] = notes_song[idx1][:, 3]
             else:
                 print("Error in beat_data_helper: forbidden notes length")
-    return pos_ar, dir_ar
+    return pos_ar, dir_ar, note_ar
 
 
 def get_first_note_lr(notes_lr):

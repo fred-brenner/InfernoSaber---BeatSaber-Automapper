@@ -17,7 +17,7 @@ from tools.config import config
 dir_path = "C:/Users/frede/Desktop/BS_Automapper/Data/"
 
 bs_song_path = "E:/SteamLibrary/steamapps/common/Beat Saber/Beat Saber_Data/CustomLevels/"
-bs_input_path = "C:/Users/frede/Desktop/BS_Automapper/Data/training/favorites_bs_input/"
+bs_input_path = "C:/Users/frede/Desktop/BS_Automapper/Data/training/custom_bs_input_new/"
 
 ############################# (no need to change)
 # main workspace path
