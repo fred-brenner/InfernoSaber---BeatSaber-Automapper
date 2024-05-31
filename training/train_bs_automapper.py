@@ -148,9 +148,11 @@ gc.collect()
 # extract ml content
 mask_r = [x for xs in ml_arrow[2] for x in xs]
 mask_l = [x for xs in ml_arrow[3] for x in xs]
-# ml_time_in = [x for xs in ml_arrow[0] for x in xs]
-ml_time_in = np.vstack([ml_input_arrow[1][mask_r], ml_input_arrow[1][mask_l]])
-ml_input = np.vstack([ml_input_arrow[0][mask_r], ml_input_arrow[0][mask_l]])
+mask_r = np.asarray(mask_r).astype(bool)
+mask_l = np.asarray(mask_l).astype(bool)
+ml_time_in = np.asarray([x for xs in ml_arrow[0] for x in xs])
+# ml_time_in = np.concatenate([ml_input_arrow[1][mask_r], ml_input_arrow[1][mask_l]], axis=0)
+ml_input = np.concatenate([ml_input_arrow[0][mask_r], ml_input_arrow[0][mask_l]], axis=0)
 in_song_l = ai_encode_song(ml_input)
 ml_output = np.asarray([x for xs in ml_arrow[1] for x in xs])
 

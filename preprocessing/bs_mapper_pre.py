@@ -96,15 +96,15 @@ def get_arrow_dataset(beat_ar, time_ar):
         timing_ar[-1].extend(calc_time_between_beats([time_selection])[0])
         arrow_l[-1] = [arrow_l[-1][x] for x in range(len(mask_l)) if mask_l[x] > 0]
 
-        arrow_r[-1] = np.hstack([arrow_r[-1], np.asarray(arrow_l[-1])[:, 3]])
-        # onehot encode output
-        arrow_r[-1] = arrow_r[-1].reshape(-1, 1)
+        arrow_all = np.hstack([arrow_r[-1], np.asarray(arrow_l[-1])[:, 3]])
         # make sure that every arrow direction is recognized
-        arrow_r[-1] = np.hstack([np.arange(0, 9), arrow_r[-1]])
-        arrow_enc = onehot_encode(arrow_r[-1])
-        arrow_r[-1] = arrow_enc.toarray()
+        arrow_all = np.hstack([np.arange(0, 9), arrow_all])
+        # onehot encode output
+        arrow_all = arrow_all.reshape(-1, 1)
+        arrow_enc = onehot_encode(arrow_all)
+        arrow_all = arrow_enc.toarray()
         # delete added arrows
-        arrow_r[-1] = arrow_r[-1][10:]
+        arrow_r[-1] = arrow_all[9:]
 
     return [timing_ar, arrow_r, mask_r_full, mask_l_full]
 
