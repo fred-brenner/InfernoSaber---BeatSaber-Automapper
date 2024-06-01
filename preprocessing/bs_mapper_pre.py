@@ -101,7 +101,7 @@ def get_arrow_dataset(beat_ar, time_ar):
         arrow_all = np.hstack([np.arange(0, 9), arrow_all])
         # onehot encode output
         arrow_all = arrow_all.reshape(-1, 1)
-        arrow_enc = onehot_encode(arrow_all)
+        arrow_enc = onehot_encode(arrow_all, paths.arrows_classify_encoder_file)
         arrow_all = arrow_enc.toarray()
         # delete added arrows
         arrow_r[-1] = arrow_all[9:]
@@ -133,6 +133,7 @@ def load_ml_data():
             beat_class.pop(idx)
             song_ar.pop(idx)
             time_ar.pop(idx)
+            note_ar.pop(idx)
         else:
             idx += 1
 
@@ -150,7 +151,7 @@ def load_ml_data():
 
     # onehot encode output
     ml_output_notes = ml_output_notes.reshape(-1, 1)
-    ml_output_notes = onehot_encode(ml_output_notes)
+    ml_output_notes = onehot_encode(ml_output_notes, paths.beats_classify_encoder_file)
     ml_output_notes = ml_output_notes.toarray()
 
     ml_arrow = get_arrow_dataset(note_ar, time_ar)
@@ -158,13 +159,12 @@ def load_ml_data():
     return [song_input, time_input], ml_output_notes, ml_arrow
 
 
-def onehot_encode(ml_output):
+def onehot_encode(ml_output, save_path):
     encoder = OneHotEncoder(dtype=int)
     encoder.fit(ml_output)
     ml_output = encoder.transform(ml_output)
 
     # save onehot encoder
-    save_path = paths.beats_classify_encoder_file
     with open(save_path, "wb") as enc_file:
         pickle.dump(encoder, enc_file)
     # return ml data

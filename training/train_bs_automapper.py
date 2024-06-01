@@ -77,70 +77,72 @@ del ml_input
 del ml_output
 gc.collect()
 
-#
-# # Create model
-# ##############
-# # create timestamp
-# dateTimeObj = datetime.now()
-# timestamp = f"{dateTimeObj.month}_{dateTimeObj.day}__{dateTimeObj.hour}_{dateTimeObj.minute}"
-# save_model_name = f"tf_model_mapper_{min_bps_limit}-{max_bps_limit}_{timestamp}.h5"
-# # load model
-# mapper_model, save_model_name = load_keras_model(save_model_name)
-# # create model
-# if mapper_model is None:
-#     mapper_model = create_keras_model('lstm_half', dim_in, dim_out)
-#     adam = Adam(learning_rate=learning_rate, weight_decay=2*learning_rate / n_epochs)
-#     # mapper_model.compile(loss='mean_squared_error', optimizer=adam, metrics=['accuracy'])
-#     mapper_model.compile(loss='categorical_crossentropy', optimizer=adam, metrics=['accuracy'])
-#
-# mapper_model.summary()
-#
-# # Model training
-# ################
-# training = mapper_model.fit(x=ds_train, y=out_class_train,
-#                             epochs=n_epochs, batch_size=batch_size,
-#                             shuffle=True, verbose=1)
-#
-# # Evaluate model
-# ################
-# try:
-#     command_len = 10
-#     print("Validate model with test data...")
-#     validation = mapper_model.evaluate(x=ds_test, y=out_class_test)
-#     pred_result = mapper_model.predict(x=ds_test, verbose=0)
-#
-#     pred_class = categorical_to_class(pred_result)
-#     real_class = categorical_to_class(out_class_test)
-#
-#     pred_class = pred_class.flatten().tolist()
-#     real_class = real_class.flatten().tolist()
-#
-#     print(tabulate([['Pred', pred_class], ['Real', real_class]], headers=['Type', 'Result (test data)']))
-#
-#     print("Validate model with train data...")
-#     validation = mapper_model.evaluate(x=ds_train_sample, y=out_class_train[:test_samples])
-#
-#     pred_result = mapper_model.predict(x=ds_train_sample, verbose=0)
-#     pred_class = categorical_to_class(pred_result)
-#     real_class = categorical_to_class(out_class_train[:test_samples])
-#
-#     pred_class = pred_class.flatten().tolist()
-#     real_class = real_class.flatten().tolist()
-#
-#     print(tabulate([['Pred', pred_class], ['Real', real_class]], headers=['Type', 'Result (train data)']))
-#
-# except Exception as e:
-#     print(f"Error: {type(e).__name__}")
-#     print(f"Error message: {e}")
-#     print("Error in displaying mapper evaluation. Continue with saving.")
-#
-# # Save Model
-# ############
-# print(f"Saving model at: {paths.model_path + save_model_name}")
-# mapper_model.save(paths.model_path + save_model_name)
-#
-# print("Finished Training part1")
 
+# Create model
+##############
+# create timestamp
+dateTimeObj = datetime.now()
+timestamp = f"{dateTimeObj.month}_{dateTimeObj.day}__{dateTimeObj.hour}_{dateTimeObj.minute}"
+save_model_name = f"tf_model_mapper_{min_bps_limit}-{max_bps_limit}_{timestamp}.h5"
+# load model
+mapper_model, save_model_name = load_keras_model(save_model_name)
+# create model
+if mapper_model is None:
+    mapper_model = create_keras_model('lstm_half', dim_in, dim_out)
+    adam = Adam(learning_rate=learning_rate, weight_decay=2*learning_rate / n_epochs)
+    # mapper_model.compile(loss='mean_squared_error', optimizer=adam, metrics=['accuracy'])
+    mapper_model.compile(loss='categorical_crossentropy', optimizer=adam, metrics=['accuracy'])
+
+mapper_model.summary()
+
+# Model training
+################
+training = mapper_model.fit(x=ds_train, y=out_class_train,
+                            epochs=n_epochs, batch_size=batch_size,
+                            shuffle=True, verbose=1)
+
+# Evaluate model
+################
+try:
+    command_len = 10
+    print("Validate model with test data...")
+    validation = mapper_model.evaluate(x=ds_test, y=out_class_test)
+    pred_result = mapper_model.predict(x=ds_test, verbose=0)
+
+    pred_class = categorical_to_class(pred_result)
+    real_class = categorical_to_class(out_class_test)
+
+    pred_class = pred_class.flatten().tolist()
+    real_class = real_class.flatten().tolist()
+
+    print(tabulate([['Pred', pred_class], ['Real', real_class]], headers=['Type', 'Result (test data)']))
+
+    print("Validate model with train data...")
+    validation = mapper_model.evaluate(x=ds_train_sample, y=out_class_train[:test_samples])
+
+    pred_result = mapper_model.predict(x=ds_train_sample, verbose=0)
+    pred_class = categorical_to_class(pred_result)
+    real_class = categorical_to_class(out_class_train[:test_samples])
+
+    pred_class = pred_class.flatten().tolist()
+    real_class = real_class.flatten().tolist()
+
+    print(tabulate([['Pred', pred_class], ['Real', real_class]], headers=['Type', 'Result (train data)']))
+
+except Exception as e:
+    print(f"Error: {type(e).__name__}")
+    print(f"Error message: {e}")
+    print("Error in displaying mapper evaluation. Continue with saving.")
+
+# Save Model
+############
+print(f"Saving model at: {paths.model_path + save_model_name}")
+mapper_model.save(paths.model_path + save_model_name)
+
+print("Finished Training part1")
+mapper_model = None
+del mapper_model
+gc.collect()
 
 ##################################
 # Training part 2: Arrow detection
@@ -190,7 +192,7 @@ dim_out = out_class_train.shape
 del in_class_l
 del in_class_test
 # del in_song
-# del in_song_l
+del in_song_l
 del in_song_test
 del in_song_train
 del in_time_l
@@ -206,7 +208,7 @@ gc.collect()
 # create timestamp
 dateTimeObj = datetime.now()
 timestamp = f"{dateTimeObj.month}_{dateTimeObj.day}__{dateTimeObj.hour}_{dateTimeObj.minute}"
-save_model_name = f"tf_model_mapper_{min_bps_limit}-{max_bps_limit}_{timestamp}.h5"
+save_model_name = f"tf_model_arrow_{min_bps_limit}-{max_bps_limit}_{timestamp}.h5"
 # load model
 mapper_model, save_model_name = load_keras_model(save_model_name)
 # create model
