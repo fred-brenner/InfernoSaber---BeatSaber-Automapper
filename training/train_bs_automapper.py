@@ -22,8 +22,11 @@ from lighting_prediction.train_lighting import lstm_shift_events_half
 min_bps_limit = config.min_bps_limit
 max_bps_limit = config.max_bps_limit
 learning_rate = config.map_learning_rate
+learning_rate_arrow = config.arrow_learning_rate
 n_epochs = config.map_n_epochs
+n_epochs_arrow = config.arrow_n_epochs
 batch_size = config.map_batch_size
+batch_size_arrow = config.arrow_batch_size
 test_samples = config.map_test_samples
 np.random.seed(3)
 
@@ -214,7 +217,7 @@ mapper_model, save_model_name = load_keras_model(save_model_name)
 # create model
 if mapper_model is None:
     mapper_model = create_keras_model('lstm_half', dim_in, dim_out)
-    adam = Adam(learning_rate=learning_rate, weight_decay=2*learning_rate / n_epochs)
+    adam = Adam(learning_rate=learning_rate_arrow, weight_decay=2*learning_rate_arrow / n_epochs_arrow)
     # mapper_model.compile(loss='mean_squared_error', optimizer=adam, metrics=['accuracy'])
     mapper_model.compile(loss='categorical_crossentropy', optimizer=adam, metrics=['accuracy'])
 
@@ -223,7 +226,7 @@ mapper_model.summary()
 # Model training
 ################
 training = mapper_model.fit(x=ds_train, y=out_class_train,
-                            epochs=n_epochs, batch_size=batch_size,
+                            epochs=n_epochs_arrow, batch_size=batch_size_arrow,
                             shuffle=True, verbose=1)
 
 # Evaluate model

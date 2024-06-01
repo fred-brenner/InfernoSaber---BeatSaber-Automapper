@@ -180,6 +180,14 @@ lstm_len = 16
 remove_double_notes = False
 mapper_song_limit = 240    # maximum number of songs used for training, to not overload RAM
 
+# Mapper model configuration
+arrow_learning_rate = 4e-4  # model learning rate
+arrow_n_epochs = 150  # number of total epochs
+arrow_batch_size = 128  # batch size
+# map_test_samples = 10 # taken fro mapper model configuration
+# arrow_lstm_len = 16   # taken from mapper model configuration
+# mapper_song_limit     # taken from mapper model configuration
+
 # Beat prediction model configuration
 beat_learning_rate = 5e-4
 beat_n_epochs = 80
