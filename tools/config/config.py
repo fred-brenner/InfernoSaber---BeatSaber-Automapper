@@ -160,6 +160,7 @@ vram_limit = 20     # free VRAM in GB (needed for lighting training)
 enc_version = 'tf_model_enc_'
 autoenc_version = 'tf_model_autoenc_'
 mapper_version = 'tf_model_mapper_'
+arrow_version = 'tf_model_arrow_'
 beat_gen_version = 'tf_beat_gen_'
 event_gen_version = 'tf_event_gen_'
 

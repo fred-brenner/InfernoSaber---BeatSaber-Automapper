@@ -1,3 +1,5 @@
+import pickle
+
 import numpy as np
 import gc
 from keras import backend as K
@@ -10,11 +12,11 @@ from beat_prediction.beat_prop import get_beat_prop, tcn_reshape
 
 from map_creation.sanity_check import *
 # from map_creation.class_helpers import *
-from map_creation.map_creator import create_map
+from map_creation.map_creator import create_map, decode_beats
 from map_creation.find_bpm import get_file_bpm
 
 from preprocessing.music_processing import run_music_preprocessing
-from preprocessing.bs_mapper_pre import calc_time_between_beats
+from preprocessing.bs_mapper_pre import calc_time_between_beats, get_arrow_dataset
 from tools.utils.numpy_shorts import get_factor_from_max_speed
 # from preprocessing.bs_mapper_pre import lstm_shift
 
@@ -240,12 +242,41 @@ def main(name_ar: list, debug_beats=False) -> bool:
     gc.collect()
     del mapper_model, enc_model
 
-    ############
-    # create map
-    ############
+    # TODO: sanity check timings with notes
+
     # TODO: replace with default content instead of deletion
     map_times = map_times[config.lstm_len:]     # required by lstm start-up
     map_times = map_times[:len(y_class_map)]    # rest from sectioning into lstm len batches
+
+    #######################
+    # apply arrow generator
+    #######################
+    # load notes classify keys
+    with open(paths.notes_classify_dict_file, 'rb') as f:
+        class_keys = pickle.load(f)
+    # decode mapper into notes
+    notes_generated = decode_beats(y_class_map, class_keys)
+    # add dummy arrows to beats
+    for idx, notes_dummy in enumerate(notes_generated):
+        for idx2 in range(len(notes_generated[idx]), 1, -3):
+            notes_dummy.insert(idx2, 0)
+        notes_generated[idx] = notes_dummy
+    # pass dummy notes to ml training preparation
+    ml_arrow = get_arrow_dataset([notes_generated], [map_times])
+    # generate new map times for right and left side individually
+
+    mapper_model = get_full_model_path(config.arrow_version)
+    # section into len(lstm) batches and calculate mapping for each batch
+    y_class_map = generate(in_song_l, map_times, mapper_model, config.lstm_len,
+                           paths.arrows_classify_encoder_file)
+
+    K.clear_session()
+    gc.collect()
+    del mapper_model, enc_model
+
+    ############
+    # create map
+    ############
 
     ############
     # add events
