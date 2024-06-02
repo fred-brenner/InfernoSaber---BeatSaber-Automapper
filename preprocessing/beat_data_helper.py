@@ -61,7 +61,7 @@ def remove_duplicate_notes(notes_ar_all):
         mask = np.asarray(mask[mask != 0], dtype=int) - 1
         # iterate through duplicate notes and use only first occurrence
         for idx in mask:
-            changed_notes = False
+            # changed_notes = False
             notes = notes_ar[idx]
             # split left and right notes
             nl = []
@@ -74,25 +74,30 @@ def remove_duplicate_notes(notes_ar_all):
                     nr.append(note)
             if len(nl) > 0:
                 # remove secondary left notes
-                if len(nl) > 1:
-                    changed_notes = True
+                # if len(nl) > 1:
+                #     changed_notes = True
                 nl = get_first_note_lr(nl)
             if len(nr) > 0:
                 # remove secondary right notes
-                if len(nr) > 1:
-                    changed_notes = True
+                # if len(nr) > 1:
+                #     changed_notes = True
                 nr = get_first_note_lr(nr)
 
-            if changed_notes:
-                # stack notes back together
-                if len(nl) > 1:
-                    if len(nr) > 1:
-                        nl = np.stack([nl, nr])
-                elif len(nr) > 1:
-                    nl = nr
-                else:
-                    nl = np.array([], dtype=int)
-                notes_ar[idx] = nl
+            # if changed_notes:
+            # stack notes back together
+            if len(nl) > 1:
+                if len(nr) > 1:
+                    nl = np.stack([nl, nr])
+            elif len(nr) > 1:
+                nl = nr
+            else:
+                nl = np.array([], dtype=int)
+            notes_ar[idx] = nl
+
+            # sanity check that only one note per side passes through
+            # if len(notes_ar[idx]) > 2 and len(notes_ar[idx].shape) > 1:
+            #     print("Error")
+
         notes_ar_all[idx_naa] = notes_ar
 
     return notes_ar_all
