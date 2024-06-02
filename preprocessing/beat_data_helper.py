@@ -115,12 +115,12 @@ def get_pos_and_dir_from_notes(pos_ar):
                 pos_ar[idx0][idx1] = notes_song[idx1][:3]
                 note_ar[idx0][idx1] = notes_song[idx1][:4]
                 dir_ar[idx0][idx1] = notes_song[idx1][3:4]
-            elif len(notes_song[idx1].shape) == 2:
-                pos_ar[idx0][idx1] = notes_song[idx1][:, :3]
-                note_ar[idx0][idx1] = notes_song[idx1][:, :4].reshape(-1)
-                dir_ar[idx0][idx1] = notes_song[idx1][:, 3]
             else:
-                print("Error in beat_data_helper: forbidden notes length")
+                if len(notes_song[idx1].shape) != 2:
+                    print("Error in beat_data_helper: forbidden notes length")
+                pos_ar[idx0][idx1] = notes_song[idx1][:2, :3]
+                note_ar[idx0][idx1] = notes_song[idx1][:2, :4].reshape(-1)
+                dir_ar[idx0][idx1] = notes_song[idx1][:2, 3:4]
     return pos_ar, dir_ar, note_ar
 
 

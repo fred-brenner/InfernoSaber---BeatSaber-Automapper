@@ -99,15 +99,16 @@ def create_map(y_class_num, timings, events, name, bpm, pitch_input, pitch_times
         print(f"Finished song: {name}")
 
 
-def decode_beats(y_class_num, class_keys):
+def decode_beats(y_class_num, class_keys, allow_growth=True):
     notes = []
     for idx in range(len(y_class_num)):
         y = int(y_class_num[idx])
         encoded = class_keys[y]
         notes.append(decode_class_keys(encoded))
 
-    if config.gimme_more_notes_flag:
-        notes = gimme_more_notes(notes)
+    if allow_growth:
+        if config.gimme_more_notes_flag:
+            notes = gimme_more_notes(notes)
     return notes
 
 

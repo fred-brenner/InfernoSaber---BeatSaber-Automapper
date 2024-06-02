@@ -1,3 +1,4 @@
+import copy
 import pickle
 
 import numpy as np
@@ -244,10 +245,6 @@ def main(name_ar: list, debug_beats=False) -> bool:
 
     # TODO: sanity check timings with notes
 
-    # TODO: replace with default content instead of deletion
-    map_times = map_times[config.lstm_len:]     # required by lstm start-up
-    map_times = map_times[:len(y_class_map)]    # rest from sectioning into lstm len batches
-
     #######################
     # apply arrow generator
     #######################
@@ -255,19 +252,27 @@ def main(name_ar: list, debug_beats=False) -> bool:
     with open(paths.notes_classify_dict_file, 'rb') as f:
         class_keys = pickle.load(f)
     # decode mapper into notes
-    notes_generated = decode_beats(y_class_map, class_keys)
+    notes_generated = decode_beats(y_class_map, class_keys, allow_growth=False)
     # add dummy arrows to beats
     for idx, notes_dummy in enumerate(notes_generated):
         for idx2 in range(len(notes_generated[idx]), 1, -3):
             notes_dummy.insert(idx2, 0)
         notes_generated[idx] = notes_dummy
+    # fill up notes with dummy notes at start
+    notes_diff = len(map_times) - len(notes_generated)
+    if notes_diff > 0:
+        notes_generated_temp = copy.deepcopy(notes_generated[:notes_diff])
+        notes_generated = notes_generated_temp + notes_generated
     # pass dummy notes to ml training preparation
     ml_arrow = get_arrow_dataset([notes_generated], [map_times])
-    # generate new map times for right and left side individually
+    [_, _, arrow_mask_r, arrow_mask_l] = ml_arrow
+    # generate left and right arrow input dataset
+    arrow_in_song_l = np.vstack([in_song_l[arrow_mask_r], in_song_l[arrow_mask_l]])
+    arrow_map_times = np.vstack([map_times[arrow_mask_r], map_times[arrow_mask_l]])
 
     mapper_model = get_full_model_path(config.arrow_version)
     # section into len(lstm) batches and calculate mapping for each batch
-    y_class_map = generate(in_song_l, map_times, mapper_model, config.lstm_len,
+    y_class_map = generate(arrow_in_song_l, arrow_map_times, mapper_model, config.lstm_len,
                            paths.arrows_classify_encoder_file)
 
     K.clear_session()
@@ -277,6 +282,9 @@ def main(name_ar: list, debug_beats=False) -> bool:
     ############
     # create map
     ############
+    # TODO: replace with default content instead of deletion
+    map_times = map_times[config.lstm_len:]     # required by lstm start-up
+    map_times = map_times[:len(y_class_map)]    # rest from sectioning into lstm len batches
 
     ############
     # add events

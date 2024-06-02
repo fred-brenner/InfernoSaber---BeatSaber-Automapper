@@ -74,7 +74,7 @@ def main():
     [x_volume, x_onset] = get_beat_prop(song_input)
 
     # load real beats
-    _, real_beats = load_beat_data(name_ar)
+    _, real_beats = load_beat_data(name_ar, return_notes=True)
 
     beat_resampled = samplerate_beats(real_beats, pitch_times)
 
