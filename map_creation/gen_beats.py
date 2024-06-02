@@ -288,26 +288,37 @@ def main(name_ar: list, debug_beats=False) -> bool:
     # add arrows into notes
 
     # TODO: align them correctly, currently wrong!
-    arrow_mask_r = arrow_mask_r[config.lstm_len:]   # required by lstm start-up
-    arrow_mask_r = arrow_mask_r[:len(y_class_arrow)]
-    arrow_mask_l = arrow_mask_l[config.lstm_len:]
-    arrow_mask_l = arrow_mask_l[:len(y_class_arrow)]
+    # arrow_mask_r = arrow_mask_r[config.lstm_len:]   # required by lstm start-up
+    # # arrow_mask_r = arrow_mask_r[:len(y_class_arrow)]
+    # arrow_mask_l = arrow_mask_l[config.lstm_len:]
+    # arrow_mask_l = arrow_mask_l[:len(y_class_arrow)]
 
     idx_note_right = 0
-    idx_note_left = np.sum(arrow_mask_r)
-    for idx in range(len(notes_generated)):
-        if arrow_mask_l[idx]:
-            notes_generated[idx][3] = y_class_arrow[idx_note_left][0]
-            idx_note_left += 1
-            if arrow_mask_r[idx]:
-                notes_generated[idx][7] = y_class_arrow[idx_note_right][0]
+    idx_note_left = arrow_mask_r[33:].sum()
+    idx_note_left_og = copy.copy(idx_note_left)
+    for idx, notes in enumerate(notes_generated):
+        for idx2 in range(0, len(notes), 4):
+            if notes[idx2+2] == 1:
+                # add arrow to right note
+                notes_generated[idx][idx2+3] = y_class_arrow[idx_note_right][0]
                 idx_note_right += 1
-        elif arrow_mask_r[idx]:
-            notes_generated[idx][3] = y_class_arrow[idx_note_right][0]
-            idx_note_right += 1
+            elif notes[idx2+2] == 0:
+                # add arrow to left note
+                notes_generated[idx][idx2 + 3] = y_class_arrow[idx_note_left][0]
+                idx_note_left += 1
 
+        # if arrow_mask_l[idx]:
+        #     notes_generated[idx][3] = y_class_arrow[idx_note_left][0]
+        #     idx_note_left += 1
+        #     if arrow_mask_r[idx]:
+        #         notes_generated[idx][7] = y_class_arrow[idx_note_right][0]
+        #         idx_note_right += 1
+        # elif arrow_mask_r[idx]:
+        #     notes_generated[idx][3] = y_class_arrow[idx_note_right][0]
+        #     idx_note_right += 1
+
+    assert idx_note_right == idx_note_left_og, "Error: Mismatch in arrow decoding."
     assert idx_note_left == len(y_class_arrow), "Error: Mismatch in arrow decoding."
-    assert idx_note_right == np.sum(arrow_mask_r), "Error: Mismatch in arrow decoding."
 
     ############
     # create map
