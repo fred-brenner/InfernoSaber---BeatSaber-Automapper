@@ -266,25 +266,55 @@ def main(name_ar: list, debug_beats=False) -> bool:
     # pass dummy notes to ml training preparation
     ml_arrow = get_arrow_dataset([notes_generated], [map_times])
     [_, _, arrow_mask_r, arrow_mask_l] = ml_arrow
+    arrow_mask_r = np.asarray(arrow_mask_r[0], dtype='bool')
+    arrow_mask_l = np.asarray(arrow_mask_l[0], dtype='bool')
     # generate left and right arrow input dataset
-    arrow_in_song_l = np.vstack([in_song_l[arrow_mask_r], in_song_l[arrow_mask_l]])
-    arrow_map_times = np.vstack([map_times[arrow_mask_r], map_times[arrow_mask_l]])
+    arrow_in_song_l = np.concatenate([in_song_l[arrow_mask_r], in_song_l[arrow_mask_l]], axis=0)#.reshape(-1, in_song_l.shape[1])
+    arrow_map_times = np.concatenate([map_times[arrow_mask_r], map_times[arrow_mask_l]], axis=0)#.reshape(-1)
 
     mapper_model = get_full_model_path(config.arrow_version)
     # section into len(lstm) batches and calculate mapping for each batch
-    y_class_map = generate(arrow_in_song_l, arrow_map_times, mapper_model, config.lstm_len,
-                           paths.arrows_classify_encoder_file)
+    y_class_arrow = generate(arrow_in_song_l, arrow_map_times, mapper_model, config.lstm_len,
+                             paths.arrows_classify_encoder_file)
 
     K.clear_session()
     gc.collect()
-    del mapper_model, enc_model
+    del mapper_model
+
+    # # decode arrows
+    # with open(paths.arrows_classify_encoder_file, 'rb') as f:
+    #     arrow_keys = pickle.load(f)
+    # arrows_generated = decode_beats(y_class_arrow, arrow_keys)
+    # add arrows into notes
+
+    # TODO: align them correctly, currently wrong!
+    arrow_mask_r = arrow_mask_r[config.lstm_len:]   # required by lstm start-up
+    arrow_mask_r = arrow_mask_r[:len(y_class_arrow)]
+    arrow_mask_l = arrow_mask_l[config.lstm_len:]
+    arrow_mask_l = arrow_mask_l[:len(y_class_arrow)]
+
+    idx_note_right = 0
+    idx_note_left = np.sum(arrow_mask_r)
+    for idx in range(len(notes_generated)):
+        if arrow_mask_l[idx]:
+            notes_generated[idx][3] = y_class_arrow[idx_note_left][0]
+            idx_note_left += 1
+            if arrow_mask_r[idx]:
+                notes_generated[idx][7] = y_class_arrow[idx_note_right][0]
+                idx_note_right += 1
+        elif arrow_mask_r[idx]:
+            notes_generated[idx][3] = y_class_arrow[idx_note_right][0]
+            idx_note_right += 1
+
+    assert idx_note_left == len(y_class_arrow), "Error: Mismatch in arrow decoding."
+    assert idx_note_right == np.sum(arrow_mask_r), "Error: Mismatch in arrow decoding."
 
     ############
     # create map
     ############
     # TODO: replace with default content instead of deletion
-    map_times = map_times[config.lstm_len:]     # required by lstm start-up
-    map_times = map_times[:len(y_class_map)]    # rest from sectioning into lstm len batches
+    map_times = map_times[config.lstm_len:]  # required by lstm start-up
+    map_times = map_times[:len(y_class_map)]  # rest from sectioning into lstm len batches
 
     ############
     # add events
@@ -319,11 +349,11 @@ def apply_first_beat_thresholding(y_beat):
 
     # change threshold for start
     # thresh_ar[:int(lenni/5)] *= config.threshold_start
-    thresh_ar[:int(lenni/10)] *= config.threshold_start
+    thresh_ar[:int(lenni / 10)] *= config.threshold_start
 
     # change threshold for end
-    thresh_ar[-int(lenni/5):] *= config.threshold_end
-    thresh_ar[-int(lenni/10):] *= config.threshold_end
+    thresh_ar[-int(lenni / 5):] *= config.threshold_end
+    thresh_ar[-int(lenni / 10):] *= config.threshold_end
 
     # run thresholding
     y_beat = y_beat.reshape(-1)
