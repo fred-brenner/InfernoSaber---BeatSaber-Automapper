@@ -269,13 +269,17 @@ def main(name_ar: list, debug_beats=False) -> bool:
     arrow_mask_r = np.asarray(arrow_mask_r[0], dtype='bool')
     arrow_mask_l = np.asarray(arrow_mask_l[0], dtype='bool')
     # generate left and right arrow input dataset
-    arrow_in_song_l = np.concatenate([in_song_l[arrow_mask_r], in_song_l[arrow_mask_l]], axis=0)#.reshape(-1, in_song_l.shape[1])
-    arrow_map_times = np.concatenate([map_times[arrow_mask_r], map_times[arrow_mask_l]], axis=0)#.reshape(-1)
+    arrow_in_song_r = in_song_l[arrow_mask_r]
+    arrow_in_song_l = in_song_l[arrow_mask_l]
+    arrow_map_times_r = map_times[arrow_mask_r]
+    arrow_map_times_l = map_times[arrow_mask_l]
 
     mapper_model = get_full_model_path(config.arrow_version)
     # section into len(lstm) batches and calculate mapping for each batch
-    y_class_arrow = generate(arrow_in_song_l, arrow_map_times, mapper_model, config.lstm_len,
-                             paths.arrows_classify_encoder_file)
+    y_class_arrow_r = generate(arrow_in_song_r, arrow_map_times_r, mapper_model, config.lstm_len,
+                               paths.arrows_classify_encoder_file)
+    y_class_arrow_l = generate(arrow_in_song_l, arrow_map_times_l, mapper_model, config.lstm_len,
+                               paths.arrows_classify_encoder_file)
 
     K.clear_session()
     gc.collect()
@@ -293,32 +297,31 @@ def main(name_ar: list, debug_beats=False) -> bool:
     # arrow_mask_l = arrow_mask_l[config.lstm_len:]
     # arrow_mask_l = arrow_mask_l[:len(y_class_arrow)]
 
+    idx_note_left = 0
     idx_note_right = 0
-    idx_note_left = arrow_mask_r[33:].sum()
-    idx_note_left_og = copy.copy(idx_note_left)
+    over_lstm_len_r = len(arrow_in_song_r)-len(y_class_arrow_r)
+    over_lstm_len_l = len(arrow_in_song_l)-len(y_class_arrow_l)
+    over_lstm_len = [False, False]
     for idx, notes in enumerate(notes_generated):
         for idx2 in range(0, len(notes), 4):
-            if notes[idx2+2] == 1:
+            if notes[idx2 + 2] == 1:
                 # add arrow to right note
-                notes_generated[idx][idx2+3] = y_class_arrow[idx_note_right][0]
+                notes_generated[idx][idx2 + 3] = y_class_arrow_r[idx_note_right][0]
                 idx_note_right += 1
-            elif notes[idx2+2] == 0:
+                # duplicate missing arrows for first lstm batch
+                if idx_note_right == over_lstm_len_r and not over_lstm_len[0]:
+                    idx_note_right = 0
+                    over_lstm_len[0] = True
+            elif notes[idx2 + 2] == 0:
                 # add arrow to left note
-                notes_generated[idx][idx2 + 3] = y_class_arrow[idx_note_left][0]
+                notes_generated[idx][idx2 + 3] = y_class_arrow_l[idx_note_left][0]
                 idx_note_left += 1
-
-        # if arrow_mask_l[idx]:
-        #     notes_generated[idx][3] = y_class_arrow[idx_note_left][0]
-        #     idx_note_left += 1
-        #     if arrow_mask_r[idx]:
-        #         notes_generated[idx][7] = y_class_arrow[idx_note_right][0]
-        #         idx_note_right += 1
-        # elif arrow_mask_r[idx]:
-        #     notes_generated[idx][3] = y_class_arrow[idx_note_right][0]
-        #     idx_note_right += 1
-
-    assert idx_note_right == idx_note_left_og, "Error: Mismatch in arrow decoding."
-    assert idx_note_left == len(y_class_arrow), "Error: Mismatch in arrow decoding."
+                # duplicate missing arrows for first lstm batch
+                if idx_note_left == over_lstm_len_l and not over_lstm_len[1]:
+                    idx_note_left = 0
+                    over_lstm_len[1] = True
+    assert idx_note_right == len(y_class_arrow_r), "Arrow generator failed on right side"
+    assert idx_note_left == len(y_class_arrow_l), "Arrow generator failed on left side"
 
     ############
     # create map
