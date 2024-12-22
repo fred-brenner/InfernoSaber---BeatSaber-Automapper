@@ -42,6 +42,10 @@ if len(run_list) != 5:
 
 # run bs_shift / shift.py
 if run_list[0].lower() == 'y':
+    print("Hint 1: To import favorite maps manually start the scripts "
+          "bs_shift/hashtest.py and bs_shift/copyfavorites.py first.")
+    print("Hint 2: Before running shift.py, make sure all maps are in "
+          "the correct format with bs_shift/cleanup_n_format.py first.")
     print(f"Analyzing BS music files from folder: {paths.bs_input_path}")
     subprocess.call(['python3', './bs_shift/shift.py'])
 

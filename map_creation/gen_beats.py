@@ -29,6 +29,37 @@ from tools.config.mapper_selection import get_full_model_path
 
 
 # @profile
+def add_start_end_beats(map_times, x_volume, x_onset):
+    if config.add_start_end_beats is False:
+        return map_times
+
+    x_onset_flat = x_onset.max(axis=1).reshape(-1) + x_onset.mean(axis=1).reshape(-1)
+    x_volume_flat = x_volume.max(axis=1).reshape(-1) + x_volume.mean(axis=1).reshape(-1)
+    x_flat = x_onset_flat + 3 * x_volume_flat
+
+    limit_low = x_flat.mean()
+    map_times_start_index = int(map_times[0] * config.beat_spacing)
+    map_times_end_index = int(map_times[-1] * config.beat_spacing)
+    map_times = list(map_times)
+    # x_mask = np.zeros(len(x_flat))
+    for idx in range(len(x_flat)):
+        if idx < map_times_start_index or idx > map_times_end_index:
+            if x_flat[idx] > limit_low:
+                limit_low = x_flat[idx] + 0.1
+                map_times.append(idx / config.beat_spacing)
+            else:
+                limit_low -= 0.1
+
+    # timing_ar = x_mask * np.arange(0, len(x_mask), 1)
+    # timing_ar = timing_ar.astype(float) / config.beat_spacing
+    # timing_ar = timing_ar[timing_ar > 0]
+
+    map_times = np.asarray(map_times)
+    map_times.sort()
+
+    return map_times
+
+
 def main(name_ar: list, debug_beats=False) -> bool:
     if len(name_ar) > 1:
         print("Multi-core song generation currently not implemented!")
@@ -154,6 +185,10 @@ def main(name_ar: list, debug_beats=False) -> bool:
         return 1
     # map_times = fill_map_times(map_times)
     add_beats_min_bps = config.max_speed * 10 / 40  # max_speed=40 -> min_bps = 10
+
+    # fill start and end by onset detection
+    map_times = add_start_end_beats(map_times, x_volume, x_onset)
+
     scale_idx = 0
     while scale_idx < config.map_filler_iters:
         if len(map_times) > add_beats_min_bps * map_times[-1] * config.add_beat_intensity / 100:
@@ -174,6 +209,8 @@ def main(name_ar: list, debug_beats=False) -> bool:
 
     # # calculate time between beats
     # timing_diff_ar = calc_time_between_beats([map_times])
+
+    # map_times = add_start_end_beats(map_times, x_volume, x_onset)
 
     #####################
     # apply map generator

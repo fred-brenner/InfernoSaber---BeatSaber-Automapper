@@ -15,12 +15,13 @@ bs_mapping_version = "v3"  # allows to generate advanced features like arcs
 # use_mapper_selection = "pp3_15"
 # use_mapper_selection = "easy_15"
 # use_mapper_selection = "hard_15"
-use_mapper_selection = "expert_15"
+# use_mapper_selection = "expert_15"
+use_mapper_selection = "fav_15"
 
 """Change only for new training"""
 use_mapper_selection = use_mapper_selection.lower()
 use_bpm_selection = True   # use number of beats for selection of maps in training
-min_bps_limit = 7  # minimum beats_per_second value for training
+min_bps_limit = 2  # minimum beats_per_second value for training
 max_bps_limit = 12  # maximum beats_per_second value for training
 
 """Change for application"""
@@ -135,6 +136,7 @@ shift_beats_fact = 0.30  # fraction beats to shift in cut direction
 # add_beat_fact = 0.90        # fraction add beats (beat_generator)
 add_beat_max_bounds = [0.1, 0.5, 0.8, 1.6]
 # pitches_allowed = [40, 50]  # percentage of pitches to be over threshold
+add_start_end_beats = True
 
 
 """Do not change unless you change the DNN models"""

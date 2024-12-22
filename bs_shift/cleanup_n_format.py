@@ -47,9 +47,13 @@ def check_info_name(bs_song_path):
         for file in files:
             if file.lower().endswith("info.dat"):
                 if not file == "info.dat":
-                    src_path = os.path.join(root, file)
-                    dst_path = os.path.join(root, "info.dat")
-                    os.rename(src_path, dst_path)
+                    if file.lower().startswith("bpm"):
+                        src_path = os.path.join(root, file)
+                        os.remove(src_path)
+                    else:
+                        src_path = os.path.join(root, file)
+                        dst_path = os.path.join(root, "info.dat")
+                        os.rename(src_path, dst_path)
 
 
 def check_beatmap_name(bs_song_path):
