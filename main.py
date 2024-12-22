@@ -22,7 +22,7 @@ def main(use_model=None, diff=None, export_results_to_bs=True,
          add_obstacles=None, sporty_obstacles=None,
          add_sliders=None, slider_start_time=None,
          slider_end_time=None, slider_probability=None,
-         slider_movement_min=None, legacy_mode=None):
+         slider_movement_min=None, legacy_mode=None, single_mode=None):
 
     if use_model is not None:
         config.use_mapper_selection = use_model
@@ -61,6 +61,13 @@ def main(use_model=None, diff=None, export_results_to_bs=True,
         config.slider_probability = slider_probability
     if slider_movement_min is not None:
         config.slider_movement_minimum = slider_movement_min
+    if single_mode is not None:
+        if single_mode:
+            config.emphasize_beats_flag = False
+            config.single_notes_only_flag = True
+        else:
+            config.emphasize_beats_flag = True
+            config.single_notes_only_flag = False
     if legacy_mode is not None:
         if legacy_mode:
             config.bs_mapping_version = 'v2'

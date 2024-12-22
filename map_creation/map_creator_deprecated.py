@@ -5,6 +5,7 @@ import aubio
 import os
 import shutil
 
+from map_creation.note_postprocessing import remove_double_notes
 from map_creation.sanity_check import sanity_check_notes, improve_timings
 from map_creation.gen_obstacles import calculate_obstacles
 # from map_creation.gen_sliders import calculate_sliders
@@ -34,6 +35,8 @@ def create_map_depr(y_class_num, timings, events, name, bpm, pitch_input, pitch_
                 events = np.delete(events, rm_idx, axis=0)
             time_last = timings[idx]
 
+        if config.single_notes_only_flag:
+            notes = remove_double_notes(notes)
         # run all beat and note sanity checks
         notes = sanity_check_notes(notes, timings)
         # timings = improve_timings(notes, timings, pitch_input, pitch_times)

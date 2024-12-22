@@ -6,7 +6,7 @@ import numpy as np
 # config file for all important values 
 # used in multiple codes
 ########################################
-InfernoSaber_version = "1.7.0"  # coded into the info.dat file
+InfernoSaber_version = "1.7.1"  # coded into the info.dat file
 bs_mapping_version = "v3"  # allows to generate advanced features like arcs
 # bs_mapping_version = "v2"  # legacy mode, may be deprecated in future
 
@@ -60,7 +60,10 @@ add_breaks_flag = True  # add breaks after strong patterns
 silence_threshold = 0.20   # silence threshold quantile value [0.0, 0.3]
 silence_thresh_hard = 0.25  # add fixed threshold to dynamic value [0-2]
 add_silence_flag = True  # whether to apply silence threshold
-emphasize_beats_flag = True  # emphasize beats into double notes #TODO
+emphasize_beats_flag = True  # emphasize beats into double notes
+single_notes_only_flag = False  # no more double notes #TODO new feature
+single_notes_only_strict_flag = True  # if previous flag applied, restricts to one note at a time #TODO new feature
+single_notes_remove_lr = 0.4   # >0.5 removes left, <0.5 removes right more often
 add_obstacle_flag = True  # add obstacles in free areas
 obstacle_time_gap = [0.3, 0.8]  # time gap before [0.2-1] after [0.5-2]
 obstacle_min_duration = 0.1  # minimum duration for each obstacle [0.1-2]
