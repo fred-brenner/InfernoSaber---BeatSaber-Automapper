@@ -14,3 +14,4 @@ progressbar2~=4.5.0
 librosa~=0.10.2.post1
 huggingface-hub~=0.27.0
 requests~=2.32.3
+gradio~=5.9.1

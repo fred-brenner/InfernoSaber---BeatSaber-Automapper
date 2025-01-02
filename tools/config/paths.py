@@ -39,12 +39,6 @@ if main_path.startswith('/mnt/'):
     # import sys
     # sys.path.append(main_path + '/tools/')
 
-# try Google Drive path
-if not os.path.isdir(dir_path):
-    dir_path = "/content/drive/My Drive/InfernoSaber/Data/"
-    main_path = "/content/drive/My Drive/InfernoSaber/Code/"
-
-
 if not os.path.isfile(main_path + '/main.py'):
     print(f"dir_path={dir_path}")
     print(f"main_path={main_path}")
@@ -97,12 +91,3 @@ notes_classify_dict_file = f"{model_path}notes_class_dict.pkl"
 # beats_classify_encoder_file = pred_path + f"onehot_encoder_beats_{config.min_bps_limit}-{config.max_bps_limit}.pkl"
 beats_classify_encoder_file = model_path + "onehot_encoder_beats.pkl"
 events_classify_encoder_file = model_path + "onehot_encoder_events.pkl"
-############################
-
-# check runtime environment
-try:
-    import google.colab
-
-    IN_COLAB = True
-except:
-    IN_COLAB = False
