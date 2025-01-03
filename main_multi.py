@@ -248,7 +248,8 @@ def combine_maps(song_list_potential, song_list_run, diff_list, export_results_t
                             'zip', f'{paths.new_map_path}12345_{song_name}')
         # export map to beat saber
         if export_results_to_bs:
-            shutil_copy_maps(song_name, index="12345_")
+            if shutil_copy_maps(song_name, index="12345_"):
+                yield "Copied map(s) to BeatSaber directory"
             # print("Successfully exported full difficulty maps to BS")
 
     # if len(song_list) < 10:
@@ -288,17 +289,17 @@ if __name__ == "__main__":
     # Download AI Model from huggingface
     model_download()
 
-    if paths.IN_COLAB:
-        print("Multi-processing on colab notebook not supported :|\n"
-              "Running single process.")
-        main_multi(diff_list, False)
-    else:
-        # main_multi(diff_list, True)
-        # each worker needs 2-5gb of ram memory
-        # each worker needs 2-4gb of gpu memory (if GPU available)
-        n_workers = 3
-        if paths.main_path.startswith('/mnt/'):
-            # use GPU in linux
-            n_workers = 7
-        main_multi_par(n_workers, diff_list, export_results_to_bs)
+    # if paths.IN_COLAB:
+    #     print("Multi-processing on colab notebook not supported :|\n"
+    #           "Running single process.")
+    #     main_multi(diff_list, False)
+    # else:
+    # main_multi(diff_list, True)
+    # each worker needs 2-5gb of ram memory
+    # each worker needs 2-4gb of gpu memory (if GPU available)
+    n_workers = 3
+    if paths.main_path.startswith('/mnt/'):
+        # use GPU in linux
+        n_workers = 7
+    main_multi_par(n_workers, diff_list, export_results_to_bs)
 

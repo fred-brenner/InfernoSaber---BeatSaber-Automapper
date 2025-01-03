@@ -22,8 +22,8 @@ def main(use_model=None, diff=None, export_results_to_bs=True,
          add_obstacles=None, sporty_obstacles=None,
          add_sliders=None, slider_start_time=None,
          slider_end_time=None, slider_probability=None,
-         slider_movement_min=None, legacy_mode=None, single_mode=None):
-
+         slider_movement_min=None, legacy_mode=None, single_mode=None,
+         logger_callback=None):
     if use_model is not None:
         config.use_mapper_selection = use_model
     # change difficulty
@@ -76,7 +76,13 @@ def main(use_model=None, diff=None, export_results_to_bs=True,
     update_model_file_paths(check_model_exists=False)
 
     # Download AI Model from huggingface
+    log_message = "Loading AI Model [if not yet done, ~1GB will be downloaded (see second tab)]"
+    if logger_callback:
+        logger_callback(log_message)
     model_download()
+    log_message = "Model Found"
+    if logger_callback:
+        logger_callback(log_message)
 
     # # limit gpu ram usage
     # conf = tf.compat.v1.ConfigProto()
@@ -91,6 +97,9 @@ def main(use_model=None, diff=None, export_results_to_bs=True,
     print(f"Found {len(song_list)} songs. Iterating...")
     if len(song_list) == 0:
         print("No songs found!")
+        log_message = "No songs found! Please go to first tab."
+        if logger_callback:
+            logger_callback(log_message)
 
     for i, song_name in enumerate(song_list):
         start_time = time.time()
@@ -108,9 +117,15 @@ def main(use_model=None, diff=None, export_results_to_bs=True,
                             'zip', f'{paths.new_map_path}1234_{config.max_speed_orig:.1f}_{song_name}')
         # export map to beat saber
         if export_results_to_bs:
-            shutil_copy_maps(f"{config.max_speed_orig:.1f}_{song_name}")
+            if shutil_copy_maps(f"{config.max_speed_orig:.1f}_{song_name}"):
+                log_message = "Copied map(s) to BeatSaber directory."
+                if logger_callback:
+                    logger_callback(log_message)
 
     print("Finished map generator")
+    log_message = "Finished map generator"
+    if logger_callback:
+        logger_callback(log_message)
 
 
 # ############################################################
@@ -232,8 +247,6 @@ if __name__ == "__main__":
             lm = False
 
     export_results_to_bs = False
-    if paths.IN_COLAB:
-        export_results_to_bs = False
 
     main(use_model, diff, export_results_to_bs, gm, qs, bi, rf, jso,
          ndf, sf, aof, sof, asf, sst, se, sp, smm, lm)
