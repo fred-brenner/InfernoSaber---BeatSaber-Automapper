@@ -156,7 +156,7 @@ def upload_files(input_folder, files):
 # Run main.py with live output
 def run_process(num_workers, use_model, diff1, diff2, diff3, diff4, diff5):
     # Check if all inputs are valid
-    summary_log = get_summary()
+    summary_log = get_summary(diff1, diff2, diff3, diff4, diff5)
     if "Error: " in summary_log:
         yield "Error: Inputs not set up yet. See Summary on top."
         time.sleep(1)
@@ -361,7 +361,7 @@ with gr.Blocks() as demo:
                     minimum=1,
                     maximum=16,
                     step=1,
-                    value=4,
+                    value=2,
                     interactive=True,
                 )
                 ram_required = gr.Textbox(
