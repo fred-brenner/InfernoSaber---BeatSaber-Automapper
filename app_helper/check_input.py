@@ -57,36 +57,37 @@ def get_summary(diff1, diff2, diff3, diff4, diff5) -> str:
     # check difficulty rating
     diff_count = 0
     diff_count_values = []
-    if not isinstance(diff1, int):
+    if not isinstance(diff1, float):
         log.append("Error: Difficulty 1 is not set. If not required, set it to 0")
     else:
         if diff1 > 0:
             diff_count += 1
             diff_count_values.append(diff1)
-    if not isinstance(diff2, int):
+    if not isinstance(diff2, float):
         log.append("Error: Difficulty 2 is not set. If not required, set it to 0")
     else:
         if diff2 > 0:
             diff_count += 1
             diff_count_values.append(diff2)
-    if not isinstance(diff3, int):
+    if not isinstance(diff3, float):
         log.append("Error: Difficulty 3 is not set. If not required, set it to 0")
     else:
         if diff3 > 0:
             diff_count += 1
             diff_count_values.append(diff3)
-    if not isinstance(diff4, int):
+    if not isinstance(diff4, float):
         log.append("Error: Difficulty 4 is not set. If not required, set it to 0")
     else:
         if diff4 > 0:
             diff_count += 1
             diff_count_values.append(diff4)
-    if not isinstance(diff5, int):
+    if not isinstance(diff5, float):
         log.append("Error: Difficulty 5 is not set. If not required, set it to 0")
     else:
         if diff5 > 0:
             diff_count += 1
             diff_count_values.append(diff5)
+    diff_count_values = [str(diff_float) for diff_float in diff_count_values]
     log.append(f"Info: Generating {diff_count} difficulties for each song: [{', '.join(diff_count_values)}]")
 
     return "\n".join(log)

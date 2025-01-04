@@ -19,11 +19,12 @@ def update_dir_path(file_path, input_dir):
             for line in lines:
                 # Check if the line contains 'dir_path'
                 if re.match(r"^\s*dir_path\s*=", line):
-                    # Replace with the new value
-                    file.write(f'dir_path = "{input_dir}"')
+                    # Replace with the new value and ensure a newline is added
+                    file.write(f'dir_path = "{input_dir}"\n')
                 else:
                     file.write(line)
-                    print(f"Updated 'dir_path' in {file_path} to: {input_dir}")
+
+        print(f"Updated 'dir_path' in {file_path} to: {input_dir}")
 
     except FileNotFoundError:
         print(f"Error: The file {file_path} does not exist.")
@@ -34,5 +35,5 @@ def update_dir_path(file_path, input_dir):
 # Example usage
 if __name__ == "__main__":
     file_path = "tools/config/paths.py"
-    input_dir = "/new/directory/path/"
+    input_dir = "/new/directory/path"
     update_dir_path(file_path, input_dir)
