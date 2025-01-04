@@ -1,3 +1,4 @@
+from app_helper.update_dir_path import update_dir_path
 from tools.config import paths, config
 from tools.config.check_folder_structure import check_folder_structure
 
@@ -12,6 +13,7 @@ def update_file_paths(input_dir):
     if not input_dir.endswith('/'):
         input_dir += '/'
     paths.dir_path = input_dir
+    update_dir_path('tools/config/paths.py', input_dir)
 
     ########################
     # input folder structure

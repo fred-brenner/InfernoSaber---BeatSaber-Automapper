@@ -18,39 +18,39 @@ data_folder_name = 'Data'
 bs_folder_name = "Beat Saber/Beat Saber_Data/CustomLevels"
 
 
-# Function to handle folder selection using tkinter
-def on_browse(data_type):
-    root = Tk()
-    root.attributes("-topmost", True)
-    root.withdraw()
-    if data_type == "Files":
-        filenames = filedialog.askopenfilenames()
-        if len(filenames) > 0:
-            root.destroy()
-            return str(filenames)
-        else:
-            filename = "Files not selected"
-            root.destroy()
-            return str(filename)
-
-    elif data_type == "Folder":
-        filename = filedialog.askdirectory()
-        if filename:
-            if os.path.isdir(filename):
-                if not os.path.basename(filename) == data_folder_name:
-                    filename = os.path.join(filename, data_folder_name)
-                    if not os.path.isdir(filename):
-                        os.mkdir(filename)
-                root.destroy()
-                return str(filename)
-            else:
-                filename = "Folder not available"
-                root.destroy()
-                return str(filename)
-        else:
-            filename = "Folder not selected"
-            root.destroy()
-            return str(filename)
+# # Function to handle folder selection using tkinter
+# def on_browse(data_type):
+#     root = Tk()
+#     root.attributes("-topmost", True)
+#     root.withdraw()
+#     if data_type == "Files":
+#         filenames = filedialog.askopenfilenames()
+#         if len(filenames) > 0:
+#             root.destroy()
+#             return str(filenames)
+#         else:
+#             filename = "Files not selected"
+#             root.destroy()
+#             return str(filename)
+#
+#     elif data_type == "Folder":
+#         filename = filedialog.askdirectory()
+#         if filename:
+#             if os.path.isdir(filename):
+#                 if not os.path.basename(filename) == data_folder_name:
+#                     filename = os.path.join(filename, data_folder_name)
+#                     if not os.path.isdir(filename):
+#                         os.mkdir(filename)
+#                 root.destroy()
+#                 return str(filename)
+#             else:
+#                 filename = "Folder not available"
+#                 root.destroy()
+#                 return str(filename)
+#         else:
+#             filename = "Folder not selected"
+#             root.destroy()
+#             return str(filename)
 
 
 def on_browse_input_path():
