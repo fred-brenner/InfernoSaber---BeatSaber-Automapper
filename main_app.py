@@ -221,7 +221,7 @@ def run_process(num_workers, use_model, diff1, diff2, diff3, diff4, diff5):
 
 # Function to update RAM requirement
 def update_ram(workers):
-    return f"{workers * 5} GB RAM"
+    return f"{workers * 2} GB free RAM, {workers} physical CPU cores"
 
 
 def update_auto_cut_done(flag):
@@ -362,12 +362,12 @@ with gr.Blocks() as demo:
                     minimum=1,
                     maximum=16,
                     step=1,
-                    value=2,
+                    value=4,
                     interactive=True,
                 )
                 ram_required = gr.Textbox(
-                    label="Estimated RAM Requirement (GB)",
-                    value="20 GB",  # Default: 4 workers * 5GB = 20GB
+                    label="Estimated RAM Requirement",
+                    value="8 GB RAM, 4 physical CPU cores",  # Default: 4 workers * 5GB = 20GB
                     interactive=False,
                 )
 
