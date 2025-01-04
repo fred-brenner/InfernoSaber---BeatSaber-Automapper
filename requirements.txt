@@ -1,5 +1,5 @@
 scipy~=1.14.1
-numpy~=2.0.2
+# numpy~=2.0.2
 tensorflow~=2.18.0
 ffmpy~=0.5.0
 librosa~=0.10.2.post1
