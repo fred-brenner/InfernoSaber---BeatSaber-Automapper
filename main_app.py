@@ -351,6 +351,7 @@ with gr.Blocks() as demo:
                     lines=3,
                     interactive=False,
                     value=get_summary,
+                    inputs=[difficulty_1, difficulty_2, difficulty_3, difficulty_4, difficulty_5],
                     every=5,
                 )
 
