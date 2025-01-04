@@ -8,6 +8,7 @@ import shutil
 import queue
 import threading
 
+from app_helper.check_input import get_summary
 from app_helper.set_app_paths import set_app_paths
 from main import main
 from tools.config import paths, config
@@ -57,10 +58,14 @@ def on_browse_input_path():
     root.withdraw()
 
     filename = filedialog.askdirectory()
+    filename = filename.replace('\\\\', '/').replace('\\', '/')
     if filename:
         if os.path.isdir(filename):
+            if len(os.listdir(filename)) > 5:
+                return str(filename), 'Error: Please select an empty folder to set up InfernoSaber'
             if not os.path.basename(filename) == data_folder_name:
-                filename = os.path.join(filename, data_folder_name)
+                # filename = os.path.join(filename, data_folder_name)
+                filename += f"/{data_folder_name}"
                 if not os.path.isdir(filename):
                     os.mkdir(filename)
             if not filename.endswith('/'):
@@ -84,9 +89,12 @@ def on_browse_bs_path():
     root.withdraw()
 
     filename = filedialog.askdirectory()
+    filename = filename.replace('\\\\', '/').replace('\\', '/')
     if filename:
         if os.path.isdir(filename):
-            "Beat Saber/Beat Saber_Data/CustomLevels/"
+            # copy in path anyway as soon as it is valid
+            paths.bs_song_path = filename
+
             bs_folders = bs_folder_name.split('/')
             for i_bs, bs_folder in enumerate(bs_folders):
                 # check for root folder
@@ -95,13 +103,15 @@ def on_browse_bs_path():
                     return str(filename), 'BS root folder not found'
                 # search custom level folder
                 if i_bs > 0 and bs_folder not in filename:
-                    filename = os.path.join(filename, bs_folder)
+                    # filename = os.path.join(filename, bs_folder)
+                    filename += f"/{bs_folder}"
 
             if not filename.endswith('/'):
                 filename += '/'
             if not os.path.isdir(filename):
                 print("Error: Input path not valid")
-                return str(filename), 'Folder does not exist'
+                paths.bs_song_path = ""
+                return str(filename), 'Could not find custom maps folder in Beat Saber'
 
             root.destroy()
             paths.bs_song_path = filename
@@ -109,10 +119,12 @@ def on_browse_bs_path():
             return str(filename), 'Found BS folder'
         else:
             filename = "Folder not available"
+            paths.bs_song_path = ""
             root.destroy()
             return str(filename), 'Folder does not exist'
     else:
         filename = "Folder not selected"
+        paths.bs_song_path = ""
         root.destroy()
         return str(filename), 'not set'
 
@@ -142,6 +154,12 @@ def upload_files(input_folder, files):
 
 # Run main.py with live output
 def run_process(num_workers, use_model, diff):
+    summary_log = get_summary()
+    if "Error: " in summary_log:
+        yield "Error: Inputs not set up yet. See Summary on top."
+        time.sleep(1)
+        return
+
     export_results_to_bs = False
     progress_log = []  # List to store logs
     log_queue = queue.Queue()  # Thread-safe queue for logs
@@ -189,7 +207,7 @@ with gr.Blocks() as demo:
         with gr.Row():
             with gr.Column():
                 gr.Markdown("## Setup")
-                gr.Markdown(f"""Version: {config.InfernoSaber_version}
+                gr.Markdown(f"""Version: {config.InfernoSaber_version}  
                 This app is under development and not extensively tested on different systems.  
                 If you encounter problems, please check the Discord channel. It is free to use and open source.  
                 [GitHub Repo](https://github.com/fred-brenner/InfernoSaber---BeatSaber-Automapper/tree/main_app): View the code  
@@ -292,33 +310,41 @@ with gr.Blocks() as demo:
     with gr.Tab("Run"):
         gr.Markdown("## Run")
 
-        # Empty Textbox
-        gr.Markdown("### Summary")
-        log_output = gr.Textbox(
-            label="Logs",
-            placeholder="TBD",
-            lines=1,
-            interactive=False,
-        )
+        with gr.Row():
+            with gr.Column():
+                # Empty Textbox
+                gr.Markdown("### Summary")
+                log_output = gr.Textbox(
+                    label="Information",
+                    lines=3,
+                    interactive=False,
+                    value=get_summary,
+                    every=5,
+                )
 
-        # CPU Workers Selection and RAM Requirement Display
-        gr.Markdown("### CPU Workers")
-        num_workers = gr.Slider(
-            label="Number of CPU Workers",
-            minimum=1,
-            maximum=16,
-            step=1,
-            value=4,
-            interactive=True,
-        )
-        ram_required = gr.Textbox(
-            label="Estimated RAM Requirement (GB)",
-            value="20 GB",  # Default: 4 workers * 5GB = 20GB
-            interactive=False,
-        )
+                # CPU Workers Selection and RAM Requirement Display
+                gr.Markdown("### CPU Workers")
+                num_workers = gr.Slider(
+                    label="Number of CPU Workers",
+                    minimum=1,
+                    maximum=16,
+                    step=1,
+                    value=4,
+                    interactive=True,
+                )
+                ram_required = gr.Textbox(
+                    label="Estimated RAM Requirement (GB)",
+                    value="20 GB",  # Default: 4 workers * 5GB = 20GB
+                    interactive=False,
+                )
 
-        # Update RAM display when number of workers changes
-        num_workers.change(update_ram, inputs=[num_workers], outputs=[ram_required])
+                # Update RAM display when number of workers changes
+                num_workers.change(update_ram, inputs=[num_workers], outputs=[ram_required])
+
+            with gr.Column():
+                # Checkbox to select automatic cut to "done" folder
+                gr.Markdown("### Move finished songs")
+                auto_cut_done = gr.Checkbox(label="Automatically move songs to 'done' folder", value=False)
 
         # Run Button
         gr.Markdown("### Start Processing")
@@ -339,6 +365,10 @@ with gr.Blocks() as demo:
             outputs=[progress_eta],
             queue=True,
         )
+
+        # image_browse_btn.click(get_summary, inputs=[], outputs=[log_output])
+        # image_browse_btn_2.click(get_summary, inputs=[], outputs=[log_output])
+        # upload_button.click(get_summary, inputs=[], outputs=[log_output])
 
 # Launch the app
 if __name__ == "__main__":

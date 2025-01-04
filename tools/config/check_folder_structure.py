@@ -4,6 +4,8 @@ Missing folders can be automatically created.
 """
 
 import os
+import shutil
+
 import tools.config.paths as paths
 from tools.utils.ask_parameter import ask_parameter
 
@@ -50,6 +52,10 @@ def check_folder_structure():
 
     # check_exists(paths.pred_input_path)
     check_exists(paths.new_map_path)
+    if not os.path.isfile(paths.new_map_path + "cover.jpg"):
+        src = f"{paths.main_path}app_helper/cover.jpg"
+        dst = f"{paths.new_map_path}cover.jpg"
+        shutil.copy(src, dst)
 
     check_exists(paths.fail_path)
     check_exists(paths.diff_path)

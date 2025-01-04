@@ -14,10 +14,10 @@ from tools.config import config
 
 ################################# (change this for your pc)
 # setup folder for input data (automatically determined if inside this project)
-dir_path = "C:/Users/frede/Desktop/BS_Automapper/Data/"
+dir_path = ""
 
-bs_song_path = "E:/SteamLibrary/steamapps/common/Beat Saber/Beat Saber_Data/CustomLevels/"
-bs_input_path = "C:/Users/frede/Desktop/BS_Automapper/Data/training/custom_bs_input/"
+bs_song_path = ""
+bs_input_path = ""
 
 ############################# (no need to change)
 # main workspace path
@@ -30,14 +30,6 @@ for i in range(0, max_tries):
     else:
         # found main folder
         break
-
-# linux wsl2
-if main_path.startswith('/mnt/'):
-    dir_path = os.path.dirname(main_path) + '/Data/'
-    bs_input_path = os.path.join('/mnt/', bs_input_path.replace('C:', 'c'))
-    bs_song_path = os.path.join('/mnt/', bs_song_path.replace('E:', 'e'))
-    # import sys
-    # sys.path.append(main_path + '/tools/')
 
 if not os.path.isfile(main_path + '/main.py'):
     print(f"dir_path={dir_path}")

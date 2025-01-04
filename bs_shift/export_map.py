@@ -5,12 +5,6 @@ from pydub import AudioSegment, effects
 from tools.config import config, paths
 
 
-from pydub.utils import which
-# Set FFmpeg path
-AudioSegment.ffmpeg = which("ffmpeg")
-AudioSegment.ffprobe = which("ffprobe")
-
-
 def shutil_copy_maps(song_name, index="1234_"):
     if not os.path.isdir(paths.bs_song_path):
         print("Warning: Beatsaber folder not found, automatic export disabled.")
