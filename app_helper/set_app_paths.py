@@ -1,3 +1,6 @@
+import os
+import shutil
+
 from tools.config import paths, config
 from tools.config.check_folder_structure import check_folder_structure
 
@@ -9,6 +12,8 @@ def set_app_paths(input_dir):
 
 
 def update_file_paths(input_dir):
+    if not input_dir.endswith('/'):
+        input_dir += '/'
     paths.dir_path = input_dir
 
     ########################
@@ -32,7 +37,10 @@ def update_file_paths(input_dir):
     paths.songs_pred = paths.pred_path + "songs_predict/"
 
     paths.new_map_path = paths.pred_path + "new_map/"
-
+    if not os.path.isfile(paths.new_map_path + "cover.jpg"):
+        src = f"{paths.dir_path}app_helper/cover.jpg"
+        dst = f"{paths.new_map_path}cover.jpg"
+        shutil.copy(src, dst)
     paths.fail_path = paths.train_path + "fail_list/"
     paths.diff_path = paths.train_path + "songs_diff/"
     paths.song_data = paths.train_path + "song_data/"
