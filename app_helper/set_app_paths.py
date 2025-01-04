@@ -38,7 +38,7 @@ def update_file_paths(input_dir):
 
     paths.new_map_path = paths.pred_path + "new_map/"
     if not os.path.isfile(paths.new_map_path + "cover.jpg"):
-        src = f"{paths.dir_path}app_helper/cover.jpg"
+        src = f"{paths.main_path}app_helper/cover.jpg"
         dst = f"{paths.new_map_path}cover.jpg"
         shutil.copy(src, dst)
     paths.fail_path = paths.train_path + "fail_list/"

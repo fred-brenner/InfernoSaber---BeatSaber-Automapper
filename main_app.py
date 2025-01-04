@@ -156,6 +156,7 @@ def run_process(num_workers, use_model, diff):
             "use_model": use_model,
             "diff": diff,
             "logger_callback": logger_callback,
+            "export_results_to_bs": export_results_to_bs,
         }
     )
     thread.start()
