@@ -5,6 +5,7 @@ import os
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 import logging
 import tensorflow as tf
+
 tf.get_logger().setLevel(logging.ERROR)
 import time
 import shutil
@@ -15,6 +16,8 @@ import map_creation.gen_beats as beat_generator
 from tools.config import paths, config
 from tools.utils.huggingface import model_download
 from bs_shift.export_map import *
+
+
 # from training.helpers import test_gpu_tf
 
 
@@ -34,7 +37,7 @@ def stack_info_data(new_info_file: list, content: list, diff_str: str, diff_num:
     if last_matching_idx is None:
         print(f"Error: Could not find {target_prefix} in map.")
         exit()
-    new_info_file.extend(content[last_matching_idx:last_matching_idx+2])
+    new_info_file.extend(content[last_matching_idx:last_matching_idx + 2])
     if diff_str != "ExpertPlus":
         new_info_file.append('},\n')
     else:
@@ -77,19 +80,26 @@ def process_song(song_list_worker, total_runs):
         # time_per_run = (4 * time_per_run + (end_time - start_time)) / 5
 
 
-def main_multi_par(n_workers: int, diff_list: list, export_results_to_bs=True):
-    config.create_expert_flag = False
+def main_multi_par(n_workers: int, diff_list: list, export_results_to_bs=True,
+                   logger_callback=None):
+    # config.create_expert_flag = False
     diff_list = np.sort(diff_list)
     diff_list *= 4
-    print("Starting multi map generator.")
+    print(f"Starting multi map generator with {n_workers} workers.")
+    if logger_callback:
+        logger_callback(f"Starting multi map generator with {n_workers} workers.")
 
     # MAP GENERATOR
     ###############
     song_list_files = os.listdir(paths.songs_pred)
     song_list_files = check_music_files(song_list_files, paths.songs_pred)
     print(f"Found {len(song_list_files)} songs. Iterating...")
+    if logger_callback:
+        logger_callback(f"Found {len(song_list_files)} songs. Iterating...")
     if len(song_list_files) == 0:
         print("No songs found!")
+        if logger_callback:
+            logger_callback("No songs found!")
         return
 
     song_list = []
@@ -120,11 +130,17 @@ def main_multi_par(n_workers: int, diff_list: list, export_results_to_bs=True):
                 except Exception as e:
                     print(f"Error: {type(e).__name__}")
                     print(f"Error message: {e}")
+                    if logger_callback:
+                        logger_callback(f"Error: {type(e).__name__}")
+                        logger_callback(f"Error message: {e}")
                 uncombined_count = 0
             new_time_per_run = (time.time() - start_time) / processed_count
-            time_per_run = (time_per_run*5 + new_time_per_run) / 6
+            time_per_run = (time_per_run * 5 + new_time_per_run) / 6
             print(f"### ETA: {(len(song_list) - processed_count) * time_per_run / 60:.1f} minutes. "
                   f"Time per song: {time_per_run * len(diff_list):.0f} s ###")
+            if logger_callback:
+                logger_callback(f"### ETA: {(len(song_list) - processed_count) * time_per_run / 60:.1f} minutes. "
+                                f"Time per song: {time_per_run * len(diff_list):.0f} s ###")
 
     song_list_run = combine_maps(song_list_files, song_list_run,
                                  diff_list, export_results_to_bs)
@@ -132,6 +148,8 @@ def main_multi_par(n_workers: int, diff_list: list, export_results_to_bs=True):
                                  diff_list, export_results_to_bs)
     if len(song_list_run) != 0:
         print(f"Error: Remaining songs in song_list for combination: {song_list_run}")
+        if logger_callback:
+            logger_callback(f"Error: Remaining songs in song_list for combination: {song_list_run}")
 
 
 def main_multi(diff_list: list, export_results_to_bs=True):
@@ -248,8 +266,8 @@ def combine_maps(song_list_potential, song_list_run, diff_list, export_results_t
                             'zip', f'{paths.new_map_path}12345_{song_name}')
         # export map to beat saber
         if export_results_to_bs:
-            if shutil_copy_maps(song_name, index="12345_"):
-                yield "Copied map(s) to BeatSaber directory"
+            shutil_copy_maps(song_name, index="12345_")
+                # yield "Copied map(s) to BeatSaber directory"
             # print("Successfully exported full difficulty maps to BS")
 
     # if len(song_list) < 10:
@@ -260,7 +278,7 @@ def combine_maps(song_list_potential, song_list_run, diff_list, export_results_t
             delete_folder = f"{paths.new_map_path}1234_{diff:.1f}_{sl[:-4]}"
             shutil.rmtree(delete_folder)
 
-    if not paths.IN_COLAB and export_results_to_bs:
+    if config.auto_move_song_afterwards:
         folder_finished = os.path.join(paths.songs_pred, "y_done")
         if not os.path.isdir(folder_finished):
             os.mkdir(folder_finished)
@@ -281,8 +299,8 @@ if __name__ == "__main__":
         diff_list = json.loads(diff_list)
     # if len(diff_list) != 5:
     #     print(f"Warning: Did not get 5 difficulties: {diff_list}")
-
-    config.create_expert_flag = False
+    if len(diff_list) > 1:
+        config.create_expert_flag = False
     export_results_to_bs = True
     print(f"Using difficulties: {diff_list}")
 
@@ -302,4 +320,3 @@ if __name__ == "__main__":
         # use GPU in linux
         n_workers = 7
     main_multi_par(n_workers, diff_list, export_results_to_bs)
-

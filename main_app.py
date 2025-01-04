@@ -10,7 +10,8 @@ import threading
 
 from app_helper.check_input import get_summary
 from app_helper.set_app_paths import set_app_paths
-from main import main
+# from main import main
+from main_multi import main_multi_par
 from tools.config import paths, config
 
 data_folder_name = 'Data'
@@ -153,26 +154,52 @@ def upload_files(input_folder, files):
 
 
 # Run main.py with live output
-def run_process(num_workers, use_model, diff):
+def run_process(num_workers, use_model, diff1, diff2, diff3, diff4, diff5):
+    # Check if all inputs are valid
     summary_log = get_summary()
     if "Error: " in summary_log:
         yield "Error: Inputs not set up yet. See Summary on top."
         time.sleep(1)
         return
 
-    export_results_to_bs = False
+    # Read the difficulty settings
+    diff = []
+    if diff1 > 0:
+        diff.append(diff1)
+    if diff2 > 0:
+        diff.append(diff2)
+    if diff3 > 0:
+        diff.append(diff3)
+    if diff4 > 0:
+        diff.append(diff4)
+    if diff5 > 0:
+        diff.append(diff5)
+    if len(diff) == 0:
+        yield "Error: Inputs not set up yet. See Summary on top."
+        time.sleep(1)
+        return
+
+    config.use_mapper_selection = use_model
     progress_log = []  # List to store logs
     log_queue = queue.Queue()  # Thread-safe queue for logs
 
     def logger_callback(message):
         log_queue.put(message)
 
+    # Read logs to determine BS export status
+    export_results_to_bs = False
+    if "Info: Beat Saber folder found." in summary_log:
+        export_results_to_bs = True
+        print("Activated automatic export to Beat Saber")
+        progress_log.append("Activated automatic export to Beat Saber")
+        yield "\n".join(progress_log)
+
     # Run main() in a separate thread and pass the logger callback
     thread = threading.Thread(
-        target=main,
+        target=main_multi_par,
         kwargs={
-            "use_model": use_model,
-            "diff": diff,
+            "n_workers": num_workers,
+            "diff_list": diff,
             "logger_callback": logger_callback,
             "export_results_to_bs": export_results_to_bs,
         }
@@ -195,6 +222,11 @@ def run_process(num_workers, use_model, diff):
 # Function to update RAM requirement
 def update_ram(workers):
     return f"{workers * 5} GB RAM"
+
+
+def update_auto_cut_done(flag):
+    config.auto_move_song_afterwards = flag
+    return
 
 
 # Gradio App Setup Section
@@ -270,8 +302,8 @@ with gr.Blocks() as demo:
         gr.Markdown("### Difficulty Selection")
         gr.Markdown(
             """Specify the difficulties you want to use for the song generation.  
-            You can input up to 5 difficulties. Set any unused difficulties to **0** to reduce computation time.  
-            Each difficulty value must be between 0.01 and 1000."""
+            You can input **up to 5** difficulties. Set any unused difficulties to **0** to reduce computation time.  
+            Each difficulty value must be between 0.01 and 1000 (or 0 to deactivate)."""
         )
 
         # Inputs for difficulties
@@ -345,6 +377,7 @@ with gr.Blocks() as demo:
                 # Checkbox to select automatic cut to "done" folder
                 gr.Markdown("### Move finished songs")
                 auto_cut_done = gr.Checkbox(label="Automatically move songs to 'done' folder", value=False)
+                auto_cut_done.input(update_auto_cut_done, inputs=[auto_cut_done], outputs=[])
 
         # Run Button
         gr.Markdown("### Start Processing")
@@ -361,7 +394,8 @@ with gr.Blocks() as demo:
         # Link Run button to the process function
         run_button.click(
             run_process,
-            inputs=[num_workers, model_selector, difficulty_1],
+            inputs=[num_workers, model_selector, difficulty_1, difficulty_2, difficulty_3, difficulty_4,
+                    difficulty_5],
             outputs=[progress_eta],
             queue=True,
         )

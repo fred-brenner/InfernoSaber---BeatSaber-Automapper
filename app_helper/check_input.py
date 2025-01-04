@@ -38,7 +38,10 @@ def get_summary() -> str:
             ending = file_name.split('.')[-1]
             if ending in ['mp3', 'mp4', 'm4a', 'wav', 'aac', 'flv', 'wma', 'ogg', 'egg']:
                 song_list.append(file_name)
-        log.append(f"Info: Found {len(song_list)} song(s).")
+        if len(song_list) > 0:
+            log.append(f"Info: Found {len(song_list)} song(s).")
+        else:
+            log.append("Error: Found 0 songs. Please go to first tab or manually copy them to the input folder.")
     except OSError:
         log.append("Error: Data folder not found.")
         return "\n".join(log)
