@@ -153,6 +153,30 @@ def upload_files(input_folder, files):
     return f"{len(files)} file(s) successfully imported to {music_folder_name}"
 
 
+def open_folder_music(folder_path):
+    if os.path.isdir(folder_path):
+        music_folder_name = paths.songs_pred
+        if os.path.isdir(music_folder_name):
+            os.startfile(music_folder_name)
+        else:
+            print(f"Error: Could not find folder: {music_folder_name}")
+    else:
+        print("Not set up yet")
+    return
+
+
+def open_folder_maps(folder_path):
+    if os.path.isdir(folder_path):
+        maps_folder_name = paths.new_map_path
+        if os.path.isdir(maps_folder_name):
+            os.startfile(maps_folder_name)
+        else:
+            print(f"Error: Could not find folder: {maps_folder_name}")
+    else:
+        print("Not set up yet")
+    return
+
+
 # Run main.py with live output
 def run_process(num_workers, use_model, diff1, diff2, diff3, diff4, diff5):
     # Check if all inputs are valid
@@ -346,7 +370,7 @@ with gr.Blocks() as demo:
                 gr.Markdown("Select your BeatSaber folder to automatically export generated songs.")
                 bs_path = gr.Textbox(label='BeatSaber Folder', interactive=False)
                 image_browse_btn_2 = gr.Button('Browse', min_width=1)
-                bs_path_status = gr.Textbox(label='Folder Status', value='not set', interactive=False)
+                bs_path_status = gr.Textbox(label='Folder Status', placeholder='(optional)', interactive=False)
                 image_browse_btn_2.click(on_browse_bs_path, inputs=[], outputs=[bs_path, bs_path_status])
 
             # Right Column
@@ -358,9 +382,14 @@ with gr.Blocks() as demo:
                     file_types=['.mp3', '.wav', '.ogg', '.egg'],
                     file_count='multiple'
                 )
-                file_status = gr.Textbox(label='File Import Status', value='not set', interactive=False)
+                file_status = gr.Textbox(label='File Import Status', placeholder='(optional)', interactive=False)
                 upload_button = gr.Button('Copy Files to Input Folder')
                 upload_button.click(upload_files, inputs=[input_path, music_loader], outputs=[file_status])
+
+                # Add button to open the folder
+                gr.Markdown("... Or copy your songs to this folder:")
+                open_folder_button = gr.Button('Open Input Folder')
+                open_folder_button.click(open_folder_music, inputs=[input_path], outputs=[])
 
     ################################
     # TAB 2: Parameters
@@ -550,6 +579,11 @@ with gr.Blocks() as demo:
             outputs=[progress_eta],
             queue=True,
         )
+
+        # Add button to open the folder
+        gr.Markdown("... Maps will be generated here:")
+        open_folder_button2 = gr.Button('Open Output Folder')
+        open_folder_button2.click(open_folder_maps, inputs=[input_path], outputs=[])
 
 # Launch the app
 if __name__ == "__main__":
