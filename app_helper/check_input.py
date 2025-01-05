@@ -88,6 +88,7 @@ def get_summary(diff1, diff2, diff3, diff4, diff5) -> str:
             diff_count += 1
             diff_count_values.append(diff5)
     diff_count_values = [str(diff_float) for diff_float in diff_count_values]
-    log.append(f"Info: Generating {diff_count} difficulties for each song: [{', '.join(diff_count_values)}]")
+    log.append(f"Info: Generating {diff_count} difficulties for each song: [{', '.join(diff_count_values)}]. "
+               f"Total runs: {diff_count * len(song_list)}")
 
     return "\n".join(log)

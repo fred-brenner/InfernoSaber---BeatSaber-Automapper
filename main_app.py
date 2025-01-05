@@ -224,8 +224,91 @@ def update_ram(workers):
     return f"{workers * 2} GB free RAM, {workers} physical CPU cores"
 
 
-def update_auto_cut_done(flag):
-    config.auto_move_song_afterwards = flag
+def update_auto_cut_done(move_flag):
+    config.auto_move_song_afterwards = move_flag
+    return
+
+
+def set_version_selector(version_value):
+    config.bs_mapping_version = version_value
+    return
+
+
+def set_single_mode(single_mode_value):
+    if single_mode:
+        config.emphasize_beats_flag = False
+        config.single_notes_only_flag = True
+    else:
+        config.emphasize_beats_flag = True
+        config.single_notes_only_flag = False
+    return
+
+
+def set_dot_notes(dot_notes_value):
+    config.allow_dot_notes = dot_notes_value
+    return
+
+
+def set_add_obstacles(add_obstacles_value):
+    config.add_obstacle_flag = add_obstacles_value
+    return
+
+
+def set_add_obstacles_sporty(add_sporty_obstacles_value):
+    config.sporty_obstacles = add_sporty_obstacles_value
+    return
+
+
+def set_js_offset(js_offset_value):
+    config.jump_speed_offset += js_offset_value
+    config.jump_speed_offset_orig += js_offset_value
+    return
+
+
+def set_intensity(intensity_value):
+    config.add_beat_intensity = intensity_value
+    config.add_beat_intensity_orig = intensity_value
+    return
+
+
+def set_silence_threshold(silence_threshold_value):
+    config.silence_threshold *= (silence_threshold_value / 100)
+    config.silence_threshold_orig *= (silence_threshold_value / 100)
+    return
+
+
+# def set_quick_start(quick_start_value):
+#     config.quick_start = quick_start_value
+#     return
+
+
+def set_random_behaviour(random_behaviour_value):
+    config.random_note_map_factor = random_behaviour_value
+    return
+
+
+def set_add_arcs(add_arcs_value):
+    config.add_slider_flag = add_arcs_value
+    return
+
+
+def set_arc_start_time(arc_start_time_value):
+    config.slider_time_gap[0] = arc_start_time_value
+    return
+
+
+def set_arc_end_time(arc_end_time_value):
+    config.slider_time_gap[1] = arc_end_time_value
+    return
+
+
+def set_arc_probability(arc_probability_value):
+    config.slider_probability = (arc_probability_value / 100)
+    return
+
+
+def set_arc_movement_min(arc_movement_min_value):
+    config.slider_movement_minimum = arc_movement_min_value
     return
 
 
@@ -294,18 +377,24 @@ with gr.Blocks() as demo:
                     choices=["fav_15", "pp3_15", "easy_15", "expert_15"],
                     label="Select Model", value="fav_15", interactive=True,
                 )
-            with gr.Column():
                 gr.Markdown("Info: Selected model will be download from "
                             "[HuggingFace Repo](https://huggingface.co/BierHerr/InfernoSaber) at runtime if required")
 
+            with gr.Column():
+                # Dropdown Menu for Version Selection
+                gr.Markdown("Select Beat Saber mapping verison: v3-default, v2-without arcs")
+                version_selector = gr.Dropdown(
+                    choices=["v3", "v2"],
+                    label="Select BS Mapping Output Version", value="v3", interactive=True,
+                )
+                version_selector.input(set_version_selector, inputs=[version_selector], outputs=[])
+
         # Difficulty Selection
         gr.Markdown("### Difficulty Selection")
-        gr.Markdown(
-            """Specify the difficulties you want to use for the song generation.  
+        gr.Markdown("""Specify the difficulties you want to use for the song generation.  
             You can input **up to 5** difficulties. Set any unused difficulties to **0** to reduce computation time.  
             Each difficulty value must be between 0.01 and 1000 (or 0 to deactivate)."""
-        )
-
+                    )
         # Inputs for difficulties
         with gr.Row():
             difficulty_1 = gr.Number(
@@ -333,6 +422,67 @@ with gr.Blocks() as demo:
                 value=0, precision=2, interactive=True,
                 step=0.5, minimum=0, maximum=1000,
             )
+
+        with gr.Row():
+            gr.Markdown("""### Further 
+                        ### Modifications""")
+
+            # single mode on/off
+            single_mode = gr.Checkbox(label="Single Mode", value=False)
+            single_mode.input(set_single_mode, inputs=[single_mode], outputs=[])
+            # dot notes on/off
+            dot_notes = gr.Checkbox(label="Allow Dot Notes", value=True)
+            dot_notes.input(set_dot_notes, inputs=[dot_notes], outputs=[])
+            # add obstacles on/off
+            add_obstacles = gr.Checkbox(label="Add Obstacles", value=True)
+            add_obstacles.input(set_add_obstacles, inputs=[add_obstacles], outputs=[])
+            # add sporty obstacles on/off
+            add_sporty_obstacles = gr.Checkbox(label="Add Sporty Obstacles", value=False)
+            add_sporty_obstacles.input(set_add_obstacles_sporty, inputs=[add_sporty_obstacles], outputs=[])
+            # set js offset
+            js_offset = gr.Number(label="Jump Speed Offset", value=-0.4, precision=1, interactive=True, step=0.5,
+                                  minimum=-5, maximum=5)
+            js_offset.input(set_js_offset, inputs=[js_offset], outputs=[])
+            # set intensity
+            intensity = gr.Number(label="Beat Intensity (%)", value=95, precision=0, interactive=True, step=5,
+                                  minimum=70, maximum=125)
+            intensity.input(set_intensity, inputs=[intensity], outputs=[])
+            # set silence threshold
+            silence_threshold = gr.Number(label="Silence Threshold (%)", value=100, precision=2, interactive=True,
+                                          step=10, minimum=50, maximum=200)
+            silence_threshold.input(set_silence_threshold, inputs=[silence_threshold], outputs=[])
+            # # set quick start value
+            # quick_start = gr.Number(label="Quick Start", value=0, precision=1, interactive=True, step=0.5, minimum=0, maximum=3)
+            # quick_start.input(set_quick_start, inputs=[quick_start], outputs=[])
+            # set random behaviour value
+            random_behaviour = gr.Number(label="Random Behaviour", value=0.3, precision=1, interactive=True,
+                                         step=0.05, minimum=0, maximum=0.6)
+            random_behaviour.input(set_random_behaviour, inputs=[random_behaviour], outputs=[])
+
+        with gr.Row():
+            # Set arc stats
+            gr.Markdown("""### Arc Modifications
+                        ### (v3 only)""")
+
+            # add Arcs (v3 only) on/off
+            add_arcs = gr.Checkbox(label="Add Arcs (v3 only)", value=True)
+            add_arcs.input(set_add_arcs, inputs=[add_arcs], outputs=[])
+            # slider_start_time
+            arc_start_time = gr.Number(label="Arc Start Time", value=0.5, precision=1, interactive=True, step=0.25,
+                                       minimum=0, maximum=2)
+            arc_start_time.input(set_arc_start_time, inputs=[arc_start_time], outputs=[])
+            # slider_end_time
+            arc_end_time = gr.Number(label="Arc End Time", value=12, precision=0, interactive=True, step=1,
+                                     minimum=3, maximum=20)
+            arc_end_time.input(set_arc_end_time, inputs=[arc_end_time], outputs=[])
+            # slider_probability
+            arc_probability = gr.Number(label="Arc Probability (%)", value=80, precision=0, interactive=True,
+                                        step=10, minimum=10, maximum=100)
+            arc_probability.input(set_arc_probability, inputs=[arc_probability], outputs=[])
+            # slider_movement_min
+            arc_movement_min = gr.Number(label="Arc Movement Min", value=3, precision=1, interactive=True, step=0.5,
+                                         minimum=0, maximum=5)
+            arc_movement_min.input(set_arc_movement_min, inputs=[arc_movement_min], outputs=[])
 
     ################################
     # TAB 3: Runtime
@@ -400,10 +550,6 @@ with gr.Blocks() as demo:
             outputs=[progress_eta],
             queue=True,
         )
-
-        # image_browse_btn.click(get_summary, inputs=[], outputs=[log_output])
-        # image_browse_btn_2.click(get_summary, inputs=[], outputs=[log_output])
-        # upload_button.click(get_summary, inputs=[], outputs=[log_output])
 
 # Launch the app
 if __name__ == "__main__":
