@@ -1,4 +1,5 @@
 import time
+import requests     # to check for updates opn GitHub
 
 import gradio as gr
 from tkinter import Tk, filedialog
@@ -336,6 +337,19 @@ def set_arc_movement_min(arc_movement_min_value):
     return
 
 
+def check_for_updates():
+    repo_owner = "fred-brenner"
+    # repo_name = "InfernoSaber---BeatSaber-Automapper"
+    repo_name = "InfernoSaber-App"
+    github_url = f"https://api.github.com/repos/{repo_owner}/{repo_name}/releases"
+    response = requests.get(github_url)
+    latest_version = response.json()[0]['tag_name']
+    if latest_version != config.InfernoSaber_version:
+        return (f"Version {latest_version} is released! Your version is {config.InfernoSaber_version}. "
+                f"Automatic updates are currently not supported.")
+    return "You are up to date!"
+
+
 # Gradio App Setup Section
 with gr.Blocks() as demo:
     ################################
@@ -351,6 +365,11 @@ with gr.Blocks() as demo:
                 If you encounter problems, please check the Discord channel. It is free to use and open source.  
                 [GitHub Repo](https://github.com/fred-brenner/InfernoSaber---BeatSaber-Automapper/tree/main_app): View the code  
                 [Discord Channel](https://discord.com/invite/cdV6HhpufY): Questions, suggestions, and improvements are welcome""")
+            with gr.Column():
+                gr.Markdown("### Check for updates")
+                check_version_button = gr.Button("Check for updates")
+                version_info = gr.Textbox(label="Version Info", interactive=False)
+                check_version_button.click(check_for_updates, inputs=[], outputs=[version_info])
 
         # Two-column layout
         with gr.Row():
