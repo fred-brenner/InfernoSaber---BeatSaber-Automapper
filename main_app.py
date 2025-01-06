@@ -344,10 +344,11 @@ def check_for_updates():
     github_url = f"https://api.github.com/repos/{repo_owner}/{repo_name}/releases"
     response = requests.get(github_url)
     latest_version = response.json()[0]['tag_name']
-    if latest_version != config.InfernoSaber_version:
-        return (f"Version {latest_version} is released! Your version is {config.InfernoSaber_version}. "
-                f"Automatic updates are currently not supported.")
-    return "You are up to date!"
+    current_version = f"v{config.InfernoSaber_version}"
+    if latest_version != current_version:
+        return (f"Version <{latest_version}> is released! Your version is <{config.InfernoSaber_version}>. "
+                f"Please re-install through Pinokio (delete InfernoSaber app, not Data folder).")
+    return f"You are up to date ({latest_version})!"
 
 
 # Gradio App Setup Section
