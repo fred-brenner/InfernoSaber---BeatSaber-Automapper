@@ -2,34 +2,28 @@
     
     Automapper with fully adjustable difficulty (inpsired by star difficulty) ranging from easy maps (1) to Expert++ maps (10+)
 
-    New: Get maps from the discord bot (if online): https://discord.gg/cdV6HhpufY
+    Update 2025: App is finally available via Pinokio: https://program.pinokio.computer/#/  
+    Just type in the searchfield of Pinokio: https://github.com/fred-brenner/InfernoSaber-App
 
-    Recommendation: Generate BeatSaber maps using AI with the convenience of Google Drive storage.
-    Use the Google Colab template included in the repository without the need of hardware.
+    This installs all depondencies in the capsulated environment of Pinokio and loads the application from (this) main repository: 
+    https://github.com/fred-brenner/InfernoSaber---BeatSaber-Automapper/tree/main_app
+
+    Alternatively:
+
+    Join the Discord and let the bot generate single difficulty maps for you (not always available): 
+    https://discord.com/invite/cdV6HhpufY
     
-    Alternative: Install the project locally with anaconda (not recommended)
+    ... Or clone the repo yourself (Note: Use a conda environment to install audio packages on windows machines)
 
 
-## Roadmap 2023
-Already Finished:
+## Roadmap 2025
 
-    Publish InfernoSaber
-    Add obstacles in unused spaces
-    Simple cardio obstacle model
+    Increase number of models to improve accuracy and enable more options
+    
+## 2023 Notes: Automapper for Beatsaber made for expert+ levels
 
-Mid of 2023:
-
-    Create InfernoSaber website/independent server (?)
-    Rework AI model to create "impossible" note speeds
-
-End of 2023:
-
-    Create Cardio Obstacle AI Model
-    Check out Reinforcement Models
-    Add bombs in unused spaces (?)
-
-
-## Automapper for Beatsaber made for expert+ levels
+You can also train your own models on your favorite maps and difficulty.
+This can only be done locally with cloning the repo and using GPU (one high-end consumer GPU is enough)
 
 Extract maps from Beatsaber/Bsaber to feed them 
 into AI models.
@@ -57,9 +51,7 @@ frederic.brenner@tum.de
 anaconda_environment.yaml
 
 ## To run automapper go to:
-[Outdated] Download models from GDrive link in model_data/Data/model/link_to_model.txt
-
-[Currently] Create Colab notebook and download model data from the created GDrive repository.
+[Automatically] download model data from the HuggingFace repository (already implementated in code).
 
 run main.py
 
