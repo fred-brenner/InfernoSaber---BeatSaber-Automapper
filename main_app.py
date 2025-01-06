@@ -242,6 +242,7 @@ def run_process(num_workers, use_model, diff1, diff2, diff3, diff4, diff5):
     # Final message after completion
     progress_log.append("Process finished!")
     yield "\n".join(progress_log)
+    return
 
 
 # Function to update RAM requirement
