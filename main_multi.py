@@ -85,12 +85,15 @@ def main_multi_par(n_workers: int, diff_list: list, export_results_to_bs=True,
     # config.create_expert_flag = False
     diff_list = np.sort(diff_list)
     diff_list *= 4
+
     print(f"Starting multi map generator with {n_workers} workers.")
     if logger_callback:
         logger_callback(f"Starting multi map generator with {n_workers} workers.")
 
     # MAP GENERATOR
     ###############
+    if logger_callback:
+        logger_callback("Checking and Normalizing Song Files...")
     song_list_files = os.listdir(paths.songs_pred)
     song_list_files = check_music_files(song_list_files, paths.songs_pred)
     print(f"Found {len(song_list_files)} songs. Iterating...")

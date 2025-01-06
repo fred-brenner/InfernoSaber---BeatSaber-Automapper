@@ -14,6 +14,8 @@ from app_helper.set_app_paths import set_app_paths
 # from main import main
 from main_multi import main_multi_par
 from tools.config import paths, config
+from tools.config.mapper_selection import update_model_file_paths
+from tools.utils.huggingface import model_download
 
 data_folder_name = 'Data'
 bs_folder_name = "Beat Saber/Beat Saber_Data/CustomLevels"
@@ -207,6 +209,20 @@ def run_process(num_workers, use_model, diff1, diff2, diff3, diff4, diff5):
     config.use_mapper_selection = use_model
     progress_log = []  # List to store logs
     log_queue = queue.Queue()  # Thread-safe queue for logs
+
+    # Download InfernoSaber AI Model
+    update_model_file_paths(check_model_exists=False)
+    # Download AI Model from huggingface
+    progress_log.append(f"Loading AI Model: {use_model}")
+    yield "\n".join(progress_log)
+    try:
+        update_model_file_paths()
+    except:
+        progress_log.append("Downloading Model from HuggingFace (~1GB, see second tab)")
+        yield "\n".join(progress_log)
+    model_download(use_model)
+    progress_log.append("Model Found")
+    yield "\n".join(progress_log)
 
     def logger_callback(message):
         log_queue.put(message)
