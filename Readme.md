@@ -2,17 +2,17 @@
     
     Automapper with fully adjustable difficulty (inpsired by star difficulty) ranging from easy maps (1) to Expert++ maps (10+)
 
-    Update 2025: App is finally available via Pinokio: https://program.pinokio.computer/#/  
-    Just type in the searchfield of Pinokio: https://github.com/fred-brenner/InfernoSaber-App
+    Update 2025: App is finally available via Pinokio: https://program.pinokio.computer/#/
+    Just got to "Discover" and then "Download from URL": https://github.com/fred-brenner/InfernoSaber-App
 
-    This installs all depondencies in the capsulated environment of Pinokio and loads the application from (this) main repository: 
+    This installs all dependencies in the capsulated environment of Pinokio and loads the application from (this) main repository:
     https://github.com/fred-brenner/InfernoSaber---BeatSaber-Automapper/tree/main_app
 
     Alternatively:
 
-    Join the Discord and let the bot generate single difficulty maps for you (not always available): 
+    Join the Discord and let the bot generate single difficulty maps for you (not always available):
     https://discord.com/invite/cdV6HhpufY
-    
+
     ... Or clone the repo yourself (Note: Use a conda environment to install audio packages on windows machines)
 
 
