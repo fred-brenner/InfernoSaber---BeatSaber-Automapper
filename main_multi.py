@@ -142,10 +142,13 @@ def main_multi_par(n_workers: int, diff_list: list, export_results_to_bs=True,
                 logger_callback(f"### ETA: {(len(song_list) - processed_count) * time_per_run / 60:.1f} minutes. "
                                 f"Time per song: {time_per_run * len(diff_list):.0f} s ###")
 
-    song_list_run = combine_maps(song_list_files, song_list_run,
-                                 diff_list, export_results_to_bs)
-    song_list_run = combine_maps(song_list_files, song_list_run,
-                                 diff_list, export_results_to_bs)
+    for _ in range(20):
+        time.sleep(0.1)
+        song_list_run = combine_maps(song_list_files, song_list_run,
+                                     diff_list, export_results_to_bs)
+        if len(song_list_run) == 0:
+            break
+
     if len(song_list_run) != 0:
         print(f"Error: Remaining songs in song_list for combination: {song_list_run}")
         if logger_callback:
