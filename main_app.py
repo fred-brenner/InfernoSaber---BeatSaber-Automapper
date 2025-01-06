@@ -348,7 +348,7 @@ def check_for_updates():
     if latest_version != current_version:
         return (f"Version <{latest_version}> is released! Your version is <{config.InfernoSaber_version}>. "
                 f"Please re-install through Pinokio (delete InfernoSaber app, not Data folder).")
-    return f"You are up to date ({latest_version})!"
+    return f"You are up to date ({latest_version})"
 
 
 # Gradio App Setup Section
