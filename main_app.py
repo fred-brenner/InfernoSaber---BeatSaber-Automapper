@@ -327,9 +327,10 @@ def set_intensity(intensity_value):
 
 
 def set_silence_threshold(silence_threshold_value):
-    config.silence_threshold *= (silence_threshold_value / 100)
+    orig_value = 0.2
+    config.silence_threshold = orig_value * (silence_threshold_value / 100)
     update_dir_path('tools/config/config.py', 'silence_threshold', config.silence_threshold)
-    config.silence_threshold_orig *= (silence_threshold_value / 100)
+    config.silence_threshold_orig = orig_value * (silence_threshold_value / 100)
     update_dir_path('tools/config/config.py', 'silence_threshold_orig', config.silence_threshold_orig)
     return
 
@@ -453,8 +454,8 @@ with gr.Blocks() as demo:
     with gr.Tab("Specify Parameters"):
         gr.Markdown("## Specify Parameters")
         gr.Markdown("All changes will be stored and applied to the next run on this page. "
-                    "After a restart, your previous setting will be applied and not the state of the buttons. "
-                    "(except if you change the respective parameter again) "
+                    "After a restart, your previous setting will be applied and not the state of the buttons "
+                    "(except if you change the respective parameter again). "
                     "The next update will fix this.")
         with gr.Row():
             with gr.Column():
