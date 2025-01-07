@@ -10,10 +10,18 @@ def update_dir_path(file_path, keyword='dir_path', new_value=''):
         keyword (str): The new path/new_value to set.
         new_value (str): The new content to set.
     """
-    # if new_value.lower() == 'true':
-    #     new_value = True
-    # elif new_value.lower() == 'false':
-    #     new_value = False
+    if new_value.lower() == 'true':
+        new_value = True
+    elif new_value.lower() == 'false':
+        new_value = False
+    else:
+        try:
+            if float(new_value):
+                new_value = float(new_value)
+            if int(new_value) == new_value:
+                new_value = int(new_value)
+        except:
+            pass
 
     try:
         # Read the file
@@ -27,7 +35,7 @@ def update_dir_path(file_path, keyword='dir_path', new_value=''):
                 # Check if the line contains 'dir_path'
                 if re.match(rf"^\s*{keyword}\s*=", line):
                     # Replace with the new value and ensure a newline is added
-                    file.write(f'{keyword} = "{new_value}"\n')
+                    file.write(f'{keyword} = "{str(new_value)}"\n')
                     print(f"Updated {keyword} in {file_path} to: {new_value}")
                     found_it = True
                 else:
