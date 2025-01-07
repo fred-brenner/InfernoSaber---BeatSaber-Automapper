@@ -13,7 +13,7 @@ def update_file_paths(input_dir):
     if not input_dir.endswith('/'):
         input_dir += '/'
     paths.dir_path = input_dir
-    update_dir_path('tools/config/paths.py', input_dir)
+    update_dir_path('tools/config/paths.py', 'dir_path', input_dir)
 
     ########################
     # input folder structure

@@ -11,6 +11,7 @@ import threading
 
 from app_helper.check_input import get_summary
 from app_helper.set_app_paths import set_app_paths
+from app_helper.update_dir_path import update_dir_path
 # from main import main
 from main_multi import main_multi_par
 from tools.config import paths, config
@@ -207,6 +208,7 @@ def run_process(num_workers, use_model, diff1, diff2, diff3, diff4, diff5):
         return
 
     config.use_mapper_selection = use_model
+    update_dir_path('tools/config/config.py', 'use_mapper_selection', use_model)
     progress_log = []  # List to store logs
     log_queue = queue.Queue()  # Thread-safe queue for logs
 
@@ -268,11 +270,13 @@ def update_ram(workers):
 
 def update_auto_cut_done(move_flag):
     config.auto_move_song_afterwards = move_flag
+    update_dir_path('tools/config/config.py', 'auto_move_song_afterwards', move_flag)
     return
 
 
 def set_version_selector(version_value):
     config.bs_mapping_version = version_value
+    update_dir_path('tools/config/config.py', 'bs_mapping_version', version_value)
     return
 
 
@@ -283,74 +287,88 @@ def set_single_mode(single_mode_value):
     else:
         config.emphasize_beats_flag = True
         config.single_notes_only_flag = False
+    update_dir_path('tools/config/config.py', 'emphasize_beats_flag', config.emphasize_beats_flag)
+    update_dir_path('tools/config/config.py', 'single_notes_only_flag', config.single_notes_only_flag)
     return
 
 
 def set_dot_notes(dot_notes_value):
     config.allow_dot_notes = dot_notes_value
+    update_dir_path('tools/config/config.py', 'allow_dot_notes', dot_notes_value)
     return
 
 
 def set_add_obstacles(add_obstacles_value):
     config.add_obstacle_flag = add_obstacles_value
+    update_dir_path('tools/config/config.py', 'add_obstacle_flag', add_obstacles_value)
     return
 
 
 def set_add_obstacles_sporty(add_sporty_obstacles_value):
     config.sporty_obstacles = add_sporty_obstacles_value
+    update_dir_path('tools/config/config.py', 'sporty_obstacles', add_sporty_obstacles_value)
     return
 
 
 def set_js_offset(js_offset_value):
     config.jump_speed_offset += js_offset_value
+    update_dir_path('tools/config/config.py', 'jump_speed_offset', config.jump_speed_offset)
     config.jump_speed_offset_orig += js_offset_value
+    update_dir_path('tools/config/config.py', 'jump_speed_offset_orig', config.jump_speed_offset_orig)
     return
 
 
 def set_intensity(intensity_value):
     config.add_beat_intensity = intensity_value
+    update_dir_path('tools/config/config.py', 'add_beat_intensity', intensity_value)
     config.add_beat_intensity_orig = intensity_value
+    update_dir_path('tools/config/config.py', 'add_beat_intensity_orig', intensity_value)
     return
 
 
 def set_silence_threshold(silence_threshold_value):
     config.silence_threshold *= (silence_threshold_value / 100)
+    update_dir_path('tools/config/config.py', 'silence_threshold', config.silence_threshold)
     config.silence_threshold_orig *= (silence_threshold_value / 100)
+    update_dir_path('tools/config/config.py', 'silence_threshold_orig', config.silence_threshold_orig)
     return
 
 
 # def set_quick_start(quick_start_value):
 #     config.quick_start = quick_start_value
+#     update_dir_path('tools/config/config.py', 'quick_start', quick_start_value)
 #     return
 
 
 def set_random_behaviour(random_behaviour_value):
     config.random_note_map_factor = random_behaviour_value
+    update_dir_path('tools/config/config.py', 'random_note_map_factor', random_behaviour_value)
     return
 
 
 def set_add_arcs(add_arcs_value):
     config.add_slider_flag = add_arcs_value
+    update_dir_path('tools/config/config.py', 'add_slider_flag', add_arcs_value)
     return
 
 
-def set_arc_start_time(arc_start_time_value):
+def set_arc_time(arc_start_time_value, arc_end_time_value):
     config.slider_time_gap[0] = arc_start_time_value
-    return
-
-
-def set_arc_end_time(arc_end_time_value):
     config.slider_time_gap[1] = arc_end_time_value
+    update_dir_path('tools/config/config.py', 'slider_time_gap',
+                    f'[{arc_start_time_value}, {arc_end_time_value}]')
     return
 
 
 def set_arc_probability(arc_probability_value):
     config.slider_probability = (arc_probability_value / 100)
+    update_dir_path('tools/config/config.py', 'slider_probability', config.slider_probability)
     return
 
 
 def set_arc_movement_min(arc_movement_min_value):
     config.slider_movement_minimum = arc_movement_min_value
+    update_dir_path('tools/config/config.py', 'slider_movement_minimum', arc_movement_min_value)
     return
 
 
@@ -364,7 +382,7 @@ def check_for_updates():
     current_version = f"v{config.InfernoSaber_version}"
     if latest_version != current_version:
         return (f"Version <{latest_version}> is released! Your version is <{config.InfernoSaber_version}>. "
-                f"Please re-install through Pinokio (delete InfernoSaber app, not Data folder).")
+                f"Please update with the Pinokio Update function on the left.")
     return f"You are up to date ({latest_version})"
 
 
@@ -379,15 +397,14 @@ with gr.Blocks() as demo:
             with gr.Column():
                 gr.Markdown("## Setup")
                 gr.Markdown(f"""Version: {config.InfernoSaber_version}  
-                This app is under development and not extensively tested on different systems.  
-                If you encounter problems, please check the Discord channel. It is free to use and open source.  
+                InfernoSaber is free and OpenSource. This app is under development and not extensively tested on different systems.  
+                If you encounter problems, please check the Discord channel.
                 [GitHub Repo](https://github.com/fred-brenner/InfernoSaber---BeatSaber-Automapper/tree/main_app): View the code  
                 [Discord Channel](https://discord.com/invite/cdV6HhpufY): Questions, suggestions, and improvements are welcome""")
             with gr.Column():
                 gr.Markdown("### Check for updates")
-                check_version_button = gr.Button("Check for updates")
-                version_info = gr.Textbox(label="Version Info", interactive=False)
-                check_version_button.click(check_for_updates, inputs=[], outputs=[version_info])
+                version_info = gr.Textbox(label="Version Info", interactive=False,
+                                          value=check_for_updates)
 
         # Two-column layout
         with gr.Row():
@@ -536,11 +553,12 @@ with gr.Blocks() as demo:
             # slider_start_time
             arc_start_time = gr.Number(label="Arc Start Time", value=0.5, precision=1, interactive=True, step=0.25,
                                        minimum=0, maximum=2)
-            arc_start_time.input(set_arc_start_time, inputs=[arc_start_time], outputs=[])
+            # arc_start_time.input(set_arc_time, inputs=[arc_start_time, arc_end_time], outputs=[])
             # slider_end_time
             arc_end_time = gr.Number(label="Arc End Time", value=12, precision=0, interactive=True, step=1,
                                      minimum=3, maximum=20)
-            arc_end_time.input(set_arc_end_time, inputs=[arc_end_time], outputs=[])
+            arc_start_time.input(set_arc_time, inputs=[arc_start_time, arc_end_time], outputs=[])
+            arc_end_time.input(set_arc_time, inputs=[arc_start_time, arc_end_time], outputs=[])
             # slider_probability
             arc_probability = gr.Number(label="Arc Probability (%)", value=80, precision=0, interactive=True,
                                         step=10, minimum=10, maximum=100)
