@@ -1,7 +1,6 @@
 import json
 import numpy as np
 import os
-import re
 
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 import logging
@@ -30,10 +29,10 @@ def stack_info_data(new_info_file: list, content: list, diff_str: str, diff_num:
     new_info_file.append(f'"_difficulty": "{diff_str}",\n')
     new_info_file.append(f'"_difficultyRank": {diff_num},\n')
     new_info_file.append(f'"_beatmapFilename": "{diff_str}.dat",\n')
-    target_prefix = re.compile(r'\s*"_noteJumpMovementSpeed":')
+    target_prefix = '"_noteJumpMovementSpeed":'
     last_matching_idx = None
     for idx, item in enumerate(content):
-        if re.search(target_prefix, item):
+        if item.startswith(target_prefix):
             last_matching_idx = idx
     if last_matching_idx is None:
         print(f"Error: Could not find {target_prefix} in map.")
@@ -266,10 +265,8 @@ def combine_maps(song_list_potential, song_list_run, diff_list, export_results_t
             shutil.copy(src, dst)
         # write info file
         new_info_file.extend(content[-3:])
-        new_info_file = ''.join(new_info_file)
-        print(new_info_file)
         with open(f"{overall_folder}/info.dat", 'w') as fp:
-            fp.write(json.dumps(json.loads(new_info_file), indent=4))
+            fp.writelines(new_info_file)
         # create zip archive for online viewer
         shutil.make_archive(f'{paths.new_map_path}12345_{song_name}',
                             'zip', f'{paths.new_map_path}12345_{song_name}')
@@ -302,8 +299,8 @@ if __name__ == "__main__":
     # freeze_support()  # required for pyinstaller packaging
     diff_list = os.environ.get('diff_list')
     if diff_list is None:
-        # diff_list = [5, 6, 7, 8, 9]
-        diff_list = [1]
+        diff_list = [5, 6, 7, 8, 9]
+        # diff_list = [1, 5, 10, 100, 1e4]
     else:
         diff_list = json.loads(diff_list)
     # if len(diff_list) != 5:
