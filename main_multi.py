@@ -266,8 +266,10 @@ def combine_maps(song_list_potential, song_list_run, diff_list, export_results_t
             shutil.copy(src, dst)
         # write info file
         new_info_file.extend(content[-3:])
+        new_info_file = '\n'.join(new_info_file)
+        print(new_info_file)
         with open(f"{overall_folder}/info.dat", 'w') as fp:
-            fp.write(json.dumps(new_info_file, indent=4))
+            fp.write(json.dumps(json.loads(new_info_file), indent=4))
         # create zip archive for online viewer
         shutil.make_archive(f'{paths.new_map_path}12345_{song_name}',
                             'zip', f'{paths.new_map_path}12345_{song_name}')
