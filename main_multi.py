@@ -33,7 +33,7 @@ def stack_info_data(new_info_file: list, content: list, diff_str: str, diff_num:
     target_prefix = re.compile(r'\s*"_noteJumpMovementSpeed":')
     last_matching_idx = None
     for idx, item in enumerate(content):
-        if item.startswith(target_prefix):
+        if re.search(target_prefix, item):
             last_matching_idx = idx
     if last_matching_idx is None:
         print(f"Error: Could not find {target_prefix} in map.")
