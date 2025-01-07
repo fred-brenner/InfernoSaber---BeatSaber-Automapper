@@ -15,6 +15,7 @@ def update_dir_path(file_path, keyword='dir_path', value=''):
         with open(file_path, 'r') as file:
             lines = file.readlines()
 
+        found_it = False
         # Update the specific line containing 'dir_path'
         with open(file_path, 'w') as file:
             for line in lines:
@@ -23,10 +24,11 @@ def update_dir_path(file_path, keyword='dir_path', value=''):
                     # Replace with the new value and ensure a newline is added
                     file.write(f'{keyword} = "{value}"\n')
                     print(f"Updated {keyword} in {file_path} to: {value}")
-                    return
+                    found_it = True
                 else:
                     file.write(line)
-        print(f"Error: Could not find keyword {keyword} in configuration file.")
+        if not found_it:
+            print(f"Error: Could not find keyword {keyword} in configuration file.")
 
     except FileNotFoundError:
         print(f"Error: The file {file_path} does not exist.")
