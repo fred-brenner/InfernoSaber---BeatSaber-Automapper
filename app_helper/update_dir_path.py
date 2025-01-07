@@ -10,10 +10,10 @@ def update_dir_path(file_path, keyword='dir_path', new_value=''):
         keyword (str): The new path/new_value to set.
         new_value (str): The new content to set.
     """
-    if new_value.lower() == 'true':
-        new_value = True
-    elif new_value.lower() == 'false':
-        new_value = False
+    # if new_value.lower() == 'true':
+    #     new_value = True
+    # elif new_value.lower() == 'false':
+    #     new_value = False
 
     try:
         # Read the file
