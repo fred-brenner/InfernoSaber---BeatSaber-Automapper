@@ -1,28 +1,14 @@
 import re
 
-
 def update_dir_path(file_path, keyword='dir_path', new_value=''):
     """
     Updates the line containing 'dir_path' in the specified file to the new new_value.
 
     Args:
         file_path (str): Path to the file to be updated.
-        keyword (str): The new path/new_value to set.
-        new_value (str): The new content to set.
+        keyword (str): The keyword to search for in the file.
+        new_value (str, int, float, bool): The new content to set.
     """
-    if new_value.lower() == 'true':
-        new_value = True
-    elif new_value.lower() == 'false':
-        new_value = False
-    else:
-        try:
-            if float(new_value):
-                new_value = float(new_value)
-            if int(new_value) == new_value:
-                new_value = int(new_value)
-        except:
-            pass
-
     try:
         # Read the file
         with open(file_path, 'r') as file:
@@ -34,8 +20,13 @@ def update_dir_path(file_path, keyword='dir_path', new_value=''):
             for line in lines:
                 # Check if the line contains 'dir_path'
                 if re.match(rf"^\s*{keyword}\s*=", line):
+                    # Determine the format based on the type of new_value
+                    if isinstance(new_value, str):
+                        formatted_value = f'"{new_value}"'
+                    else:
+                        formatted_value = str(new_value)
                     # Replace with the new value and ensure a newline is added
-                    file.write(f'{keyword} = "{str(new_value)}"\n')
+                    file.write(f'{keyword} = {formatted_value}\n')
                     print(f"Updated {keyword} in {file_path} to: {new_value}")
                     found_it = True
                 else:
@@ -48,7 +39,6 @@ def update_dir_path(file_path, keyword='dir_path', new_value=''):
     except Exception as e:
         print(f"An error occurred: {e}")
     return
-
 
 # Example usage
 if __name__ == "__main__":
