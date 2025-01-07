@@ -14,6 +14,7 @@ def update_dir_path(file_path, keyword='dir_path', new_value=''):
         new_value = True
     elif new_value.lower() == 'false':
         new_value = False
+
     try:
         # Read the file
         with open(file_path, 'r') as file:

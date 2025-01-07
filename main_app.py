@@ -533,7 +533,7 @@ with gr.Blocks() as demo:
             # set intensity
             intensity = gr.Number(label="Beat Intensity (%)", value=95, precision=0, interactive=True, step=5,
                                   minimum=70, maximum=125)
-            intensity.input(set_intensity, inputs=[intensity], outputs=[])
+            intensity.change(set_intensity, inputs=[intensity], outputs=[])
             # set silence threshold
             silence_threshold = gr.Number(label="Silence Threshold (%)", value=100, precision=2, interactive=True,
                                           step=10, minimum=50, maximum=200)
