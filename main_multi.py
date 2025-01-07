@@ -38,10 +38,11 @@ def stack_info_data(new_info_file: list, content: list, diff_str: str, diff_num:
         print(f"Error: Could not find {target_prefix} in map.")
         exit()
     new_info_file.extend(content[last_matching_idx:last_matching_idx + 2])
-    if diff_str != "ExpertPlus":
-        new_info_file.append('},\n')
-    else:
-        new_info_file.append('}\n')
+    # if diff_str != "ExpertPlus":
+    #     new_info_file.append('},\n')
+    # else:
+    #     new_info_file.append('}\n')
+    new_info_file.append('},\n')
     return new_info_file
 
 
@@ -263,10 +264,12 @@ def combine_maps(song_list_potential, song_list_run, diff_list, export_results_t
                 dst = f"{overall_folder}/ExpertPlus.dat"
                 new_info_file = stack_info_data(new_info_file, content, "ExpertPlus", 9)
             shutil.copy(src, dst)
+        new_info_file[-1] = '}\n'
         # write info file
         new_info_file.extend(content[-3:])
+        new_info_file = ''.join(new_info_file)
         with open(f"{overall_folder}/info.dat", 'w') as fp:
-            fp.writelines(new_info_file)
+            fp.write(json.dumps(json.loads(new_info_file), indent=4))
         # create zip archive for online viewer
         shutil.make_archive(f'{paths.new_map_path}12345_{song_name}',
                             'zip', f'{paths.new_map_path}12345_{song_name}')
@@ -299,8 +302,8 @@ if __name__ == "__main__":
     # freeze_support()  # required for pyinstaller packaging
     diff_list = os.environ.get('diff_list')
     if diff_list is None:
-        diff_list = [5, 6, 7, 8, 9]
-        # diff_list = [1, 5, 10, 100, 1e4]
+        # diff_list = [5, 6, 7, 8, 9]
+        diff_list = [1]
     else:
         diff_list = json.loads(diff_list)
     # if len(diff_list) != 5:
