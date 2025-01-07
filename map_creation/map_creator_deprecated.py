@@ -72,7 +72,7 @@ def create_map_depr(y_class_num, timings, events, name, bpm, pitch_input, pitch_
         file = new_map_folder + 'info.dat'
         complete_info_map = get_info_map_string(name, bpm, bs_diff)
         with open(file, 'w') as f:
-            f.write(json.dumps(json.loads(complete_info_map), indent=4))
+            f.write(complete_info_map)
         return new_map_folder
 
     ################################################################
