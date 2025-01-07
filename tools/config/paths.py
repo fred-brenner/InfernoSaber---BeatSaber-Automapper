@@ -14,7 +14,7 @@ from tools.config import config
 
 ################################# (change this for your pc)
 # setup folder for input data (automatically determined if inside this project)
-dir_path = ""
+dir_path = "C:/Users/frede/Desktop/bs_test/Data/"
 
 bs_song_path = ""
 bs_input_path = ""
