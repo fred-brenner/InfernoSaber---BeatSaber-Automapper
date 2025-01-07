@@ -1,6 +1,7 @@
 import json
 import numpy as np
 import os
+import re
 
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 import logging
@@ -29,7 +30,7 @@ def stack_info_data(new_info_file: list, content: list, diff_str: str, diff_num:
     new_info_file.append(f'"_difficulty": "{diff_str}",\n')
     new_info_file.append(f'"_difficultyRank": {diff_num},\n')
     new_info_file.append(f'"_beatmapFilename": "{diff_str}.dat",\n')
-    target_prefix = '"_noteJumpMovementSpeed":'
+    target_prefix = re.compile(r'\s*"_noteJumpMovementSpeed":')
     last_matching_idx = None
     for idx, item in enumerate(content):
         if item.startswith(target_prefix):
