@@ -397,7 +397,7 @@ with gr.Blocks() as demo:
             with gr.Column():
                 gr.Markdown("## Setup")
                 gr.Markdown(f"""Version: {config.InfernoSaber_version}  
-                InfernoSaber is free and OpenSource. This app is under development and not extensively tested on different systems.  
+                InfernoSaber is free and OpenSource.
                 If you encounter problems, please check the Discord channel.
                 [GitHub Repo](https://github.com/fred-brenner/InfernoSaber---BeatSaber-Automapper/tree/main_app): View the code  
                 [Discord Channel](https://discord.com/invite/cdV6HhpufY): Questions, suggestions, and improvements are welcome""")
@@ -452,6 +452,10 @@ with gr.Blocks() as demo:
     # Second Tab for "Specify Parameters"
     with gr.Tab("Specify Parameters"):
         gr.Markdown("## Specify Parameters")
+        gr.Markdown("All changes will be stored and applied to the next run on this page. "
+                    "After a restart, your previous setting will be applied and not the state of the buttons. "
+                    "(except if you change the respective parameter again) "
+                    "The next update will fix this.")
         with gr.Row():
             with gr.Column():
                 # Dropdown Menu for Model Selection
