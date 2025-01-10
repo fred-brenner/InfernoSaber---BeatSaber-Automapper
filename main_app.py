@@ -431,10 +431,11 @@ with gr.Blocks() as demo:
             # Right Column
             with gr.Column():
                 # Music Import
-                gr.Markdown("**Music Import**")
+                gr.Markdown("**Music Import: Currently only ogg/egg files supported!**")
+                # TODO: fix for mp3, wav, etc.
                 music_loader = gr.File(
                     label='Select Music Files',
-                    file_types=['.mp3', '.wav', '.ogg', '.egg'],
+                    file_types=['.ogg', '.egg'],
                     file_count='multiple'
                 )
                 file_status = gr.Textbox(label='File Import Status', placeholder='(optional)', interactive=False)
