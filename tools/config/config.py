@@ -6,7 +6,7 @@ import numpy as np
 # config file for all important values 
 # used in multiple codes
 ########################################
-InfernoSaber_version = "1.7.1.app2"  # coded into the info.dat file
+InfernoSaber_version = "1.7.1.app3"  # coded into the info.dat file
 bs_mapping_version = "v2"  # allows to generate advanced features like arcs
 # bs_mapping_version = "v2"  # legacy mode, may be deprecated in future
 
