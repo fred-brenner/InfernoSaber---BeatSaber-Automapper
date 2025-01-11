@@ -592,7 +592,7 @@ with gr.Blocks() as demo:
                     interactive=False,
                     value=get_summary,
                     inputs=[difficulty_1, difficulty_2, difficulty_3, difficulty_4, difficulty_5],
-                    every=5,
+                    every=4,
                 )
 
                 # CPU Workers Selection and RAM Requirement Display
