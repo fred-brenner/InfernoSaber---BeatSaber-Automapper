@@ -424,7 +424,10 @@ def check_for_updates():
         latest_version = response.json()[0]['tag_name']
     except:
         print("Could not reach GitHub for update check.")
-        print(f"Response: {response}")
+        try:
+            print(f"Response: {response.json()[0]}")
+        except:
+            pass
         return "Could not reach GitHub for update check."
     current_version = f"v{config.InfernoSaber_version}"
     if latest_version != current_version:
