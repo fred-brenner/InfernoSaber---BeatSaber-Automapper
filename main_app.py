@@ -436,6 +436,9 @@ def check_for_updates():
     return f"You are up to date ({latest_version})"
 
 
+# call update check once to mitigate rate limiting
+update_status = check_for_updates()
+
 # Gradio App Setup Section
 with gr.Blocks() as demo:
     ################################
@@ -454,7 +457,7 @@ with gr.Blocks() as demo:
             with gr.Column():
                 gr.Markdown("### Check for updates")
                 version_info = gr.Textbox(label="Version Info", interactive=False,
-                                          value=check_for_updates)
+                                          value=update_status)
 
         # Two-column layout
         with gr.Row():
