@@ -421,10 +421,11 @@ def check_for_updates():
     github_url = f"https://api.github.com/repos/{repo_owner}/{repo_name}/releases"
     try:
         response = requests.get(github_url)
+        latest_version = response.json()[0]['tag_name']
     except:
         print("Could not reach GitHub for update check.")
+        print(f"Response: {response}")
         return "Could not reach GitHub for update check."
-    latest_version = response.json()[0]['tag_name']
     current_version = f"v{config.InfernoSaber_version}"
     if latest_version != current_version:
         return (f"Version <{latest_version}> is released! Your version is <{config.InfernoSaber_version}>. "
