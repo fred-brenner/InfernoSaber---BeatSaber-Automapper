@@ -7,7 +7,7 @@ import numpy as np
 # used in multiple codes
 ########################################
 InfernoSaber_version = "1.7.1.app3"  # coded into the info.dat file
-bs_mapping_version = "v2"  # allows to generate advanced features like arcs
+bs_mapping_version = "v3"  # allows to generate advanced features like arcs
 # bs_mapping_version = "v2"  # legacy mode, may be deprecated in future
 
 """Do change"""
@@ -61,8 +61,8 @@ silence_threshold = 0.20   # silence threshold quantile value [0.0, 0.3]
 silence_thresh_hard = 0.25  # add fixed threshold to dynamic value [0-2]
 add_silence_flag = True  # whether to apply silence threshold
 emphasize_beats_flag = True  # emphasize beats into double notes
-single_notes_only_flag = False  # no more double notes #TODO new feature
-single_notes_only_strict_flag = True  # if previous flag applied, restricts to one note at a time #TODO new feature
+single_notes_only_flag = False  # no more double notes
+single_notes_only_strict_flag = True  # if previous flag applied, restricts to one note at a time
 single_notes_remove_lr = 0.4   # >0.5 removes left, <0.5 removes right more often
 add_obstacle_flag = True  # add obstacles in free areas
 obstacle_time_gap = [0.3, 0.8]  # time gap before [0.2-1] after [0.5-2]
@@ -100,6 +100,15 @@ waveform_pattern = [
 waveform_apply_dir = [0, 4, 5, 1, 6, 7]     # either [0, 1] or [0, 4, 5, 1, 6, 7]
 waveform_pattern_length = 25   # pattern length in sampling rate [10-200]
 waveform_threshold = 4  # minimum number of notes applicable for waveform to start
+
+"""Pinokio app only"""
+num_workers = 2
+silence_threshold_percentage = 100
+difficulty_1 = 3
+difficulty_2 = 0
+difficulty_3 = 0
+difficulty_4 = 0
+difficulty_5 = 0
 
 """Caution on changes"""
 verbose_level = 1       # verbose level from 0 (only ETA) to 5 (all messages)

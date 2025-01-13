@@ -1,5 +1,5 @@
 import time
-import requests     # to check for updates opn GitHub
+import requests  # to check for updates opn GitHub
 
 import gradio as gr
 from tkinter import Tk, filedialog
@@ -280,8 +280,33 @@ def set_version_selector(version_value):
     return
 
 
+def set_difficulty_1(value):
+    config.difficulty_1 = value
+    update_dir_path('tools/config/config.py', 'difficulty_1', value)
+
+
+def set_difficulty_2(value):
+    config.difficulty_2 = value
+    update_dir_path('tools/config/config.py', 'difficulty_2', value)
+
+
+def set_difficulty_3(value):
+    config.difficulty_3 = value
+    update_dir_path('tools/config/config.py', 'difficulty_3', value)
+
+
+def set_difficulty_4(value):
+    config.difficulty_4 = value
+    update_dir_path('tools/config/config.py', 'difficulty_4', value)
+
+
+def set_difficulty_5(value):
+    config.difficulty_5 = value
+    update_dir_path('tools/config/config.py', 'difficulty_5', value)
+
+
 def set_single_mode(single_mode_value):
-    if single_mode:
+    if single_mode_value:
         config.emphasize_beats_flag = False
         config.single_notes_only_flag = True
     else:
@@ -289,6 +314,21 @@ def set_single_mode(single_mode_value):
         config.single_notes_only_flag = False
     update_dir_path('tools/config/config.py', 'emphasize_beats_flag', config.emphasize_beats_flag)
     update_dir_path('tools/config/config.py', 'single_notes_only_flag', config.single_notes_only_flag)
+    return config.emphasize_beats_flag
+
+
+def set_more_notes_prob(more_notes_prob_value):
+    config.gimme_more_notes_prob = more_notes_prob_value / 100
+    update_dir_path('tools/config/config.py', 'gimme_more_notes_prob', config.gimme_more_notes_prob)
+    return
+
+
+def set_emphasize_mode(emphasize_mode_value):
+    if emphasize_mode_value:
+        config.emphasize_beats_flag = True
+    else:
+        config.emphasize_beats_flag = False
+    update_dir_path('tools/config/config.py', 'emphasize_beats_flag', config.emphasize_beats_flag)
     return
 
 
@@ -332,6 +372,7 @@ def set_silence_threshold(silence_threshold_value):
     update_dir_path('tools/config/config.py', 'silence_threshold', config.silence_threshold)
     config.silence_threshold_orig = orig_value * (silence_threshold_value / 100)
     update_dir_path('tools/config/config.py', 'silence_threshold_orig', config.silence_threshold_orig)
+    update_dir_path('tools/config/config.py', 'silence_threshold_percentage', silence_threshold_value)
     return
 
 
@@ -397,10 +438,10 @@ with gr.Blocks() as demo:
         with gr.Row():
             with gr.Column():
                 gr.Markdown("## Setup")
-                gr.Markdown(f"""Version: {config.InfernoSaber_version}  
+                gr.Markdown(f"""Version: {config.InfernoSaber_version}
                 InfernoSaber is free and OpenSource.
                 If you encounter problems, please check the Discord channel.
-                [GitHub Repo](https://github.com/fred-brenner/InfernoSaber---BeatSaber-Automapper/tree/main_app): View the code  
+                [GitHub Repo](https://github.com/fred-brenner/InfernoSaber---BeatSaber-Automapper/tree/main_app): View the code
                 [Discord Channel](https://discord.com/invite/cdV6HhpufY): Questions, suggestions, and improvements are welcome""")
             with gr.Column():
                 gr.Markdown("### Check for updates")
@@ -464,7 +505,7 @@ with gr.Blocks() as demo:
                 gr.Markdown("### Model Selection")
                 model_selector = gr.Dropdown(
                     choices=["fav_15", "pp3_15", "easy_15", "expert_15"],
-                    label="Select Model", value="fav_15", interactive=True,
+                    label="Select Model", value=config.use_mapper_selection, interactive=True,
                 )
                 gr.Markdown("Info: Selected model will be download from "
                             "[HuggingFace Repo](https://huggingface.co/BierHerr/InfernoSaber) at runtime if required")
@@ -474,78 +515,93 @@ with gr.Blocks() as demo:
                 gr.Markdown("Select Beat Saber mapping verison: v3-default, v2-without arcs")
                 version_selector = gr.Dropdown(
                     choices=["v3", "v2"],
-                    label="Select BS Mapping Output Version", value="v3", interactive=True,
+                    label="Select BS Mapping Output Version", value=config.bs_mapping_version, interactive=True,
                 )
                 version_selector.input(set_version_selector, inputs=[version_selector], outputs=[])
 
         # Difficulty Selection
         gr.Markdown("### Difficulty Selection")
-        gr.Markdown("""Specify the difficulties you want to use for the song generation.  
-            You can input **up to 5** difficulties. Set any unused difficulties to **0** to reduce computation time.  
+        gr.Markdown("""Specify the difficulties you want to use for the song generation.
+            You can input **up to 5** difficulties. Set any unused difficulties to **0** to reduce computation time.
             Each difficulty value must be between 0.01 and 1000 (or 0 to deactivate)."""
                     )
         # Inputs for difficulties
         with gr.Row():
             difficulty_1 = gr.Number(
                 label="Difficulty 1",
-                value=3, precision=2, interactive=True,
-                step=0.5, minimum=0, maximum=1000,
+                value=config.difficulty_1, precision=2, interactive=True,
+                step=0.25, minimum=0, maximum=1000,
             )
+            difficulty_1.input(set_difficulty_1, inputs=[difficulty_1], outputs=[])
+
             difficulty_2 = gr.Number(
                 label="Difficulty 2 (optional)",
-                value=0, precision=2, interactive=True,
-                step=0.5, minimum=0, maximum=1000,
+                value=config.difficulty_2, precision=2, interactive=True,
+                step=0.25, minimum=0, maximum=1000,
             )
+            difficulty_2.input(set_difficulty_2, inputs=[difficulty_2], outputs=[])
+
             difficulty_3 = gr.Number(
                 label="Difficulty 3 (optional)",
-                value=0, precision=2, interactive=True,
-                step=0.5, minimum=0, maximum=1000,
+                value=config.difficulty_3, precision=2, interactive=True,
+                step=0.25, minimum=0, maximum=1000,
             )
+            difficulty_3.input(set_difficulty_3, inputs=[difficulty_3], outputs=[])
+
             difficulty_4 = gr.Number(
                 label="Difficulty 4 (optional)",
-                value=0, precision=2, interactive=True,
-                step=0.5, minimum=0, maximum=1000,
+                value=config.difficulty_4, precision=2, interactive=True,
+                step=0.25, minimum=0, maximum=1000,
             )
+            difficulty_4.input(set_difficulty_4, inputs=[difficulty_4], outputs=[])
+
             difficulty_5 = gr.Number(
                 label="Difficulty 5 (optional)",
-                value=0, precision=2, interactive=True,
-                step=0.5, minimum=0, maximum=1000,
+                value=config.difficulty_5, precision=2, interactive=True,
+                step=0.25, minimum=0, maximum=1000,
             )
+            difficulty_5.input(set_difficulty_5, inputs=[difficulty_5], outputs=[])
 
         with gr.Row():
             gr.Markdown("""### Further 
                         ### Modifications""")
-
+            # set gimme_more_notes_prob
+            more_notes_prob = gr.Number(label="Left/Right Notes Filling (%)", value=config.gimme_more_notes_prob * 100,
+                                        precision=0, interactive=True, step=5, minimum=0, maximum=100)
+            more_notes_prob.input(set_more_notes_prob, inputs=[more_notes_prob], outputs=[])
+            # emphasize beats on/off
+            emphasize_beats = gr.Checkbox(label="Emphasize Beats", value=config.emphasize_beats_flag)
+            emphasize_beats.input(set_emphasize_mode, inputs=[emphasize_beats], outputs=[])
             # single mode on/off
-            single_mode = gr.Checkbox(label="Single Mode", value=False)
-            single_mode.input(set_single_mode, inputs=[single_mode], outputs=[])
+            single_mode = gr.Checkbox(label="Single Mode", value=config.single_notes_only_flag)
+            single_mode.input(set_single_mode, inputs=[single_mode], outputs=[emphasize_beats])
             # dot notes on/off
-            dot_notes = gr.Checkbox(label="Allow Dot Notes", value=True)
+            dot_notes = gr.Checkbox(label="Allow Dot Notes", value=config.allow_dot_notes)
             dot_notes.input(set_dot_notes, inputs=[dot_notes], outputs=[])
             # add obstacles on/off
-            add_obstacles = gr.Checkbox(label="Add Obstacles", value=True)
+            add_obstacles = gr.Checkbox(label="Add Obstacles", value=config.add_obstacle_flag)
             add_obstacles.input(set_add_obstacles, inputs=[add_obstacles], outputs=[])
             # add sporty obstacles on/off
-            add_sporty_obstacles = gr.Checkbox(label="Add Sporty Obstacles", value=False)
+            add_sporty_obstacles = gr.Checkbox(label="Add Sporty Obstacles", value=config.sporty_obstacles)
             add_sporty_obstacles.input(set_add_obstacles_sporty, inputs=[add_sporty_obstacles], outputs=[])
             # set js offset
-            js_offset = gr.Number(label="Jump Speed Offset", value=-0.4, precision=1, interactive=True, step=0.5,
-                                  minimum=-5, maximum=5)
+            js_offset = gr.Number(label="Jump Speed Offset", value=config.jump_speed_offset, precision=1,
+                                  interactive=True, step=0.5, minimum=-5, maximum=5)
             js_offset.input(set_js_offset, inputs=[js_offset], outputs=[])
             # set intensity
-            intensity = gr.Number(label="Beat Intensity (%)", value=95, precision=0, interactive=True, step=5,
-                                  minimum=70, maximum=125)
+            intensity = gr.Number(label="Beat Intensity (%)", value=config.add_beat_intensity, precision=0,
+                                  interactive=True, step=5, minimum=70, maximum=125)
             intensity.input(set_intensity, inputs=[intensity], outputs=[])
             # set silence threshold
-            silence_threshold = gr.Number(label="Silence Threshold (%)", value=100, precision=2, interactive=True,
-                                          step=10, minimum=50, maximum=200)
+            silence_threshold = gr.Number(label="Silence Threshold (%)", value=config.silence_threshold_percentage,
+                                          precision=2, interactive=True, step=10, minimum=50, maximum=200)
             silence_threshold.input(set_silence_threshold, inputs=[silence_threshold], outputs=[])
             # # set quick start value
-            # quick_start = gr.Number(label="Quick Start", value=0, precision=1, interactive=True, step=0.5, minimum=0, maximum=3)
+            # quick_start = gr.Number(label="Quick Start", value=config.quick_start, precision=1, interactive=True, step=0.5, minimum=0, maximum=3)
             # quick_start.input(set_quick_start, inputs=[quick_start], outputs=[])
             # set random behaviour value
-            random_behaviour = gr.Number(label="Random Behaviour", value=0.3, precision=1, interactive=True,
-                                         step=0.05, minimum=0, maximum=0.6)
+            random_behaviour = gr.Number(label="Random Behaviour", value=config.random_note_map_factor, precision=1,
+                                         interactive=True, step=0.05, minimum=0, maximum=0.6)
             random_behaviour.input(set_random_behaviour, inputs=[random_behaviour], outputs=[])
 
         with gr.Row():
@@ -554,24 +610,24 @@ with gr.Blocks() as demo:
                         ### (v3 only)""")
 
             # add Arcs (v3 only) on/off
-            add_arcs = gr.Checkbox(label="Add Arcs (v3 only)", value=True)
+            add_arcs = gr.Checkbox(label="Add Arcs (v3 only)", value=config.add_slider_flag)
             add_arcs.input(set_add_arcs, inputs=[add_arcs], outputs=[])
             # slider_start_time
-            arc_start_time = gr.Number(label="Arc Start Time", value=0.5, precision=1, interactive=True, step=0.25,
-                                       minimum=0, maximum=2)
+            arc_start_time = gr.Number(label="Arc Start Time", value=config.slider_time_gap[0], precision=1,
+                                       interactive=True, step=0.25, minimum=0, maximum=2)
             # arc_start_time.input(set_arc_time, inputs=[arc_start_time, arc_end_time], outputs=[])
             # slider_end_time
-            arc_end_time = gr.Number(label="Arc End Time", value=12, precision=0, interactive=True, step=1,
-                                     minimum=3, maximum=20)
+            arc_end_time = gr.Number(label="Arc End Time", value=config.slider_time_gap[1], precision=0,
+                                     interactive=True, step=1, minimum=3, maximum=20)
             arc_start_time.input(set_arc_time, inputs=[arc_start_time, arc_end_time], outputs=[])
             arc_end_time.input(set_arc_time, inputs=[arc_start_time, arc_end_time], outputs=[])
             # slider_probability
-            arc_probability = gr.Number(label="Arc Probability (%)", value=80, precision=0, interactive=True,
-                                        step=10, minimum=10, maximum=100)
+            arc_probability = gr.Number(label="Arc Probability (%)", value=config.slider_probability * 100, precision=0,
+                                        interactive=True, step=10, minimum=10, maximum=100)
             arc_probability.input(set_arc_probability, inputs=[arc_probability], outputs=[])
             # slider_movement_min
-            arc_movement_min = gr.Number(label="Arc Movement Min", value=3, precision=1, interactive=True, step=0.5,
-                                         minimum=0, maximum=5)
+            arc_movement_min = gr.Number(label="Arc Movement Min", value=config.slider_movement_minimum, precision=1,
+                                         interactive=True, step=0.5, minimum=0, maximum=5)
             arc_movement_min.input(set_arc_movement_min, inputs=[arc_movement_min], outputs=[])
 
     ################################
@@ -592,7 +648,7 @@ with gr.Blocks() as demo:
                     interactive=False,
                     value=get_summary,
                     inputs=[difficulty_1, difficulty_2, difficulty_3, difficulty_4, difficulty_5],
-                    every=5,
+                    every=4,
                 )
 
                 # CPU Workers Selection and RAM Requirement Display
@@ -602,12 +658,12 @@ with gr.Blocks() as demo:
                     minimum=1,
                     maximum=16,
                     step=1,
-                    value=4,
+                    value=config.num_workers,
                     interactive=True,
                 )
                 ram_required = gr.Textbox(
                     label="Estimated RAM Requirement",
-                    value="8 GB RAM, 4 physical CPU cores",  # Default: 4 workers * 5GB = 20GB
+                    value=f"{config.num_workers * 2} GB free RAM, {config.num_workers} physical CPU cores",
                     interactive=False,
                 )
 
@@ -617,7 +673,8 @@ with gr.Blocks() as demo:
             with gr.Column():
                 # Checkbox to select automatic cut to "done" folder
                 gr.Markdown("### Move finished songs")
-                auto_cut_done = gr.Checkbox(label="Automatically move songs to 'done' folder", value=False)
+                auto_cut_done = gr.Checkbox(label="Automatically move songs to 'done' folder",
+                                            value=config.auto_move_song_afterwards)
                 auto_cut_done.input(update_auto_cut_done, inputs=[auto_cut_done], outputs=[])
 
         # Run Button
