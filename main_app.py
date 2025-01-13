@@ -419,7 +419,11 @@ def check_for_updates():
     # repo_name = "InfernoSaber---BeatSaber-Automapper"
     repo_name = "InfernoSaber-App"
     github_url = f"https://api.github.com/repos/{repo_owner}/{repo_name}/releases"
-    response = requests.get(github_url)
+    try:
+        response = requests.get(github_url)
+    except:
+        print("Could not reach GitHub for update check.")
+        return "Could not reach GitHub for update check."
     latest_version = response.json()[0]['tag_name']
     current_version = f"v{config.InfernoSaber_version}"
     if latest_version != current_version:
