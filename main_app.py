@@ -20,6 +20,7 @@ from tools.utils.huggingface import model_download
 
 data_folder_name = 'Data'
 bs_folder_name = "Beat Saber/Beat Saber_Data/CustomLevels"
+update_check_response = None
 
 
 # # Function to handle folder selection using tkinter
@@ -415,25 +416,28 @@ def set_arc_movement_min(arc_movement_min_value):
 
 
 def check_for_updates():
-    repo_owner = "fred-brenner"
-    # repo_name = "InfernoSaber---BeatSaber-Automapper"
-    repo_name = "InfernoSaber-App"
-    github_url = f"https://api.github.com/repos/{repo_owner}/{repo_name}/releases"
-    try:
-        response = requests.get(github_url)
-        latest_version = response.json()[0]['tag_name']
-    except:
-        print("Could not reach GitHub for update check.")
+    if update_check_response is None:
+        repo_owner = "fred-brenner"
+        # repo_name = "InfernoSaber---BeatSaber-Automapper"
+        repo_name = "InfernoSaber-App"
+        github_url = f"https://api.github.com/repos/{repo_owner}/{repo_name}/releases"
         try:
-            print(f"Response: {response.json()[0]}")
+            response = requests.get(github_url)
+            latest_version = response.json()[0]['tag_name']
         except:
-            pass
-        return "Could not reach GitHub for update check."
-    current_version = f"v{config.InfernoSaber_version}"
-    if latest_version != current_version:
-        return (f"Version <{latest_version}> is released! Your version is <{config.InfernoSaber_version}>. "
-                f"Please update with the Pinokio Update function on the left.")
-    return f"You are up to date ({latest_version})"
+            print("Could not reach GitHub for update check.")
+            try:
+                print(f"Response: {response.json()[0]}")
+            except:
+                pass
+            return "Could not reach GitHub for update check."
+        current_version = f"v{config.InfernoSaber_version}"
+        if latest_version != current_version:
+            return (f"Version <{latest_version}> is released! Your version is <{config.InfernoSaber_version}>. "
+                    f"Please update with the Pinokio Update function on the left.")
+        return f"You are up to date ({latest_version})"
+    else:
+        return update_check_response
 
 
 # call update check once to mitigate rate limiting
