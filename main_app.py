@@ -495,7 +495,7 @@ with gr.Blocks() as demo:
     # Second Tab for "Specify Parameters"
     with gr.Tab("Specify Parameters"):
         gr.Markdown("## Specify Parameters")
-        gr.Markdown("All changes will be stored and applied at next start-up.")
+        gr.Markdown("All changes are automatically applied and saved for the next runs. There is no save button.")
         with gr.Row():
             with gr.Column():
                 # Dropdown Menu for Model Selection
