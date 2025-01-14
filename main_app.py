@@ -608,7 +608,7 @@ with gr.Blocks() as demo:
             dot_notes.input(set_dot_notes, inputs=[dot_notes], outputs=[])
             # add obstacles on/off
             add_obstacles = gr.Checkbox(label="Add Obstacles", value=config.add_obstacle_flag,
-                                        info="Add obstacles on the left/right with little movement. Will be added in empty spaces.")
+                                        info="Add obstacles on the left/right with little movement.")
             add_obstacles.input(set_add_obstacles, inputs=[add_obstacles], outputs=[])
         with gr.Row():
             # add sporty obstacles on/off
@@ -623,20 +623,24 @@ with gr.Blocks() as demo:
             # set intensity
             intensity = gr.Number(label="Beat Intensity (%)", value=config.add_beat_intensity, precision=0,
                                   interactive=True, step=5, minimum=70, maximum=125,
-                                  info="Acts as multiplicator to the difficulty target. High values will enforce more notes in calm sections.")
+                                  info="Acts as multiplier to the difficulty target. "
+                                       "High values will enforce more notes in calm sections.")
             intensity.input(set_intensity, inputs=[intensity], outputs=[])
             # set silence threshold
             silence_threshold = gr.Number(label="Silence Threshold (%)", value=config.silence_threshold_percentage,
-                                          precision=2, interactive=True, step=10, minimum=50, maximum=200,
-                                          info="In-/decrease the silence threshold. Lower values will better enforce silent sections.")
+                                          precision=2, interactive=True, step=10, minimum=50, maximum=400,
+                                          info="In-/decrease the silence threshold. "
+                                               "High values will enforce less notes in calm sections.")
             silence_threshold.input(set_silence_threshold, inputs=[silence_threshold], outputs=[])
             # # set quick start value
-            # quick_start = gr.Number(label="Quick Start", value=config.quick_start, precision=1, interactive=True, step=0.5, minimum=0, maximum=3)
+            # quick_start = gr.Number(label="Quick Start", value=config.quick_start, precision=1,
+            #                         interactive=True, step=0.5, minimum=0, maximum=3)
             # quick_start.input(set_quick_start, inputs=[quick_start], outputs=[])
             # set random behaviour value
             random_behaviour = gr.Number(label="Random Behaviour", value=config.random_note_map_factor, precision=1,
                                          interactive=True, step=0.05, minimum=0, maximum=0.6,
-                                         info="Increase to produce different outcomes on each iteration. 0 deactivates the feature.")
+                                         info="Increase to produce different outcomes on each iteration. "
+                                              "0 deactivates the feature.")
             random_behaviour.input(set_random_behaviour, inputs=[random_behaviour], outputs=[])
 
         with gr.Row():
@@ -716,7 +720,8 @@ with gr.Blocks() as demo:
                 gr.Markdown("### Move finished songs")
                 auto_cut_done = gr.Checkbox(label="Automatically move songs to 'y_done' folder",
                                             value=config.auto_move_song_afterwards,
-                                            info="Songs in 'y_done' will not be processed again, until moved back to the input folder.")
+                                            info="Songs in 'y_done' will not be processed again, "
+                                                 "until moved back to the input folder.")
                 auto_cut_done.input(update_auto_cut_done, inputs=[auto_cut_done], outputs=[])
 
         # Run Button
@@ -725,8 +730,20 @@ with gr.Blocks() as demo:
 
         # Textbox for Progress/ETA
         progress_eta = gr.Textbox(
-            label="Progress/ETA",
-            placeholder="Processing progress or ETA will appear here.",
+            label="Progress: After run plus max. 1 minute, it should display an ETA. "
+                  "Else check the server logs and try another song",
+            placeholder="""Processing progress or ETA will appear here. 
+            After latest 1 minute, it should display an ETA like that: 
+            Loading AI Model: fav_15
+            Model Found
+            Starting multi map generator with 10 workers.
+            Checking and Normalizing Song Files...
+            Found 3 songs. Iterating...
+            ### ETA: 0.3 minutes. Time per song: 9 s ###
+            ### ETA: 0.2 minutes. Time per song: 10 s ###
+            ### ETA: 0.0 minutes. Time per song: 10 s ###
+            Process finished!
+            """,
             lines=5,
             interactive=False,
         )
