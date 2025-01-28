@@ -21,8 +21,9 @@ from tools.utils.huggingface import model_download
 data_folder_name = 'Data'
 bs_folder_name = "Beat Saber/Beat Saber_Data/CustomLevels"
 
-
 update_check_response = None
+
+
 def check_for_updates():
     try:
         global update_check_response
@@ -36,8 +37,9 @@ def check_for_updates():
             latest_version = response.json()[0]['tag_name']
             current_version = f"v{config.InfernoSaber_version}"
             if latest_version != current_version:
-                update_check_response = (f"Version <{latest_version}> is released! Your version is <{config.InfernoSaber_version}>. "
-                                         f"Please update with the Pinokio Update function on the left.")
+                update_check_response = (
+                    f"Version <{latest_version}> is released! Your version is <{config.InfernoSaber_version}>. "
+                    f"Please update with the Pinokio Update function on the left.")
                 return (f"Version <{latest_version}> is released! Your version is <{config.InfernoSaber_version}>. "
                         f"Please update with the Pinokio Update function on the left.")
             update_check_response = f"You are up to date ({latest_version})"
@@ -57,6 +59,8 @@ def check_for_updates():
 
 # call update check once to mitigate rate limiting
 update_status = check_for_updates()
+
+
 # update_status = "Currently not available. Please wait for app5 release in Discord."
 
 
@@ -298,6 +302,12 @@ def run_process(num_workers, use_model, diff1, diff2, diff3, diff4, diff5):
     # Final message after completion
     progress_log.append("Process finished!")
     yield "\n".join(progress_log)
+    return
+
+
+def update_num_workers(workers):
+    config.num_workers = workers
+    update_dir_path('tools/config/config.py', 'num_workers', workers)
     return
 
 
@@ -715,6 +725,7 @@ with gr.Blocks() as demo:
 
                 # Update RAM display when number of workers changes
                 num_workers.change(update_ram, inputs=[num_workers], outputs=[ram_required])
+                num_workers.change(update_num_workers, inputs=[num_workers], outputs=[])
 
             with gr.Column():
                 # Checkbox to select automatic cut to "done" folder
@@ -762,7 +773,6 @@ with gr.Blocks() as demo:
         gr.Markdown("... Maps will be generated here:")
         open_folder_button2 = gr.Button('Open Output Folder')
         open_folder_button2.click(open_folder_maps, inputs=[input_path], outputs=[])
-
 
 # Launch the app
 if __name__ == "__main__":
