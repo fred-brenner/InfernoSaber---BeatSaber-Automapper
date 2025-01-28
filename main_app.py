@@ -462,6 +462,23 @@ def set_arc_movement_min(arc_movement_min_value):
     return
 
 
+def song_counting():
+    music_folder_name = paths.songs_pred
+    print(f"Copying to folder: {music_folder_name}")
+    if not os.path.exists(music_folder_name):
+        return "Folder not set up yet."
+
+    if os.path.isdir(music_folder_name):
+        files = os.listdir(music_folder_name)
+        song_counter = 0
+        for f in files:
+            if any(f.endswith(ext) for ext in ['.egg', '.ogg', '.mp3', '.m4a', '.mp4']):
+                song_counter += 1
+        return f"{song_counter} song(s) in folder"
+    else:
+        return "Folder not set up yet."
+
+
 # Gradio App Setup Section
 with gr.Blocks() as demo:
     ################################
@@ -506,11 +523,11 @@ with gr.Blocks() as demo:
             # Right Column
             with gr.Column():
                 # Music Import
-                gr.Markdown("**Music Import: Currently only ogg/egg files supported!**")
-                # TODO: fix for mp3, wav, etc.
+                gr.Markdown("**Music Import: Currently only ogg/egg/mp3/m4a files supported!**")
+                # TODO: fix/test for wma, wav, etc.
                 music_loader = gr.File(
                     label='Select Music Files',
-                    file_types=['.ogg', '.egg'],
+                    file_types=['.ogg', '.egg', '.mp3', '.m4a', '.mp4'],
                     file_count='multiple'
                 )
                 file_status = gr.Textbox(label='File Import Status', placeholder='(optional)', interactive=False)
@@ -521,6 +538,11 @@ with gr.Blocks() as demo:
                 gr.Markdown("... Or copy your songs to this folder:")
                 open_folder_button = gr.Button('Open Input Folder')
                 open_folder_button.click(open_folder_music, inputs=[input_path], outputs=[])
+
+                # Show status text box of how many songs are in th folder
+                song_count = gr.Textbox(label='Song Count', interactive=False,
+                                        value=song_counting, every=3)
+                # upload_button.click(song_counting, inputs=[], outputs=[song_count])
 
     ################################
     # TAB 2: Parameters
