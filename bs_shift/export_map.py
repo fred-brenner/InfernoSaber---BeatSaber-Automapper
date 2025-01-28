@@ -20,7 +20,8 @@ def check_music_files(files, dir_path):
     song_list = []
     for file_name in files:
         ending = file_name.split('.')[-1]
-        if ending in ['mp3', 'mp4', 'm4a', 'wav', 'aac', 'flv', 'wma']:   # (TODO: test more music formats)
+        # if ending in ['mp3', 'mp4', 'm4a', 'wav', 'aac', 'flv', 'wma']:   # (TODO: test more music formats)
+        if ending in ['mp3', 'mp4', 'm4a']:   # (TODO: test more music formats)
         # if ending in ['NOT_WORKING!']:
             # convert music to ogg format
             output_file = f"{file_name[:-4]}.egg"
