@@ -20,10 +20,13 @@
 
     Increase number of models to improve accuracy and enable more options
     
+    Support new features for InfernoSaber Pinokio App    
+
 ## 2023 Notes: Automapper for Beatsaber made for expert+ levels
 
 You can also train your own models on your favorite maps and difficulty.
-This can only be done locally with cloning the repo and using GPU (one high-end consumer GPU is enough)
+This can only be done locally with cloning the repo and using GPU (one better consumer GPU is enough)
+A guide to train the 4 models is included in the repo: How_to_Train_InfernoSaber.docx
 
 Extract maps from Beatsaber/Bsaber to feed them 
 into AI models.
