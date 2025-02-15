@@ -462,6 +462,15 @@ def set_arc_movement_min(arc_movement_min_value):
     return
 
 
+def set_bpm_overwrite(bpm_overwrite_flag):
+    if bpm_overwrite_flag:
+        config.use_fixed_bpm = 100
+    else:
+        config.use_fixed_bpm = 0
+    update_dir_path('tools/config/config.py', 'use_fixed_bpm', config.use_fixed_bpm)
+    return
+
+
 def song_counting():
     music_folder_name = paths.songs_pred
     print(f"Copying to folder: {music_folder_name}")
@@ -706,6 +715,12 @@ with gr.Blocks() as demo:
                                          interactive=True, step=0.5, minimum=0, maximum=5,
                                          info="Note distance required to allow arcs.")
             arc_movement_min.input(set_arc_movement_min, inputs=[arc_movement_min], outputs=[])
+            # add bpm overwrite
+            bpm_overwrite = gr.Checkbox(label="BPM Overwrite", value=config.use_fixed_bpm > 0,
+                                        info="If False, uses real song bpm instead of fixed value. Real song bpm "
+                                             "can lead to rare timing bugs in BS. "
+                                             "Only enable if you want to edit the map with ChroMapper.")
+            bpm_overwrite.input(set_bpm_overwrite, inputs=[bpm_overwrite], outputs=[])
 
     ################################
     # TAB 3: Runtime

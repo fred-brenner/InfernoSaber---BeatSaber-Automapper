@@ -167,14 +167,14 @@ def main(name_ar: list, debug_beats=False) -> bool:
 
     # return timing_ar
 
-    # # calculate bpm
-    # file = paths.songs_pred + name_ar[0] + '.egg'
-    # bpm, song_duration = get_file_bpm(file)  # 1.6
-    # # average bpm for songs to make more similar (jump) speeds
-    # if config.use_fixed_bpm is None:
-    #     bpm = int((bpm + 120) / 2)
-    # else:
-    bpm = config.use_fixed_bpm
+    # calculate bpm
+    if config.use_fixed_bpm is None or config.use_fixed_bpm <= 0:
+        file = paths.songs_pred + name_ar[0] + '.egg'
+        bpm, _ = get_file_bpm(file)  # 1.6
+        # # average bpm for songs to make more similar (jump) speeds
+        # bpm = int((bpm + 120) / 2)
+    else:
+        bpm = config.use_fixed_bpm
 
     # sanity check timings
     # map_times, pitch_algo = sanity_check_timing(name_ar[0], timing_ar, song_duration)  # 3.9
