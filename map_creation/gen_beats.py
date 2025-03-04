@@ -12,6 +12,7 @@ from map_creation.sanity_check import *
 # from map_creation.class_helpers import *
 from map_creation.map_creator import create_map
 from map_creation.find_bpm import get_file_bpm
+from map_creation.bpm_optimizer import align_beats_on_bpm
 
 from preprocessing.music_processing import run_music_preprocessing
 from preprocessing.bs_mapper_pre import calc_time_between_beats
@@ -171,6 +172,8 @@ def main(name_ar: list, debug_beats=False) -> bool:
     if config.use_fixed_bpm is None or config.use_fixed_bpm <= 0:
         file = paths.songs_pred + name_ar[0] + '.egg'
         bpm, _ = get_file_bpm(file)  # 1.6
+        # align beats on bpm
+        timing_ar = align_beats_on_bpm(timing_ar, bpm)
         # # average bpm for songs to make more similar (jump) speeds
         # bpm = int((bpm + 120) / 2)
     else:
@@ -200,6 +203,9 @@ def main(name_ar: list, debug_beats=False) -> bool:
     if config.add_silence_flag:
         # remove silent parts
         map_times = remove_silent_times(map_times, silent_times[0])
+
+    if config.use_fixed_bpm is None or config.use_fixed_bpm <= 0:
+        map_times = align_beats_on_bpm(map_times, bpm)
 
     if debug_beats:
         return map_times
