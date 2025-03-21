@@ -3,7 +3,8 @@ import os
 from tools.config import paths
 
 
-bs_folder_name = "Beat Saber/Beat Saber_Data/CustomLevels"
+bs_folder_name = "Beat Saber_Data/CustomLevels"
+bs_folder_name2 = "SharedMaps/CustomLevels"
 
 
 def check_int_input(inp, start=1, end=10):
@@ -50,6 +51,8 @@ def get_summary(diff1, diff2, diff3, diff4, diff5) -> str:
     filename = paths.bs_song_path
     # filename = filename.replace('\\\\', '/').replace('\\', '/')
     if os.path.isdir(filename) and bs_folder_name in filename:
+        log.append("Info: Beat Saber folder found. Maps will be exported by default")
+    elif os.path.isdir(filename) and bs_folder_name2 in filename:
         log.append("Info: Beat Saber folder found. Maps will be exported by default")
     else:
         log.append("Info: Beat Saber folder not found. Link it in the first tab to automatically export maps.")

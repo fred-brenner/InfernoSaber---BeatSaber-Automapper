@@ -19,7 +19,8 @@ from tools.config.mapper_selection import update_model_file_paths
 from tools.utils.huggingface import model_download
 
 data_folder_name = 'Data'
-bs_folder_name = "Beat Saber/Beat Saber_Data/CustomLevels"
+bs_folder_name = "Beat Saber_Data/CustomLevels"
+bs_folder_name2 = "SharedMaps/CustomLevels"
 
 update_check_response = None
 
@@ -142,16 +143,24 @@ def on_browse_bs_path():
             # copy in path anyway as soon as it is valid
             paths.bs_song_path = filename
 
-            bs_folders = bs_folder_name.split('/')
-            for i_bs, bs_folder in enumerate(bs_folders):
-                # check for root folder
-                if i_bs == 0 and bs_folder not in filename:
-                    print("Error: Could not find root BS folder.")
-                    return str(filename), 'BS root folder not found'
-                # search custom level folder
-                if i_bs > 0 and bs_folder not in filename:
-                    # filename = os.path.join(filename, bs_folder)
-                    filename += f"/{bs_folder}"
+            for bs_folders in [bs_folder_name, bs_folder_name2]:
+                found = False
+                bs_folders = bs_folders.split('/')
+                for i_bs, bs_folder in enumerate(bs_folders):
+                    # check for root folder
+                    if i_bs == 0 and bs_folder not in filename:
+                        break
+                    # search custom level folder
+                    if i_bs > 0 and bs_folder not in filename:
+                        # filename = os.path.join(filename, bs_folder)
+                        filename += f"/{bs_folder}"
+                    found = True
+                if found:
+                    break
+            if not found:
+                paths.bs_song_path = ""
+                print("Error: Could not find root BS folder.")
+                return str(filename), 'BS root folder not found'
 
             if not filename.endswith('/'):
                 filename += '/'
@@ -162,6 +171,7 @@ def on_browse_bs_path():
 
             root.destroy()
             paths.bs_song_path = filename
+            update_dir_path('tools/config/paths.py', 'bs_song_path', filename)
             print(f"Set BS export path to: {filename}")
             return str(filename), 'Found BS folder'
         else:
@@ -498,11 +508,13 @@ with gr.Blocks() as demo:
         with gr.Row():
             with gr.Column():
                 gr.Markdown("## Setup")
-                gr.Markdown(f"""Version: {config.InfernoSaber_version}
-                InfernoSaber is free and OpenSource.
+                gr.Markdown(f"""Version: {config.InfernoSaber_version} | InfernoSaber is free and OpenSource.
                 If you encounter problems, please check the Discord channel.
                 [GitHub Repo](https://github.com/fred-brenner/InfernoSaber---BeatSaber-Automapper/tree/main_app): View the code
-                [Discord Channel](https://discord.com/invite/cdV6HhpufY): Questions, suggestions, and improvements are welcome""")
+                [Discord Channel](https://discord.com/invite/cdV6HhpufY): Questions, suggestions, and improvements are welcome
+                
+                Info: All your changes will be applied immediately and saved for the next runs. Only updates will reset the settings.
+                """)
             with gr.Column():
                 gr.Markdown("### Check for updates")
                 version_info = gr.Textbox(label="Version Info", interactive=False,
@@ -516,7 +528,7 @@ with gr.Blocks() as demo:
                 gr.Markdown("**Folder Selection**")
                 gr.Markdown("Please create a new folder (once) for the InfernoSaber input to "
                             "make sure you do not lose any music/data.")
-                input_path = gr.Textbox(label='InfernoSaber Input Folder', interactive=False)
+                input_path = gr.Textbox(label='InfernoSaber Input Folder', interactive=False, value=paths.dir_path)
                 image_browse_btn = gr.Button('Browse', min_width=1)
                 path_status = gr.Textbox(label='Folder Status', value='not set', interactive=False)
                 image_browse_btn.click(on_browse_input_path, inputs=[], outputs=[input_path, path_status])
@@ -524,7 +536,7 @@ with gr.Blocks() as demo:
                 # Optional BS Link
                 gr.Markdown("**Optional: BeatSaber Link**")
                 gr.Markdown("Select your BeatSaber folder to automatically export generated songs.")
-                bs_path = gr.Textbox(label='BeatSaber Folder', interactive=False)
+                bs_path = gr.Textbox(label='BeatSaber Folder', interactive=False, value=paths.bs_song_path)
                 image_browse_btn_2 = gr.Button('Browse', min_width=1)
                 bs_path_status = gr.Textbox(label='Folder Status', placeholder='(optional)', interactive=False)
                 image_browse_btn_2.click(on_browse_bs_path, inputs=[], outputs=[bs_path, bs_path_status])
