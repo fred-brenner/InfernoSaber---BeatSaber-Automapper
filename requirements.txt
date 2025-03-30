@@ -14,4 +14,4 @@ keras-tcn==3.5.1
 progressbar2
 huggingface-hub~=0.29.1
 requests~=2.32.3
-gradio~=4.44.1
+gradio~=4.27.0
