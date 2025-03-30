@@ -60,8 +60,6 @@ def check_for_updates():
 
 # call update check once to mitigate rate limiting
 update_status = check_for_updates()
-
-
 # update_status = "Currently not available. Please wait for app5 release in Discord."
 
 
@@ -752,7 +750,6 @@ with gr.Blocks() as demo:
                     lines=3,
                     interactive=False,
                     value=get_summary,
-                    inputs=[difficulty_1, difficulty_2, difficulty_3, difficulty_4, difficulty_5],
                     every=4,
                 )
 

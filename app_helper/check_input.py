@@ -1,6 +1,6 @@
 import os
 
-from tools.config import paths
+from tools.config import paths, config
 
 
 bs_folder_name = "Beat Saber_Data/CustomLevels"
@@ -28,8 +28,18 @@ def check_str_input(inp, min_len=5):
     return False
 
 
-def get_summary(diff1, diff2, diff3, diff4, diff5) -> str:
+def get_summary(diff1=config.difficulty_1, diff2 = config.difficulty_2, diff3 = config.difficulty_3,
+                diff4 = config.difficulty_4, diff5 = config.difficulty_5) -> str:
     log = []
+    if not isinstance(diff1, float) and not isinstance(diff1, int):
+        try:
+            diff1 = diff1.value
+            diff2 = diff2.value
+            diff3 = diff3.value
+            diff4 = diff4.value
+            diff5 = diff5.value
+        except:
+            print("Error: Could not convert difficulty values to numbers.")
 
     # log number of songs found
     try:
