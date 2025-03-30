@@ -194,7 +194,7 @@ def set_input_folder(folder_path):
 
 
 # Function to handle file upload
-def upload_files(input_folder, files):
+def upload_files(files):
     music_folder_name = paths.songs_pred
     print(f"Copying to folder: {music_folder_name}")
     if not os.path.exists(music_folder_name):
@@ -481,7 +481,7 @@ def set_bpm_overwrite(bpm_overwrite_flag):
 
 def song_counting():
     music_folder_name = paths.songs_pred
-    print(f"Copying to folder: {music_folder_name}")
+    # print(f"Copying to folder: {music_folder_name}")
     if not os.path.exists(music_folder_name):
         return "Folder not set up yet."
 
@@ -551,7 +551,7 @@ with gr.Blocks() as demo:
                 )
                 file_status = gr.Textbox(label='File Import Status', placeholder='(optional)', interactive=False)
                 upload_button = gr.Button('Copy Files to Input Folder')
-                upload_button.click(upload_files, inputs=[input_path, music_loader], outputs=[file_status])
+                upload_button.click(upload_files, inputs=[music_loader], outputs=[file_status])
 
                 # Add button to open the folder
                 gr.Markdown("... Or copy your songs to this folder:")
