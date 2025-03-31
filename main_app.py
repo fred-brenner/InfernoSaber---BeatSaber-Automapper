@@ -411,10 +411,10 @@ def set_add_obstacles_sporty(add_sporty_obstacles_value):
 
 
 def set_js_offset(js_offset_value):
-    config.jump_speed_offset += js_offset_value
+    config.jump_speed_offset = js_offset_value
     update_dir_path('tools/config/config.py', 'jump_speed_offset', config.jump_speed_offset)
-    config.jump_speed_offset_orig += js_offset_value
-    update_dir_path('tools/config/config.py', 'jump_speed_offset_orig', config.jump_speed_offset_orig)
+    config.jump_speed_offset_orig = js_offset_value
+    # update_dir_path('tools/config/config.py', 'jump_speed_offset_orig', config.jump_speed_offset_orig)
     return
 
 
@@ -754,6 +754,7 @@ with gr.Blocks() as demo:
                     lines=3,
                     interactive=False,
                     value=get_summary,
+                    inputs=[difficulty_1, difficulty_2, difficulty_3, difficulty_4, difficulty_5],
                     every=4,
                 )
 

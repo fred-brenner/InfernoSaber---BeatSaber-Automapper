@@ -19,7 +19,7 @@ def update_dir_path(file_path, keyword='dir_path', new_value=''):
         with open(file_path, 'w') as file:
             for line in lines:
                 # Check if the line contains 'dir_path'
-                if re.match(rf"^\s*{keyword}\s*=", line):
+                if re.match(rf"^\s*{keyword}\s*=", line) and not found_it:
                     # Determine the format based on the type of new_value
                     if isinstance(new_value, str):
                         formatted_value = f'"{new_value}"'

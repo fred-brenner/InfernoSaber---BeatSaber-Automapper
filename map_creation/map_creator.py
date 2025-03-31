@@ -301,6 +301,38 @@ def get_info_map_string(name, bpm, bs_diff):
             jump_speed[i] = 15.5
             jsb_offset[i] += 0.2
 
+    def calculate_jump_distance(njs, c_bpm, offset):
+        half_jump = 4.0
+        num = 60.0 / c_bpm
+        # Ensure njs is not too low
+        if njs <= 0.01:
+            njs = 10.0
+        # Adjust half_jump to meet the condition
+        while njs * num * half_jump > 17.999:
+            half_jump /= 2
+        half_jump += offset
+        if half_jump < 0.25:
+            half_jump = 0.25
+        jump_distance = njs * num * half_jump * 2
+        return jump_distance
+
+    if bpm != 100:
+        for i in range(len(jump_speed)):
+            last_abs = 99999
+            jump_distance_orig = calculate_jump_distance(jump_speed[i], 100, jsb_offset[i])
+            for _i in range(15):
+                jump_distance_new = calculate_jump_distance(jump_speed[i], bpm, jsb_offset[i])
+                if jump_distance_new > jump_distance_orig:
+                    jsb_offset[i] -= 0.1
+                elif jump_distance_new < jump_distance_orig:
+                    jsb_offset[i] += 0.1
+                abs_diff = abs(jump_distance_new - jump_distance_orig)
+                if abs_diff < 0.5:
+                    break
+                if abs_diff > last_abs:
+                    break
+                last_abs = abs_diff
+
     info_string = '{\n'
     info_string += '"_version": "2.0.0",\n'
     info_string += f'"_songName": "{name}",\n'
