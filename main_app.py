@@ -60,6 +60,8 @@ def check_for_updates():
 
 # call update check once to mitigate rate limiting
 update_status = check_for_updates()
+
+
 # update_status = "Currently not available. Please wait for app5 release in Discord."
 
 
@@ -195,6 +197,8 @@ def set_input_folder(folder_path):
 
 # Function to handle file upload
 def upload_files(files):
+    if not files or files.value is None:
+        return "No files selected."
     music_folder_name = paths.songs_pred
     print(f"Copying to folder: {music_folder_name}")
     if not os.path.exists(music_folder_name):
@@ -510,7 +514,7 @@ with gr.Blocks() as demo:
                 If you encounter problems, please check the Discord channel.
                 [GitHub Repo](https://github.com/fred-brenner/InfernoSaber---BeatSaber-Automapper/tree/main_app): View the code
                 [Discord Channel](https://discord.com/invite/cdV6HhpufY): Questions, suggestions, and improvements are welcome
-                
+
                 Info: All your changes will be applied immediately and saved for the next runs. Only updates will reset the settings.
                 """)
             with gr.Column():
@@ -550,8 +554,8 @@ with gr.Blocks() as demo:
                     file_count='multiple'
                 )
                 file_status = gr.Textbox(label='File Import Status', placeholder='(optional)', interactive=False)
-                upload_button = gr.Button('Copy Files to Input Folder')
-                upload_button.click(upload_files, inputs=[music_loader], outputs=[file_status])
+                upload_button = gr.Button('NOT WORKING - Copy Files to Input Folder')
+                # upload_button.click(upload_files, inputs=[music_loader], outputs=[file_status])   # TODO: fix
 
                 # Add button to open the folder
                 gr.Markdown("... Or copy your songs to this folder:")
@@ -791,8 +795,8 @@ with gr.Blocks() as demo:
         progress_eta = gr.Textbox(
             label="Progress: After run plus max. 1 minute, it should display an ETA. "
                   "Else check the server logs and try another song",
-            placeholder="""Processing progress or ETA will appear here. 
-            After latest 1 minute, it should display an ETA like that: 
+            placeholder="""Processing progress or ETA will appear here.
+            After latest 1 minute, it should display an ETA like that:
             Loading AI Model: fav_15
             Model Found
             Starting multi map generator with 10 workers.
