@@ -319,17 +319,23 @@ def get_info_map_string(name, bpm, bs_diff):
     if bpm != 100:
         for i in range(len(jump_speed)):
             last_abs = 99999
+            last_offset = 0
             jump_distance_orig = calculate_jump_distance(jump_speed[i], 100, jsb_offset[i])
-            for _i in range(15):
+            for _ in range(20):
                 jump_distance_new = calculate_jump_distance(jump_speed[i], bpm, jsb_offset[i])
                 if jump_distance_new > jump_distance_orig:
                     jsb_offset[i] -= 0.1
+                    last_offset = -0.1
                 elif jump_distance_new < jump_distance_orig:
                     jsb_offset[i] += 0.1
+                    last_offset = 0.1
                 abs_diff = abs(jump_distance_new - jump_distance_orig)
                 if abs_diff < 0.5:
+                    # good enough
                     break
                 if abs_diff > last_abs:
+                    # if it gets worse, go back
+                    jsb_offset[i] -= last_offset
                     break
                 last_abs = abs_diff
 
