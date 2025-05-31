@@ -102,13 +102,13 @@ waveform_pattern_length = 25   # pattern length in sampling rate [10-200]
 waveform_threshold = 4  # minimum number of notes applicable for waveform to start
 
 """Pinokio app only"""
-num_workers = 2
+num_workers = 4
 silence_threshold_percentage = 100
-difficulty_1 = 3
-difficulty_2 = 0
-difficulty_3 = 0
-difficulty_4 = 0
-difficulty_5 = 0
+difficulty_1 = 4
+difficulty_2 = 5
+difficulty_3 = 6
+difficulty_4 = 7
+difficulty_5 = 8
 
 """Caution on changes"""
 verbose_level = 1       # verbose level from 0 (only ETA) to 5 (all messages)
@@ -128,7 +128,7 @@ jump_speed_expert_factor = 0.91     # factor from expert+ to expert
 jsb_offset = [0.21, 0.15]  # note jump speed offset for Expert, Expert+ (range [-0.5, 0.5])
 jsb_offset_min = [-0.2, -0.4]  # minimum allowed values (expert, expert+)
 jsb_offset_factor = 0.011  # note jump factor for high difficulties
-use_fixed_bpm = 100  # use fixed bpm or set to None for the song bpm
+use_fixed_bpm = 0   # use fixed bpm or set to None for the song bpm
 max_njs = 26  # maximum Note Jump Speed allowed
 decr_speed_range = 30  # range for start and end (n first and last notes)
 decr_speed_val = 0.35  # decrease max speed at start

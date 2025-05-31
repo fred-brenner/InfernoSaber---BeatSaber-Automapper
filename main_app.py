@@ -8,6 +8,7 @@ import shutil
 
 import queue
 import threading
+import subprocess
 
 from app_helper.check_input import get_summary
 from app_helper.set_app_paths import set_app_paths
@@ -197,7 +198,7 @@ def set_input_folder(folder_path):
 
 # Function to handle file upload
 def upload_files(files):
-    if not files or files.value is None:
+    if not files or len(files) == 0:
         return "No files selected."
     music_folder_name = paths.songs_pred
     print(f"Copying to folder: {music_folder_name}")
@@ -500,6 +501,34 @@ def song_counting():
         return "Folder not set up yet."
 
 
+def import_urls(urls):
+    if not urls.strip():
+        return "No URLs found."
+    url_list = [u.strip() for u in urls.splitlines() if u.strip()]
+    print(f"{len(url_list)} URLs found: " + ", ".join(url_list))
+
+    music_folder_name = paths.songs_pred
+    if not os.path.exists(music_folder_name):
+        return "Error: Input folder not set up."
+
+    results = []
+    for url in url_list:
+        try:
+            cmd = [
+                "yt-dlp",
+                "-x",
+                "--audio-format", "mp3",
+                "-o", os.path.join(music_folder_name, "%(title)s.%(ext)s"),
+                url
+            ]
+            subprocess.run(cmd, check=True)
+            results.append(f"Downloaded: {url}")
+        except Exception as e:
+            results.append(f"Error for {url}: {e}")
+
+    return "\n".join(results)
+
+
 # Gradio App Setup Section
 with gr.Blocks() as demo:
     ################################
@@ -554,8 +583,8 @@ with gr.Blocks() as demo:
                     file_count='multiple'
                 )
                 file_status = gr.Textbox(label='File Import Status', placeholder='(optional)', interactive=False)
-                upload_button = gr.Button('NOT WORKING - Copy Files to Input Folder')
-                # upload_button.click(upload_files, inputs=[music_loader], outputs=[file_status])   # TODO: fix
+                upload_button = gr.Button('Copy Files to Input Folder')
+                upload_button.click(upload_files, inputs=[music_loader], outputs=[file_status])
 
                 # Add button to open the folder
                 gr.Markdown("... Or copy your songs to this folder:")
@@ -566,6 +595,18 @@ with gr.Blocks() as demo:
                 song_count = gr.Textbox(label='Song Count', interactive=False,
                                         value=song_counting, every=3)
                 # upload_button.click(song_counting, inputs=[], outputs=[song_count])
+
+                # YT download
+                gr.Markdown("**Music download (YT_DLP)**")
+                gr.Markdown("Add one or more YouTube URLs to download music files. Using [yt-dlp](https://github.com/yt-dlp/yt-dlp), use at your own risk!")
+                url_input = gr.Textbox(label='URL(s)', lines=3, placeholder='https://...')
+                url_status = gr.Textbox(label='URL Import Status', interactive=False)
+                url_import_btn = gr.Button('Start import')
+                url_import_btn.click(
+                    fn=import_urls,
+                    inputs=[url_input],
+                    outputs=[url_status]
+                )
 
     ################################
     # TAB 2: Parameters
@@ -731,10 +772,8 @@ with gr.Blocks() as demo:
             arc_movement_min.input(set_arc_movement_min, inputs=[arc_movement_min], outputs=[])
             # add bpm overwrite
             bpm_overwrite = gr.Checkbox(label="BPM Overwrite", value=config.use_fixed_bpm > 0,
-                                        info="Default True. If False, uses real song bpm instead of fixed value. Real song bpm "
-                                             "can lead to note jump speed bugs in BS at high difficulties. "
-                                             "Unclick if you want to edit the map with ChroMapper or "
-                                             "for improved beat alignment (experimental).")
+                                        info="Default False (uses real song bpm instead of fixed value). "
+                                             "Activate only in case of note jump speed bugs in BS at high difficulties.")
             bpm_overwrite.input(set_bpm_overwrite, inputs=[bpm_overwrite], outputs=[])
 
     ################################
@@ -822,9 +861,14 @@ with gr.Blocks() as demo:
         )
 
         # Add button to open the folder
-        gr.Markdown("... Maps will be generated here:")
-        open_folder_button2 = gr.Button('Open Output Folder')
-        open_folder_button2.click(open_folder_maps, inputs=[input_path], outputs=[])
+        with gr.Row():
+            with gr.Column():
+                gr.Markdown("... Maps will be generated here:")
+                open_folder_button2 = gr.Button('Open Output Folder')
+                open_folder_button2.click(open_folder_maps, inputs=[input_path], outputs=[])
+            with gr.Column():
+                gr.Markdown("... or view the maps here:")
+                gr.Markdown("[ArcViewer](https://allpoland.github.io/ArcViewer/)")
 
 # Launch the app
 if __name__ == "__main__":
