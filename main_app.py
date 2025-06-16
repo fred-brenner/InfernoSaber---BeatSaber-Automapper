@@ -207,7 +207,6 @@ def upload_files(files):
     if not os.path.exists(music_folder_name):
         return "Error: Folder not found."
 
-    dumper_path = os.path.join(os.path.dirname(__file__), "ncmdump.exe")
     for file in files:
         def check_support(fmt):
             return file.endswith(fmt)
@@ -217,7 +216,7 @@ def upload_files(files):
             shutil.copyfile(file, destination)
         else:
             file_name = os.path.basename(file.name)
-            destination = os.path.join(music_folder_name, str(file_name.replace(".flac", ".mp3")))
+            destination = os.path.join(music_folder_name, file_name[0:file_name.rindex('.')] + ".mp3")
             ffmpy.FFmpeg(inputs={file: None}, outputs={str(destination): None}).run()
     return f"{len(files)} file(s) successfully imported to {music_folder_name}"
 
