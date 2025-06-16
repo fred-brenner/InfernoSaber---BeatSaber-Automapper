@@ -1,4 +1,5 @@
 import time
+import ffmpy
 import requests  # to check for updates opn GitHub
 
 import gradio as gr
@@ -196,6 +197,7 @@ def set_input_folder(folder_path):
     return f"Input folder set to: {folder_path}"
 
 
+support_format = ['.ogg', '.egg', '.mp3', '.m4a', '.mp4']
 # Function to handle file upload
 def upload_files(files):
     if not files or len(files) == 0:
@@ -205,10 +207,18 @@ def upload_files(files):
     if not os.path.exists(music_folder_name):
         return "Error: Folder not found."
 
+    dumper_path = os.path.join(os.path.dirname(__file__), "ncmdump.exe")
     for file in files:
-        file_name = os.path.basename(file.name)
-        destination = os.path.join(music_folder_name, file_name)
-        shutil.copyfile(file, destination)
+        def check_support(fmt):
+            return file.endswith(fmt)
+        if any(map(check_support, support_format)):
+            file_name = os.path.basename(file.name)
+            destination = os.path.join(music_folder_name, file_name)
+            shutil.copyfile(file, destination)
+        else:
+            file_name = os.path.basename(file.name)
+            destination = os.path.join(music_folder_name, str(file_name.replace(".flac", ".mp3")))
+            ffmpy.FFmpeg(inputs={file: None}, outputs={str(destination): None}).run()
     return f"{len(files)} file(s) successfully imported to {music_folder_name}"
 
 
@@ -578,7 +588,7 @@ with gr.Blocks() as demo:
                 # TODO: fix/test for wma, wav, etc.
                 music_loader = gr.File(
                     label='Select Music Files',
-                    file_types=['.ogg', '.egg', '.mp3', '.m4a', '.mp4'],
+                    file_types=None,
                     file_count='multiple'
                 )
                 file_status = gr.Textbox(label='File Import Status', placeholder='(optional)', interactive=False)
