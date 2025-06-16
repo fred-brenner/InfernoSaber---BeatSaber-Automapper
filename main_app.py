@@ -458,8 +458,7 @@ def set_add_arcs(add_arcs_value):
 def set_arc_time(arc_start_time_value, arc_end_time_value):
     config.slider_time_gap[0] = arc_start_time_value
     config.slider_time_gap[1] = arc_end_time_value
-    update_dir_path('tools/config/config.py', 'slider_time_gap',
-                    f'[{arc_start_time_value}, {arc_end_time_value}]')
+    update_dir_path('tools/config/config.py', 'slider_time_gap',config.slider_time_gap)
     return
 
 
@@ -751,12 +750,12 @@ with gr.Blocks() as demo:
             add_arcs.input(set_add_arcs, inputs=[add_arcs], outputs=[])
             # slider_start_time
             arc_start_time = gr.Number(label="Arc Start Time", value=config.slider_time_gap[0], precision=1,
-                                       interactive=True, step=0.25, minimum=0, maximum=2,
+                                       interactive=True, step=0.1, minimum=0, maximum=2,
                                        info="Minimum time in seconds to activate arcs.")
             # arc_start_time.input(set_arc_time, inputs=[arc_start_time, arc_end_time], outputs=[])
             # slider_end_time
-            arc_end_time = gr.Number(label="Arc End Time", value=config.slider_time_gap[1], precision=0,
-                                     interactive=True, step=1, minimum=3, maximum=20,
+            arc_end_time = gr.Number(label="Arc End Time", value=config.slider_time_gap[1], precision=1,
+                                     interactive=True, step=0.1, minimum=0, maximum=20,
                                      info="Maximum time in seconds to activate arcs.")
             arc_start_time.input(set_arc_time, inputs=[arc_start_time, arc_end_time], outputs=[])
             arc_end_time.input(set_arc_time, inputs=[arc_start_time, arc_end_time], outputs=[])
