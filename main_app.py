@@ -1,4 +1,5 @@
 import time
+import ffmpy
 import requests  # to check for updates opn GitHub
 
 import gradio as gr
@@ -196,6 +197,7 @@ def set_input_folder(folder_path):
     return f"Input folder set to: {folder_path}"
 
 
+support_format = ['.ogg', '.egg', '.mp3', '.m4a', '.mp4']
 # Function to handle file upload
 def upload_files(files):
     if not files or len(files) == 0:
@@ -206,9 +208,16 @@ def upload_files(files):
         return "Error: Folder not found."
 
     for file in files:
-        file_name = os.path.basename(file.name)
-        destination = os.path.join(music_folder_name, file_name)
-        shutil.copyfile(file, destination)
+        def check_support(fmt):
+            return file.endswith(fmt)
+        if any(map(check_support, support_format)):
+            file_name = os.path.basename(file.name)
+            destination = os.path.join(music_folder_name, file_name)
+            shutil.copyfile(file, destination)
+        else:
+            file_name = os.path.basename(file.name)
+            destination = os.path.join(music_folder_name, file_name[0:file_name.rindex('.')] + ".mp3")
+            ffmpy.FFmpeg(inputs={file: None}, outputs={str(destination): None}).run()
     return f"{len(files)} file(s) successfully imported to {music_folder_name}"
 
 
@@ -458,8 +467,7 @@ def set_add_arcs(add_arcs_value):
 def set_arc_time(arc_start_time_value, arc_end_time_value):
     config.slider_time_gap[0] = arc_start_time_value
     config.slider_time_gap[1] = arc_end_time_value
-    update_dir_path('tools/config/config.py', 'slider_time_gap',
-                    f'[{arc_start_time_value}, {arc_end_time_value}]')
+    update_dir_path('tools/config/config.py', 'slider_time_gap',config.slider_time_gap)
     return
 
 
@@ -579,7 +587,7 @@ with gr.Blocks() as demo:
                 # TODO: fix/test for wma, wav, etc.
                 music_loader = gr.File(
                     label='Select Music Files',
-                    file_types=['.ogg', '.egg', '.mp3', '.m4a', '.mp4'],
+                    file_types=None,
                     file_count='multiple'
                 )
                 file_status = gr.Textbox(label='File Import Status', placeholder='(optional)', interactive=False)
@@ -751,12 +759,12 @@ with gr.Blocks() as demo:
             add_arcs.input(set_add_arcs, inputs=[add_arcs], outputs=[])
             # slider_start_time
             arc_start_time = gr.Number(label="Arc Start Time", value=config.slider_time_gap[0], precision=1,
-                                       interactive=True, step=0.25, minimum=0, maximum=2,
+                                       interactive=True, step=0.1, minimum=0, maximum=2,
                                        info="Minimum time in seconds to activate arcs.")
             # arc_start_time.input(set_arc_time, inputs=[arc_start_time, arc_end_time], outputs=[])
             # slider_end_time
-            arc_end_time = gr.Number(label="Arc End Time", value=config.slider_time_gap[1], precision=0,
-                                     interactive=True, step=1, minimum=3, maximum=20,
+            arc_end_time = gr.Number(label="Arc End Time", value=config.slider_time_gap[1], precision=1,
+                                     interactive=True, step=0.1, minimum=0, maximum=20,
                                      info="Maximum time in seconds to activate arcs.")
             arc_start_time.input(set_arc_time, inputs=[arc_start_time, arc_end_time], outputs=[])
             arc_end_time.input(set_arc_time, inputs=[arc_start_time, arc_end_time], outputs=[])
