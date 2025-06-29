@@ -1,95 +1,107 @@
-## Flexible Automapper for Beatsaber made for any difficulty
-    
-    Automapper with fully adjustable difficulty (inpsired by star difficulty) ranging from easy maps (1) to Expert++ maps (10+)
 
-    New: Get maps from the discord bot (if online): https://discord.gg/cdV6HhpufY
+<br/>
+<div align="center">
+<a href="https://github.com/fred-brenner/InfernoSaber---BeatSaber-Automapper/edit/main_app">
+<img src="https://github.com/fred-brenner/InfernoSaber---BeatSaber-Automapper/blob/main_app/app_helper/cover.jpg" alt="Logo" width="80" height="80">
+</a>
+<h3 align="center">InfernoSaber</h3>
+<p align="center">
+Flexible Automapper for Beatsaber made for any difficulty
+<br/>
+<br/>
+<a href="https://www.youtube.com/watch?v=GpdHE6puDng"><strong>Installation walkthrough »</strong></a>
+<br/>
+<br/>
+<a href="https://www.youtube.com/watch?v=wJSOBuKs42Q">View Demo .</a>  
+<a href="https://github.com/fred-brenner/InfernoSaber---BeatSaber-Automapper/issues">Report Bug .</a>
+<a href="https://github.com/fred-brenner/InfernoSaber---BeatSaber-Automapper/discussions">Request Feature</a>
+</p>
+</div>
 
-    Recommendation: Generate BeatSaber maps using AI with the convenience of Google Drive storage.
-    Use the Google Colab template included in the repository without the need of hardware.
-    
-    Alternative: Install the project locally with anaconda (not recommended)
+## About The Project
 
+![Screenshot played by RamenBot](https://i.imgur.com/ECXMxY5.jpeg)
 
-## Roadmap 2023
-Already Finished:
+Automapper with fully adjustable difficulty (inpsired by star difficulty) ranging from easy maps (< 1) to Expert+++ maps (10+)
 
-    Publish InfernoSaber
-    Add obstacles in unused spaces
-    Simple cardio obstacle model
+Update Jan 2025: App is finally available via Pinokio: https://program.pinokio.computer/#/
+Just got to "Discover" and then "Download from URL": https://github.com/fred-brenner/InfernoSaber-App
 
-Mid of 2023:
+This installs all dependencies in the capsulated environment of Pinokio and loads the application from (this) main repository:
+https://github.com/fred-brenner/InfernoSaber---BeatSaber-Automapper/tree/main_app
 
-    Create InfernoSaber website/independent server (?)
-    Rework AI model to create "impossible" note speeds
+Alternatively:
 
-End of 2023:
+Join the Discord and let the bot generate single difficulty maps for you (currently not available):
+https://discord.com/invite/cdV6HhpufY
 
-    Create Cardio Obstacle AI Model
-    Check out Reinforcement Models
-    Add bombs in unused spaces (?)
+... Or clone the repo yourself (Note: Use a conda environment to install audio packages on windows machines)
 
+### Built With
 
-## Automapper for Beatsaber made for expert+ levels
+The automapper currently consists of 4 consecutive AI models:
 
-Extract maps from Beatsaber/Bsaber to feed them 
-into AI models.
-Map versions with custom modded data (values out of normal boundaries) are excluded,
-so that the data is as smooth as possible.
-
-Automapper is trained on expert+ maps for 
-average 6 notes-per-second in prediction
-
-The automapper consists of 4 consecutive AI models:
 1. Deep convolutional autoencoder - to encode the music/simplify all other models
 2. Temporal Convolutional Network (TCN) - to generate the beat
 3. Deep Neural Network (Classification) - mapping the notes/bombs
 4. Deep Neural Network (Classification) - mapping the events/lights
 
-An overview over the current status of map generation (and past ones) can be found at:
-https://youtu.be/2uK22jXeNLw
+## Getting Started
 
-### Author: Frederic Brenner
+Install via Pinokio. A walkthrough is given in: https://www.youtube.com/watch?v=GpdHE6puDng
+
+This project is open-source, free-to-use and will remain so. Enjoy :)
+
+### Prerequisites
+
+Current pinokio version from: https://github.com/pinokiocomputer/pinokio/releases
+
+### Installation
+
+(Not recommended) You can also clone the repo yourself. Note: Conda environment works best to install audio packages on windows machines
+
+## Usage
+
+The inference usage is simplified with the included app in branch 'main_app'. The AI models will be automatically downloaded during runtime from [Hugging Face](https://huggingface.co/BierHerr/InfernoSaber), if not yet available.
+
+You can also train your own models on your favorite maps and difficulty. This can only be done locally with cloning the repo and using GPU (one better consumer GPU is enough) A guide to train the 4 models is included in the repo: 'How_to_Train_InfernoSaber.docx'
+
+Extract maps from Beatsaber/Bsaber to feed them into AI models. Map versions with custom modded data (values out of normal boundaries) are excluded, so that the data is as smooth as possible.
+
+## Roadmap
+
+[ ] Increase number of models to improve accuracy and enable more options
+
+[x] Support new features for InfernoSaber Pinokio App
+
+[ ] Get the discord bot back online (yt blocks the bot)
+
+## Contributing
+
+Contributions are what make the open source community such an amazing place to learn, inspire, and create. Any contributions you make are **greatly appreciated**.
+
+If you have a suggestion that would make this better, please fork the repo and create a pull request. You can also simply open an issue with the tag "enhancement".
+Don't forget to give the project a star and join the [Discord community](https://discord.com/invite/cdV6HhpufY)! Thanks again!
+
+1. Fork the Project and checkout the 'main_app' branch
+2. Create your Feature Branch (`git checkout -b feature/AmazingFeature`)
+3. Commit your Changes (`git commit -m 'Add some AmazingFeature'`)
+4. Push to the Branch (`git push origin feature/AmazingFeature`)
+5. Open a Pull Request
+
+## License
+
+Distributed under the MIT License. See [MIT License](https://opensource.org/licenses/MIT) for more information.
+
+## Contact
+
+I've been working on this app since the release of BeatSaber and am happy to share the progress here!
+
+Author: Frederic Brenner
 frederic.brenner@tum.de
 
-## Alternatively you can run the project local:
+## Acknowledgments
 
-## To install suitable python environment import in Anaconda:
-anaconda_environment.yaml
-
-## To run automapper go to:
-[Outdated] Download models from GDrive link in model_data/Data/model/link_to_model.txt
-
-[Currently] Create Colab notebook and download model data from the created GDrive repository.
-
-run main.py
-
-## To adjust paths go to:
-tools/config/paths.py
-
-## To adjust difficulty go to:
-tools/config/config.py
-
-especially max_speed,
-change the rest with caution!
-
-
-## folder structure needed for this version:
-can be automatically created with:
-tools/config/check_folder_structure.py
-
-## starting extraction of beatsaber data:
-01/preprocessing/shift.py (whole preprocessing)
-
-see end of main.py file for more information on training order
-
-
-## passing the beatsaber songs into a different directory (e.g. for PowerBeats VR)
-tools/PowerBeats_extension/PowerBeats_shift.py
-
-The beatsaber path is taken from the paths.py file, 
-the destination folder needs to be set inside the file
-
-The song name detection is quite simple,
-for better naming extract the files from the preprocessing algorithm (not implemented)
-
-## Automapper is finally there. Have fun!
+Thanks for the many contributions on Discord and Github so far. Here, I want to thank the code contributors
+- [__Zender__](https://github.com/aCzenderCa) - App enhancement and fixes
+- [tjoen](https://github.com/tjoen) - Prototype for Pinokio install script
