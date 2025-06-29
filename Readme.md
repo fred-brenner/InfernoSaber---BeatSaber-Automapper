@@ -103,5 +103,5 @@ frederic.brenner@tum.de
 ## Acknowledgments
 
 Thanks for the many contributions on Discord and Github so far. Here, I want to thank the code contributors
-- [__Zender__](https://github.com/aCzenderCa) - App enhancement and fixes
+- [aCzenderCa](https://github.com/aCzenderCa) - App enhancement and fixes
 - [tjoen](https://github.com/tjoen) - Prototype for Pinokio install script
