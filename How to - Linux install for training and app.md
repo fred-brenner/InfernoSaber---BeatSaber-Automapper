@@ -37,34 +37,54 @@ Use the `main` branch for the latest stable version for training. Use the `main_
 4. **Update and upgrade packages**:
    ```bash
    sudo apt update && sudo apt upgrade
-   ```
 
-5. **Install TensorFlow with CUDA (for NVIDIA)**:
+5. **Create your preferred Python env**:
+   go to InfernoSaber folder with cd, ls:
    ```bash
-   pip install tensorflow[and-cuda]
-   # Tested with TensorFlow 2.15
-   # For app install only, just install pip install tensorflow==2.15
+   cd mnt/c/Users/YourUsername/Desktop/BS_Automapper/InfernoSaber---BeatSaber-Automapper
+   ```
+   ```bash
+   sudo apt install -y software-properties-common
+   sudo add-apt-repository -y ppa:deadsnakes/ppa
+   sudo apt install -y python3.10 python3.10-venv python3.10-dev
+   python3.10 --version
+   python3.10 -m venv ubuntu_venv
+   ```
+   Always after startup:
+   ```bash
+   source ubuntu_venv/bin/activate
    ```
 
-6. **Install required dependencies**:
+6. **Install TensorFlow with CUDA (for NVIDIA)**:
+   ```bash
+   pip install tensorflow[and-cuda]==2.15
+   ```
+   Tested with TensorFlow 2.15
+   For app install only (no training), you don't need CUDA:
+   ```bash
+   pip install tensorflow==2.15
+   ```
+
+7. **Install required dependencies**:
    ```bash
    sudo apt install libswresample-dev libsamplerate-dev libsndfile-dev txt2man doxygen
    sudo apt install python3-aubio aubio-tools ffmpeg libavcodec-extra
    sudo apt install libavcodec-dev libavformat-dev libavutil-dev libswresample-dev
    ```
 
-7. **In case of `aubio` issues**:
+8. **In case of `aubio` issues (skip else)**:
    ```bash
    pip uninstall -yv aubio
    pip install --force-reinstall --no-cache-dir --verbose aubio
    ```
 
-8. **Mount Windows path inside WSL2 (example)**:
-   ```bash
-   wsl --mount C:\\Users\\YourUsername\\Desktop\\BS_Automapper
-   ```
-
 9. **Install Python requirements**:
+   ```bash
+   pip install git+https://git.aubio.org/aubio/aubio/
+   ```
+   Aubio tends to make problems. Alternative is to install via Conda or try to use pip install aubio.
+   
+   Make sure all already installed versions are removed from the requirements.txt (tensorflow, keras, aubio)
    ```bash
    pip install -r requirements.txt
    ```
