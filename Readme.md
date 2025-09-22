@@ -22,7 +22,7 @@ Flexible Automapper for Beatsaber made for any difficulty
 
 ![Screenshot played by RamenBot](https://i.imgur.com/ECXMxY5.jpeg)
 
-Automapper with fully adjustable difficulty (inpsired by star difficulty) ranging from easy maps (< 1) to Expert+++ maps (10+)
+Automapper with fully adjustable difficulty (inspired by star difficulty) ranging from easy maps (< 1) to Expert+++ maps (10+)
 
 Update Jan 2025: App is finally available via Pinokio: https://program.pinokio.computer/#/
 Just got to "Discover" and then "Download from URL": https://github.com/fred-brenner/InfernoSaber-App
@@ -64,7 +64,7 @@ Current pinokio version from: https://github.com/pinokiocomputer/pinokio/release
 
 The inference usage is simplified with the included app in branch 'main_app'. The AI models will be automatically downloaded during runtime from [Hugging Face](https://huggingface.co/BierHerr/InfernoSaber), if not yet available.
 
-You can also train your own models on your favorite maps and difficulty. This can only be done locally with cloning the repo and using GPU (one better consumer GPU is enough) A guide to train the 4 models is included in the repo: 'How_to_Train_InfernoSaber.docx'
+You can also train your own models on your favorite maps and difficulty. This can only be done locally with cloning the repo and using GPU (one better consumer GPU is enough) A guide to train the 4 models is included in the repo: [How to - Linux install for training and app](How%20to%20-%20Linux%20install%20for%20training%20and%20app.md)
 
 Extract maps from Beatsaber/Bsaber to feed them into AI models. Map versions with custom modded data (values out of normal boundaries) are excluded, so that the data is as smooth as possible.
 

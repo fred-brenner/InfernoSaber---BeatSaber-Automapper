@@ -8,8 +8,8 @@ def return_mapper_list(mapper_shortcut):
         mapper_list = ['Nuketime', 'Heisenberg', 'Ruckus',
                        'Joetastic', 'BennyDaBeast', 'Hexagonial',
                        'Ryger', 'Skyler Wallace', 'Uninstaller',
-                       'Teuflum', 'GreatYazer', 'puds'
-                                                'Moriik', 'Ab', 'DE125', 'Skeelie',
+                       'Teuflum', 'GreatYazer', 'puds',
+                       'Moriik', 'Ab', 'DE125', 'Skeelie',
                        'Psyc0pathic', 'Hexagonial', 'Electrostats',
                        'DankruptMemer', 'StyngMe', 'Rustic',
                        'Souk', 'Oddloop', 'Chroma', 'Pendulum',
