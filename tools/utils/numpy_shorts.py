@@ -10,9 +10,17 @@ def np_append(old, new, axis=0):
     return out
 
 
-def minmax_3d(ar: np.array) -> np.array:
-    ar -= ar.min()
-    ar /= ar.max()
+def minmax_3d(ar: np.ndarray) -> np.ndarray:
+    """Normalize an array to the range [0, 1] while avoiding division by zero."""
+    min_val = ar.min()
+    max_val = ar.max()
+    value_range = max_val - min_val
+
+    ar -= min_val
+    if value_range == 0:
+        ar.fill(0)
+    else:
+        ar /= value_range
     return ar
 
 
