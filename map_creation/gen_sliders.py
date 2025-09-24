@@ -1,7 +1,8 @@
 import numpy as np
 from random import randint, random
 
-from tools.config import config
+from tools.config import get_config
+config = get_config()
 from map_creation.sanity_check import calc_note_speed
 
 

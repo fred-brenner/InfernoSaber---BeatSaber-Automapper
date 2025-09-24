@@ -1,8 +1,20 @@
 import re
+from typing import Any
+
+
+def _format_value(new_value: Any) -> str:
+    """Return a string representation suitable for assignment statements."""
+    if isinstance(new_value, str):
+        escaped = new_value.replace("\\", "\\\\").replace('"', '\\"')
+        return f'"{escaped}"'
+    if isinstance(new_value, bool):
+        return "True" if new_value else "False"
+    return str(new_value)
+
 
 def update_dir_path(file_path, keyword='dir_path', new_value=''):
     """
-    Updates the line containing 'dir_path' in the specified file to the new new_value.
+    Update the line containing the keyword in the specified file to ``new_value``.
 
     Args:
         file_path (str): Path to the file to be updated.
@@ -18,15 +30,14 @@ def update_dir_path(file_path, keyword='dir_path', new_value=''):
         # Update the specific line containing 'dir_path'
         with open(file_path, 'w') as file:
             for line in lines:
-                # Check if the line contains 'dir_path'
-                if re.match(rf"^\s*{keyword}\s*=", line) and not found_it:
-                    # Determine the format based on the type of new_value
-                    if isinstance(new_value, str):
-                        formatted_value = f'"{new_value}"'
-                    else:
-                        formatted_value = str(new_value)
+                # Check if the line contains the keyword (optionally prefixed with "self.")
+                match = re.match(rf"^(?P<indent>\s*)(?P<prefix>self\.)?{re.escape(keyword)}\s*=", line)
+                if match and not found_it:
+                    indent = match.group('indent') or ''
+                    prefix = match.group('prefix') or ''
+                    formatted_value = _format_value(new_value)
                     # Replace with the new value and ensure a newline is added
-                    file.write(f'{keyword} = {formatted_value}\n')
+                    file.write(f"{indent}{prefix}{keyword} = {formatted_value}\n")
                     print(f"Updated {keyword} in {file_path} to: {new_value}")
                     found_it = True
                 else:
@@ -46,3 +57,4 @@ if __name__ == "__main__":
     keyword = "dir_path"
     new_value = "/new/directory/path"
     update_dir_path(file_path, keyword, new_value)
+

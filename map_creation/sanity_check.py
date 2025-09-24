@@ -9,7 +9,8 @@ import librosa
 # import matplotlib.pyplot as plt
 from scipy.signal import savgol_filter
 
-from tools.config import config, paths
+from tools.config import get_config, paths
+config = get_config()
 from tools.utils.numpy_shorts import get_factor_from_max_speed, add_onset_half_times
 
 

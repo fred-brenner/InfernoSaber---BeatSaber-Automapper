@@ -4,7 +4,8 @@ import shutil
 import sys
 import subprocess
 
-from tools.config import paths, config
+from tools.config import paths, get_config
+config = get_config()
 
 
 from training.helpers import test_gpu_tf

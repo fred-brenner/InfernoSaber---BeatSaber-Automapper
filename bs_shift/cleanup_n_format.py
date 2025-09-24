@@ -1,7 +1,8 @@
 import json
 import os
 
-from tools.config import config, paths
+from tools.config import get_config, paths
+config = get_config()
 
 
 def read_json_content_file(file_path: str, filename="") -> list[str]:

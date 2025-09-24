@@ -1,7 +1,8 @@
 import pickle
 import numpy as np
 
-from tools.config import paths, config
+from tools.config import paths, get_config
+config = get_config()
 
 
 def load_raw_beat_data(name_ar):
