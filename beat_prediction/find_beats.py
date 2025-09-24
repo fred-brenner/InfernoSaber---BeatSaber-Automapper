@@ -4,7 +4,8 @@ import aubio
 import numpy as np
 # import matplotlib.pyplot as plt
 
-from tools.config import config, paths
+from tools.config import get_config, paths
+config = get_config()
 from preprocessing.music_processing import log_specgram
 
 

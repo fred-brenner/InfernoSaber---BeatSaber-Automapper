@@ -1,7 +1,8 @@
 import numpy as np
 from random import randint
 
-from tools.config import config
+from tools.config import get_config
+config = get_config()
 
 
 def add_obstacle(obstacles: list, position: int, first_time, last_time):

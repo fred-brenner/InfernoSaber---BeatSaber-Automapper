@@ -11,7 +11,8 @@ parent_dir = os.path.abspath(os.path.join(script_dir, ".."))
 sys.path.append(parent_dir)
 
 from tools.utils.load_and_save import load_npy
-from tools.config import paths, config
+from tools.config import paths, get_config
+config = get_config()
 from tools.config.mapper_selection import return_mapper_list, get_full_model_path
 from preprocessing.map_info_processing import get_maps_from_mapper
 

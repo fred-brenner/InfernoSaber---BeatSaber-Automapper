@@ -20,7 +20,8 @@ from preprocessing.bs_mapper_pre import load_beat_data
 from training.helpers import test_gpu_tf, filter_by_bps, calc_class_weight
 from training.tensorflow_models import create_music_model
 
-from tools.config import config, paths
+from tools.config import get_config, paths
+config = get_config()
 from tools.utils import numpy_shorts
 from tools.utils.numpy_shorts import reduce_number_of_songs
 

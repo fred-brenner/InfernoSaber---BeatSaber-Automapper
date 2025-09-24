@@ -1,6 +1,7 @@
 import os
 
-from tools.config import paths, config
+from tools.config import paths, get_config
+config = get_config()
 
 
 def return_mapper_list(mapper_shortcut):

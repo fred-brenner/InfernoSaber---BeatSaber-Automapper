@@ -1,5 +1,6 @@
 from app_helper.update_dir_path import update_dir_path
-from tools.config import paths, config
+from tools.config import paths, get_config
+config = get_config()
 from tools.config.check_folder_structure import check_folder_structure
 
 

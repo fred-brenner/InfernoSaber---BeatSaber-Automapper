@@ -6,7 +6,8 @@ from keras.layers import Flatten
 
 from training import helpers as helpers_module
 from training import tensorflow_models as tf_models
-from tools.config import config
+from tools.config import get_config
+config = get_config()
 
 
 def test_filter_by_bps_uses_bpm_selection(monkeypatch):

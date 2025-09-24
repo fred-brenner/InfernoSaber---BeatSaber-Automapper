@@ -3,7 +3,8 @@ from sklearn.preprocessing import OneHotEncoder
 import pickle
 
 from preprocessing.beat_data_helper import *
-from tools.config import paths, config
+from tools.config import paths, get_config
+config = get_config()
 from tools.utils.numpy_shorts import reduce_number_of_songs
 from training.helpers import filter_by_bps
 from preprocessing.music_processing import run_music_preprocessing

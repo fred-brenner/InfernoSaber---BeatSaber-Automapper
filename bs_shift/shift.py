@@ -18,7 +18,8 @@ from tools.fail_list.black_list import append_fail, delete_fails
 from tools.utils.index_find_str import return_find_str
 
 # set folder paths
-from tools.config import paths, config
+from tools.config import paths, get_config
+config = get_config()
 # import exclusion names
 from tools.config import exclusion
 

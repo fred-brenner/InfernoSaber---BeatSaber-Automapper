@@ -13,7 +13,8 @@ from functools import partial
 from multiprocessing import Pool, freeze_support
 
 import map_creation.gen_beats as beat_generator
-from tools.config import paths, config
+from tools.config import paths, get_config
+config = get_config()
 from tools.utils.huggingface import model_download
 from bs_shift.export_map import *
 

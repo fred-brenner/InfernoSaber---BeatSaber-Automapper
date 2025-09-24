@@ -1,7 +1,8 @@
 # import matplotlib.pyplot as plt
 import numpy as np
 
-from tools.config import paths, config
+from tools.config import paths, get_config
+config = get_config()
 
 
 def plot_autoenc_results(img_in, img_repr, img_out, n_samples, scale_repr=True, save=False):

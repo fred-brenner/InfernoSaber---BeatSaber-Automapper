@@ -1,7 +1,8 @@
 import os
 import json
 
-from tools.config import config, paths
+from tools.config import get_config, paths
+config = get_config()
 
 
 def get_mapper_name(name_ar):

@@ -5,7 +5,8 @@ import aubio
 import numpy as np
 
 from bs_shift.bps_find_songs import bps_find_songs
-from tools.config import paths, config
+from tools.config import paths, get_config
+config = get_config()
 from tools.fail_list.black_list import append_fail, delete_fails
 from tools.utils import numpy_shorts
 from tools.utils.load_and_save import save_npy
