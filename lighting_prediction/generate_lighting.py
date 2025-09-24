@@ -13,7 +13,8 @@ from map_creation.class_helpers import get_class_size, update_out_class, add_fav
 
 # from preprocessing.music_processing import run_music_preprocessing
 
-# from tools.config import config, paths
+from tools.config import get_config, paths
+config = get_config()
 # from tools.utils import numpy_shorts
 
 from training.helpers import *

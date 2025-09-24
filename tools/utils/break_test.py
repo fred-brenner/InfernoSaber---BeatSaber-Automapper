@@ -1,7 +1,8 @@
 # import matplotlib.pyplot as plt
 # from scipy.signal import savgol_filter
 
-from tools.config import config, paths
+from tools.config import get_config, paths
+config = get_config()
 from map_creation.sanity_check import add_breaks
 from tools.utils.load_and_save import load_pkl
 

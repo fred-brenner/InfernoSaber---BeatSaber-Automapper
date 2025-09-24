@@ -9,7 +9,8 @@
 # /mnt/c/Users/frede/Desktop/BS_Automapper/InfernoSaber---BeatSaber-Automapper
 
 import os
-from tools.config import config
+from tools.config import get_config
+config = get_config()
 
 
 ################################# (change this for your pc)

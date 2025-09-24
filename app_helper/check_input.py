@@ -1,6 +1,7 @@
 import os
 
-from tools.config import paths, config
+from tools.config import paths, get_config
+config = get_config()
 
 
 bs_folder_name = "Beat Saber_Data/CustomLevels"

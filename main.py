@@ -7,7 +7,8 @@ import time
 import tensorflow as tf
 # import sys
 
-from tools.config import paths, config
+from tools.config import paths, get_config
+config = get_config()
 import map_creation.gen_beats as beat_generator
 from bs_shift.export_map import check_music_files, shutil_copy_maps
 

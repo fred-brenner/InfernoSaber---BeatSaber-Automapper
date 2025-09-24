@@ -8,7 +8,8 @@ from tabulate import tabulate
 from helpers import test_gpu_tf, ai_encode_song, load_keras_model, categorical_to_class
 from tensorflow_models import create_keras_model
 from preprocessing.bs_mapper_pre import load_ml_data, lstm_shift
-from tools.config import config, paths
+from tools.config import get_config, paths
+config = get_config()
 from lighting_prediction.train_lighting import lstm_shift_events_half
 
 

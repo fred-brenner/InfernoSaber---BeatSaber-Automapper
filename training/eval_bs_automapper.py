@@ -8,7 +8,8 @@ from helpers import *
 from lighting_prediction.train_lighting import lstm_shift_events_half
 from tensorflow_models import *
 from preprocessing.bs_mapper_pre import load_ml_data, lstm_shift
-from tools.config import config, paths
+from tools.config import get_config, paths
+config = get_config()
 from tools.config.mapper_selection import get_full_model_path
 
 # Check Cuda compatible GPU

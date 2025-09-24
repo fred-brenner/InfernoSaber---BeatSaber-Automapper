@@ -1,7 +1,8 @@
 # helper functions for changing the map apart from the original input
 from random import random
 
-from tools.config import config
+from tools.config import get_config
+config = get_config()
 
 
 def mirror_notes(n):

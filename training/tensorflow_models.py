@@ -5,7 +5,8 @@ from tcn import TCN  # pip install keras-tcn
 from keras.models import Model
 import numpy as np
 
-from tools.config import config
+from tools.config import get_config
+config = get_config()
 
 
 def create_keras_model(model_type, dim_in=[], dim_out=None):

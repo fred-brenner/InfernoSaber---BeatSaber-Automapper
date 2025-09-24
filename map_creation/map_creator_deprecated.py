@@ -10,7 +10,8 @@ from map_creation.sanity_check import sanity_check_notes, improve_timings
 from map_creation.gen_obstacles import calculate_obstacles
 # from map_creation.gen_sliders import calculate_sliders
 from map_creation.artificial_mod import gimme_more_notes
-from tools.config import config, paths
+from tools.config import get_config, paths
+config = get_config()
 
 
 def create_map_depr(y_class_num, timings, events, name, bpm, pitch_input, pitch_times):

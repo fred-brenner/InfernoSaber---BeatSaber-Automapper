@@ -2,7 +2,8 @@ import shutil
 import os
 from pydub import AudioSegment, effects
 
-from tools.config import config, paths
+from tools.config import get_config, paths
+config = get_config()
 
 
 def shutil_copy_maps(song_name, index="1234_"):

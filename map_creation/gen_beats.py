@@ -24,7 +24,8 @@ from training.tensorflow_models import *
 
 from lighting_prediction.generate_lighting import generate
 
-from tools.config import config, paths
+from tools.config import get_config, paths
+config = get_config()
 from tools.utils import numpy_shorts
 from tools.config.mapper_selection import get_full_model_path
 

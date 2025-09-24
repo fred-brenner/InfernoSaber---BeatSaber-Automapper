@@ -1,4 +1,5 @@
-from tools.config import config
+from tools.config import get_config
+config = get_config()
 import random
 
 

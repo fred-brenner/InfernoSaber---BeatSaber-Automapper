@@ -19,7 +19,8 @@ from helpers import test_gpu_tf, filter_by_bps, load_keras_model
 from plot_model import run_plot_autoenc
 from tensorflow_models import create_keras_model
 from preprocessing.music_processing import run_music_preprocessing
-from tools.config import config, paths
+from tools.config import get_config, paths
+config = get_config()
 from tools.fail_list.black_list import delete_fails
 from tools.utils.numpy_shorts import reduce_number_of_songs
 

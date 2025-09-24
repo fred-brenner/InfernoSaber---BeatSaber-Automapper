@@ -16,7 +16,8 @@ from app_helper.set_app_paths import set_app_paths
 from app_helper.update_dir_path import update_dir_path
 # from main import main
 from main_multi import main_multi_par
-from tools.config import paths, config
+from tools.config import paths, get_config
+config = get_config()
 from tools.config.mapper_selection import update_model_file_paths
 from tools.utils.huggingface import model_download
 

@@ -2,7 +2,8 @@ import numpy as np
 from sklearn.preprocessing import OneHotEncoder
 import joblib
 
-from tools.config import config, paths
+from tools.config import get_config, paths
+config = get_config()
 
 
 def update_out_class(in_class_l, y_class, idx):

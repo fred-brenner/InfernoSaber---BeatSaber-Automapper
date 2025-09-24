@@ -7,7 +7,8 @@ script_dir = os.path.dirname(os.path.realpath(__file__))
 parent_dir = os.path.abspath(os.path.join(script_dir, ".."))
 sys.path.append(parent_dir)
 
-from tools.config import paths, config
+from tools.config import paths, get_config
+config = get_config()
 
 # overwrite test path and config
 ################################

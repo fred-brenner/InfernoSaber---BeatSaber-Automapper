@@ -1,7 +1,8 @@
 import os
 from huggingface_hub import snapshot_download
 
-from tools.config import config, paths
+from tools.config import get_config, paths
+config = get_config()
 from tools.config.mapper_selection import get_full_model_path
 
 
