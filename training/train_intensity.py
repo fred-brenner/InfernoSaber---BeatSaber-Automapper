@@ -1,7 +1,13 @@
 """Training script for the beat intensity prediction model."""
 
 from datetime import datetime
+from pathlib import Path
 
+import matplotlib
+
+matplotlib.use("Agg")
+
+import matplotlib.pyplot as plt
 import numpy as np
 from keras.optimizers import Adam
 
@@ -81,6 +87,37 @@ intensity_model.fit(
 print("\nEvaluating test data...")
 eval_results = intensity_model.evaluate(x_test, y_test, verbose=1)
 print(f"Test loss: {eval_results[0]:.4f}, test MAE: {eval_results[1]:.4f}")
+
+# Plot predictions vs actuals for the test set
+if x_test.shape[0] > 0:
+    predictions = intensity_model.predict(x_test, verbose=0).squeeze()
+    y_test_flat = y_test.squeeze()
+
+    predictions = np.atleast_1d(predictions)
+    y_test_flat = np.atleast_1d(y_test_flat)
+
+    min_val = float(np.min([predictions.min(), y_test_flat.min()]))
+    max_val = float(np.max([predictions.max(), y_test_flat.max()]))
+
+    plt.figure(figsize=(8, 6))
+    plt.scatter(y_test_flat, predictions, alpha=0.6, label="Predictions")
+    plt.plot([min_val, max_val], [min_val, max_val], "r--", label="Ideal")
+    plt.xlabel("Actual intensity ratio")
+    plt.ylabel("Predicted intensity ratio")
+    plt.title("Beat intensity model predictions vs actual (test set)")
+    plt.legend()
+    plt.grid(True)
+    plt.tight_layout()
+
+    plot_dir_root = paths.train_path if paths.train_path else "./"
+    plot_path = Path(plot_dir_root) / "plots"
+    plot_path.mkdir(parents=True, exist_ok=True)
+    plot_file = plot_path / f"intensity_predictions_{timestamp}.png"
+    plt.savefig(plot_file, dpi=200)
+    plt.close()
+    print(f"Saved test prediction plot to: {plot_file}")
+else:
+    print("Skipping prediction plot because no test samples are available.")
 
 # Save model
 model_path = paths.model_path + save_model_name
