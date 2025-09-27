@@ -1,5 +1,11 @@
 import json
 import os
+import sys
+from pathlib import Path
+
+# add the project root (one level up) to sys.path
+sys.path.append(str(Path(__file__).resolve().parent.parent))
+
 
 from tools.config import get_config, paths
 config = get_config()
@@ -99,13 +105,19 @@ def clean_songs():
     print("Warning: This script is not fully tested and might break some song files.\n"
           "Do not use on your original beat saber folder!")
     print(f"Cleanup folder: {bs_song_path}")
+    print(f"Found items within folder: {len(os.listdir(bs_song_path))}")
     input("Continue with Enter")
 
+    print("Checking file names...")
     check_info_name(bs_song_path)
 
+    print("Checking beatmap names...")
     check_beatmap_name(bs_song_path)
 
+    print("Checking info file content...")
     check_info_content(bs_song_path)
+
+    print("Done.")
 
 
 if __name__ == "__main__":

@@ -39,8 +39,8 @@ def copy_matching_folders(ids, source_dir, target_dir):
 
 def main():
     csv_file = 'output.csv'
-    source_directory = "E:/SteamLibrary/steamapps/common/Beat Saber/Beat Saber_Data/CustomLevels/"
-    target_directory = "C:/Users/frede/Desktop/BS_Automapper/Data/training/favorites_bs_input/"
+    source_directory = "D:/SteamLibrary/steamapps/common/Beat Saber/Beat Saber_Data/CustomLevels/"
+    target_directory = "C:/Users/frede/Desktop/BS_Automapper/Data/training/favorites_bs_input_new/"
 
     ids = read_ids_from_csv(csv_file)
     copy_matching_folders(ids, source_directory, target_directory)

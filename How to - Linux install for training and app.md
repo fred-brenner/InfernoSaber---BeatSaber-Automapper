@@ -41,7 +41,7 @@ Use the `main` branch for the latest stable version for training. Use the `main_
 5. **Create your preferred Python env**:
    go to InfernoSaber folder with cd, ls:
    ```bash
-   cd mnt/c/Users/YourUsername/Desktop/BS_Automapper/InfernoSaber---BeatSaber-Automapper
+   cd mnt/c/Users/frede/Desktop/BS_Automapper/InfernoSaber---BeatSaber-Automapper
    ```
    ```bash
    sudo apt install -y software-properties-common
@@ -57,9 +57,9 @@ Use the `main` branch for the latest stable version for training. Use the `main_
 
 6. **Install TensorFlow with CUDA (for NVIDIA)**:
    ```bash
-   pip install tensorflow[and-cuda]==2.15
+   pip install tensorflow[and-cuda]==2.15 --extra-index-url https://pypi.nvidia.com
    ```
-   Tested with TensorFlow 2.15
+   Tested with TensorFlow 2.15 (this needs nvidia pypi: pip install --extra-index-url https://pypi.nvidia.com tensorrt-libs==8.6.1 --no-cache-dir)
    For app install only (no training), you don't need CUDA:
    ```bash
    pip install tensorflow==2.15
@@ -90,8 +90,10 @@ Use the `main` branch for the latest stable version for training. Use the `main_
    ```
 
 10. **Configure your paths**:  
-    Edit `/tools/config/paths.py` and set desired folders.
-
+   Edit `/tools/config/paths.py` and set desired folders.
+   ```bash
+    dir_path = "/mnt/c/Users/frede/Desktop/bs_test/Data/"
+   ```
 ---
 
 ## Configuration

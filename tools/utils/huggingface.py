@@ -14,6 +14,7 @@ def model_download(model_branch=None):
 
     # Create folder if it doesn't exist
     if not os.path.exists(model_folder):
+        print(f"Warning: Model folder did not exist or not complete. Creating: {model_folder}")
         os.makedirs(model_folder)
 
     # Check if model already exists

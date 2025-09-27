@@ -1,4 +1,4 @@
-# import matplotlib.pyplot as plt
+import matplotlib.pyplot as plt
 import numpy as np
 
 from tools.config import paths, get_config
@@ -38,8 +38,8 @@ def plot_autoenc_results(img_in, img_repr, img_out, n_samples, scale_repr=True, 
     if save:
         save_path = f"{paths.model_path}bneck{config.bottleneck_len}_encoder_decoder_example.png"
         fig.savefig(save_path)
-
-    plt.show()
+    else:
+        plt.show()
 
 
 def run_plot_autoenc(enc_model, auto_model, ds_test, save=False):
