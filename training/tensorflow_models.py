@@ -58,6 +58,26 @@ def create_keras_model(model_type, dim_in=[], dim_out=None):
         model = Model(inputs=[input_a, input_b, input_c], outputs=out)
         return model
 
+    elif model_type == 'intensity_cnn':
+        input_img = Input(shape=dim_in[0], name='input_intensity_window')
+
+        x = Conv2D(32, (3, 3), activation='relu', padding='same')(input_img)
+        x = BatchNormalization()(x)
+        x = MaxPooling2D((2, 2), padding='same')(x)
+
+        x = Conv2D(64, (3, 3), activation='relu', padding='same')(x)
+        x = BatchNormalization()(x)
+        x = MaxPooling2D((2, 2), padding='same')(x)
+
+        x = Flatten('channels_last')(x)
+        x = Dense(128, activation='relu')(x)
+        x = Dropout(0.1)(x)
+
+        out = Dense(1, activation='linear', name='output_intensity')(x)
+
+        model = Model(inputs=input_img, outputs=out)
+        return model
+
     # autoencoder
     elif model_type == 'enc1':
         input_img = Input(shape=(24, 20, 1))
