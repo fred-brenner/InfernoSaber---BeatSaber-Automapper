@@ -200,6 +200,13 @@ class Config:
         # self.tcn_skip = 10
         self.beat_song_limit = 240    # maximum number of songs used for training, to not overload RAM
 
+        # Beat intensity model configuration
+        self.intensity_learning_rate = 3e-4
+        self.intensity_n_epochs = 80
+        self.intensity_batch_size = 128
+        self.intensity_test_samples = 350
+        self.intensity_song_limit = 240
+
         # Event prediction model configuration
         self.event_learning_rate = 1e-3
         self.event_n_epochs = 180
