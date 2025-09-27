@@ -3,7 +3,7 @@ import ffmpy
 import requests  # to check for updates opn GitHub
 
 import gradio as gr
-from tkinter import Tk, filedialog
+from tkinter import Tk, filedialog, messagebox
 import os
 import shutil
 
@@ -24,6 +24,9 @@ from tools.utils.huggingface import model_download
 data_folder_name = 'Data'
 bs_folder_name = "Beat Saber_Data/CustomLevels"
 bs_folder_name2 = "SharedMaps/CustomLevels"
+
+REQUIRED_REPO_FOLDERS = ("model", "prediction", "training")
+FOLDER_SETUP_CANCELED_MESSAGE = "Folder setup canceled"
 
 update_check_response = None
 
@@ -103,35 +106,72 @@ update_status = check_for_updates()
 #             return str(filename)
 
 
+def _ensure_repo_setup(folder_path, previous_folder, root):
+    missing_folders = [
+        folder for folder in REQUIRED_REPO_FOLDERS
+        if not os.path.isdir(os.path.join(folder_path, folder))
+    ]
+
+    if not missing_folders:
+        set_app_paths(folder_path)
+        return paths.dir_path, 'Finished folder setup'
+
+    prompt_message = (
+        "The selected folder is missing the InfernoSaber repository structure.\n"
+        f"Missing folders: {', '.join(missing_folders)}.\n"
+        "Do you want to create a new repository here?"
+    )
+    if messagebox.askyesno(
+        "InfernoSaber Setup",
+        prompt_message,
+        parent=root,
+    ):
+        set_app_paths(folder_path)
+        return paths.dir_path, 'Created new InfernoSaber repository'
+
+    return previous_folder, FOLDER_SETUP_CANCELED_MESSAGE
+
+
 def on_browse_input_path():
     root = Tk()
     root.attributes("-topmost", True)
     root.withdraw()
 
-    filename = filedialog.askdirectory()
-    filename = filename.replace('\\\\', '/').replace('\\', '/')
-    if filename:
-        if os.path.isdir(filename):
-            if len(os.listdir(filename)) > 5:
-                return str(filename), 'Error: Please select an empty folder to set up InfernoSaber'
-            if not os.path.basename(filename) == data_folder_name:
-                # filename = os.path.join(filename, data_folder_name)
-                filename += f"/{data_folder_name}"
-                if not os.path.isdir(filename):
-                    os.mkdir(filename)
-            if not filename.endswith('/'):
-                filename += '/'
+    previous_dir_path = paths.dir_path
+    created_data_dir = False
+
+    try:
+        filename = filedialog.askdirectory()
+        filename = filename.replace('\\\\', '/').replace('\\', '/')
+        if not filename:
+            return "Folder not selected", 'not set'
+        if not os.path.isdir(filename):
+            return "Folder not available", 'not set'
+        if len(os.listdir(filename)) > 5:
+            return str(filename), 'Error: Please select an empty folder to set up InfernoSaber'
+        if not os.path.basename(filename) == data_folder_name:
+            filename += f"/{data_folder_name}"
+            if not os.path.isdir(filename):
+                os.mkdir(filename)
+                created_data_dir = True
+        if not filename.endswith('/'):
+            filename += '/'
+
+        final_path, status_message = _ensure_repo_setup(filename, previous_dir_path, root)
+
+        if status_message == FOLDER_SETUP_CANCELED_MESSAGE and created_data_dir:
+            try:
+                if os.path.isdir(filename) and not os.listdir(filename):
+                    os.rmdir(filename)
+            except OSError:
+                pass
+
+        return str(final_path), status_message
+    finally:
+        try:
             root.destroy()
-            set_app_paths(filename)
-            return str(filename), 'Finished folder setup'
-        else:
-            filename = "Folder not available"
-            root.destroy()
-            return str(filename), 'not set'
-    else:
-        filename = "Folder not selected"
-        root.destroy()
-        return str(filename), 'not set'
+        except Exception:
+            pass
 
 
 def on_browse_bs_path():
@@ -318,7 +358,16 @@ def run_process(num_workers, use_model, diff1, diff2, diff3, diff4, diff5):
     while thread.is_alive() or not log_queue.empty():
         while not log_queue.empty():
             log_message = log_queue.get()
-            progress_log.append(log_message)
+            if log_message.startswith("### ETA:"):
+                # Replace the most recent ETA entry to avoid flooding the log
+                for index in range(len(progress_log) - 1, -1, -1):
+                    if progress_log[index].startswith("### ETA:"):
+                        progress_log[index] = log_message
+                        break
+                else:
+                    progress_log.append(log_message)
+            else:
+                progress_log.append(log_message)
             yield "\n".join(progress_log)
         time.sleep(0.2)  # Prevent busy-waiting
 
