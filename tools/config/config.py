@@ -206,6 +206,12 @@ class Config:
         self.intensity_batch_size = 128
         self.intensity_test_samples = 350
         self.intensity_song_limit = 240
+        self.use_intensity_model = True
+        self.intensity_model_version = 'tf_model_intensity_'
+        self.intensity_speed_min = 0.75
+        self.intensity_speed_max = 1.30
+        self.intensity_response = 0.65
+        self.intensity_smoothing = 5
 
         # Event prediction model configuration
         self.event_learning_rate = 1e-3
@@ -222,6 +228,7 @@ class Config:
         self.obstacle_time_gap_orig = self.obstacle_time_gap
         self.thresh_beat_orig = self.thresh_beat
         self.thresh_onbeat_orig = self.thresh_onbeat
+        self.dynamic_speed_factors = None
 
 
 _CONFIG_INSTANCE = Config()

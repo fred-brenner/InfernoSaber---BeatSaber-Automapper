@@ -938,6 +938,13 @@ def correct_notes(notes, timings):
     last_time = 0
     rm_counter = 0
 
+    dynamic_factors = getattr(config, "dynamic_speed_factors", None)
+    if dynamic_factors is not None:
+        dynamic_factors = np.asarray(dynamic_factors, dtype=np.float32)
+        dynamic_len = len(dynamic_factors)
+    else:
+        dynamic_len = 0
+
     # reduce note difficulty at start and end of song
     se_idx = config.decr_speed_range  # start_end_index
     # compensate quick start behavior
@@ -965,10 +972,14 @@ def correct_notes(notes, timings):
             speed = calc_note_speed(nl_last, notes[idx], new_time - last_time)
 
             # remove too fast elements
+            base_speed = config.max_speed
+            if dynamic_factors is not None and idx < dynamic_len:
+                base_speed = config.max_speed * float(dynamic_factors[idx])
+
             if idx in decrease_range:
-                mx_speed = config.max_speed * decrease_val[idx]
+                mx_speed = base_speed * decrease_val[idx]
             else:
-                mx_speed = config.max_speed
+                mx_speed = base_speed
 
             factor = get_factor_from_max_speed(mx_speed, 0.5, 1)
             mx_speed *= factor
