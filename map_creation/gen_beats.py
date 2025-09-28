@@ -11,6 +11,7 @@ from beat_prediction.beat_prop import get_beat_prop, tcn_reshape
 from map_creation.sanity_check import *
 # from map_creation.class_helpers import *
 from map_creation.map_creator import create_map
+from map_creation.intensity_inference import compute_dynamic_speed_factors
 from map_creation.find_bpm import get_file_bpm
 from map_creation.bpm_optimizer import align_beats_on_bpm
 
@@ -66,6 +67,9 @@ def main(name_ar: list, debug_beats=False) -> bool:
     if len(name_ar) > 1:
         print("Multi-core song generation currently not implemented!")
         exit()
+
+    # reset dynamic speed factors for every run
+    config.dynamic_speed_factors = None
 
     # update configuration
     if config.add_silence_flag:
@@ -233,6 +237,17 @@ def main(name_ar: list, debug_beats=False) -> bool:
         # timing_ar = np.delete(timing_ar, rm_idx)  # not working/unused
         map_times = np.delete(map_times, rm_idx)
 
+    dynamic_speed_factors = None
+    if config.use_intensity_model and song_ar and len(song_ar[0]) > 0:
+        dynamic_speed_factors = compute_dynamic_speed_factors(song_ar[0])
+        if dynamic_speed_factors is not None and len(dynamic_speed_factors) != len(map_times):
+            if config.verbose_level > 0:
+                print(
+                    "Warning: Intensity predictions did not align with beat times. "
+                    "Skipping dynamic speed adaptation."
+                )
+            dynamic_speed_factors = None
+
     # Load pretrained encoder model
     model_path = get_full_model_path(config.enc_version)
     enc_model = load_model(model_path)
@@ -252,7 +267,21 @@ def main(name_ar: list, debug_beats=False) -> bool:
     ############
     # TODO: replace with default content instead of deletion
     map_times = map_times[config.lstm_len:]     # required by lstm start-up
+    if dynamic_speed_factors is not None:
+        if len(dynamic_speed_factors) <= config.lstm_len:
+            dynamic_speed_factors = None
+        else:
+            dynamic_speed_factors = dynamic_speed_factors[config.lstm_len:]
+
     map_times = map_times[:len(y_class_map)]    # rest from sectioning into lstm len batches
+    if dynamic_speed_factors is not None:
+        if len(dynamic_speed_factors) >= len(y_class_map):
+            dynamic_speed_factors = dynamic_speed_factors[:len(y_class_map)]
+        else:
+            dynamic_speed_factors = None
+
+    if dynamic_speed_factors is not None:
+        config.dynamic_speed_factors = dynamic_speed_factors
 
     ############
     # add events
@@ -275,8 +304,11 @@ def main(name_ar: list, debug_beats=False) -> bool:
         create_map_depr(y_class_map, map_times, events, name_ar[0], bpm,
                         pitch_input[-1], pitch_times[-1])
     else:
-        create_map(y_class_map, map_times, events, name_ar[0], bpm,
-                   pitch_input[-1], pitch_times[-1])
+        try:
+            create_map(y_class_map, map_times, events, name_ar[0], bpm,
+                       pitch_input[-1], pitch_times[-1])
+        finally:
+            config.dynamic_speed_factors = None
 
     return False  # success
 
