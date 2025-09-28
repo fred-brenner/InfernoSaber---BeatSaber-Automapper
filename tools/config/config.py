@@ -7,7 +7,7 @@ class Config:
     def __init__(self) -> None:
         """Initialize configuration with default values."""
         # General settings
-        self.InfernoSaber_version = "1.7.1.app8"  # coded into the info.dat file
+        self.InfernoSaber_version = "1.8"  # coded into the info.dat file
         self.bs_mapping_version = "v3"  # allows to generate advanced features like arcs
         # self.bs_mapping_version = "v2"  # legacy mode, may be deprecated in future
 
@@ -16,7 +16,8 @@ class Config:
         # self.use_mapper_selection = "easy_15"
         # self.use_mapper_selection = "hard_15"
         # self.use_mapper_selection = "expert_15"
-        self.use_mapper_selection = "fav_15"
+        # self.use_mapper_selection = "fav_15"
+        self.use_mapper_selection = "fav_20"
 
         # Training configuration
         self.use_mapper_selection = self.use_mapper_selection.lower()
@@ -101,7 +102,7 @@ class Config:
         self.waveform_threshold = 4  # minimum number of notes applicable for waveform to start
 
         # Pinokio app settings
-        self.num_workers = 4
+        self.num_workers = 8
         self.silence_threshold_percentage = 100
         self.difficulty_1 = 4
         self.difficulty_2 = 5
@@ -164,7 +165,7 @@ class Config:
         self.window = 2.0  # window in seconds for each song to spectrum picture (from wav_to_pic)
         self.specgram_res = 24  # y resolution of the spectrogram (frequency subdivisions)
         # self.ram_limit = 24      # free RAM in GB (unused currently)
-        self.vram_limit = 20     # free VRAM in GB (needed for lighting training)
+        self.vram_limit = 16     # free VRAM in GB (needed for lighting training)
 
         # Model versions
         self.enc_version = 'tf_model_enc_'
@@ -179,7 +180,7 @@ class Config:
         self.batch_size = 128  # batch size
         self.test_samples = 10  # number of test files to plot (excluded from training)
         self.bottleneck_len = 16  # size of bottleneck distribution (1D array)
-        self.autoenc_song_limit = 120    # maximum number of songs used for training, to not overload RAM
+        self.autoenc_song_limit = 140    # maximum number of songs used for training, to not overload RAM
 
         # Mapper model configuration
         self.map_learning_rate = 4e-4  # model learning rate
@@ -201,15 +202,15 @@ class Config:
         self.beat_song_limit = 240    # maximum number of songs used for training, to not overload RAM
 
         # Beat intensity model configuration
-        self.intensity_learning_rate = 3e-4
+        self.intensity_learning_rate = 5e-4
         self.intensity_n_epochs = 80
         self.intensity_batch_size = 128
         self.intensity_test_samples = 350
         self.intensity_song_limit = 240
         self.use_intensity_model = True
         self.intensity_model_version = 'tf_model_intensity_'
-        self.intensity_speed_min = 0.75
-        self.intensity_speed_max = 1.30
+        self.intensity_speed_min = 0.3
+        self.intensity_speed_max = 2.5
         self.intensity_response = 0.65
         self.intensity_smoothing = 5
 

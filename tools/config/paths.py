@@ -15,10 +15,10 @@ config = get_config()
 
 ################################# (change this for your pc)
 # setup folder for input data (automatically determined if inside this project)
-dir_path = ""
+dir_path = "/mnt/c/Users/frede/Desktop/BS_Automapper/Data/"
 
 bs_song_path = ""
-bs_input_path = ""
+bs_input_path = "/mnt/c/Users/frede/Desktop/BS_Automapper/Data/training/favorites_bs_input_new/"
 
 ############################# (no need to change)
 # main workspace path
