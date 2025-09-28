@@ -679,7 +679,7 @@ with gr.Blocks() as demo:
                 # Dropdown Menu for Model Selection
                 gr.Markdown("### Model Selection")
                 model_selector = gr.Dropdown(
-                    choices=["fav_15", "pp3_15", "easy_15", "expert_15"],
+                    choices=["fav_15", "pp3_15", "easy_15", "expert_15", "fav_20"],
                     label="Select Model", value=config.use_mapper_selection, interactive=True,
                     info="Select the model to be used for song generation. "
                          "The model will be downloaded from [HuggingFace](https://huggingface.co/BierHerr/InfernoSaber)"
