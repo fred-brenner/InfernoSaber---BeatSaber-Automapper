@@ -84,10 +84,14 @@ if False:
 
 # Import map data
 #################
-name_ar, _ = filter_by_bps(0.1, 50)
+name_ar, diff_ar = filter_by_bps(0.1, 50)
 _, real_beats = load_beat_data(name_ar, return_notes=True)
 name_ar = [name_ar[0]]
 real_beats = real_beats[0]
+print(f"Using song: '{name_ar[0]}' with ~{diff_ar[0]} bps and total {len(real_beats)} beats.")
+print(f"Overwriting song difficulty with bps {diff_ar[0]}")
+config.max_speed = diff_ar[0] * 4  # calculate bps to max_speed
+config.max_speed_orig = config.max_speed
 
 # Set tuning parameters
 #######################
