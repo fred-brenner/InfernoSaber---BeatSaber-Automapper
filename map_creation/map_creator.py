@@ -11,6 +11,7 @@ from map_creation.gen_obstacles import calculate_obstacles
 from map_creation.gen_sliders import calculate_sliders
 from map_creation.artificial_mod import gimme_more_notes
 from tools.config import config, paths
+from tools.utils.song_metadata import load_metadata
 
 
 def create_map(y_class_num, timings, events, name, bpm, pitch_input, pitch_times):
@@ -339,50 +340,56 @@ def get_info_map_string(name, bpm, bs_diff):
                     break
                 last_abs = abs_diff
 
-    info_string = '{\n'
-    info_string += '"_version": "2.0.0",\n'
-    info_string += f'"_songName": "{name}",\n'
-    info_string += f'"_songSubName": "Diff_{diff_plus / 4:.1f}",\n'
-    info_string += '"_songAuthorName": "unknown",\n'
-    info_string += '"_levelAuthorName": "InfernoSaber",\n'
-    info_string += f'"_beatsPerMinute": {bpm},\n'
-    info_string += '"_songTimeOffset": 0,\n'
-    info_string += '"_shuffle": 0,\n'
-    info_string += '"_shufflePeriod": 0.5,\n'
-    info_string += '"_previewStartTime": 10,\n'
-    info_string += '"_previewDuration": 20,\n'
-    info_string += f'"_songFilename": "{name}.egg",\n'
-    info_string += '"_coverImageFilename": "cover.jpg",\n'
-    info_string += '"_environmentName": "DefaultEnvironment",\n'
-    info_string += '"_allDirectionsEnvironmentName": "GlassDesertEnvironment",\n'
-    info_string += '"_difficultyBeatmapSets": ['
-    info_string += '{\n'
-    info_string += '"_beatmapCharacteristicName": "Standard",\n'
-    info_string += '"_difficultyBeatmaps": [\n'
+    jump_speed = [float(js) for js in jump_speed]
+    jsb_offset = [float(round(offset, 2)) for offset in jsb_offset]
 
+    metadata = load_metadata(name)
+    song_title = metadata.get('title', name)
+    song_author = metadata.get('artist', 'unknown')
+    song_sub_name = metadata.get('album', f'Diff_{diff_plus / 4:.1f}')
+
+    beatmaps = []
     for i, diff in enumerate(diff_list):
-        info_string += '{\n'
-        info_string += f'"_difficulty": "{diff}",\n'
-        if diff == 'Expert':
-            info_string += '"_difficultyRank": 7,\n'
-        else:
-            info_string += '"_difficultyRank": 9,\n'
-        info_string += f'"_beatmapFilename": "{diff}.dat",\n'
-        info_string += f'"_noteJumpMovementSpeed": {jump_speed[i]},\n'
-        info_string += f'"_noteJumpStartBeatOffset": {jsb_offset[i]:.2f}\n'
-        if i + 1 < len(diff_list):
-            info_string += '},\n'
-        else:
-            info_string += '}\n'
+        beatmaps.append({
+            "_difficulty": diff,
+            "_difficultyRank": 7 if diff == 'Expert' else 9,
+            "_beatmapFilename": f"{diff}.dat",
+            "_noteJumpMovementSpeed": jump_speed[i],
+            "_noteJumpStartBeatOffset": jsb_offset[i],
+        })
 
-    info_string += ']}],\n'
-    info_string += ('"_customData": {"_editors": {"_lastEditedBy": '
-                    '"InfernoSaber", "InfernoSaber": {"version": "'
-                    f"{config.InfernoSaber_version}"
-                    '"}}}\n')
-    info_string += '}\n'
+    editors = {
+        "_lastEditedBy": "InfernoSaber",
+        "InfernoSaber": {"version": f"{config.InfernoSaber_version}"}
+    }
+    custom_data = {"_editors": editors}
+    if metadata:
+        custom_data["_songMetadata"] = metadata
 
-    return info_string
+    info_data = {
+        "_version": "2.0.0",
+        "_songName": song_title,
+        "_songSubName": song_sub_name,
+        "_songAuthorName": song_author,
+        "_levelAuthorName": "InfernoSaber",
+        "_beatsPerMinute": float(bpm),
+        "_songTimeOffset": 0,
+        "_shuffle": 0,
+        "_shufflePeriod": 0.5,
+        "_previewStartTime": 10,
+        "_previewDuration": 20,
+        "_songFilename": f"{name}.egg",
+        "_coverImageFilename": "cover.jpg",
+        "_environmentName": "DefaultEnvironment",
+        "_allDirectionsEnvironmentName": "GlassDesertEnvironment",
+        "_difficultyBeatmapSets": [{
+            "_beatmapCharacteristicName": "Standard",
+            "_difficultyBeatmaps": beatmaps,
+        }],
+        "_customData": custom_data,
+    }
+
+    return json.dumps(info_data, indent=2) + '\n'
 
 # {
 #   "_version": "2.0.0",
