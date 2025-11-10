@@ -384,12 +384,14 @@ def get_info_map_string(name, bpm, bs_diff):
         "_allDirectionsEnvironmentName": "GlassDesertEnvironment",
         "_difficultyBeatmapSets": [{
             "_beatmapCharacteristicName": "Standard",
-            "_difficultyBeatmaps": beatmaps,
+            "_difficultyBeatmaps": [
+                beatmaps,           # TODO continue here
+            ]
         }],
         "_customData": custom_data,
     }
 
-    return json.dumps(info_data, indent=2) + '\n'
+    return json.dumps(info_data, indent=0) + '\n'
 
 # {
 #   "_version": "2.0.0",

@@ -102,7 +102,7 @@ waveform_pattern_length = 25   # pattern length in sampling rate [10-200]
 waveform_threshold = 4  # minimum number of notes applicable for waveform to start
 
 """Pinokio app only"""
-num_workers = 4
+num_workers = 5
 silence_threshold_percentage = 100
 difficulty_1 = 4
 difficulty_2 = 5

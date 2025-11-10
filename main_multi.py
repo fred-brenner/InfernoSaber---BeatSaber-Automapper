@@ -21,6 +21,21 @@ from bs_shift.export_map import *
 # from training.helpers import test_gpu_tf
 
 
+def stack_remaining_info_file(new_info_file: list, content: list, diff_str: str, before: int) -> list:
+    target_prefix = diff_str
+    last_matching_idx = None
+    for idx, item in enumerate(content):
+        if item.strip().startswith(target_prefix):
+            last_matching_idx = idx
+    if last_matching_idx is None:
+        print(f"Warning: Could not find {target_prefix} in map. Using default ending.")
+        new_info_file.extend(content[-3:])
+    else:
+        new_info_file.extend(content[last_matching_idx - before:])
+    new_info_file = ''.join(new_info_file)
+    return new_info_file
+
+
 def stack_info_data(new_info_file: list, content: list, diff_str: str, diff_num: int) -> list:
     if len(new_info_file) == 0:
         new_info_file = content[:19]
@@ -32,7 +47,7 @@ def stack_info_data(new_info_file: list, content: list, diff_str: str, diff_num:
     target_prefix = '"_noteJumpMovementSpeed":'
     last_matching_idx = None
     for idx, item in enumerate(content):
-        if item.startswith(target_prefix):
+        if item.strip().startswith(target_prefix):
             last_matching_idx = idx
     if last_matching_idx is None:
         print(f"Error: Could not find {target_prefix} in map.")
@@ -266,8 +281,8 @@ def combine_maps(song_list_potential, song_list_run, diff_list, export_results_t
             shutil.copy(src, dst)
         new_info_file[-1] = '}\n'
         # write info file
-        new_info_file.extend(content[-3:])
-        new_info_file = ''.join(new_info_file)
+        new_info_file = stack_remaining_info_file(new_info_file, content, diff_str='"_customData":', before=3)
+
         with open(f"{overall_folder}/info.dat", 'w') as fp:
             fp.write(json.dumps(json.loads(new_info_file), indent=4))
         # create zip archive for online viewer
