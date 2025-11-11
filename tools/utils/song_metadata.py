@@ -5,8 +5,10 @@ from __future__ import annotations
 import json
 import os
 from typing import Dict, Optional
+import re
+from pathlib import Path
 
-from tools.config import paths
+from tools.config import paths, config
 
 try:
     from mutagen import File as MutagenFile
@@ -42,7 +44,6 @@ def extract_metadata(file_path: str) -> Dict[str, str]:
 
     Returns an empty dictionary if the metadata cannot be read or the dependency is missing.
     """
-
     if MutagenFile is None:
         return {}
 
@@ -67,10 +68,10 @@ def save_metadata(name: str, metadata: Dict[str, Optional[str]]) -> None:
     """Persist *metadata* for the song *name* (without extension)."""
 
     sanitized = _sanitize_metadata(metadata)
-    metadata_path = os.path.join(paths.song_data, f"{name}.json")
+    metadata_path = os.path.join(paths.songs_pred, f"{name}.json")
 
     if sanitized:
-        os.makedirs(paths.song_data, exist_ok=True)
+        os.makedirs(paths.songs_pred, exist_ok=True)
         with open(metadata_path, "w", encoding="utf-8") as file:
             json.dump(sanitized, file, ensure_ascii=False, indent=2)
     elif os.path.exists(metadata_path):
@@ -80,7 +81,7 @@ def save_metadata(name: str, metadata: Dict[str, Optional[str]]) -> None:
 def load_metadata(name: str) -> Dict[str, str]:
     """Load persisted metadata for the song *name* (without extension)."""
 
-    metadata_path = os.path.join(paths.song_data, f"{name}.json")
+    metadata_path = os.path.join(paths.songs_pred, f"{name}.json")
     if not os.path.isfile(metadata_path):
         return {}
 

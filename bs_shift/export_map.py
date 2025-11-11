@@ -4,7 +4,7 @@ import shutil
 from pydub import AudioSegment, effects
 
 from tools.config import config, paths
-from tools.utils.song_metadata import extract_metadata, metadata_to_tags, save_metadata
+from tools.utils.song_metadata import extract_metadata, metadata_to_tags, save_metadata, extract_metadata_manual
 
 
 def shutil_copy_maps(song_name, index="1234_"):
