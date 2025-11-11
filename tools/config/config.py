@@ -18,11 +18,6 @@ bs_mapping_version = "v3"  # allows to generate advanced features like arcs
 # use_mapper_selection = "expert_15"
 use_mapper_selection = "fav_15"
 
-# select song metadata search mode
-enable_auto_metadata = True  # if True, tries to get song metadata from song name
-# allowed patterns for metadata: artist, title
-metadata_naming_convention = "{artist} - {title}"  # naming convention for auto metadata
-
 """Change only for new training"""
 use_mapper_selection = use_mapper_selection.lower()
 use_bpm_selection = True   # use number of beats for selection of maps in training
@@ -107,7 +102,7 @@ waveform_pattern_length = 25   # pattern length in sampling rate [10-200]
 waveform_threshold = 4  # minimum number of notes applicable for waveform to start
 
 """Pinokio app only"""
-num_workers = 5
+num_workers = 4
 silence_threshold_percentage = 100
 difficulty_1 = 4
 difficulty_2 = 5
