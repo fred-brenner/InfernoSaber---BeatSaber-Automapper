@@ -38,7 +38,7 @@ def stack_remaining_info_file(new_info_file: list, content: list, diff_str: str,
 
 def stack_info_data(new_info_file: list, content: list, diff_str: str, diff_num: int) -> list:
     if len(new_info_file) == 0:
-        new_info_file = content[:19]
+        new_info_file = content[:20]    # TODO check for non-meta data
         new_info_file[3] = '"_songSubName": "",\n'
     new_info_file.append('{\n')
     new_info_file.append(f'"_difficulty": "{diff_str}",\n')
@@ -288,6 +288,8 @@ def combine_maps(song_list_potential, song_list_run, diff_list, export_results_t
         # create zip archive for online viewer
         shutil.make_archive(f'{paths.new_map_path}12345_{song_name}',
                             'zip', f'{paths.new_map_path}12345_{song_name}')
+
+        # print(f"Finished map combination for: {song_name}")   # already done
         # export map to beat saber
         if export_results_to_bs:
             shutil_copy_maps(song_name, index="12345_")

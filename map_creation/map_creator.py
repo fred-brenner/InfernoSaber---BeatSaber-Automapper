@@ -384,9 +384,7 @@ def get_info_map_string(name, bpm, bs_diff):
         "_allDirectionsEnvironmentName": "GlassDesertEnvironment",
         "_difficultyBeatmapSets": [{
             "_beatmapCharacteristicName": "Standard",
-            "_difficultyBeatmaps": [
-                beatmaps,           # TODO continue here
-            ]
+            "_difficultyBeatmaps": beatmaps
         }],
         "_customData": custom_data,
     }
