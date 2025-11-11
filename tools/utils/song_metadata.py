@@ -39,29 +39,59 @@ def _sanitize_metadata(metadata: Dict[str, Optional[str]]) -> Dict[str, str]:
     return sanitized
 
 
+def _metadata_from_filename(file_path: str) -> Dict[str, str]:
+    """Attempt to derive song metadata from *file_path* using configured conventions."""
+
+    if not getattr(config, "enable_auto_metadata", False):
+        return {}
+
+    convention = getattr(config, "metadata_naming_convention", "")
+    if not convention or "{artist}" not in convention or "{title}" not in convention:
+        return {}
+
+    filename = Path(file_path).stem
+
+    pattern = re.escape(convention)
+    pattern = pattern.replace(r"\{artist\}", r"(?P<artist>.+?)")
+    pattern = pattern.replace(r"\{title\}", r"(?P<title>.+?)")
+
+    match = re.fullmatch(pattern, filename)
+    if not match:
+        return {}
+
+    metadata: Dict[str, Optional[str]] = {
+        key: (value.strip() if value is not None else value)
+        for key, value in match.groupdict().items()
+    }
+    return _sanitize_metadata(metadata)
+
+
 def extract_metadata(file_path: str) -> Dict[str, str]:
     """Extract metadata from *file_path* if possible.
 
-    Returns an empty dictionary if the metadata cannot be read or the dependency is missing.
+    Returns an empty dictionary if the metadata cannot be read and the filename does not
+    match the configured metadata naming convention.
     """
-    if MutagenFile is None:
-        return {}
-
-    try:
-        audio = MutagenFile(file_path, easy=True)
-    except Exception:
-        return {}
-
-    if not audio or not getattr(audio, "tags", None):
-        return {}
 
     metadata: Dict[str, Optional[str]] = {}
-    for key in _METADATA_KEYS:
-        value = audio.tags.get(key)
-        if value:
-            metadata[key] = value
 
-    return _sanitize_metadata(metadata)
+    if MutagenFile is not None:
+        try:
+            audio = MutagenFile(file_path, easy=True)
+        except Exception:
+            audio = None
+
+        if audio and getattr(audio, "tags", None):
+            for key in _METADATA_KEYS:
+                value = audio.tags.get(key)
+                if value:
+                    metadata[key] = value
+
+    sanitized = _sanitize_metadata(metadata)
+    if sanitized:
+        return sanitized
+
+    return _metadata_from_filename(file_path)
 
 
 def save_metadata(name: str, metadata: Dict[str, Optional[str]]) -> None:
