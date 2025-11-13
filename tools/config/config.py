@@ -1,12 +1,24 @@
 import numpy as np
+from typing import Optional
 
 # from map_creation.sanity_check import improve_timings
 
 ########################################
-# config file for all important values 
+# config file for all important values
 # used in multiple codes
 ########################################
-InfernoSaber_version = "1.7.2.app1"  # coded into the info.dat file
+InfernoSaber_version = "1.7.2.app1-reinstall"  # coded into the info.dat file
+
+
+def get_clean_version(version: Optional[str] = None) -> str:
+    """Return ``version`` without any reinstall flag suffix."""
+
+    suffix = "-reinstall"
+    if version is None:
+        version = InfernoSaber_version
+    if version.endswith(suffix):
+        return version[: -len(suffix)]
+    return version
 bs_mapping_version = "v3"  # allows to generate advanced features like arcs
 # bs_mapping_version = "v2"  # legacy mode, may be deprecated in future
 

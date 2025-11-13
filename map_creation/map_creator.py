@@ -360,7 +360,7 @@ def get_info_map_string(name, bpm, bs_diff):
 
     editors = {
         "_lastEditedBy": "InfernoSaber",
-        "InfernoSaber": {"version": f"{config.InfernoSaber_version}"}
+        "InfernoSaber": {"version": config.get_clean_version()}
     }
     custom_data = {"_editors": editors}
     if metadata:
