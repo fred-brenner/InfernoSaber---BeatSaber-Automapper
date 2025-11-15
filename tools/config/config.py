@@ -1,12 +1,24 @@
 import numpy as np
+from typing import Optional
 
 # from map_creation.sanity_check import improve_timings
 
 ########################################
-# config file for all important values 
+# config file for all important values
 # used in multiple codes
 ########################################
-InfernoSaber_version = "1.7.1.app8"  # coded into the info.dat file
+InfernoSaber_version = "1.7.2.app1-reinstall"  # coded into the info.dat file
+
+
+def get_clean_version(version: Optional[str] = None) -> str:
+    """Return ``version`` without any reinstall flag suffix."""
+
+    suffix = "-reinstall"
+    if version is None:
+        version = InfernoSaber_version
+    if version.endswith(suffix):
+        return version[: -len(suffix)]
+    return version
 bs_mapping_version = "v3"  # allows to generate advanced features like arcs
 # bs_mapping_version = "v2"  # legacy mode, may be deprecated in future
 
@@ -17,6 +29,11 @@ bs_mapping_version = "v3"  # allows to generate advanced features like arcs
 # use_mapper_selection = "hard_15"
 # use_mapper_selection = "expert_15"
 use_mapper_selection = "fav_15"
+
+# select song metadata search mode
+enable_auto_metadata = True  # if True, tries to get song metadata from song name
+# allowed patterns for metadata: artist, title
+metadata_naming_convention = "{artist} - {title}"  # naming convention for auto metadata
 
 """Change only for new training"""
 use_mapper_selection = use_mapper_selection.lower()
@@ -102,7 +119,7 @@ waveform_pattern_length = 25   # pattern length in sampling rate [10-200]
 waveform_threshold = 4  # minimum number of notes applicable for waveform to start
 
 """Pinokio app only"""
-num_workers = 4
+num_workers = 5
 silence_threshold_percentage = 100
 difficulty_1 = 4
 difficulty_2 = 5
