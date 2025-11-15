@@ -560,7 +560,7 @@ with gr.Blocks() as demo:
         with gr.Row():
             with gr.Column():
                 gr.Markdown("## Setup")
-                gr.Markdown(f"""Version: {config.InfernoSaber_version} | InfernoSaber is free and OpenSource.
+                gr.Markdown(f"""Version: {config.get_clean_version()} | InfernoSaber is free and OpenSource.
                 If you encounter problems, please check the Discord channel.
                 [GitHub Repo](https://github.com/fred-brenner/InfernoSaber---BeatSaber-Automapper/tree/main_app): View the code
                 [Discord Channel](https://discord.com/invite/cdV6HhpufY): Questions, suggestions, and improvements are welcome
