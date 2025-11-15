@@ -38,15 +38,28 @@ def check_for_updates():
 
             response = requests.get(github_url)
             latest_version = response.json()[0]['tag_name']
+            requires_reinstall = latest_version.endswith('-reinstall')
+            latest_display_version = latest_version[:-len('-reinstall')] if requires_reinstall else latest_version
             current_version = f"v{config.InfernoSaber_version}"
+            current_display_version = f"v{config.get_clean_version()}"
+
             if latest_version != current_version:
-                update_check_response = (
-                    f"Version <{latest_version}> is released! Your version is <{config.InfernoSaber_version}>. "
-                    f"Please update with the Pinokio Update function on the left.")
-                return (f"Version <{latest_version}> is released! Your version is <{config.InfernoSaber_version}>. "
-                        f"Please update with the Pinokio Update function on the left.")
-            update_check_response = f"You are up to date ({latest_version})"
-            return f"You are up to date ({latest_version})"
+                if requires_reinstall:
+                    update_check_response = (
+                        f"Version <{latest_display_version}> requires a full reinstall. "
+                        f"Your version is <{current_display_version}>. "
+                        "Please delete your existing InfernoSaber installation and reinstall via the Pinokio installer."
+                    )
+                else:
+                    update_check_response = (
+                        f"Version <{latest_display_version}> is released! "
+                        f"Your version is <{current_display_version}>. "
+                        "Please update with the Pinokio Update function on the left."
+                    )
+                return update_check_response
+
+            update_check_response = f"You are up to date ({latest_display_version})"
+            return update_check_response
 
         else:
             return update_check_response
@@ -547,7 +560,7 @@ with gr.Blocks() as demo:
         with gr.Row():
             with gr.Column():
                 gr.Markdown("## Setup")
-                gr.Markdown(f"""Version: {config.InfernoSaber_version} | InfernoSaber is free and OpenSource.
+                gr.Markdown(f"""Version: {config.get_clean_version()} | InfernoSaber is free and OpenSource.
                 If you encounter problems, please check the Discord channel.
                 [GitHub Repo](https://github.com/fred-brenner/InfernoSaber---BeatSaber-Automapper/tree/main_app): View the code
                 [Discord Channel](https://discord.com/invite/cdV6HhpufY): Questions, suggestions, and improvements are welcome

@@ -313,7 +313,7 @@ def get_info_map_string(name, bpm, bs_diff):
     info_string += ']}],\n'
     info_string += ('"_customData": {"_editors": {"_lastEditedBy": '
                     '"InfernoSaber", "InfernoSaber": {"version": "'
-                    f"{config.InfernoSaber_version}"
+                    f"{config.get_clean_version()}"
                     '"}}}\n')
     info_string += '}\n'
 

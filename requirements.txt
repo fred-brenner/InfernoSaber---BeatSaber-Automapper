@@ -16,3 +16,4 @@ huggingface-hub~=0.29.3
 requests~=2.32.3
 gradio~=5.29.1
 yt-dlp
+mutagen
