@@ -3,7 +3,7 @@
 ## System Requirements
 
 **Recommended setup for training:**
-- **GPU:** NVIDIA with ≥ 8GB VRAM (NOTE: Last tested May 2025, current NVIDIA GPUs (5000 series) are not supported)
+- **GPU:** NVIDIA with ≥ 8GB VRAM ~~(NOTE: Last tested May 2025, current NVIDIA GPUs (5000 series) are not supported)~~
 - **RAM:** ≥ 24GB
 - **OS:** Linux (or WSL2 on Windows)
 - *(This spec supports ~50–150 songs, depending on variety)*
