@@ -3,13 +3,14 @@ import ffmpy
 import requests  # to check for updates opn GitHub
 
 import gradio as gr
-from tkinter import Tk, filedialog
 import os
 import shutil
 
 import queue
 import threading
 import subprocess
+import sys
+import shutil as which_shutil
 
 from app_helper.check_input import get_summary
 from app_helper.set_app_paths import set_app_paths
@@ -80,48 +81,66 @@ update_status = check_for_updates()
 # update_status = "Currently not available. Please wait for app5 release in Discord."
 
 
-# # Function to handle folder selection using tkinter
-# def on_browse(data_type):
-#     root = Tk()
-#     root.attributes("-topmost", True)
-#     root.withdraw()
-#     if data_type == "Files":
-#         filenames = filedialog.askopenfilenames()
-#         if len(filenames) > 0:
-#             root.destroy()
-#             return str(filenames)
-#         else:
-#             filename = "Files not selected"
-#             root.destroy()
-#             return str(filename)
-#
-#     elif data_type == "Folder":
-#         filename = filedialog.askdirectory()
-#         if filename:
-#             if os.path.isdir(filename):
-#                 if not os.path.basename(filename) == data_folder_name:
-#                     filename = os.path.join(filename, data_folder_name)
-#                     if not os.path.isdir(filename):
-#                         os.mkdir(filename)
-#                 root.destroy()
-#                 return str(filename)
-#             else:
-#                 filename = "Folder not available"
-#                 root.destroy()
-#                 return str(filename)
-#         else:
-#             filename = "Folder not selected"
-#             root.destroy()
-#             return str(filename)
+def normalize_selected_path(path_value):
+    if not path_value:
+        return ""
+    return path_value.strip().replace('\\\\', '/').replace('\\', '/')
+
+
+def select_directory():
+    try:
+        if sys.platform == "darwin":
+            result = subprocess.run(
+                [
+                    "osascript",
+                    "-e",
+                    'POSIX path of (choose folder with prompt "Select a folder for InfernoSaber")'
+                ],
+                capture_output=True,
+                text=True,
+                check=False
+            )
+            if result.returncode == 0:
+                return normalize_selected_path(result.stdout)
+            return ""
+
+        if os.name == "nt":
+            result = subprocess.run(
+                [
+                    "powershell",
+                    "-NoProfile",
+                    "-Command",
+                    "[void][System.Reflection.Assembly]::LoadWithPartialName('System.Windows.Forms');"
+                    "$dialog = New-Object System.Windows.Forms.FolderBrowserDialog;"
+                    "$dialog.ShowNewFolderButton = $true;"
+                    "if ($dialog.ShowDialog() -eq [System.Windows.Forms.DialogResult]::OK) {"
+                    "  [Console]::Out.Write($dialog.SelectedPath)"
+                    "}"
+                ],
+                capture_output=True,
+                text=True,
+                check=False
+            )
+            if result.returncode == 0:
+                return normalize_selected_path(result.stdout)
+            return ""
+
+        for command in [["zenity", "--file-selection", "--directory"], ["kdialog", "--getexistingdirectory", "."]]:
+            if which_shutil.which(command[0]):
+                result = subprocess.run(command, capture_output=True, text=True, check=False)
+                if result.returncode == 0:
+                    return normalize_selected_path(result.stdout)
+                return ""
+    except Exception as exc:
+        print(f"Folder picker failed: {exc}")
+        return ""
+
+    print("No supported folder picker is available on this platform.")
+    return ""
 
 
 def on_browse_input_path():
-    root = Tk()
-    root.attributes("-topmost", True)
-    root.withdraw()
-
-    filename = filedialog.askdirectory()
-    filename = filename.replace('\\\\', '/').replace('\\', '/')
+    filename = select_directory()
     if filename:
         if os.path.isdir(filename):
             if len(os.listdir(filename)) > 5:
@@ -133,26 +152,18 @@ def on_browse_input_path():
                     os.mkdir(filename)
             if not filename.endswith('/'):
                 filename += '/'
-            root.destroy()
             set_app_paths(filename)
             return str(filename), 'Finished folder setup'
         else:
             filename = "Folder not available"
-            root.destroy()
             return str(filename), 'not set'
     else:
         filename = "Folder not selected"
-        root.destroy()
         return str(filename), 'not set'
 
 
 def on_browse_bs_path():
-    root = Tk()
-    root.attributes("-topmost", True)
-    root.withdraw()
-
-    filename = filedialog.askdirectory()
-    filename = filename.replace('\\\\', '/').replace('\\', '/')
+    filename = select_directory()
     if filename:
         if os.path.isdir(filename):
             # copy in path anyway as soon as it is valid
@@ -184,7 +195,6 @@ def on_browse_bs_path():
                 paths.bs_song_path = ""
                 return str(filename), 'Could not find custom maps folder in Beat Saber'
 
-            root.destroy()
             paths.bs_song_path = filename
             update_dir_path('tools/config/paths.py', 'bs_song_path', filename)
             print(f"Set BS export path to: {filename}")
@@ -192,12 +202,10 @@ def on_browse_bs_path():
         else:
             filename = "Folder not available"
             paths.bs_song_path = ""
-            root.destroy()
             return str(filename), 'Folder does not exist'
     else:
         filename = "Folder not selected"
         paths.bs_song_path = ""
-        root.destroy()
         return str(filename), 'not set'
 
 
@@ -234,11 +242,27 @@ def upload_files(files):
     return f"{len(files)} file(s) successfully imported to {music_folder_name}"
 
 
+def open_path_in_file_manager(path_to_open):
+    if not os.path.isdir(path_to_open):
+        print(f"Error: Could not find folder: {path_to_open}")
+        return
+
+    try:
+        if os.name == "nt":
+            os.startfile(path_to_open)
+        elif sys.platform == "darwin":
+            subprocess.run(["open", path_to_open], check=False)
+        else:
+            subprocess.run(["xdg-open", path_to_open], check=False)
+    except Exception as exc:
+        print(f"Error: Could not open folder {path_to_open}: {exc}")
+
+
 def open_folder_music(folder_path):
     if os.path.isdir(folder_path):
         music_folder_name = paths.songs_pred
         if os.path.isdir(music_folder_name):
-            os.startfile(music_folder_name)
+            open_path_in_file_manager(music_folder_name)
         else:
             print(f"Error: Could not find folder: {music_folder_name}")
     else:
@@ -250,7 +274,7 @@ def open_folder_maps(folder_path):
     if os.path.isdir(folder_path):
         maps_folder_name = paths.new_map_path
         if os.path.isdir(maps_folder_name):
-            os.startfile(maps_folder_name)
+            open_path_in_file_manager(maps_folder_name)
         else:
             print(f"Error: Could not find folder: {maps_folder_name}")
     else:
