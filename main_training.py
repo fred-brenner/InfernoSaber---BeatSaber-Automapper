@@ -47,21 +47,21 @@ if run_list[0].lower() == 'y':
     print("Hint 2: Before running shift.py, make sure all maps are in "
           "the correct format with bs_shift/cleanup_n_format.py first.")
     print(f"Analyzing BS music files from folder: {paths.bs_input_path}")
-    subprocess.call(['python3', './bs_shift/shift.py'])
+    subprocess.call([sys.executable, './bs_shift/shift.py'])
 
 # run training / train_autoenc_music.py
 # os.system("training/train_autoenc_music.py")
 if run_list[1].lower() == 'y':
-    subprocess.call(['python3', './training/train_autoenc_music.py'])
+    subprocess.call([sys.executable, './training/train_autoenc_music.py'])
 
 # run training / train_bs_automapper.py
 if run_list[2].lower() == 'y':
-    subprocess.call(['python3', './training/train_bs_automapper.py'])
+    subprocess.call([sys.executable, './training/train_bs_automapper.py'])
 
 # run beat_prediction / ai_beat_gen.py
 if run_list[3].lower() == 'y':
-    subprocess.call(['python3', './beat_prediction/ai_beat_gen.py'])
+    subprocess.call([sys.executable, './beat_prediction/ai_beat_gen.py'])
 
 # run lighting_prediction / train_lighting.py
 if run_list[4].lower() == 'y':
-    subprocess.call(['python3', './lighting_prediction/train_lighting.py'])
+    subprocess.call([sys.executable, './lighting_prediction/train_lighting.py'])

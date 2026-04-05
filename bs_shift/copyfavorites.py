@@ -4,6 +4,7 @@ Second script (2/2)
 """
 
 import csv
+import argparse
 import os
 import shutil
 
@@ -37,14 +38,15 @@ def copy_matching_folders(ids, source_dir, target_dir):
                 print(f"Skipped {folder} as it already exists in {target_dir}")
 
 
-def main():
-    csv_file = 'output.csv'
-    source_directory = "E:/SteamLibrary/steamapps/common/Beat Saber/Beat Saber_Data/CustomLevels/"
-    target_directory = "C:/Users/frede/Desktop/BS_Automapper/Data/training/favorites_bs_input/"
-
+def main(csv_file, source_directory, target_directory):
     ids = read_ids_from_csv(csv_file)
     copy_matching_folders(ids, source_directory, target_directory)
 
 
 if __name__ == "__main__":
-    main()
+    parser = argparse.ArgumentParser(description="Copy Beat Saber maps listed in a CSV export.")
+    parser.add_argument("--csv-file", default="output.csv", help="CSV file containing map IDs")
+    parser.add_argument("--source-dir", required=True, help="Beat Saber CustomLevels folder")
+    parser.add_argument("--target-dir", required=True, help="Destination folder for copied maps")
+    args = parser.parse_args()
+    main(args.csv_file, args.source_dir, args.target_dir)
