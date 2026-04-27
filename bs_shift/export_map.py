@@ -7,6 +7,19 @@ from tools.config import config, paths
 from tools.utils.song_metadata import extract_metadata, metadata_to_tags, save_metadata
 
 
+OGG_EXPORT_PARAMS = ["-ac", "2", "-strict", "-2"]
+
+
+def export_ogg(audio, output_file, tags=None):
+    audio.export(
+        output_file,
+        format="ogg",
+        codec="vorbis",
+        parameters=OGG_EXPORT_PARAMS,
+        tags=tags,
+    )
+
+
 def shutil_copy_maps(song_name, index="1234_"):
     if not os.path.isdir(paths.bs_song_path):
         print("Warning: Beatsaber folder not found, automatic export disabled.")
@@ -85,7 +98,7 @@ def check_music_files(files, dir_path):
                         break
 
                 tags = metadata_to_tags(metadata_for_song.get(song_name))
-                normalized_song.export(dir_path + song_name, format="ogg", tags=tags)
+                export_ogg(normalized_song, dir_path + song_name, tags=tags)
                 print(f"Normalized volume of song: {song_name} with new RMS: {normalized_song.rms/1e9:.2f}")
             else:
                 # ensure metadata is kept even if no normalization is needed
@@ -111,7 +124,7 @@ def convert_music_file(file_name, output_file, metadata=None):
     # Export the audio as ogg file
     tags = metadata_to_tags(metadata)
     if output_file_format == 'ogg' or output_file_format == 'egg':
-        audio.export(output_file, format="ogg", tags=tags)
+        export_ogg(audio, output_file, tags=tags)
     elif output_file_format == 'mp3':
         audio.export(output_file, format="mp3", tags=tags)
     else:
