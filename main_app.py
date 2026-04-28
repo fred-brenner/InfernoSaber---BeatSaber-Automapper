@@ -6,6 +6,7 @@ import gradio as gr
 from tkinter import Tk, filedialog
 import os
 import shutil
+import sys
 
 import queue
 import threading
@@ -80,6 +81,35 @@ update_status = check_for_updates()
 # update_status = "Currently not available. Please wait for app5 release in Discord."
 
 
+def _select_directory():
+    if sys.platform == "darwin":
+        result = subprocess.run(
+            ["osascript", "-e", "POSIX path of (choose folder)"],
+            capture_output=True,
+            text=True,
+        )
+        if result.returncode != 0:
+            return ""
+        return result.stdout.strip()
+
+    root = Tk()
+    root.attributes("-topmost", True)
+    root.withdraw()
+    try:
+        return filedialog.askdirectory()
+    finally:
+        root.destroy()
+
+
+def _open_directory(folder_path):
+    if sys.platform == "win32":
+        os.startfile(folder_path)
+    elif sys.platform == "darwin":
+        subprocess.run(["open", folder_path], check=False)
+    else:
+        subprocess.run(["xdg-open", folder_path], check=False)
+
+
 # # Function to handle folder selection using tkinter
 # def on_browse(data_type):
 #     root = Tk()
@@ -116,11 +146,7 @@ update_status = check_for_updates()
 
 
 def on_browse_input_path():
-    root = Tk()
-    root.attributes("-topmost", True)
-    root.withdraw()
-
-    filename = filedialog.askdirectory()
+    filename = _select_directory()
     filename = filename.replace('\\\\', '/').replace('\\', '/')
     if filename:
         if os.path.isdir(filename):
@@ -133,25 +159,18 @@ def on_browse_input_path():
                     os.mkdir(filename)
             if not filename.endswith('/'):
                 filename += '/'
-            root.destroy()
             set_app_paths(filename)
             return str(filename), 'Finished folder setup'
         else:
             filename = "Folder not available"
-            root.destroy()
             return str(filename), 'not set'
     else:
         filename = "Folder not selected"
-        root.destroy()
         return str(filename), 'not set'
 
 
 def on_browse_bs_path():
-    root = Tk()
-    root.attributes("-topmost", True)
-    root.withdraw()
-
-    filename = filedialog.askdirectory()
+    filename = _select_directory()
     filename = filename.replace('\\\\', '/').replace('\\', '/')
     if filename:
         if os.path.isdir(filename):
@@ -184,7 +203,6 @@ def on_browse_bs_path():
                 paths.bs_song_path = ""
                 return str(filename), 'Could not find custom maps folder in Beat Saber'
 
-            root.destroy()
             paths.bs_song_path = filename
             update_dir_path('tools/config/paths.py', 'bs_song_path', filename)
             print(f"Set BS export path to: {filename}")
@@ -192,12 +210,10 @@ def on_browse_bs_path():
         else:
             filename = "Folder not available"
             paths.bs_song_path = ""
-            root.destroy()
             return str(filename), 'Folder does not exist'
     else:
         filename = "Folder not selected"
         paths.bs_song_path = ""
-        root.destroy()
         return str(filename), 'not set'
 
 
@@ -238,7 +254,7 @@ def open_folder_music(folder_path):
     if os.path.isdir(folder_path):
         music_folder_name = paths.songs_pred
         if os.path.isdir(music_folder_name):
-            os.startfile(music_folder_name)
+            _open_directory(music_folder_name)
         else:
             print(f"Error: Could not find folder: {music_folder_name}")
     else:
@@ -250,7 +266,7 @@ def open_folder_maps(folder_path):
     if os.path.isdir(folder_path):
         maps_folder_name = paths.new_map_path
         if os.path.isdir(maps_folder_name):
-            os.startfile(maps_folder_name)
+            _open_directory(maps_folder_name)
         else:
             print(f"Error: Could not find folder: {maps_folder_name}")
     else:
