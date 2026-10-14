@@ -16,6 +16,8 @@ platforms before implementing them unless the task already authorizes them.
 - For environment setup or running the WSL app, read
   [docs/development.md](docs/development.md).
 - For RTX 5080 GPU execution, read [docs/gpu-execution.md](docs/gpu-execution.md).
+- For model calls, tensor contracts, checkpoint sizes, or preprocessing, read
+  [docs/model-architecture.md](docs/model-architecture.md).
 - For baseline comparisons or revival planning, read
   [docs/baseline.md](docs/baseline.md). It distinguishes verified checks from pending work.
 - For the existing user workflow, read [Readme.md](Readme.md).

@@ -39,12 +39,17 @@ https://discord.com/invite/cdV6HhpufY
 
 ### Built With
 
-The automapper currently consists of 4 consecutive AI models:
+Generation uses four learned stages in execution order:
 
-1. Deep convolutional autoencoder - to encode the music/simplify all other models
-2. Temporal Convolutional Network (TCN) - to generate the beat
-3. Deep Neural Network (Classification) - mapping the notes/bombs
-4. Deep Neural Network (Classification) - mapping the events/lights
+1. Temporal Convolutional Network (TCN) - proposes beat timings from audio features
+2. Convolutional audio encoder - compresses audio patches around candidate timings
+3. Note-pattern classifier - generates note/bomb patterns with block feedback
+4. Lighting classifier - generates lighting event type/value pairs
+
+The full audio autoencoder is used for training and reconstruction evaluation.
+See the [model architecture and call reference](docs/model-architecture.md) for
+the architecture drawing, input/output shapes and tensor ranks, measured model
+sizes, preprocessing, execution order, and training/evaluation calls.
 
 ## Getting Started
 

@@ -1,0 +1,1125 @@
+{
+  "verified_date": "2026-10-14",
+  "style": "fav_15",
+  "runtime": {
+    "python": "3.10.19",
+    "tensorflow": "2.15.1",
+    "device": "CPU"
+  },
+  "models": [
+    {
+      "role": "beat",
+      "file": "tf_beat_gen_2_12_5_5__22_13.h5",
+      "sha256": "43803cea040631b99db72f7f1a123ca002e09b0e31c7dbf38f95e7c94741e448",
+      "file_bytes": 6534024,
+      "h5_dataset_bytes": {
+        "model_weights": 2127108,
+        "optimizer_weights": 4254224
+      },
+      "parameters": 531777,
+      "trainable_parameters": 531777,
+      "non_trainable_parameters": 0,
+      "inputs": [
+        {
+          "name": "input_song_img",
+          "shape": [
+            null,
+            24,
+            264
+          ],
+          "rank": 3,
+          "dtype": "float32"
+        },
+        {
+          "name": "input_beat_prop",
+          "shape": [
+            null,
+            24,
+            1
+          ],
+          "rank": 3,
+          "dtype": "float32"
+        },
+        {
+          "name": "input_onset_detection",
+          "shape": [
+            null,
+            24,
+            1
+          ],
+          "rank": 3,
+          "dtype": "float32"
+        }
+      ],
+      "outputs": [
+        {
+          "name": "dense_2/Sigmoid:0",
+          "shape": [
+            null,
+            1
+          ],
+          "rank": 2,
+          "dtype": "float32"
+        }
+      ],
+      "finite_forward_pass": true,
+      "layers": [
+        {
+          "name": "input_song_img",
+          "type": "InputLayer",
+          "parameters": 0,
+          "output_shape": [
+            [
+              null,
+              24,
+              264
+            ]
+          ],
+          "settings": {}
+        },
+        {
+          "name": "input_beat_prop",
+          "type": "InputLayer",
+          "parameters": 0,
+          "output_shape": [
+            [
+              null,
+              24,
+              1
+            ]
+          ],
+          "settings": {}
+        },
+        {
+          "name": "input_onset_detection",
+          "type": "InputLayer",
+          "parameters": 0,
+          "output_shape": [
+            [
+              null,
+              24,
+              1
+            ]
+          ],
+          "settings": {}
+        },
+        {
+          "name": "tcn",
+          "type": "TCN",
+          "parameters": 463488,
+          "output_shape": [
+            null,
+            128
+          ],
+          "settings": {
+            "activation": "relu",
+            "kernel_size": 2,
+            "padding": "causal",
+            "return_sequences": false,
+            "nb_filters": 128,
+            "dilations": [
+              1,
+              2,
+              4,
+              8,
+              16,
+              32
+            ],
+            "nb_stacks": 1,
+            "use_skip_connections": true,
+            "dropout_rate": 0.0,
+            "use_batch_norm": false,
+            "use_weight_norm": false,
+            "use_layer_norm": false
+          }
+        },
+        {
+          "name": "lstm",
+          "type": "LSTM",
+          "parameters": 96,
+          "output_shape": [
+            null,
+            4
+          ],
+          "settings": {
+            "units": 4,
+            "activation": "tanh",
+            "return_sequences": false
+          }
+        },
+        {
+          "name": "lstm_1",
+          "type": "LSTM",
+          "parameters": 96,
+          "output_shape": [
+            null,
+            4
+          ],
+          "settings": {
+            "units": 4,
+            "activation": "tanh",
+            "return_sequences": false
+          }
+        },
+        {
+          "name": "concatenate",
+          "type": "Concatenate",
+          "parameters": 0,
+          "output_shape": [
+            null,
+            136
+          ],
+          "settings": {}
+        },
+        {
+          "name": "dense",
+          "type": "Dense",
+          "parameters": 35072,
+          "output_shape": [
+            null,
+            256
+          ],
+          "settings": {
+            "units": 256,
+            "activation": "relu"
+          }
+        },
+        {
+          "name": "dense_1",
+          "type": "Dense",
+          "parameters": 32896,
+          "output_shape": [
+            null,
+            128
+          ],
+          "settings": {
+            "units": 128,
+            "activation": "relu"
+          }
+        },
+        {
+          "name": "dense_2",
+          "type": "Dense",
+          "parameters": 129,
+          "output_shape": [
+            null,
+            1
+          ],
+          "settings": {
+            "units": 1,
+            "activation": "sigmoid"
+          }
+        }
+      ]
+    },
+    {
+      "role": "encoder",
+      "file": "tf_model_enc_16bneck_5_5__22_3.h5",
+      "sha256": "4270e16af9206cd00f28215c5a04c76384e1e3fdf0736c86b87d3e8c12cc6d0f",
+      "file_bytes": 1611512,
+      "h5_dataset_bytes": {
+        "model_weights": 274304,
+        "optimizer_weights": 1278992
+      },
+      "parameters": 68576,
+      "trainable_parameters": 68576,
+      "non_trainable_parameters": 0,
+      "inputs": [
+        {
+          "name": "input_1",
+          "shape": [
+            null,
+            24,
+            20,
+            1
+          ],
+          "rank": 4,
+          "dtype": "float32"
+        }
+      ],
+      "outputs": [
+        {
+          "name": "dense_1/Relu:0",
+          "shape": [
+            null,
+            16
+          ],
+          "rank": 2,
+          "dtype": "float32"
+        }
+      ],
+      "finite_forward_pass": true,
+      "layers": [
+        {
+          "name": "input_1",
+          "type": "InputLayer",
+          "parameters": 0,
+          "output_shape": [
+            [
+              null,
+              24,
+              20,
+              1
+            ]
+          ],
+          "settings": {}
+        },
+        {
+          "name": "conv2d",
+          "type": "Conv2D",
+          "parameters": 320,
+          "output_shape": [
+            null,
+            24,
+            20,
+            32
+          ],
+          "settings": {
+            "activation": "relu",
+            "filters": 32,
+            "kernel_size": [
+              3,
+              3
+            ],
+            "strides": [
+              1,
+              1
+            ],
+            "padding": "same",
+            "data_format": "channels_last"
+          }
+        },
+        {
+          "name": "max_pooling2d",
+          "type": "MaxPooling2D",
+          "parameters": 0,
+          "output_shape": [
+            null,
+            12,
+            10,
+            32
+          ],
+          "settings": {
+            "strides": [
+              2,
+              2
+            ],
+            "padding": "same",
+            "pool_size": [
+              2,
+              2
+            ],
+            "data_format": "channels_last"
+          }
+        },
+        {
+          "name": "conv2d_1",
+          "type": "Conv2D",
+          "parameters": 4624,
+          "output_shape": [
+            null,
+            12,
+            10,
+            16
+          ],
+          "settings": {
+            "activation": "relu",
+            "filters": 16,
+            "kernel_size": [
+              3,
+              3
+            ],
+            "strides": [
+              1,
+              1
+            ],
+            "padding": "same",
+            "data_format": "channels_last"
+          }
+        },
+        {
+          "name": "max_pooling2d_1",
+          "type": "MaxPooling2D",
+          "parameters": 0,
+          "output_shape": [
+            null,
+            6,
+            5,
+            16
+          ],
+          "settings": {
+            "strides": [
+              2,
+              2
+            ],
+            "padding": "same",
+            "pool_size": [
+              2,
+              2
+            ],
+            "data_format": "channels_last"
+          }
+        },
+        {
+          "name": "flatten",
+          "type": "Flatten",
+          "parameters": 0,
+          "output_shape": [
+            null,
+            480
+          ],
+          "settings": {
+            "data_format": "channels_last"
+          }
+        },
+        {
+          "name": "dropout",
+          "type": "Dropout",
+          "parameters": 0,
+          "output_shape": [
+            null,
+            480
+          ],
+          "settings": {
+            "rate": 0.05
+          }
+        },
+        {
+          "name": "dense",
+          "type": "Dense",
+          "parameters": 61568,
+          "output_shape": [
+            null,
+            128
+          ],
+          "settings": {
+            "units": 128,
+            "activation": "relu"
+          }
+        },
+        {
+          "name": "dense_1",
+          "type": "Dense",
+          "parameters": 2064,
+          "output_shape": [
+            null,
+            16
+          ],
+          "settings": {
+            "units": 16,
+            "activation": "relu"
+          }
+        }
+      ]
+    },
+    {
+      "role": "mapper",
+      "file": "tf_model_mapper_2-12_5_5__22_6.h5",
+      "sha256": "afb5512fb2a63c36909c23a1eb5f3b769c0a9d41b6f2692a52079f4e19fda103",
+      "file_bytes": 754264800,
+      "h5_dataset_bytes": {
+        "model_weights": 251395584,
+        "optimizer_weights": 502791176
+      },
+      "parameters": 62848896,
+      "trainable_parameters": 62848896,
+      "non_trainable_parameters": 0,
+      "inputs": [
+        {
+          "name": "input_song_enc",
+          "shape": [
+            null,
+            16,
+            16,
+            1
+          ],
+          "rank": 4,
+          "dtype": "float32"
+        },
+        {
+          "name": "input_time_lstm",
+          "shape": [
+            null,
+            16,
+            1
+          ],
+          "rank": 3,
+          "dtype": "float32"
+        },
+        {
+          "name": "input_class_lstm",
+          "shape": [
+            null,
+            16,
+            3380
+          ],
+          "rank": 3,
+          "dtype": "float32"
+        }
+      ],
+      "outputs": [
+        {
+          "name": "reshape/Reshape:0",
+          "shape": [
+            null,
+            16,
+            3380
+          ],
+          "rank": 3,
+          "dtype": "float32"
+        }
+      ],
+      "finite_forward_pass": true,
+      "layers": [
+        {
+          "name": "input_time_lstm",
+          "type": "InputLayer",
+          "parameters": 0,
+          "output_shape": [
+            [
+              null,
+              16,
+              1
+            ]
+          ],
+          "settings": {}
+        },
+        {
+          "name": "input_class_lstm",
+          "type": "InputLayer",
+          "parameters": 0,
+          "output_shape": [
+            [
+              null,
+              16,
+              3380
+            ]
+          ],
+          "settings": {}
+        },
+        {
+          "name": "input_song_enc",
+          "type": "InputLayer",
+          "parameters": 0,
+          "output_shape": [
+            [
+              null,
+              16,
+              16,
+              1
+            ]
+          ],
+          "settings": {}
+        },
+        {
+          "name": "lstm",
+          "type": "LSTM",
+          "parameters": 4352,
+          "output_shape": [
+            null,
+            16,
+            32
+          ],
+          "settings": {
+            "units": 32,
+            "activation": "tanh",
+            "return_sequences": true
+          }
+        },
+        {
+          "name": "lstm_1",
+          "type": "LSTM",
+          "parameters": 881920,
+          "output_shape": [
+            null,
+            16,
+            64
+          ],
+          "settings": {
+            "units": 64,
+            "activation": "tanh",
+            "return_sequences": true
+          }
+        },
+        {
+          "name": "conv2d",
+          "type": "Conv2D",
+          "parameters": 320,
+          "output_shape": [
+            null,
+            14,
+            14,
+            32
+          ],
+          "settings": {
+            "activation": "relu",
+            "filters": 32,
+            "kernel_size": [
+              3,
+              3
+            ],
+            "strides": [
+              1,
+              1
+            ],
+            "padding": "valid",
+            "data_format": "channels_last"
+          }
+        },
+        {
+          "name": "concatenate",
+          "type": "Concatenate",
+          "parameters": 0,
+          "output_shape": [
+            null,
+            16,
+            96
+          ],
+          "settings": {}
+        },
+        {
+          "name": "flatten",
+          "type": "Flatten",
+          "parameters": 0,
+          "output_shape": [
+            null,
+            6272
+          ],
+          "settings": {
+            "data_format": "channels_last"
+          }
+        },
+        {
+          "name": "lstm_2",
+          "type": "LSTM",
+          "parameters": 41216,
+          "output_shape": [
+            null,
+            64
+          ],
+          "settings": {
+            "units": 64,
+            "activation": "tanh",
+            "return_sequences": false
+          }
+        },
+        {
+          "name": "concatenate_1",
+          "type": "Concatenate",
+          "parameters": 0,
+          "output_shape": [
+            null,
+            6336
+          ],
+          "settings": {}
+        },
+        {
+          "name": "dense",
+          "type": "Dense",
+          "parameters": 6489088,
+          "output_shape": [
+            null,
+            1024
+          ],
+          "settings": {
+            "units": 1024,
+            "activation": "relu"
+          }
+        },
+        {
+          "name": "dropout",
+          "type": "Dropout",
+          "parameters": 0,
+          "output_shape": [
+            null,
+            1024
+          ],
+          "settings": {
+            "rate": 0.05
+          }
+        },
+        {
+          "name": "dense_1",
+          "type": "Dense",
+          "parameters": 55432000,
+          "output_shape": [
+            null,
+            54080
+          ],
+          "settings": {
+            "units": 54080,
+            "activation": "sigmoid"
+          }
+        },
+        {
+          "name": "reshape",
+          "type": "Reshape",
+          "parameters": 0,
+          "output_shape": [
+            null,
+            16,
+            3380
+          ],
+          "settings": {
+            "target_shape": [
+              16,
+              3380
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "role": "lighting",
+      "file": "tf_event_gen_2_12_5_5__22_18.h5",
+      "sha256": "eaad1873a46b42f718f840914dda66f38631ce165dece2614ade391c5042cba7",
+      "file_bytes": 459253728,
+      "h5_dataset_bytes": {
+        "model_weights": 153058560,
+        "optimizer_weights": 306117128
+      },
+      "parameters": 38264640,
+      "trainable_parameters": 38264640,
+      "non_trainable_parameters": 0,
+      "inputs": [
+        {
+          "name": "input_song_enc",
+          "shape": [
+            null,
+            16,
+            16,
+            1
+          ],
+          "rank": 4,
+          "dtype": "float32"
+        },
+        {
+          "name": "input_time_lstm",
+          "shape": [
+            null,
+            16,
+            1
+          ],
+          "rank": 3,
+          "dtype": "float32"
+        },
+        {
+          "name": "input_class_lstm",
+          "shape": [
+            null,
+            16,
+            1904
+          ],
+          "rank": 3,
+          "dtype": "float32"
+        }
+      ],
+      "outputs": [
+        {
+          "name": "reshape/Reshape:0",
+          "shape": [
+            null,
+            16,
+            1904
+          ],
+          "rank": 3,
+          "dtype": "float32"
+        }
+      ],
+      "finite_forward_pass": true,
+      "layers": [
+        {
+          "name": "input_time_lstm",
+          "type": "InputLayer",
+          "parameters": 0,
+          "output_shape": [
+            [
+              null,
+              16,
+              1
+            ]
+          ],
+          "settings": {}
+        },
+        {
+          "name": "input_class_lstm",
+          "type": "InputLayer",
+          "parameters": 0,
+          "output_shape": [
+            [
+              null,
+              16,
+              1904
+            ]
+          ],
+          "settings": {}
+        },
+        {
+          "name": "input_song_enc",
+          "type": "InputLayer",
+          "parameters": 0,
+          "output_shape": [
+            [
+              null,
+              16,
+              16,
+              1
+            ]
+          ],
+          "settings": {}
+        },
+        {
+          "name": "lstm",
+          "type": "LSTM",
+          "parameters": 4352,
+          "output_shape": [
+            null,
+            16,
+            32
+          ],
+          "settings": {
+            "units": 32,
+            "activation": "tanh",
+            "return_sequences": true
+          }
+        },
+        {
+          "name": "lstm_1",
+          "type": "LSTM",
+          "parameters": 504064,
+          "output_shape": [
+            null,
+            16,
+            64
+          ],
+          "settings": {
+            "units": 64,
+            "activation": "tanh",
+            "return_sequences": true
+          }
+        },
+        {
+          "name": "conv2d",
+          "type": "Conv2D",
+          "parameters": 320,
+          "output_shape": [
+            null,
+            14,
+            14,
+            32
+          ],
+          "settings": {
+            "activation": "relu",
+            "filters": 32,
+            "kernel_size": [
+              3,
+              3
+            ],
+            "strides": [
+              1,
+              1
+            ],
+            "padding": "valid",
+            "data_format": "channels_last"
+          }
+        },
+        {
+          "name": "concatenate",
+          "type": "Concatenate",
+          "parameters": 0,
+          "output_shape": [
+            null,
+            16,
+            96
+          ],
+          "settings": {}
+        },
+        {
+          "name": "flatten",
+          "type": "Flatten",
+          "parameters": 0,
+          "output_shape": [
+            null,
+            6272
+          ],
+          "settings": {
+            "data_format": "channels_last"
+          }
+        },
+        {
+          "name": "lstm_2",
+          "type": "LSTM",
+          "parameters": 41216,
+          "output_shape": [
+            null,
+            64
+          ],
+          "settings": {
+            "units": 64,
+            "activation": "tanh",
+            "return_sequences": false
+          }
+        },
+        {
+          "name": "concatenate_1",
+          "type": "Concatenate",
+          "parameters": 0,
+          "output_shape": [
+            null,
+            6336
+          ],
+          "settings": {}
+        },
+        {
+          "name": "dense",
+          "type": "Dense",
+          "parameters": 6489088,
+          "output_shape": [
+            null,
+            1024
+          ],
+          "settings": {
+            "units": 1024,
+            "activation": "relu"
+          }
+        },
+        {
+          "name": "dropout",
+          "type": "Dropout",
+          "parameters": 0,
+          "output_shape": [
+            null,
+            1024
+          ],
+          "settings": {
+            "rate": 0.05
+          }
+        },
+        {
+          "name": "dense_1",
+          "type": "Dense",
+          "parameters": 31225600,
+          "output_shape": [
+            null,
+            30464
+          ],
+          "settings": {
+            "units": 30464,
+            "activation": "sigmoid"
+          }
+        },
+        {
+          "name": "reshape",
+          "type": "Reshape",
+          "parameters": 0,
+          "output_shape": [
+            null,
+            16,
+            1904
+          ],
+          "settings": {
+            "target_shape": [
+              16,
+              1904
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "role": "autoencoder",
+      "file": "tf_model_autoenc_16bneck_5_5__22_3.h5",
+      "sha256": "cbae90fb40544673ece47397db7afc0be61fcc678a2a1fe2f6d4ec980122d64c",
+      "file_bytes": 1986280,
+      "h5_dataset_bytes": {
+        "model_weights": 639492,
+        "optimizer_weights": 1278992
+      },
+      "parameters": 159873,
+      "trainable_parameters": 159873,
+      "non_trainable_parameters": 0,
+      "inputs": [
+        {
+          "name": "input_3",
+          "shape": [
+            null,
+            24,
+            20,
+            1
+          ],
+          "rank": 4,
+          "dtype": "float32"
+        }
+      ],
+      "outputs": [
+        {
+          "name": "model_1/conv2d_transpose_1/Sigmoid:0",
+          "shape": [
+            null,
+            24,
+            20,
+            1
+          ],
+          "rank": 4,
+          "dtype": "float32"
+        }
+      ],
+      "finite_forward_pass": true,
+      "layers": [
+        {
+          "name": "input_3",
+          "type": "InputLayer",
+          "parameters": 0,
+          "output_shape": [
+            [
+              null,
+              24,
+              20,
+              1
+            ]
+          ],
+          "settings": {}
+        },
+        {
+          "name": "model",
+          "type": "Functional",
+          "parameters": 68576,
+          "output_shape": [
+            null,
+            16
+          ],
+          "settings": {}
+        },
+        {
+          "name": "model_1",
+          "type": "Functional",
+          "parameters": 91297,
+          "output_shape": [
+            null,
+            24,
+            20,
+            1
+          ],
+          "settings": {}
+        }
+      ]
+    }
+  ],
+  "class_artifacts": [
+    {
+      "file": "notes_class_dict.pkl",
+      "file_bytes": 42506,
+      "sha256": "02f83ebecd3fa018e2950daa8d6dc986eb1e590b3b9e826699e37fed5ec527de",
+      "python_type": "list",
+      "entries": 3428,
+      "examples": [
+        "200130113111",
+        "0104",
+        "2007",
+        "0006",
+        "3110"
+      ]
+    },
+    {
+      "file": "onehot_encoder_beats.pkl",
+      "file_bytes": 27590,
+      "sha256": "45bce9a234dc50e4acaa13c8c98a2f022271644de05a8ba1e49109bddb626432",
+      "python_type": "OneHotEncoder",
+      "classes": 3380,
+      "dtype": "<class 'int'>",
+      "category_dtype": "int64",
+      "examples": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        11
+      ],
+      "sparse_output": true
+    },
+    {
+      "file": "onehot_encoder_events.pkl",
+      "file_bytes": 91946,
+      "sha256": "23be4d1c8b49aff94fd6922eec84d30dcd55834db850f43ea381ab67210e4069",
+      "python_type": "OneHotEncoder",
+      "classes": 1904,
+      "dtype": "<class 'int'>",
+      "category_dtype": "<U12",
+      "examples": [
+        "0;0",
+        "0;1",
+        "0;2",
+        "0;2000000000",
+        "0;2000000804",
+        "0;2000001341",
+        "0;2000001873",
+        "0;2000002138",
+        "0;2000002142",
+        "0;2000002672",
+        "0;2000003480",
+        "0;2000003741"
+      ],
+      "sparse_output": true
+    }
+  ],
+  "measurement_method": "Local H5 files loaded with tensorflow.keras, custom TCN, compile=False; float32 batch-one zero-input forward passes on CPU. Byte counts are on-disk bytes; dataset bytes exclude HDF5 metadata.",
+  "preprocessing_check": {
+    "sample": "BWB - No Sleep.egg",
+    "sample_sha256": "b213b729a4cffad84421e6f5b6a8c7ce3dfae6db070e2ec3771e2edbdf10a0f5",
+    "spectrogram": {
+      "shape": [
+        264,
+        3887
+      ],
+      "dtype": "float32"
+    },
+    "beat_inputs": [
+      {
+        "shape": [
+          3863,
+          24,
+          264
+        ],
+        "dtype": "float32"
+      },
+      {
+        "shape": [
+          3863,
+          24,
+          1
+        ],
+        "dtype": "float64"
+      },
+      {
+        "shape": [
+          3863,
+          24,
+          1
+        ],
+        "dtype": "float64"
+      }
+    ],
+    "encoder_patches": {
+      "shape": [
+        3,
+        24,
+        20,
+        1
+      ],
+      "dtype": "float32",
+      "times_seconds": [
+        5.0,
+        10.0,
+        15.0
+      ],
+      "removed_indices": []
+    }
+  }
+}

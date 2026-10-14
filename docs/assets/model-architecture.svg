@@ -1,0 +1,80 @@
+<?xml version='1.0' encoding='utf-8'?>
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="1400" viewBox="0 0 1280 1400" role="img" aria-labelledby="title description">
+  <title id="title">InfernoSaber model architecture — fav_15</title>
+  <desc id="description">Four inference stages: audio features enter the beat timing model, analytic timing refinement determines encoder patches, and shared encoder latents feed the note mapper then lighting generator. Both generators use previous-block feedback. The full autoencoder is used only for training and evaluation. Tensor shapes include the batch axis.</desc>
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#64748b" />
+    </marker>
+  </defs>
+  <rect width="1280" height="1400" fill="#f8fafc" />
+  <text x="64" y="53" font-family="DejaVu Sans, Arial, sans-serif" font-size="32" font-weight="700" fill="#0f172a" text-anchor="start">InfernoSaber · model architecture</text>
+  <text x="64" y="86" font-family="DejaVu Sans, Arial, sans-serif" font-size="17" font-weight="400" fill="#334155" text-anchor="start">Measured fav_15 checkpoints · 2026-10-14 · shapes include batch · model tensors are float32</text>
+  <rect x="340" y="120" width="600" height="76" rx="14" fill="#ffffff" stroke="#cbd5e1" stroke-width="2" />
+  <text x="362" y="152" font-family="DejaVu Sans, Arial, sans-serif" font-size="21" font-weight="600" fill="#0f172a" text-anchor="start">App / CLI → one song × difficulty</text>
+  <text x="362" y="180" font-family="DejaVu Sans, Arial, sans-serif" font-size="16" font-weight="400" fill="#334155" text-anchor="start">Style selection · Ogg/Vorbis audio preparation</text>
+  <rect x="70" y="250" width="500" height="136" rx="14" fill="#ffffff" stroke="#cbd5e1" stroke-width="2" />
+  <text x="92" y="282" font-family="DejaVu Sans, Arial, sans-serif" font-size="21" font-weight="600" fill="#0f172a" text-anchor="start">Signal preprocessing</text>
+  <text x="92" y="310" font-family="DejaVu Sans, Arial, sans-serif" font-size="16" font-weight="400" fill="#334155" text-anchor="start">Mono 14,800 Hz · 264-bin log spectrum</text>
+  <text x="92" y="335" font-family="DejaVu Sans, Arial, sans-serif" font-size="16" font-weight="400" fill="#334155" text-anchor="start">24-frame windows + volume + onset</text>
+  <text x="92" y="360" font-family="DejaVu Sans, Arial, sans-serif" font-size="16" font-weight="400" fill="#334155" text-anchor="start">Preserve the existing reshape layout</text>
+  <rect x="710" y="250" width="500" height="136" rx="14" fill="#eff6ff" stroke="#60a5fa" stroke-width="2" />
+  <text x="732" y="282" font-family="DejaVu Sans, Arial, sans-serif" font-size="21" font-weight="600" fill="#1d4ed8" text-anchor="start">1 · Beat timing · 0.532M parameters</text>
+  <text x="732" y="310" font-family="DejaVu Sans, Arial, sans-serif" font-size="16" font-weight="400" fill="#334155" text-anchor="start">Inputs [B,24,264] + 2 × [B,24,1] · rank 3</text>
+  <text x="732" y="335" font-family="DejaVu Sans, Arial, sans-serif" font-size="16" font-weight="400" fill="#334155" text-anchor="start">Output [B,1] · rank 2 · sigmoid scores</text>
+  <text x="732" y="360" font-family="DejaVu Sans, Arial, sans-serif" font-size="16" font-weight="400" fill="#334155" text-anchor="start">TCN128 + two LSTM4 branches</text>
+  <rect x="340" y="450" width="600" height="90" rx="14" fill="#ffffff" stroke="#cbd5e1" stroke-width="2" />
+  <text x="362" y="482" font-family="DejaVu Sans, Arial, sans-serif" font-size="21" font-weight="600" fill="#0f172a" text-anchor="start">Analytic timing refinement</text>
+  <text x="362" y="510" font-family="DejaVu Sans, Arial, sans-serif" font-size="16" font-weight="400" fill="#334155" text-anchor="start">Thresholds · BPM/onset alignment · density · silence</text>
+  <text x="362" y="535" font-family="DejaVu Sans, Arial, sans-serif" font-size="16" font-weight="400" fill="#334155" text-anchor="start">Candidate timestamps remain in elapsed seconds</text>
+  <rect x="340" y="580" width="600" height="90" rx="14" fill="#ffffff" stroke="#cbd5e1" stroke-width="2" />
+  <text x="362" y="612" font-family="DejaVu Sans, Arial, sans-serif" font-size="21" font-weight="600" fill="#0f172a" text-anchor="start">Audio patches at candidate times</text>
+  <text x="362" y="640" font-family="DejaVu Sans, Arial, sans-serif" font-size="16" font-weight="400" fill="#334155" text-anchor="start">Centered 2 s windows → log spectrum → resize</text>
+  <text x="362" y="665" font-family="DejaVu Sans, Arial, sans-serif" font-size="16" font-weight="400" fill="#334155" text-anchor="start">Normalize per song → [M,24,20,1] · rank 4</text>
+  <rect x="340" y="710" width="600" height="125" rx="14" fill="#eff6ff" stroke="#60a5fa" stroke-width="2" />
+  <text x="362" y="742" font-family="DejaVu Sans, Arial, sans-serif" font-size="21" font-weight="600" fill="#1d4ed8" text-anchor="start">2 · Audio encoder · 68,576 parameters</text>
+  <text x="362" y="770" font-family="DejaVu Sans, Arial, sans-serif" font-size="16" font-weight="400" fill="#334155" text-anchor="start">Conv2D + pooling → Dense16/ReLU</text>
+  <text x="362" y="795" font-family="DejaVu Sans, Arial, sans-serif" font-size="16" font-weight="400" fill="#334155" text-anchor="start">[M,24,20,1] → [M,16] · rank 4 → rank 2</text>
+  <text x="362" y="820" font-family="DejaVu Sans, Arial, sans-serif" font-size="16" font-weight="400" fill="#334155" text-anchor="start">Latents are retained for both generators</text>
+  <rect x="70" y="870" width="500" height="170" rx="14" fill="#eff6ff" stroke="#60a5fa" stroke-width="2" />
+  <text x="92" y="902" font-family="DejaVu Sans, Arial, sans-serif" font-size="21" font-weight="600" fill="#1d4ed8" text-anchor="start">3 · Notes · 62.849M parameters</text>
+  <text x="92" y="930" font-family="DejaVu Sans, Arial, sans-serif" font-size="16" font-weight="400" fill="#334155" text-anchor="start">Audio [1,16,16,1] · rank 4</text>
+  <text x="92" y="955" font-family="DejaVu Sans, Arial, sans-serif" font-size="16" font-weight="400" fill="#334155" text-anchor="start">Time gaps [1,16,1] · rank 3</text>
+  <text x="92" y="980" font-family="DejaVu Sans, Arial, sans-serif" font-size="16" font-weight="400" fill="#334155" text-anchor="start">History [1,16,3380] · rank 3</text>
+  <text x="92" y="1005" font-family="DejaVu Sans, Arial, sans-serif" font-size="16" font-weight="400" fill="#334155" text-anchor="start">Output [1,16,3380] · sigmoid scores</text>
+  <text x="92" y="1030" font-family="DejaVu Sans, Arial, sans-serif" font-size="16" font-weight="400" fill="#334155" text-anchor="start">Argmax → one-hot decoder → note dictionary</text>
+  <rect x="710" y="870" width="500" height="170" rx="14" fill="#eff6ff" stroke="#60a5fa" stroke-width="2" />
+  <text x="732" y="902" font-family="DejaVu Sans, Arial, sans-serif" font-size="21" font-weight="600" fill="#1d4ed8" text-anchor="start">4 · Lighting · 38.265M parameters</text>
+  <text x="732" y="930" font-family="DejaVu Sans, Arial, sans-serif" font-size="16" font-weight="400" fill="#334155" text-anchor="start">Audio [1,16,16,1] · rank 4</text>
+  <text x="732" y="955" font-family="DejaVu Sans, Arial, sans-serif" font-size="16" font-weight="400" fill="#334155" text-anchor="start">Time gaps [1,16,1] · rank 3</text>
+  <text x="732" y="980" font-family="DejaVu Sans, Arial, sans-serif" font-size="16" font-weight="400" fill="#334155" text-anchor="start">History [1,16,1904] · rank 3</text>
+  <text x="732" y="1005" font-family="DejaVu Sans, Arial, sans-serif" font-size="16" font-weight="400" fill="#334155" text-anchor="start">Output [1,16,1904] · sigmoid scores</text>
+  <text x="732" y="1030" font-family="DejaVu Sans, Arial, sans-serif" font-size="16" font-weight="400" fill="#334155" text-anchor="start">Argmax → one-hot decoder → type/value</text>
+  <rect x="340" y="1140" width="600" height="120" rx="14" fill="#ffffff" stroke="#cbd5e1" stroke-width="2" />
+  <text x="362" y="1172" font-family="DejaVu Sans, Arial, sans-serif" font-size="21" font-weight="600" fill="#0f172a" text-anchor="start">Gameplay rules → map package</text>
+  <text x="362" y="1200" font-family="DejaVu Sans, Arial, sans-serif" font-size="16" font-weight="400" fill="#334155" text-anchor="start">Flow / movement · bombs · obstacles · arcs</text>
+  <text x="362" y="1225" font-family="DejaVu Sans, Arial, sans-serif" font-size="16" font-weight="400" fill="#334155" text-anchor="start">Seconds × BPM/60 → v3 or legacy v2 beatmap</text>
+  <text x="362" y="1250" font-family="DejaVu Sans, Arial, sans-serif" font-size="16" font-weight="400" fill="#334155" text-anchor="start">Audio + cover + metadata + beatmaps → ZIP</text>
+  <rect x="70" y="1280" width="1140" height="82" rx="14" fill="#faf5ff" stroke="#c4b5fd" stroke-width="2" />
+  <text x="92" y="1312" font-family="DejaVu Sans, Arial, sans-serif" font-size="21" font-weight="600" fill="#6d28d9" text-anchor="start">Training / reconstruction only · full autoencoder · 159,873 parameters</text>
+  <text x="92" y="1340" font-family="DejaVu Sans, Arial, sans-serif" font-size="16" font-weight="400" fill="#334155" text-anchor="start">[B,24,20,1] → encoder (68,576) → [B,16] → decoder (91,297) → [B,24,20,1]</text>
+  <polyline points="640,196 640,220 320,220 320,250" fill="none" stroke="#64748b" stroke-width="2.5" stroke-linejoin="round" marker-end="url(#arrow)" />
+  <polyline points="570,318 710,318" fill="none" stroke="#64748b" stroke-width="2.5" stroke-linejoin="round" marker-end="url(#arrow)" />
+  <polyline points="960,386 960,418 640,418 640,450" fill="none" stroke="#64748b" stroke-width="2.5" stroke-linejoin="round" marker-end="url(#arrow)" />
+  <polyline points="640,540 640,580" fill="none" stroke="#64748b" stroke-width="2.5" stroke-linejoin="round" marker-end="url(#arrow)" />
+  <polyline points="640,670 640,710" fill="none" stroke="#64748b" stroke-width="2.5" stroke-linejoin="round" marker-end="url(#arrow)" />
+  <polyline points="640,835 640,840 320,840 320,870" fill="none" stroke="#64748b" stroke-width="2.5" stroke-linejoin="round" marker-end="url(#arrow)" />
+  <polyline points="640,840 960,840 960,870" fill="none" stroke="#64748b" stroke-width="2.5" stroke-linejoin="round" marker-end="url(#arrow)" />
+  <text x="985" y="835" font-family="DejaVu Sans, Arial, sans-serif" font-size="13" font-weight="400" fill="#475569" text-anchor="start">Reuse original latent prefix</text>
+  <polyline points="570,965 710,965" fill="none" stroke="#64748b" stroke-width="2.5" stroke-linejoin="round" marker-end="url(#arrow)" />
+  <text x="640" y="932" font-family="DejaVu Sans, Arial, sans-serif" font-size="13" font-weight="400" fill="#334155" text-anchor="middle">Trimmed</text>
+  <text x="640" y="950" font-family="DejaVu Sans, Arial, sans-serif" font-size="13" font-weight="400" fill="#334155" text-anchor="middle">timestamps</text>
+  <polyline points="320,1040 320,1098 520,1098 520,1140" fill="none" stroke="#64748b" stroke-width="2.5" stroke-linejoin="round" marker-end="url(#arrow)" />
+  <polyline points="960,1040 960,1098 760,1098 760,1140" fill="none" stroke="#64748b" stroke-width="2.5" stroke-linejoin="round" marker-end="url(#arrow)" />
+  <polyline points="70,990 38,990 38,850 115,850 115,870" fill="none" stroke="#64748b" stroke-width="2.5" stroke-linejoin="round" marker-end="url(#arrow)" stroke-dasharray="6 5" />
+  <polyline points="1210,990 1242,990 1242,850 1165,850 1165,870" fill="none" stroke="#64748b" stroke-width="2.5" stroke-linejoin="round" marker-end="url(#arrow)" stroke-dasharray="6 5" />
+  <text x="320" y="1070" font-family="DejaVu Sans, Arial, sans-serif" font-size="13" font-weight="400" fill="#334155" text-anchor="middle">Previous argmax block → one-hot feedback</text>
+  <text x="960" y="1070" font-family="DejaVu Sans, Arial, sans-serif" font-size="13" font-weight="400" fill="#334155" text-anchor="middle">Previous argmax block → one-hot feedback</text>
+  <text x="640" y="1125" font-family="DejaVu Sans, Arial, sans-serif" font-size="14" font-weight="400" fill="#334155" text-anchor="middle">Random score weighting applies to both generators</text>
+  <text x="640" y="1384" font-family="DejaVu Sans, Arial, sans-serif" font-size="14" font-weight="400" fill="#334155" text-anchor="middle">Block length = 16 · existing timing/lighting offsets are documented in docs/model-architecture.md</text>
+</svg>
