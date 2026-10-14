@@ -315,3 +315,71 @@ untested; the autoencoder optimizer step is verified.
 Evidence is under `/home/frede/.local/share/infernosaber-baseline/gpu/`, including
 `device-check.json`, `model-check.json`, `generation-call.json`,
 `generation-check.json`, and logs. The earlier CPU reports remain intact.
+
+## Human-map benchmark, 2026-10-14
+
+The restored command was exercised against three local human-authored packages,
+using their Standard / ExpertPlus beatmaps. References use unique colored-note
+onsets, constant BPM, and zero song offset. Source paths, audio/map/info hashes,
+and full timestamps are retained in the JSON reports.
+
+| Song | Human mapper | Package | Audio duration (s) | Reference onsets |
+| --- | --- | --- | ---: | ---: |
+| Lost In The Echo | Heisenberg | `evaluate_beats/bs_map_input/4ac1 (Lost In The Echo - heisenbergirl)` | 205.726 | 733 |
+| Avalanche | Zorowo | `favorites_bs_input/1460 (Avalanche - Zorowo)` | 120.764 | 840 |
+| Stamp On The Ground - Nightcore | Nuketime | `favorites_bs_input/14e7 (Stamp On The Ground - Nightcore - Nuketime)` | 184.137 | 956 |
+
+Package paths above are relative to
+`/mnt/c/Users/frede/Desktop/BS_Automapper/Data/training/`. The original evaluation
+set contained only Lost In The Echo; the other two packages came from local
+favorites/training assets. Their relationship to the pretrained model's actual
+training set is unknown. This is a local execution/comparison baseline, not a
+held-out evaluation set.
+
+The model was the existing `fav_15` beat checkpoint, SHA-256
+`43803cea040631b99db72f7f1a123ca002e09b0e31c7dbf38f95e7c94741e448`.
+Both profiles used seed 3, 20 ms tolerance, and the current configured timing
+settings. No model weights, generation semantics, or persistent settings changed.
+
+All nine CPU song/BPS combinations succeeded; a separate GPU check also completed
+all nine combinations. Repeating CPU BPS 5 produced identical proposal timestamps
+for all three songs. Routine validation now defaults to CPU, as described in
+[development guidance](development.md#human-map-beat-benchmark).
+Results below pool counts across the three songs. Measured density counts
+processed proposals over the full 510.628 seconds of audio; reference density is
+4.953 unique colored-note onsets/second. Timing MAE covers matched pairs only.
+
+| Runtime | BPS setting | Proposals | Matches | Precision | Recall | F1 | Timing MAE (ms) | Measured proposal BPS |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| CPU / TensorFlow 2.15.1 | 3 | 2,489 | 567 | 0.228 | 0.224 | 0.226 | 10.055 | 4.874 |
+| CPU / TensorFlow 2.15.1 | 5 | 2,100 | 454 | 0.216 | 0.180 | 0.196 | 9.947 | 4.113 |
+| CPU / TensorFlow 2.15.1 | 7 | 3,033 | 665 | 0.219 | 0.263 | 0.239 | 10.022 | 5.940 |
+| GPU / TensorFlow 2.21.0 + legacy Keras | 3 | 2,490 | 568 | 0.228 | 0.225 | 0.226 | 10.040 | 4.876 |
+| GPU / TensorFlow 2.21.0 + legacy Keras | 5 | 2,101 | 455 | 0.217 | 0.180 | 0.197 | 9.968 | 4.115 |
+| GPU / TensorFlow 2.21.0 + legacy Keras | 7 | 3,033 | 665 | 0.219 | 0.263 | 0.239 | 10.022 | 5.940 |
+
+One proposal/match differs between the CPU and GPU BPS-5 runs, on Avalanche.
+Compare subsequent changes within the same runtime profile before attributing
+small cross-profile differences to model quality. The BPS setting is an
+approximate difficulty control; these results do not establish monotonic density
+or an optimal setting for a human difficulty label.
+
+Automated validation: `python -m pytest -q` passed **77 tests in each profile**,
+including reference loading, scoring, failure reporting, temporary audio/config
+isolation, song metadata, and legacy TCN loading. CLI help was checked in module
+and direct-script forms. Source audio/info/beatmap hashes and model hashes matched
+after the runtime runs, and recorded benchmark source hashes matched the files
+that were validated. App configuration files were not written.
+
+Local evidence, kept outside source control:
+
+- CPU: `/home/frede/.local/share/infernosaber-baseline/beat-benchmark-2026-10-14-cpu.json`
+  and its sibling `.log` file.
+- GPU: `/home/frede/.local/share/infernosaber-baseline/gpu/beat-benchmark-2026-10-14-verified.json`
+  and `gpu/logs/beat-benchmark-2026-10-14-verified.log` under the baseline root.
+
+The reports retain the exact invocation and input paths for reruns; use a new
+output filename. See [benchmark usage](development.md#human-map-beat-benchmark).
+Scores describe processed timing proposals and agreement with these references.
+Raw model output, final beatmap timing, musical quality, held-out generalization,
+tempo-change/offset alignment, and native Windows execution remain unverified.

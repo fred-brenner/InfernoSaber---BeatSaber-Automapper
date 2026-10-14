@@ -75,11 +75,20 @@ Extract maps from Beatsaber/Bsaber to feed them into AI models. Map versions wit
 
 ## Roadmap
 
-[ ] Increase number of models to improve accuracy and enable more options
+Current feature priorities, in order:
 
-[x] Support new features for InfernoSaber Pinokio App
+1. Improve the beat timing model and benchmark it against human-authored maps.
+2. Improve and expand mapping options with AI, including obstacles and arcs.
+3. Keep playability checks while fixing the upstream causes of postprocessing corrections.
+4. Simplify note-pattern generation and add a stage that expands richer patterns.
 
-[ ] Get the discord bot back online (yt blocks the bot)
+See [project goals and roadmap](docs/roadmap.md) for motivation, proposed
+approaches, benchmark plans, and open design questions.
+
+Previously listed items, outside these feature priorities:
+
+- [x] Support new features for InfernoSaber Pinokio App
+- [ ] Get the discord bot back online (yt blocks the bot)
 
 ## Contributing
 

@@ -414,7 +414,7 @@ training.
 | [`training/eval_bs_automapper.py:79`](../training/eval_bs_automapper.py#L79) | Load mapper, then `evaluate()`/`predict()` on test and training subsets; historical `lstm1` fallback |
 | [`beat_prediction/ai_beat_gen.py:136`](../beat_prediction/ai_beat_gen.py#L136) | Build beat model, `fit()`, save, training-subset `predict()` |
 | [`lighting_prediction/train_lighting.py:178`](../lighting_prediction/train_lighting.py#L178) | Build lighting model, `fit()`, save, training-subset `predict()`; its `evaluate()` line is commented out |
-| [`evaluation/evaluate_beat_algorithms.py:154`](../evaluation/evaluate_beat_algorithms.py#L154) | Indirect beat-model call through `gen_beats.main(..., debug_beats=True)` |
+| [`evaluation/evaluate_beat_algorithms.py`](../evaluation/evaluate_beat_algorithms.py), `run_benchmark()` | Indirect beat-model call through `gen_beats.main(..., debug_beats=True)`; scores processed timing proposals against human note onsets, before downstream mapping |
 | [`tests/test_keras_models.py:17`](../tests/test_keras_models.py#L17) | Build/save/load a tiny test-only TCN; direct original/restored forward calls check H5 compatibility |
 
 Historical or unused builder branches are separate from the loaded `fav_15`

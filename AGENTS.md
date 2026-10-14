@@ -2,8 +2,8 @@
 
 ## Direction
 
-Revive the existing Beat Saber automapper incrementally. The first milestone is
-to run the existing app and generate a usable map with pretrained models.
+Revive the existing Beat Saber automapper incrementally. App startup, pretrained
+model loading, and map generation have been verified on CPU and GPU.
 WSL/Linux is the primary development environment; preserve Windows app
 compatibility. Complete the requested task, including small supporting 
 refactors when they simplify the change. Keep unrelated cleanup separate. 
@@ -18,8 +18,12 @@ platforms before implementing them unless the task already authorizes them.
 - For RTX 5080 GPU execution, read [docs/gpu-execution.md](docs/gpu-execution.md).
 - For model calls, tensor contracts, checkpoint sizes, or preprocessing, read
   [docs/model-architecture.md](docs/model-architecture.md).
-- For baseline comparisons or revival planning, read
+- For feature priorities or planning model and pipeline improvements, read
+  [docs/roadmap.md](docs/roadmap.md).
+- For recorded baseline results or comparisons, read
   [docs/baseline.md](docs/baseline.md). It distinguishes verified checks from pending work.
+- For human-map beat benchmarks, reference timing rules, and reruns, read
+  [docs/development.md](docs/development.md#human-map-beat-benchmark).
 - For the existing user workflow, read [Readme.md](Readme.md).
 - For training work, consult
   [the existing installation and training guide](How%20to%20-%20Linux%20install%20for%20training%20and%20app.md)
@@ -45,16 +49,19 @@ labels require verification before becoming current requirements.
 
 ## Validation
 
-- In an environment with the test dependencies, run `python -m pytest -q` for
-  relevant code changes. The suite covers song metadata and legacy TCN model loading.
-- For audio processing, map generation, or export changes, also exercise a local
-  sample song when the runtime is available. Use a disposable data/output folder
-  and disable export to the user's Beat Saber library for development checks.
+- For small code changes, run focused tests covering the affected behavior.
+- For major or framework changes, run the full `python -m pytest -q` suite in the
+  relevant environment(s). The suite covers song metadata and legacy TCN model loading.
+- For documentation-only changes, limit validation to reviewing the text,
+  relevant links, and the final diff; runtime tests are not required.
+- For substantial changes to audio processing, map generation, or export behavior,
+  also exercise a local sample song when the runtime is available. Use a disposable
+  data/output folder and disable export to the user's Beat Saber library for checks.
 - For the current beatmap syntax, successful map-package generation is sufficient
   baseline acceptance. Use viewer or in-game checks when explicitly requested or
   when changing beatmap syntax or compatibility.
 - State which runtime and automated checks ran and which remain unverified.
-- For documentation-only changes, check links, consistency, and the final diff.
+- Only evaluate the CPU runtime, unless the task explicitly requires GPU execution. GPU runtime is only used for training.
 
 ## Files and compatibility
 

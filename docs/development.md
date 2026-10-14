@@ -156,3 +156,75 @@ behavior when reviewing changes after manual app use.
 
 For exact sample details, generated assets, and remaining verification, see the
 [runtime baseline report](baseline.md#runtime-check-2026-10-14).
+
+## Human-map beat benchmark
+
+Run the restored comparison command from the repository root in the retained
+CPU profile:
+
+```bash
+source /home/frede/.local/share/infernosaber-baseline/env.sh
+python -m evaluation.evaluate_beat_algorithms \
+  --maps-dir "/path/to/human-map-packages" \
+  --bps 3 5 7 --difficulty ExpertPlus --characteristic Standard \
+  --tolerance 0.02 --output "/path/to/results/beat-benchmark.json"
+```
+
+Routine benchmark validation uses CPU. GPU evaluation requires an explicit task
+request under the current agent instructions; GPU is otherwise reserved for training.
+
+`--maps-dir` accepts one or more unpacked map packages or folders whose immediate
+children are packages. Discovery is sorted and duplicate paths are removed.
+Each package must contain `Info.dat`, its referenced audio, and the exact human
+difficulty/characteristic requested. There is no automatic difficulty fallback;
+run separate commands to compare different human difficulty labels.
+The original local evaluation package is under
+`/mnt/c/Users/frede/Desktop/BS_Automapper/Data/training/evaluate_beats/bs_map_input/`.
+Use native paths when running on Windows.
+
+The configured beat model is used by default. `--model-dir` selects an existing
+model folder for this process without editing configuration files or downloading
+weights. Every song/BPS pair starts with the same configured settings, sets both
+`max_speed` and `max_speed_orig` to four times the BPS setting, and seeds Python
+and NumPy (`--seed`, default 3). Audio is copied afresh into a disposable directory
+for every pair. Configuration, paths, and random state are restored afterward.
+The command calls the existing `gen_beats.main(..., debug_beats=True)` path,
+which loads only the beat model and returns **processed timing proposals** before
+note generation, map creation, or Beat Saber export. It does not normalize the
+source audio or use the legacy training-map importer.
+
+Reference loading currently supports v2 `Info.dat` with v2 or v3 beatmaps,
+constant positive BPM, zero song offset, and unshuffled timing. Beat times are
+converted to elapsed seconds using `beat * 60 / BPM`. Nonempty tempo-change
+metadata, nonzero offsets/shuffle, and unknown format versions fail explicitly.
+Reference onsets are unique timestamps of colored notes: simultaneous notes count
+once, bombs are excluded, and nearby distinct timestamps remain distinct. Arcs,
+obstacles, and lighting do not add reference onsets.
+
+Scoring uses sorted one-to-one matching within an inclusive tolerance in seconds
+(default 0.02, or 20 ms). A reference can match only one prediction; duplicate
+predictions remain separate and can therefore become false positives. Earliest
+eligible matches maximize the match count; their timing error is deterministic,
+not a minimum-error assignment. Empty predictions or references yield zero
+precision, recall, and F1, with null timing error when no pairs match. Mean absolute
+timing error is reported in milliseconds over matched pairs only.
+
+The JSON report contains per-song/per-BPS counts, precision/recall/F1, matched
+timing error, reference and prediction timestamps, and measured onset density.
+Density counts timestamps over the **full audio duration**, including silence;
+it is distinct from the BPS difficulty setting and from individual-note density.
+Aggregates pool counts and matched timing errors across successful songs at each
+BPS setting. Failed inputs/runs are listed and excluded from scoring, and cause
+exit status 1. The destination must be a new file outside the input packages.
+
+Reports also retain input paths and SHA-256 hashes, human author/difficulty,
+model identity, base/effective timing settings, seed, runtime versions/devices,
+Git revision/dirty status, and benchmark source hashes. Keep reports and song
+assets outside the repository. Seeded runs help comparisons within one runtime;
+they do not guarantee identical TensorFlow results across devices or versions.
+
+Training overlap is recorded as unknown; these local packages do not establish
+a held-out set. Agreement with one human map is a timing reference, not a measure
+of musical quality. Raw model probabilities and final serialized beatmap timings
+are not evaluated by this command. See the [dated benchmark results](baseline.md#human-map-benchmark-2026-10-14)
+and [remaining benchmark work](roadmap.md#human-map-timing-benchmark).
