@@ -2,7 +2,7 @@ import numpy as np
 import tensorflow as tf
 import glob
 import os
-from keras.models import load_model
+from tensorflow.keras.models import load_model
 
 # Get the main script's directory
 import sys

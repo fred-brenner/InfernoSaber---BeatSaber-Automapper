@@ -1,7 +1,7 @@
-from keras.layers import Dense, Input, LSTM, Flatten, Dropout, \
+from tensorflow.keras.layers import Dense, Input, LSTM, Flatten, Dropout, \
     MaxPooling2D, Conv2D, BatchNormalization, SpatialDropout2D, concatenate, \
     Reshape, Conv2DTranspose, UpSampling2D
-from keras.models import Model
+from tensorflow.keras.models import Model
 # import numpy as np
 
 

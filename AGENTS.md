@@ -13,7 +13,10 @@ platforms before implementing them unless the task already authorizes them.
 ## Context pointers
 
 - For domain terms, difficulty semantics, or timing units, read [CONTEXT.md](CONTEXT.md).
-- For environment setup, baseline comparisons, or revival planning, read
+- For environment setup or running the WSL app, read
+  [docs/development.md](docs/development.md).
+- For RTX 5080 GPU execution, read [docs/gpu-execution.md](docs/gpu-execution.md).
+- For baseline comparisons or revival planning, read
   [docs/baseline.md](docs/baseline.md). It distinguishes verified checks from pending work.
 - For the existing user workflow, read [Readme.md](Readme.md).
 - For training work, consult
@@ -27,10 +30,13 @@ labels require verification before becoming current requirements.
 
 - Run project commands from the repository root; path discovery depends on the
   working directory and the presence of `main.py`.
-- Use the selected project environment's Python interpreter. The baseline records
-  the available interpreters and the incomplete runtime setup.
-- Preserve existing dependency constraints while restoring inference. Validate
+- Use the selected project environment's Python interpreter with system site
+  packages disabled.
+- Use the recorded CPU or GPU package lock for the selected environment. Validate
   pretrained model loading when changing TensorFlow, Keras, or related packages.
+- Use `tensorflow.keras` consistently. The GPU activation profile selects legacy
+  Keras through `TF_USE_LEGACY_KERAS=1`; standalone Keras imports select a different
+  API in that environment and break the existing TCN loading path.
 - Inspect scripts before importing or running them: `main_app.py` performs a
   GitHub update check at import, and `main_training.py` has top-level GPU checks
   and interactive training orchestration.
@@ -38,12 +44,14 @@ labels require verification before becoming current requirements.
 ## Validation
 
 - In an environment with the test dependencies, run `python -m pytest -q` for
-  relevant code changes. The existing suite covers song metadata only.
+  relevant code changes. The suite covers song metadata and legacy TCN model loading.
 - For audio processing, map generation, or export changes, also exercise a local
   sample song when the runtime is available. Use a disposable data/output folder
   and disable export to the user's Beat Saber library for development checks.
-- Keep automated output checks and human assessment of timing/playability distinct.
-  State which checks ran and which remain unverified.
+- For the current beatmap syntax, successful map-package generation is sufficient
+  baseline acceptance. Use viewer or in-game checks when explicitly requested or
+  when changing beatmap syntax or compatibility.
+- State which runtime and automated checks ran and which remain unverified.
 - For documentation-only changes, check links, consistency, and the final diff.
 
 ## Files and compatibility

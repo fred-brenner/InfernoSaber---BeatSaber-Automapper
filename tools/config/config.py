@@ -43,7 +43,7 @@ max_bps_limit = 12  # maximum beats_per_second value for training
 
 """Change for application"""
 # Map creation model configuration
-max_speed = 4 * 8.0  # set around 5-40 (normal-expert++)
+max_speed = 4 * 5.0  # set around 5-40 (normal-expert++)
 add_beat_intensity = 95  # try to match bps by x% [80, 120]
 gimme_more_notes_flag = True   # try to always use notes on both sides
 gimme_more_notes_prob = 0.25     # probability to activate [0.0-1.0]
@@ -119,13 +119,13 @@ waveform_pattern_length = 25   # pattern length in sampling rate [10-200]
 waveform_threshold = 4  # minimum number of notes applicable for waveform to start
 
 """Pinokio app only"""
-num_workers = 5
+num_workers = 1
 silence_threshold_percentage = 100
-difficulty_1 = 4
-difficulty_2 = 5
-difficulty_3 = 6
-difficulty_4 = 7
-difficulty_5 = 8
+difficulty_1 = 5
+difficulty_2 = 0
+difficulty_3 = 0
+difficulty_4 = 0
+difficulty_5 = 0
 
 """Caution on changes"""
 verbose_level = 1       # verbose level from 0 (only ETA) to 5 (all messages)

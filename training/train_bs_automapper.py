@@ -2,7 +2,7 @@ import gc
 import numpy as np
 from datetime import datetime
 # from tensorflow import keras
-from keras.optimizers import Adam
+from tensorflow.keras.optimizers import Adam
 from tabulate import tabulate
 
 from helpers import test_gpu_tf, ai_encode_song, load_keras_model, categorical_to_class

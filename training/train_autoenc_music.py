@@ -4,9 +4,9 @@ import time
 # import tensorflow as tf
 
 from datetime import datetime
-from keras.models import Model
-from keras.optimizers import Adam
-from keras.layers import Input
+from tensorflow.keras.models import Model
+from tensorflow.keras.optimizers import Adam
+from tensorflow.keras.layers import Input
 
 # Get the main script's directory
 import sys, os
