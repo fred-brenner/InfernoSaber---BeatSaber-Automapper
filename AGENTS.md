@@ -88,4 +88,4 @@ labels require verification before becoming current requirements.
 - Only use simple, modular, and efficient code. Avoid complex structures, prefer combining tiny atomic functions!
 - You are editing the development branch, and are free to (hard) adjust settings if needed.
 - Update the AGENTS.md file according to my usage and the current state of the project. If you find any outdated information, please correct it.
-- If relevant, use Subagents for specific tasks, and keep the main agent for overall coordination.
+- For large tasks, use Subagents with GPT-6.1 Sol High for specific tasks.

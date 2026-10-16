@@ -534,3 +534,88 @@ SciPy 1.13.1, and pinned aubio 0.5.0a0; CPU devices only. The beat model, final
 alignment/grid snapping code, and model weights were preserved. Native Windows,
 viewer/in-game behavior, variable-tempo tracking, and phase-alignment quality
 were not evaluated by this change.
+
+## CPU beat benchmark with corrected BPM, 2026-10-16
+
+Reran all seven curated songs at BPS settings 3, 5, and 7, Standard/ExpertPlus,
+seed 3, and the original 20 ms matching tolerance. All **21 runs succeeded**,
+with zero skipped inputs. Python, TensorFlow, devices, settings, input hashes,
+and the `fav_15` checkpoint match the earlier CPU benchmark. Only
+`map_creation/find_bpm.py` differs among the earlier pipeline source hashes.
+Captured timings before BPM processing reproduce the earlier run exactly in
+all 21 cases. The rerun preserved pipeline sources, model weights, raw packages,
+prepared evaluation caches, configuration, and previous reports.
+
+| BPS setting | Previous F1 | Corrected-BPM F1 | Corrected BPM, bypass final alignment |
+| ---: | ---: | ---: | ---: |
+| 3 | 17.85% | 56.72% | 34.09% |
+| 5 | 17.27% | 63.86% | 39.93% |
+| 7 | 18.89% | 61.43% | 38.08% |
+
+Both the detector change and final alignment improve 20 ms F1 in **21/21**
+comparisons. Across settings, final alignment raises pooled F1 from 37.42% to
+60.73%. It also improves pooled F1 at every evaluated tolerance (10, 20, 35, 50,
+and 100 ms). Final alignment is no longer the main observed quality loss at
+20 ms. Bypass variants are offline rescoring of captured arrays; the benchmark
+itself runs the existing generator and alignment implementation.
+
+Per-song results at BPS setting 5:
+
+| Song | Previous F1 | Corrected-BPM F1 | Bypass final alignment F1 |
+| --- | ---: | ---: | ---: |
+| Bad Hatter | 19.91% | 60.96% | 45.67% |
+| Better When You're Gone | 16.83% | 48.31% | 40.05% |
+| Insane | 14.59% | 53.60% | 38.54% |
+| Lost In The Echo | 16.50% | 68.56% | 44.32% |
+| Shiawase No Monosashi | 15.80% | 75.68% | 60.29% |
+| Shut Up and Dance | 15.56% | 67.22% | 15.85% |
+| Sweet Nothing | 19.69% | 64.47% | 36.38% |
+
+The improvement primarily repairs timing precision: pooled previous/new F1 is
+9.22%/58.59% at 10 ms, 18.06%/60.73% at 20 ms, and 66.32%/66.67% at 100 ms.
+Broad-window onset agreement changes little. Matched-pair timing error at 20 ms
+falls from approximately 9.95 ms to 2.51 ms, with different matched populations.
+
+The largest intermediate F1 loss is now onset rematching
+(`sanity_check_timing2`) in 15 runs and density filling in six. Pooled onset
+rematching reduces F1 from 63.11% to 42.39%, while final snapping subsequently
+recovers much of the loss. These local measurements identify candidates for
+complete-pipeline ablations; they do not establish that removing either stage
+would improve final output. No learned-model change is justified by this
+comparison alone.
+
+Two remaining considerations:
+
+- Integer-equivalent tempo values change the current aligner's grid resolution.
+  A 2x pulse halves the interval used for whole-beat rounding and changes
+  collisions. On saved **old** timings immediately before final alignment,
+  using the corrected BPM at the original pulse level yields BPS 5 F1 52.92%;
+  using its 2x pulse yields 63.57%, close to the full new run's 63.86%.
+  The gains therefore include both fractional-tempo accuracy and finer grid
+  resolution. These diagnostic variants keep the old upstream timings fixed.
+- Better When You're Gone remains sensitive to its small residual BPM
+  difference. Replacing 255.94 with the reference-equivalent 256 in the final
+  step alone increases its BPS 5 F1 from 48.31% to 62.83%. Across all seven songs,
+  the same-pulse reference variant only raises BPS 5 F1 from 63.86% to 65.01%.
+  This measures agreement with the human map grid; it does not independently
+  establish the recording's exact tempo or justify rounding all detected BPMs.
+
+The unchanged collision handling still produces outliers: maximum final-stage
+movement is 4.185 seconds (Insane, BPS 3), and Better When You're Gone has
+nonmonotonic final arrays at BPS 5 and 7. There are six duplicate predictions
+across the 21 final arrays. These remain alignment correctness concerns despite
+its positive aggregate contribution. The next quality investigation should
+measure onset rematching and filling through the full downstream pipeline while
+retaining final alignment as the current baseline.
+
+Evidence is saved outside the repository under
+`../Data/training/evaluate_beats/results/beat-benchmark-new-bpm-cpu-2026-10-16T195723Z/`:
+`benchmark.json` contains the new standard CPU results; `alignment-analysis.json`
+and `.csv` contain stages and offline variants; `comparison-summary.json` and
+`per-song-bps5.csv` contain comparisons; `tempo-level-diagnostic.json` isolates
+the final-step pulse-level effect on old timings. Executable harnesses and logs
+are retained alongside the reports. Inference took 86.52 seconds in total.
+
+This evaluates processed timing proposals against the same human maps. Training
+overlap and general musical quality remain unverified. No model or alignment
+code was changed, no Beat Saber export occurred, and no GPU runtime was used.
