@@ -246,8 +246,13 @@ def run_benchmark(packages, bps_values, tolerance=0.02, difficulty="ExpertPlus",
 
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--maps-dir", type=Path, nargs="+", required=True,
-                        help="Map packages or folders containing packages; originals are read only")
+    sources = parser.add_mutually_exclusive_group(required=True)
+    sources.add_argument("--maps-dir", type=Path, nargs="+",
+                         help="Map packages or folders containing packages; originals are read only")
+    sources.add_argument("--evaluation-root", type=Path,
+                         help="Prepare and benchmark only this folder's bs_map_input packages")
+    parser.add_argument("--prepare-only", action="store_true",
+                        help="Rebuild evaluation folders and report skips without loading a model")
     parser.add_argument("--bps", type=float, nargs="+", default=[3, 5, 7],
                         help="BPS difficulty settings (default: 3 5 7)")
     parser.add_argument("--difficulty", default="ExpertPlus", help="Exact human difficulty label")
@@ -255,15 +260,46 @@ def main(argv=None):
     parser.add_argument("--tolerance", type=float, default=0.02, help="Matching tolerance in seconds")
     parser.add_argument("--model-dir", type=Path, help="Override the configured model folder in memory")
     parser.add_argument("--seed", type=int, default=3)
-    parser.add_argument("--output", type=Path, required=True, help="Destination for a new JSON report")
+    parser.add_argument("--output", type=Path, help="New JSON report; evaluation-root defaults to results/")
     args = parser.parse_args(argv)
     try:
-        packages = discover_packages(args.maps_dir)
-        output = args.output.expanduser().resolve()
-        if output.exists() or any(output.is_relative_to(package) for package in packages):
+        if args.prepare_only and args.evaluation_root is None:
+            raise ValueError("--prepare-only requires --evaluation-root")
+        if args.evaluation_root is None and args.output is None:
+            raise ValueError("--maps-dir requires --output")
+        root = args.evaluation_root.expanduser().resolve() if args.evaluation_root else None
+        output = args.output.expanduser().resolve() if args.output else (
+            root / "results" / ("beat-benchmark-" + datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S%fZ") + ".json"))
+        if output.exists():
             raise ValueError("Choose a new report path outside the input map packages")
+        preprocessing = None
+        if root is not None:
+            managed = ("bs_map_input", "maps", "songs_egg", "maps_dict_all", "songs_diff", "archive")
+            if any(output.is_relative_to(root / folder) for folder in managed):
+                raise ValueError("Save benchmark results outside the source and managed evaluation folders")
+            # Validate arguments before refreshing the on-disk evaluation snapshot.
+            score_beats([], [], args.tolerance)
+            if any(not math.isfinite(bps) or bps <= 0 for bps in args.bps):
+                raise ValueError("BPS settings must be finite and positive")
+            if not 0 <= args.seed < 2**32:
+                raise ValueError("Seed must be between 0 and 2**32 - 1")
+            from evaluation.prepare_evaluation import prepare_evaluation
+            preprocessing = prepare_evaluation(root, args.difficulty, args.characteristic)
+            packages = [Path(song["package_path"]) for song in preprocessing["songs"]]
+            print(f"Preprocessing: {len(packages)} ready, {len(preprocessing['skipped'])} skipped", flush=True)
+            for skipped in preprocessing["skipped"]:
+                print(f"Skipped {Path(skipped['package_path']).name}: {skipped['error']}", flush=True)
+            print(f"Preprocessing report: {root / 'preprocessing_report.json'}", flush=True)
+            if args.prepare_only or not packages:
+                return int(bool(preprocessing["skipped"]) or not packages)
+        else:
+            packages = discover_packages(args.maps_dir)
+            if any(output.is_relative_to(package) for package in packages):
+                raise ValueError("Choose a new report path outside the input map packages")
         report = run_benchmark(packages, list(dict.fromkeys(args.bps)), args.tolerance,
                                args.difficulty, args.characteristic, args.model_dir, args.seed)
+        if preprocessing is not None:
+            report["preprocessing"] = preprocessing
     except (OSError, ValueError) as exc:
         parser.error(str(exc))
     report["command"] = sys.argv if argv is None else [parser.prog, *argv]
@@ -284,6 +320,7 @@ def main(argv=None):
             "dirty": bool(subprocess.check_output(["git", "status", "--porcelain"], cwd=root, text=True)),
             "source_sha256": {str(path.relative_to(root)): file_sha256(path) for path in
                               (Path(__file__).resolve(), root / "evaluation/human_maps.py",
+                               root / "evaluation/prepare_evaluation.py",
                                root / "map_creation/gen_beats.py")},
         }
     except (OSError, subprocess.CalledProcessError):
@@ -297,7 +334,8 @@ def main(argv=None):
               f"R={row['recall']:.3f} F1={row['f1']:.3f}; "
               f"{row['successful_runs']} succeeded, {row['failed_runs']} failed")
     print(f"Saved report: {output}")
-    return int(any(row["status"] != "ok" for row in report["results"]))
+    return int(any(row["status"] != "ok" for row in report["results"])
+               or bool(preprocessing and preprocessing["skipped"]))
 
 
 if __name__ == "__main__":

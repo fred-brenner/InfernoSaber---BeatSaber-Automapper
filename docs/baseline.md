@@ -318,6 +318,11 @@ Evidence is under `/home/frede/.local/share/infernosaber-baseline/gpu/`, includi
 
 ## Human-map benchmark, 2026-10-14
 
+Historical comparison: this set included two packages from `favorites_bs_input`.
+The owner excluded that source on 2026-10-16 and designated the curated
+`evaluate_beats/bs_map_input` folder as the comparison source. Use the curated-set baseline
+below for future comparisons; the earlier results remain a record of that run.
+
 The restored command was exercised against three local human-authored packages,
 using their Standard / ExpertPlus beatmaps. References use unique colored-note
 onsets, constant BPM, and zero song offset. Source paths, audio/map/info hashes,
@@ -383,3 +388,149 @@ output filename. See [benchmark usage](development.md#human-map-beat-benchmark).
 Scores describe processed timing proposals and agreement with these references.
 Raw model output, final beatmap timing, musical quality, held-out generalization,
 tempo-change/offset alignment, and native Windows execution remain unverified.
+
+## Curated human-map benchmark, 2026-10-16
+
+The active comparison source is exclusively the seven packages currently in
+`Data/training/evaluate_beats/bs_map_input/`, beside the repository. The owner
+confirmed this seven-package set after removing three of the initially added
+packages. No `favorites_bs_input` content is used.
+
+Selected Standard / ExpertPlus maps: Bad Hatter, Better When You're Gone, Insane,
+Lost In The Echo, Shiawase No Monosashi, Shut Up and Dance, and Sweet Nothing.
+All seven preprocess successfully; the final preprocessing report has zero skips.
+An initially overstrict wall-position check was corrected to preserve signed
+obstacle lanes and wide walls, consistent with the legacy dictionary format.
+The source maps were not edited.
+
+The evaluation-root command rebuilt 14 flat map/Info copies, seven audio copies,
+21 legacy dictionary arrays, and the two aligned difficulty/name index arrays.
+Prior derived contents and the preliminary diagnostic report were archived within
+`evaluate_beats/archive/`. The 57 files in the current raw input and existing
+`temp` package retained their exact hashes. Runtime configuration files and
+pretrained model weights were not changed.
+
+CPU validation used the retained TensorFlow 2.15.1 environment, the same `fav_15`
+checkpoint, seed 3, 20 ms tolerance, and BPS settings 3, 5, and 7. All 21
+song/setting combinations succeeded. The full automated suite passed **111 tests**;
+prepare-only operation was also checked without importing TensorFlow. GPU and
+native Windows execution were not evaluated for this change.
+
+Current evidence under `Data/training/evaluate_beats/`:
+
+- `preprocessing_report.json`: accepted source paths/hashes, preparation settings,
+  skip list, and backup location.
+- `results/beat-benchmark-cpu-2026-10-16.json`: complete CPU benchmark results with
+  the preprocessing report embedded.
+- `results/beat-benchmark-cpu-2026-10-16.log`: runtime log.
+
+These results supersede the earlier mixed-source comparison for future work.
+They still measure processed timing proposals; training overlap and final-map
+quality remain unverified. See [the repeatable command](development.md#human-map-beat-benchmark).
+
+## BPM estimation correction, 2026-10-16
+
+The seven curated songs exposed a systematic 1.4–1.9% tempo overestimate in
+`map_creation/find_bpm.py`. Directly feeding a perfectly periodic 128 BPM onset
+sequence into the pinned aubio C beat tracker returns **129.740418 BPM**. This
+isolates a bias inside the tracker independently of decoding and the Python
+median-of-intervals wrapper. The comb filter's shifted harmonic-lag indexing is
+consistent with the bias; see the [pinned tracker source](https://github.com/aubio/aubio/blob/ad5cf975aed08cc4562dd008cf9f83b12b82ffb8/src/tempo/beattracking.c#L149-L164)
+and [zero-based autocorrelation implementation](https://github.com/aubio/aubio/blob/ad5cf975aed08cc4562dd008cf9f83b12b82ffb8/src/mathutils.c).
+Decoded durations from aubio and independent audio readers agree within
+milliseconds, ruling out a 1.4–1.9% audio-clock discrepancy.
+
+### Detector choice and behavior
+
+Use the existing librosa 0.11.0 onset extractor and SciPy 1.13.1 for whole-song
+periodicity. Librosa's direct tempo estimate selects a discrete autocorrelation
+lag, which is too coarse for this task's 0.1 BPM acceptance target; see its
+[tempo source](https://librosa.org/doc/0.11.0/_modules/librosa/feature/rhythm.html).
+[Essentia RhythmExtractor2013](https://essentia.upf.edu/reference/std_RhythmExtractor2013.html)
+was considered, but its [Python bindings lack native Windows support](https://essentia.upf.edu/installing.html#building-essentia-on-windows).
+The selected method adds no packages, model downloads, or changes to the CPU lock.
+
+The implementation retains `aubio.source`, the existing default/fast/super-fast
+sampling presets and manual overrides, and `[bpm, decoded_duration_seconds]`.
+It extracts a librosa onset-strength envelope with `n_fft=win_s`,
+`hop_length=hop_s`, and `n_mels=min(64, win_s // 4)`. A whole-song
+[SciPy periodogram](https://docs.scipy.org/doc/scipy-1.13.1/reference/generated/scipy.signal.periodogram.html)
+uses a Hann window, constant detrending, spectrum scaling, and FFT length
+`16 * next_power_of_two(onset_length)`. Candidate pulse rates span 40–320 BPM
+at 0.005 BPM spacing; four harmonic powers are summed with weights `1/harmonic²`.
+FFT padding samples the spectral peak more finely; it does not add observations.
+
+The strongest fractional pulse rate is returned directly. It can represent a
+subdivision of the musical beat. Reference BPM values and map metadata never
+enter detection; no integer rounding or fixed correction factor is applied.
+Silence, audio shorter than the FFT window, and fewer than four detected onsets
+return zero BPM with decoded duration. Decoder failures propagate, and the
+decoder closes after successful reads and read failures. Dictionary and argparse
+namespace overrides both work; the CLI prints scalar BPM and the filename.
+
+### Seven-song CPU verification
+
+The owner supplied Tunebat labels and selected **0.1 BPM maximum error** after
+normalizing integer multiples or reciprocals. These labels are comparison
+references; their rounded values do not establish exact physical tempo.
+
+| Song | Tunebat reference | Previous BPM | New raw BPM | New BPM / 2 |
+| --- | ---: | ---: | ---: | ---: |
+| Bad Hatter | 122 | 124.004273 | 244.000 | 122.0000 |
+| Better When You're Gone | 128 | 129.835855 | 255.940 | 127.9700 |
+| Insane | 105 | 106.457298 | 209.995 | 104.9975 |
+| Lost In The Echo | 120 | 122.254876 | 240.000 | 120.0000 |
+| Shiawase No Monosashi | 128 | 130.178110 | 255.990 | 127.9950 |
+| Shut Up and Dance | 128 | 130.199662 | 256.005 | 128.0025 |
+| Sweet Nothing | 128 | 130.203974 | 256.000 | 128.0000 |
+
+All seven pass in all three sampling modes: **21/21 successful comparisons,
+zero skips/failures**. Maximum normalized error is **0.030 BPM**, on Better When
+You're Gone in default mode, corresponding to approximately 25 ms of accumulated
+tempo-only drift over that recording relative to the supplied 128 BPM label.
+Maximum error is 0.0125 BPM in each faster mode. Default-mode decoded durations
+match the previous implementation exactly. Faster modes retain the decoder's
+existing few-millisecond resampling differences. Insane's Info BPM is 210,
+equivalent to twice its supplied 105 BPM reference; all other Info values match
+the supplied labels.
+
+The comparison, previous detector snapshot, executable comparison harness,
+runtime log, full test log, and generation smoke report/log/harness are under
+`../Data/training/evaluate_beats/results/bpm-comparison-cpu-2026-10-16T194526Z/`.
+The measured report is `comparison-2026-10-16T194726Z.json`. It records input
+paths/hashes, map and supplied BPM values, old/new estimates, integer factors,
+errors, durations, runtimes, detector/source hashes, runtime versions, and
+per-input failure handling. It evaluates BPM only. The earlier human-note timing
+benchmark report remains the baseline for processed proposals.
+
+Rerun the comparison from the repository root; each invocation creates a new
+timestamped report alongside the retained pre-change detector:
+
+```bash
+source /home/frede/.local/share/infernosaber-baseline/env.sh
+python ../Data/training/evaluate_beats/results/bpm-comparison-cpu-2026-10-16T194526Z/compare_bpm.py
+```
+
+### Automated and generation checks
+
+The regression was verified before implementation: generated 90 BPM audio with
+missing beats measured 89.174863 BPM and failed the 0.1 BPM assertion. After the
+change, **42 focused tests passed**, including 22 cases across 60–240 BPM with
+fractional tempos, missing beats, and subdivisions, plus offsets, presets,
+manual overrides, duration, silent/sparse inputs, decoder errors, cleanup, and
+CLI output. The full retained CPU suite passed **153 tests** with one existing
+Keras HDF5-format warning.
+
+A disposable CPU run of `map_creation.gen_beats.main(..., debug_beats=False)`
+used a copied Better When You're Gone recording, BPS setting 5, and the existing
+`fav_15` model set. It completed generation in 9.519 seconds with raw BPM 255.94,
+producing v3 Expert (313 colored notes) and ExpertPlus (378 colored notes)
+beatmaps. JSON references, note bounds/times, full FFmpeg audio decode, and ZIP
+CRC passed. Beat Saber export was disabled. Source-package, model, and on-disk
+configuration hashes remained unchanged.
+
+Runtime: Python 3.10.19, TensorFlow 2.15.1, NumPy 1.26.4, librosa 0.11.0,
+SciPy 1.13.1, and pinned aubio 0.5.0a0; CPU devices only. The beat model, final
+alignment/grid snapping code, and model weights were preserved. Native Windows,
+viewer/in-game behavior, variable-tempo tracking, and phase-alignment quality
+were not evaluated by this change.

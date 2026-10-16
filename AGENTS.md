@@ -24,6 +24,8 @@ platforms before implementing them unless the task already authorizes them.
   [docs/baseline.md](docs/baseline.md). It distinguishes verified checks from pending work.
 - For human-map beat benchmarks, reference timing rules, and reruns, read
   [docs/development.md](docs/development.md#human-map-beat-benchmark).
+  Use only the curated `evaluate_beats/bs_map_input` packages for comparisons;
+  exclude `favorites_bs_input` and report skipped packages individually.
 - For the existing user workflow, read [Readme.md](Readme.md).
 - For training work, consult
   [the existing installation and training guide](How%20to%20-%20Linux%20install%20for%20training%20and%20app.md)

@@ -165,20 +165,51 @@ CPU profile:
 ```bash
 source /home/frede/.local/share/infernosaber-baseline/env.sh
 python -m evaluation.evaluate_beat_algorithms \
-  --maps-dir "/path/to/human-map-packages" \
+  --evaluation-root "../Data/training/evaluate_beats" \
   --bps 3 5 7 --difficulty ExpertPlus --characteristic Standard \
-  --tolerance 0.02 --output "/path/to/results/beat-benchmark.json"
+  --tolerance 0.02
 ```
 
 Routine benchmark validation uses CPU. GPU evaluation requires an explicit task
 request under the current agent instructions; GPU is otherwise reserved for training.
 
-`--maps-dir` accepts one or more unpacked map packages or folders whose immediate
+The comparison set is curated exclusively in `evaluate_beats/bs_map_input`.
+Use these packages for project benchmarks; `favorites_bs_input` and the legacy
+`evaluate_beats/temp` contents are excluded. The evaluation-root command inspects
+every immediate package folder, validates its selected human beatmap and fully
+decodes its Ogg audio, then rebuilds these sibling folders from accepted packages:
+
+| Folder/file | Contents |
+| --- | --- |
+| `maps/` | Selected raw beatmap and Info copies with flat song filenames |
+| `songs_egg/` | Unmodified Ogg audio copies |
+| `maps_dict_all/` | Legacy NumPy notes, events, and obstacles arrays |
+| `songs_diff/` | Matching sorted `name_ar.npy` / `diff_ar.npy` indices |
+| `preprocessing_report.json` | Input provenance, accepted packages, and per-package skip reasons |
+| `results/` | New timestamped benchmark JSON reports |
+| `archive/` | Previous derived folders and preprocessing report, retained before replacement |
+
+Raw input packages and unrelated folders remain intact. Preparation failures
+leave no partial song in the active derived folders. The benchmark reads only
+the accepted source packages; the derived arrays provide an updated snapshot for
+existing evaluation tools. Existing runtime/application paths are not rewritten.
+`--prepare-only` refreshes this snapshot without loading TensorFlow or a model.
+`--output` optionally selects a new benchmark report destination. Skipped inputs
+are excluded from scoring, listed in the preprocessing and benchmark reports,
+and cause exit status 1 even when all accepted songs complete successfully.
+
+The legacy arrays retain individual notes and bombs, with timestamps in seconds.
+Obstacle duration retains its legacy beat units. `diff_ar.npy` uses the legacy
+individual-note count divided by the first-to-last-note interval, rounded to two
+decimals. These cache values are separate from the benchmark's unique colored
+onset density over full audio duration, described below.
+
+For explicit external fixtures, `--maps-dir` accepts one or more unpacked map packages or folders whose immediate
 children are packages. Discovery is sorted and duplicate paths are removed.
 Each package must contain `Info.dat`, its referenced audio, and the exact human
 difficulty/characteristic requested. There is no automatic difficulty fallback;
 run separate commands to compare different human difficulty labels.
-The original local evaluation package is under
+The current local evaluation packages are under
 `/mnt/c/Users/frede/Desktop/BS_Automapper/Data/training/evaluate_beats/bs_map_input/`.
 Use native paths when running on Windows.
 
@@ -228,3 +259,5 @@ a held-out set. Agreement with one human map is a timing reference, not a measur
 of musical quality. Raw model probabilities and final serialized beatmap timings
 are not evaluated by this command. See the [dated benchmark results](baseline.md#human-map-benchmark-2026-10-14)
 and [remaining benchmark work](roadmap.md#human-map-timing-benchmark).
+The older three-song comparison included favorites and is retained as historical
+evidence only; use the curated-set results for subsequent decisions.
