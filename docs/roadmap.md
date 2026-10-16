@@ -64,21 +64,21 @@ listed here.
 
 ## 4. Simplify note-pattern generation, then expand it
 
-The current note-pattern model predicts complete simultaneous note/bomb
-snapshots. Explore a simpler initial representation with at most one note or
-bomb per side in each time slot. Whether obstacles belong in this representation
-is still open.
+The selected new architecture separates normalized intensity, note timing, and
+per-hand note patterns. It excludes bombs and retains at most one colored note
+per saber in a synchronized event. A red/blue pair counts as two retained notes;
+its timing remains one onset. See [the new framework](beat-model-training.md)
+for the data contract and later training workflow.
 
-A second stage would reconstruct richer snapshots, including multiple notes
-per side, using the simplified output and the current song snippet. This stage
-could be AI or non-AI; an autoencoder-like reconstruction process is a proposed
-analogy, not a selected architecture.
+The current milestone ends at tested intermediate predictions and train-ready
+model definitions. Training, a full generation rebuild, and quality evaluation
+follow separately. Model size or successful untrained inference does not
+establish improved gameplay.
 
-Before implementation, resolve what "side" means for bombs and obstacles, how
-the reduced representation preserves musical intent, and how expansion works
-with timing, model feedback, and playability checks. Compare the complete
-pipeline against the current representation rather than judging simplification
-by model size alone.
+A later multiplier can reconstruct additional same-hand notes using the original
+and reduced records retained by preprocessing. Bombs/obstacles and expansion
+remain separate future work. The existing seven-song CPU benchmark remains a
+regression reference rather than a sufficient training or generalization set.
 
 ## Human-map timing benchmark
 

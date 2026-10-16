@@ -27,7 +27,10 @@ platforms before implementing them unless the task already authorizes them.
   Use only the curated `evaluate_beats/bs_map_input` packages for comparisons;
   exclude `favorites_bs_input` and report skipped packages individually.
 - For the existing user workflow, read [Readme.md](Readme.md).
-- For training work, consult
+- For the new intensity/timing/note framework, training commands, data contracts,
+  and verification limits, read [docs/beat-model-training.md](docs/beat-model-training.md).
+  Its acceptance stops at intermediate predictions; full map generation is separate.
+- For legacy training work, consult
   [the existing installation and training guide](How%20to%20-%20Linux%20install%20for%20training%20and%20app.md)
   and verify its assumptions against the current code and environment.
 
@@ -88,4 +91,4 @@ labels require verification before becoming current requirements.
 - Only use simple, modular, and efficient code. Avoid complex structures, prefer combining tiny atomic functions!
 - You are editing the development branch, and are free to (hard) adjust settings if needed.
 - Update the AGENTS.md file according to my usage and the current state of the project. If you find any outdated information, please correct it.
-- For large tasks, use Subagents with GPT-6.1 Sol High for specific tasks.
+- For large tasks, use subagents with GPT-6.1 Sol XHigh for specific tasks.

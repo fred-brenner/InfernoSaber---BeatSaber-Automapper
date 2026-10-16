@@ -619,3 +619,128 @@ are retained alongside the reports. Inference took 86.52 seconds in total.
 This evaluates processed timing proposals against the same human maps. Training
 overlap and general musical quality remain unverified. No model or alignment
 code was changed, no Beat Saber export occurred, and no GPU runtime was used.
+
+## New intensity, timing, and note framework: CPU acceptance (2026-10-16)
+
+Implemented the independent `training.beat_models` framework and its version-1
+contracts. The dummy pipeline passed before neural builders were introduced.
+Preparation, validation, deterministic dummy inference, untrained Keras smoke,
+three stage-specific training dry runs, and explicit-checkpoint evaluation now
+complete on CPU. See [the training guide](beat-model-training.md) for commands,
+units, unsupported data cases, and checkpoint compatibility.
+
+The retained CPU environment used Python 3.10.19, TensorFlow/Keras 2.15.1/2.15.0,
+NumPy 1.26.4, and disabled GPU visibility. Full `python -m pytest -q` acceptance:
+**213 passed**, including 60 new framework tests. Warnings are upstream Python
+`randrange` deprecations and the existing legacy HDF5 save warning. No installed
+packages, existing model weights, legacy generator, alignment, or export code
+were changed during this implementation.
+
+| Model | Parameters | Real-data examples checked | Save/reload maximum prediction difference |
+| --- | ---: | ---: | ---: |
+| Intensity | 60,481 | 6 whole-song examples | 0 |
+| Timing | 180,483 | 12 first/last context windows | 0 |
+| Notes | 173,450 | 48 reference note events | 0 |
+
+Finite outputs, losses, connected finite gradients, validity masks, and exact
+weight preservation passed. Separate guards rejected any attempted `fit`, Adam
+construction, or optimizer application during executed Keras diagnostics. All
+three future-training entry points passed `--dry-run`; the training branches
+were not executed. Saved model artifacts are explicitly **untrained**.
+
+The seven curated raw packages were selected at Standard/ExpertPlus. No
+favorites inputs were used. Six maps passed preparation and remained in the
+evaluation-only test split, with synthetic-training normalization used solely
+for execution checks. The real evaluation data did not fit normalization.
+
+| Song | Decoded seconds | Original colored notes | Retained colored notes | Unique retained onsets |
+| --- | ---: | ---: | ---: | ---: |
+| Bad Hatter | 176.027188 | 924 | 908 | 744 |
+| Insane | 161.476375 | 718 | 709 | 616 |
+| Lost In The Echo | 205.725500 | 896 | 894 | 733 |
+| Shiawase No Monosashi | 171.064938 | 778 | 766 | 640 |
+| Shut Up and Dance | 199.899813 | 894 | 887 | 627 |
+| Sweet Nothing | 208.823563 | 1163 | 1158 | 1022 |
+
+**Skipped:** `8215 (Better When You're Gone - Halcyon12)/ExpertPlus.dat`.
+Source beats `219.83332824707031` and `219.83334350585938` become seconds
+`103.04687261581421` and `103.04687976837158`. They differ by about 7.15
+microseconds but both map to frame 10305. Exact-source grouping followed by
+nearest-frame labeling therefore rejects this map rather than silently merging
+its distinct onsets. This is a source/representation compatibility limit, not a
+failure of audio decoding. The original package was left unchanged.
+
+Explicit untrained checkpoints also completed teacher-forced stage evaluation
+and composed autoregressive inference on the held-out dummy split and all six
+accepted real songs. Note evaluation/decoding was capped at eight events per
+song; timing covered each song. Reports identify the bounded results as partial.
+They include intensity share/bin-count errors, timing precision/recall/F1 and
+note-rate error, per-hand class/presence/position/direction accuracy, and composed
+prediction arrays. These numbers verify diagnostic plumbing; random initialized
+outputs and synthetic normalization support **no model-quality comparison** with
+the previous trained benchmark.
+
+Evidence resides outside the source checkout at
+`../Data/training/evaluate_beats/results/beat-model-framework-cpu-2026-10-16T212414Z/`.
+`acceptance-summary.json` indexes the final outcome; `commands.json` and logs
+record executed diagnostics, `pytest-cpu.log` records the full suite,
+`curated-dataset/manifest.json` records accepted/skipped sources and splits,
+`curated-smoke/report.json` records no-update/serialization checks, and
+`curated-evaluation/report.json` records stage and composed diagnostics.
+`verify_commands.py` and `guarded_cli.py` preserve the executable checks. An
+initial standalone harness import-path error was corrected before Keras checks;
+its failed-attempt log is retained separately. Source hashes before and after
+match for all **52 files** in the seven packages. A start-of-task tracked-file
+hash comparison also confirms that pre-existing runtime changes were preserved.
+
+No new model was trained and no optimizer step occurred. Actual CPU/GPU
+training, native Windows execution, mapping quality, and full map generation
+remain unverified. The existing pretrained generation pipeline remains separate;
+this milestone ends at intermediate predictions.
+
+## Near-time source synchronization: CPU acceptance (2026-10-17)
+
+The new framework now reuses `config.min_time_diff` (0.02 seconds) to synchronize
+nearby source events silently before per-hand first-cut reduction. Each group
+uses its earliest timestamp and includes notes up to that timestamp plus the
+configured interval, matching the existing helper's inclusive comparison.
+Grouping is anchored rather than chained through the last merged note.
+A group produces one timing entry with at most one colored note per hand.
+Original numeric/JSON records and exact timestamps remain unchanged, and the
+new `original_event_indices` array maps all source notes to synchronized events
+for the future multiplier. Intensity is counted at each synchronized event's
+anchor, including when the source notes straddle an intensity-bin boundary.
+
+Target version is now **2**; schema and audio-feature versions remain 1. The
+representation records the synchronization interval. Older exact-time datasets
+and untrained checkpoints must be regenerated. See [the current training
+guide](beat-model-training.md) for fresh versioned output directories.
+
+CPU verification: **215 tests passed**, including near-time merging, inclusive
+boundaries, first-onset anchoring, configurable/disabled synchronization,
+source-order fallbacks, preserved source records, mapping validation, and
+intensity-bin consistency. All seven Standard/ExpertPlus curated packages now
+prepare, validate and complete bounded dummy/Keras smoke checks, with **zero
+skips**. This supersedes the previous Better When You're Gone compatibility
+skip; the map is accepted without changing its source files.
+
+| Song affected | Original distinct onsets | Synchronized onsets | Original colored notes | Retained colored notes |
+| --- | ---: | ---: | ---: | ---: |
+| Better When You're Gone | 359 | 357 | 483 | 483 |
+| Sweet Nothing | 1022 | 992 | 1163 | 1126 |
+
+Other five songs retain their previous onset and retained-note counts. The
+configured interval intentionally includes all nearby cuts, rather than only
+microsecond numerical differences. Seven-song outputs are evaluation-only, with
+synthetic-training normalization used solely for execution diagnostics. Seven
+whole-song intensity examples, 14 first/last timing chunks, and 56 reference
+note events passed finite loss/gradient checks with exact save/reload parity and
+unchanged weights. No model training or optimizer update occurred.
+
+Evidence: `../Data/training/evaluate_beats/results/beat-model-sync-cpu-2026-10-17-73e270/`.
+`acceptance-summary.json`, `commands.json`, and `pytest-cpu.log` record acceptance;
+`curated-v2/manifest.json` records grouping/provenance and all seven source maps;
+`keras-smoke/report.json` records bounded CPU checks. Before/after hashes match
+for all 52 input-package files. The existing setting, neural model definitions,
+legacy generator and alignment files were left unchanged. GPU execution and
+trained-model quality were not evaluated.

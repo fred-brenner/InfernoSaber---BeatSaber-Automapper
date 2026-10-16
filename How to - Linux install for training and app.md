@@ -1,9 +1,15 @@
 # How to Train Your BeatSaber Automapper with InfernoSaber
 
+For the new intensity, timing, and note models, use
+[the beat-model training guide](docs/beat-model-training.md). The workflow below
+is for legacy models. Use the recorded [CPU](docs/development.md) or
+[GPU](docs/gpu-execution.md) environment locks instead of treating these historical
+installation commands as the current package specification.
+
 ## System Requirements
 
 **Recommended setup for training:**
-- **GPU:** NVIDIA with ≥ 8GB VRAM ~~(NOTE: Last tested May 2025, current NVIDIA GPUs (5000 series) are not supported)~~
+- **GPU:** NVIDIA with ≥ 8GB VRAM; use the verified WSL profile linked above.
 - **RAM:** ≥ 24GB
 - **OS:** Linux (or WSL2 on Windows)
 - *(This spec supports ~50–150 songs, depending on variety)*
@@ -18,7 +24,7 @@
 ## Using WSL2 on Windows
 
 You will need Linux for training (and only for that).
-If you’re not using Linux natively or via dual boot, follow guides online to set up WSL2 and increase its memory allocation (reserving less for Windows). Tested with NVIDIA 30-series GPUs. Failed with NVIDIA 50-series GPUs due to driver issues.
+If you’re not using Linux natively or via dual boot, follow guides online to set up WSL2 and increase its memory allocation (reserving less for Windows). RTX 5080 execution and a legacy optimizer check now pass in the recorded WSL GPU profile; full training remains unverified. See [GPU execution](docs/gpu-execution.md).
 
 ---
 

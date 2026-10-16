@@ -261,3 +261,10 @@ are not evaluated by this command. See the [dated benchmark results](baseline.md
 and [remaining benchmark work](roadmap.md#human-map-timing-benchmark).
 The older three-song comparison included favorites and is retained as historical
 evidence only; use the curated-set results for subsequent decisions.
+
+## New beat-learning framework
+
+Use [the new training guide](beat-model-training.md) for dataset preparation,
+dummy/CPU forward checks, and explicit later training commands. It uses the
+existing Python environments and path configuration with isolated dataset/run
+folders. Importing its CLI does not launch the legacy training orchestrator.

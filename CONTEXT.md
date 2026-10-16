@@ -88,3 +88,28 @@ The app's approximate difficulty control expressed in BPS; it does not guarantee
 that a generated beatmap's measured BPS will match the setting. The expected
 working range is approximately 1–10; values outside this range are supported but
 are not expected to perform well.
+
+### New beat-learning framework
+
+**Retained note**:
+The representative colored note kept for one saber in a synchronized event.
+Original notes remain available for future expansion; bombs are excluded.
+
+**Synchronized event**:
+A group of nearby note onsets represented by one timestamp. The earliest onset
+anchors the group; notes within the minimum cut interval are considered
+simultaneous. A red/blue pair remains two notes within this one event.
+
+**Requested NPS**:
+The new framework's requested retained colored notes per second over the full
+decoded song duration. A red/blue pair counts as two. This is distinct from the
+legacy app's approximate BPS difficulty setting and from unique onset density.
+
+**Intensity share**:
+A snippet's fraction of the song's retained notes. Shares sum to one for a
+nonempty target. Multiplying by requested NPS and song duration gives the
+snippet's requested note budget; dividing by snippet duration gives local NPS.
+BPM remains a separate tempo feature.
+
+See [the framework contracts](docs/beat-model-training.md) for reduction, timing,
+empty-target masks, and supported source formats.

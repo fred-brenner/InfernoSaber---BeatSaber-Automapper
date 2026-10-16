@@ -1,5 +1,10 @@
 # Model architecture and call reference
 
+The independent [new beat-learning framework](beat-model-training.md) defines
+intensity, timing, and per-hand note models for future training. It ends at
+intermediate predictions and does not consume the legacy checkpoints below.
+This document's existing inventory describes the retained generation pipeline.
+
 InfernoSaber generates a beatmap with **four learned stages, in this order**:
 beat timing → audio encoding → note patterns → lighting. Rules refine the timing
 and gameplay between these stages. The full audio autoencoder is a fifth saved
