@@ -56,6 +56,10 @@ A curved connection between gameplay endpoints for one saber. Existing code and
 Beat Saber data use "slider" for this concept; use "arc" in prose to distinguish
 it from a UI slider.
 
+**Burst chain**:
+A colored head followed by slices along one saber's swing. A burst chain is
+distinct from an arc connecting existing notes and from staggered ordinary notes.
+
 **Lighting event**:
 A timed instruction controlling the level's lighting or related visual effects.
 _Avoid_: Using "event" for a note when discussing the lighting pipeline.

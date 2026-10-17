@@ -12,7 +12,7 @@ used `fav_15` at BPS difficulty setting 5 with Beat Saber library export disable
 See [the baseline](baseline.md) for evidence and remaining verification limits.
 This establishes execution, not a map-quality benchmark.
 
-For the current pipeline, see [model architecture](model-architecture.md).
+For the current pipeline, see [model architecture](model-beat-architecture.md).
 For BPS terminology, see [CONTEXT.md](../CONTEXT.md): the BPS difficulty setting
 is an approximate control, distinct from measured output density.
 

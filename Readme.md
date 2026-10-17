@@ -47,7 +47,7 @@ Generation uses four learned stages in execution order:
 4. Lighting classifier - generates lighting event type/value pairs
 
 The full audio autoencoder is used for training and reconstruction evaluation.
-See the [model architecture and call reference](docs/model-architecture.md) for
+See the [model architecture and call reference](docs/model-beat-architecture.md) for
 the architecture drawing, input/output shapes and tensor ranks, measured model
 sizes, preprocessing, execution order, and training/evaluation calls.
 

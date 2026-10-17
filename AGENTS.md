@@ -16,8 +16,12 @@ platforms before implementing them unless the task already authorizes them.
 - For environment setup or running the WSL app, read
   [docs/development.md](docs/development.md).
 - For RTX 5080 GPU execution, read [docs/gpu-execution.md](docs/gpu-execution.md).
-- For model calls, tensor contracts, checkpoint sizes, or preprocessing, read
+- For the v2 target stages and their output responsibilities, read
   [docs/model-architecture.md](docs/model-architecture.md).
+- For implemented intensity/timing/note contracts and training status, read
+  [docs/model-beat-architecture.md](docs/model-beat-architecture.md).
+- For legacy generation calls, checkpoints, and preprocessing, read
+  [docs/model-architecture_old.md](docs/model-architecture_old.md).
 - For feature priorities or planning model and pipeline improvements, read
   [docs/roadmap.md](docs/roadmap.md).
 - For optional import fixes and small follow-ups, read [TODO.md](TODO.md).

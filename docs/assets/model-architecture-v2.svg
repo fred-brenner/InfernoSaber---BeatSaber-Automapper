@@ -1,0 +1,167 @@
+<?xml version='1.0' encoding='utf-8'?>
+<svg xmlns="http://www.w3.org/2000/svg" aria-labelledby="title description" width="1280" height="2820" viewBox="0 0 1280 2820" role="img">
+  <title id="title">InfernoSaber model architecture v2</title>
+  <desc id="description">Intensity and timing are trained. The unchanged encoder supplies audio latents. Planned positions, arrows and multiplier stages create colored notes and chains. A combined hazards model adds walls and bombs; arcs connect existing notes. Lighting uses an independent clock. Boxes show input and output tensor shapes and network types. The full autoencoder is used only for reconstruction training and evaluation.</desc>
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#64748b" />
+    </marker>
+  </defs>
+  <rect width="1280" height="2820" fill="#f8fafc" />
+  <text x="64" y="53" font-family="DejaVu Sans, Arial, sans-serif" font-size="32" font-weight="700" fill="#0f172a" text-anchor="start">InfernoSaber · model architecture v2</text>
+  <text x="64" y="86" font-family="DejaVu Sans, Arial, sans-serif" font-size="17" font-weight="400" fill="#334155" text-anchor="start">2026-10-17 · blue: implemented / retained · amber: planned · shapes include batch</text>
+  <rect x="340" y="120" width="600" height="90" rx="14" fill="#ffffff" stroke="#cbd5e1" stroke-width="2" />
+  <text x="362" y="152" font-family="DejaVu Sans, Arial, sans-serif" font-size="20" font-weight="600" fill="#0f172a" text-anchor="start">App / CLI → one song × requested density</text>
+  <text x="362" y="182" font-family="DejaVu Sans, Arial, sans-serif" font-size="16" font-weight="400" fill="#334155" text-anchor="start">Inputs: audio + requested retained NPS + separate BPM</text>
+  <text x="362" y="207" font-family="DejaVu Sans, Arial, sans-serif" font-size="16" font-weight="400" fill="#334155" text-anchor="start">Full pipeline integration is planned</text>
+  <rect x="70" y="290" width="500" height="205" rx="14" fill="#ffffff" stroke="#cbd5e1" stroke-width="2" />
+  <text x="92" y="322" font-family="DejaVu Sans, Arial, sans-serif" font-size="20" font-weight="600" fill="#0f172a" text-anchor="start">Shared beat features · implemented</text>
+  <text x="92" y="352" font-family="DejaVu Sans, Arial, sans-serif" font-size="16" font-weight="400" fill="#334155" text-anchor="start">Mono 16 kHz · Hann FFT512 · hop160</text>
+  <text x="92" y="377" font-family="DejaVu Sans, Arial, sans-serif" font-size="16" font-weight="400" fill="#334155" text-anchor="start">80 mel bins + volume + onset = 82 channels</text>
+  <text x="92" y="402" font-family="DejaVu Sans, Arial, sans-serif" font-size="16" font-weight="400" fill="#334155" text-anchor="start">Fine: 100 Hz · coarse: one-second bins</text>
+  <text x="92" y="427" font-family="DejaVu Sans, Arial, sans-serif" font-size="16" font-weight="400" fill="#334155" text-anchor="start">Training-set normalization + validity masks</text>
+  <text x="92" y="452" font-family="DejaVu Sans, Arial, sans-serif" font-size="16" font-weight="400" fill="#334155" text-anchor="start">Partial song tails retain their actual duration</text>
+  <rect x="710" y="290" width="500" height="205" rx="14" fill="#eff6ff" stroke="#60a5fa" stroke-width="2" />
+  <text x="732" y="322" font-family="DejaVu Sans, Arial, sans-serif" font-size="20" font-weight="600" fill="#1d4ed8" text-anchor="start">1 · Intensity · trained · 60,481 params</text>
+  <text x="732" y="352" font-family="DejaVu Sans, Arial, sans-serif" font-size="16" font-weight="400" fill="#334155" text-anchor="start">Audio [B,S,82] · rank 3</text>
+  <text x="732" y="377" font-family="DejaVu Sans, Arial, sans-serif" font-size="16" font-weight="400" fill="#334155" text-anchor="start">Bin durations + mask [B,S] · rank 2</text>
+  <text x="732" y="402" font-family="DejaVu Sans, Arial, sans-serif" font-size="16" font-weight="400" fill="#334155" text-anchor="start">Output shares [B,S] · sum over valid bins = 1</text>
+  <text x="732" y="427" font-family="DejaVu Sans, Arial, sans-serif" font-size="16" font-weight="400" fill="#334155" text-anchor="start">Residual temporal CNN48 · dilations 1–8</text>
+  <text x="732" y="452" font-family="DejaVu Sans, Arial, sans-serif" font-size="16" font-weight="400" fill="#334155" text-anchor="start">Duration-aware whole-song softmax</text>
+  <rect x="710" y="565" width="500" height="230" rx="14" fill="#eff6ff" stroke="#60a5fa" stroke-width="2" />
+  <text x="732" y="597" font-family="DejaVu Sans, Arial, sans-serif" font-size="20" font-weight="600" fill="#1d4ed8" text-anchor="start">2 · Timing · trained · 180,483 params</text>
+  <text x="732" y="627" font-family="DejaVu Sans, Arial, sans-serif" font-size="16" font-weight="400" fill="#334155" text-anchor="start">Audio [B,1020,82] + conditions [B,1020,4]</text>
+  <text x="732" y="652" font-family="DejaVu Sans, Arial, sans-serif" font-size="16" font-weight="400" fill="#334155" text-anchor="start">Mask [B,1020] · 254 context frames per side</text>
+  <text x="732" y="677" font-family="DejaVu Sans, Arial, sans-serif" font-size="16" font-weight="400" fill="#334155" text-anchor="start">Output [B,512,3] · counts 0 / 1 / 2</text>
+  <text x="732" y="702" font-family="DejaVu Sans, Arial, sans-serif" font-size="16" font-weight="400" fill="#334155" text-anchor="start">Residual temporal CNN64 · dilations 1–64</text>
+  <text x="732" y="727" font-family="DejaVu Sans, Arial, sans-serif" font-size="16" font-weight="400" fill="#334155" text-anchor="start">Argmax → elapsed-second times + counts</text>
+  <text x="732" y="752" font-family="DejaVu Sans, Arial, sans-serif" font-size="16" font-weight="400" fill="#334155" text-anchor="start">No grid snapping or exact-total constraint</text>
+  <text x="85" y="722" font-family="DejaVu Sans, Arial, sans-serif" font-size="18" font-weight="600" fill="#0f172a" text-anchor="start">Density adapter</text>
+  <text x="85" y="751" font-family="DejaVu Sans, Arial, sans-serif" font-size="16" font-weight="400" fill="#334155" text-anchor="start">local NPS = share × D × duration / bin width</text>
+  <text x="85" y="779" font-family="DejaVu Sans, Arial, sans-serif" font-size="15" font-weight="400" fill="#334155" text-anchor="start">BPM supplies tempo; requested D supplies density.</text>
+  <rect x="70" y="810" width="500" height="80" rx="14" fill="#ffffff" stroke="#cbd5e1" stroke-width="2" />
+  <text x="92" y="842" font-family="DejaVu Sans, Arial, sans-serif" font-size="20" font-weight="600" fill="#0f172a" text-anchor="start">Independent lighting clock · planned</text>
+  <text x="92" y="872" font-family="DejaVu Sans, Arial, sans-serif" font-size="16" font-weight="400" fill="#334155" text-anchor="start">Audio / BPM candidates; independent of note counts</text>
+  <rect x="340" y="900" width="600" height="180" rx="14" fill="#eff6ff" stroke="#60a5fa" stroke-width="2" />
+  <text x="362" y="932" font-family="DejaVu Sans, Arial, sans-serif" font-size="20" font-weight="600" fill="#1d4ed8" text-anchor="start">3 · Audio encoder · retained · 68,576 params</text>
+  <text x="362" y="962" font-family="DejaVu Sans, Arial, sans-serif" font-size="16" font-weight="400" fill="#334155" text-anchor="start">Raw audio → existing 14,800 Hz / 2 s patch extraction</text>
+  <text x="362" y="987" font-family="DejaVu Sans, Arial, sans-serif" font-size="16" font-weight="400" fill="#334155" text-anchor="start">Input [B,24,20,1] → Z [B,16] · rank 4 → rank 2</text>
+  <text x="362" y="1012" font-family="DejaVu Sans, Arial, sans-serif" font-size="16" font-weight="400" fill="#334155" text-anchor="start">Conv2D32/16 + pooling → Dense128 → Dense16/ReLU</text>
+  <text x="362" y="1037" font-family="DejaVu Sans, Arial, sans-serif" font-size="16" font-weight="400" fill="#334155" text-anchor="start">Cache Z at each downstream model’s own query times</text>
+  <text x="362" y="1062" font-family="DejaVu Sans, Arial, sans-serif" font-size="16" font-weight="600" fill="#1d4ed8" text-anchor="start">Standalone audio input for every model 4–9</text>
+  <rect x="70" y="1180" width="500" height="230" rx="14" fill="#fffbeb" stroke="#fbbf24" stroke-width="2" />
+  <text x="92" y="1212" font-family="DejaVu Sans, Arial, sans-serif" font-size="20" font-weight="600" fill="#92400e" text-anchor="start">4 · Positions · planned replacement</text>
+  <text x="92" y="1242" font-family="DejaVu Sans, Arial, sans-serif" font-size="16" font-weight="400" fill="#334155" text-anchor="start">Z [B,16] + gap / count / density / BPM</text>
+  <text x="92" y="1267" font-family="DejaVu Sans, Arial, sans-serif" font-size="16" font-weight="400" fill="#334155" text-anchor="start">Position history [B,32,2] + ages / mask</text>
+  <text x="92" y="1292" font-family="DejaVu Sans, Arial, sans-serif" font-size="16" font-weight="400" fill="#334155" text-anchor="start">Output 2 × [B,13] · absent + 12 cells</text>
+  <text x="92" y="1317" font-family="DejaVu Sans, Arial, sans-serif" font-size="16" font-weight="400" fill="#334155" text-anchor="start">Embedding + GRU64 → Dense128 → heads</text>
+  <text x="92" y="1342" font-family="DejaVu Sans, Arial, sans-serif" font-size="16" font-weight="400" fill="#334155" text-anchor="start">Decode one or both hands per timing count</text>
+  <text x="92" y="1367" font-family="DejaVu Sans, Arial, sans-serif" font-size="16" font-weight="400" fill="#334155" text-anchor="start">Owns hand occupancy and positions</text>
+  <rect x="710" y="1180" width="500" height="230" rx="14" fill="#fffbeb" stroke="#fbbf24" stroke-width="2" />
+  <text x="732" y="1212" font-family="DejaVu Sans, Arial, sans-serif" font-size="20" font-weight="600" fill="#92400e" text-anchor="start">5 · Arrows · planned</text>
+  <text x="732" y="1242" font-family="DejaVu Sans, Arial, sans-serif" font-size="16" font-weight="600" fill="#1d4ed8" text-anchor="start">Audio: Z [B,16] from encoder 3</text>
+  <text x="732" y="1267" font-family="DejaVu Sans, Arial, sans-serif" font-size="16" font-weight="400" fill="#334155" text-anchor="start">Positions [B,2] + occupied-hand mask</text>
+  <text x="732" y="1292" font-family="DejaVu Sans, Arial, sans-serif" font-size="16" font-weight="400" fill="#334155" text-anchor="start">Neighbor positions / gaps + arrow history</text>
+  <text x="732" y="1317" font-family="DejaVu Sans, Arial, sans-serif" font-size="16" font-weight="400" fill="#334155" text-anchor="start">Output 2 × [B,9] · eight directions + dot</text>
+  <text x="732" y="1342" font-family="DejaVu Sans, Arial, sans-serif" font-size="16" font-weight="400" fill="#334155" text-anchor="start">Embeddings + GRU64 → Dense128 → heads</text>
+  <text x="732" y="1367" font-family="DejaVu Sans, Arial, sans-serif" font-size="16" font-weight="400" fill="#334155" text-anchor="start">Keep times, hand occupancy and cells fixed</text>
+  <text x="732" y="1392" font-family="DejaVu Sans, Arial, sans-serif" font-size="16" font-weight="400" fill="#334155" text-anchor="start">Owns cut directions only</text>
+  <rect x="340" y="1515" width="600" height="230" rx="14" fill="#fffbeb" stroke="#fbbf24" stroke-width="2" />
+  <text x="362" y="1547" font-family="DejaVu Sans, Arial, sans-serif" font-size="20" font-weight="600" fill="#92400e" text-anchor="start">6 · Multiplier · planned</text>
+  <text x="362" y="1577" font-family="DejaVu Sans, Arial, sans-serif" font-size="16" font-weight="600" fill="#1d4ed8" text-anchor="start">Audio: Z [B,16] from encoder 3</text>
+  <text x="362" y="1602" font-family="DejaVu Sans, Arial, sans-serif" font-size="16" font-weight="400" fill="#334155" text-anchor="start">Directed base notes + neighbors / gaps + history</text>
+  <text x="362" y="1627" font-family="DejaVu Sans, Arial, sans-serif" font-size="16" font-weight="400" fill="#334155" text-anchor="start">Output 2 × [B,K_mult] · relative templates incl. NONE</text>
+  <text x="362" y="1652" font-family="DejaVu Sans, Arial, sans-serif" font-size="16" font-weight="400" fill="#334155" text-anchor="start">Embeddings + GRU64 → Dense128 → template heads</text>
+  <text x="362" y="1677" font-family="DejaVu Sans, Arial, sans-serif" font-size="16" font-weight="400" fill="#334155" text-anchor="start">Adds stacks, staggered copies and burst chains</text>
+  <text x="362" y="1702" font-family="DejaVu Sans, Arial, sans-serif" font-size="16" font-weight="400" fill="#334155" text-anchor="start">Fixed configured offsets; copies inherit hand / cut</text>
+  <text x="362" y="1727" font-family="DejaVu Sans, Arial, sans-serif" font-size="16" font-weight="400" fill="#334155" text-anchor="start">Base anchors survive; final density may increase</text>
+  <rect x="70" y="1855" width="500" height="255" rx="14" fill="#fffbeb" stroke="#fbbf24" stroke-width="2" />
+  <text x="92" y="1887" font-family="DejaVu Sans, Arial, sans-serif" font-size="20" font-weight="600" fill="#92400e" text-anchor="start">7 · Obstacles + bombs · planned</text>
+  <text x="92" y="1917" font-family="DejaVu Sans, Arial, sans-serif" font-size="16" font-weight="600" fill="#1d4ed8" text-anchor="start">Audio: Z [B,16] from encoder 3</text>
+  <text x="92" y="1942" font-family="DejaVu Sans, Arial, sans-serif" font-size="16" font-weight="400" fill="#334155" text-anchor="start">Expanded occupancy [B,2,2,12] · rank 4</text>
+  <text x="92" y="1967" font-family="DejaVu Sans, Arial, sans-serif" font-size="16" font-weight="400" fill="#334155" text-anchor="start">Interval [B,2] + hazard history</text>
+  <text x="92" y="1992" font-family="DejaVu Sans, Arial, sans-serif" font-size="16" font-weight="400" fill="#334155" text-anchor="start">Wall head [B,K_wall] · includes NONE</text>
+  <text x="92" y="2017" font-family="DejaVu Sans, Arial, sans-serif" font-size="16" font-weight="400" fill="#334155" text-anchor="start">Bomb head [B,12] · cell-wise sigmoid</text>
+  <text x="92" y="2042" font-family="DejaVu Sans, Arial, sans-serif" font-size="16" font-weight="400" fill="#334155" text-anchor="start">Dense + GRU64 → Dense128 → two heads</text>
+  <text x="92" y="2067" font-family="DejaVu Sans, Arial, sans-serif" font-size="16" font-weight="400" fill="#334155" text-anchor="start">Scheduler owns times; model owns placement</text>
+  <text x="92" y="2092" font-family="DejaVu Sans, Arial, sans-serif" font-size="16" font-weight="400" fill="#334155" text-anchor="start">Existing rules → strobe rules → learned</text>
+  <rect x="710" y="1855" width="500" height="255" rx="14" fill="#fffbeb" stroke="#fbbf24" stroke-width="2" />
+  <text x="732" y="1887" font-family="DejaVu Sans, Arial, sans-serif" font-size="20" font-weight="600" fill="#92400e" text-anchor="start">8 · Lighting · decoupling planned</text>
+  <text x="732" y="1917" font-family="DejaVu Sans, Arial, sans-serif" font-size="16" font-weight="600" fill="#1d4ed8" text-anchor="start">Audio: Z [B,16] per lighting query</text>
+  <text x="732" y="1942" font-family="DejaVu Sans, Arial, sans-serif" font-size="16" font-weight="400" fill="#334155" text-anchor="start">Independent audio / BPM candidate clock</text>
+  <text x="732" y="1967" font-family="DejaVu Sans, Arial, sans-serif" font-size="16" font-weight="400" fill="#334155" text-anchor="start">Z blocks [B,16,16,1] + gaps [B,16,1]</text>
+  <text x="732" y="1992" font-family="DejaVu Sans, Arial, sans-serif" font-size="16" font-weight="400" fill="#334155" text-anchor="start">History / output [B,16,C_light] · rank 3</text>
+  <text x="732" y="2017" font-family="DejaVu Sans, Arial, sans-serif" font-size="16" font-weight="400" fill="#334155" text-anchor="start">Retain CNN32 + LSTM32/64 → Dense1024</text>
+  <text x="732" y="2042" font-family="DejaVu Sans, Arial, sans-serif" font-size="16" font-weight="400" fill="#334155" text-anchor="start">Sigmoid type/value scores; C_light=1904*</text>
+  <text x="732" y="2067" font-family="DejaVu Sans, Arial, sans-serif" font-size="16" font-weight="400" fill="#334155" text-anchor="start">Own times / history, independent of notes</text>
+  <text x="732" y="2092" font-family="DejaVu Sans, Arial, sans-serif" font-size="16" font-weight="400" fill="#334155" text-anchor="start">*Measured fav_15 network: 38,264,640 params</text>
+  <rect x="340" y="2220" width="600" height="205" rx="14" fill="#fffbeb" stroke="#fbbf24" stroke-width="2" />
+  <text x="362" y="2252" font-family="DejaVu Sans, Arial, sans-serif" font-size="20" font-weight="600" fill="#92400e" text-anchor="start">9 · Arcs · planned</text>
+  <text x="362" y="2282" font-family="DejaVu Sans, Arial, sans-serif" font-size="16" font-weight="600" fill="#1d4ed8" text-anchor="start">Audio: Z [B,16] from encoder 3</text>
+  <text x="362" y="2307" font-family="DejaVu Sans, Arial, sans-serif" font-size="16" font-weight="400" fill="#334155" text-anchor="start">Existing same-hand note IDs [B,2] + geometry / gap</text>
+  <text x="362" y="2332" font-family="DejaVu Sans, Arial, sans-serif" font-size="16" font-weight="400" fill="#334155" text-anchor="start">Arc history + hazard clearance</text>
+  <text x="362" y="2357" font-family="DejaVu Sans, Arial, sans-serif" font-size="16" font-weight="400" fill="#334155" text-anchor="start">Outputs: attach [B,2], shape [B,A], anchor mode</text>
+  <text x="362" y="2382" font-family="DejaVu Sans, Arial, sans-serif" font-size="16" font-weight="400" fill="#334155" text-anchor="start">Embeddings + GRU64 → Dense128 → separate heads</text>
+  <text x="362" y="2407" font-family="DejaVu Sans, Arial, sans-serif" font-size="16" font-weight="400" fill="#334155" text-anchor="start">Connects existing notes; endpoints / cuts stay fixed</text>
+  <rect x="340" y="2525" width="600" height="125" rx="14" fill="#ffffff" stroke="#cbd5e1" stroke-width="2" />
+  <text x="362" y="2557" font-family="DejaVu Sans, Arial, sans-serif" font-size="20" font-weight="600" fill="#0f172a" text-anchor="start">Validation → map package · integration planned</text>
+  <text x="362" y="2587" font-family="DejaVu Sans, Arial, sans-serif" font-size="16" font-weight="400" fill="#334155" text-anchor="start">Movement / swing / bounds / clearance checks</text>
+  <text x="362" y="2612" font-family="DejaVu Sans, Arial, sans-serif" font-size="16" font-weight="400" fill="#334155" text-anchor="start">Seconds → beat times · retain v3 + legacy v2 export</text>
+  <text x="362" y="2637" font-family="DejaVu Sans, Arial, sans-serif" font-size="16" font-weight="400" fill="#334155" text-anchor="start">Audio + cover + metadata + gameplay + lighting</text>
+  <rect x="70" y="2690" width="1140" height="82" rx="14" fill="#faf5ff" stroke="#c4b5fd" stroke-width="2" />
+  <text x="92" y="2722" font-family="DejaVu Sans, Arial, sans-serif" font-size="20" font-weight="600" fill="#6d28d9" text-anchor="start">Training / reconstruction only · full autoencoder · retained · 159,873 parameters</text>
+  <text x="92" y="2752" font-family="DejaVu Sans, Arial, sans-serif" font-size="16" font-weight="400" fill="#334155" text-anchor="start">[B,24,20,1] → encoder (68,576) → [B,16] → decoder (91,297) → [B,24,20,1]</text>
+  <polyline points="640,210 640,245 320,245 320,290" fill="none" stroke="#64748b" stroke-width="2.5" stroke-linejoin="round" marker-end="url(#arrow)" />
+  <polyline points="570,360 710,360" fill="none" stroke="#64748b" stroke-width="2.5" stroke-linejoin="round" marker-end="url(#arrow)" />
+  <rect x="613.4453125" y="328" width="53.109375" height="19" rx="3" fill="#f8fafc" />
+  <text x="640" y="342" font-family="DejaVu Sans, Arial, sans-serif" font-size="13" font-weight="400" fill="#475569" text-anchor="middle">Coarse</text>
+  <polyline points="320,495 320,645 710,645" fill="none" stroke="#64748b" stroke-width="2.5" stroke-linejoin="round" marker-end="url(#arrow)" />
+  <rect x="563.8984375" y="613" width="92.203125" height="19" rx="3" fill="#f8fafc" />
+  <text x="610" y="627" font-family="DejaVu Sans, Arial, sans-serif" font-size="13" font-weight="400" fill="#475569" text-anchor="middle">Fine features</text>
+  <polyline points="960,495 960,565" fill="none" stroke="#64748b" stroke-width="2.5" stroke-linejoin="round" marker-end="url(#arrow)" />
+  <rect x="866.640625" y="521" width="196.71875" height="19" rx="3" fill="#f8fafc" />
+  <text x="965" y="535" font-family="DejaVu Sans, Arial, sans-serif" font-size="13" font-weight="400" fill="#475569" text-anchor="middle">Shares → local NPS; add BPM</text>
+  <polyline points="340,165 30,165 30,980 340,980" fill="none" stroke="#64748b" stroke-width="2.5" stroke-linejoin="round" marker-end="url(#arrow)" />
+  <rect x="91" y="935" width="75.484375" height="19" rx="3" fill="#f8fafc" />
+  <text x="95" y="949" font-family="DejaVu Sans, Arial, sans-serif" font-size="13" font-weight="400" fill="#475569" text-anchor="start">Raw audio</text>
+  <polyline points="30,850 70,850" fill="none" stroke="#64748b" stroke-width="2.5" stroke-linejoin="round" marker-end="url(#arrow)" />
+  <polyline points="570,850 605,850 605,900" fill="none" stroke="#64748b" stroke-width="2.5" stroke-linejoin="round" marker-end="url(#arrow)" />
+  <polyline points="960,795 960,845 680,845 680,900" fill="none" stroke="#64748b" stroke-width="2.5" stroke-linejoin="round" marker-end="url(#arrow)" />
+  <rect x="846.9453125" y="814" width="156.109375" height="19" rx="3" fill="#f8fafc" />
+  <text x="925" y="828" font-family="DejaVu Sans, Arial, sans-serif" font-size="13" font-weight="400" fill="#475569" text-anchor="middle">Gameplay query times</text>
+  <polyline points="640,1080 640,1120 320,1120 320,1180" fill="none" stroke="#64748b" stroke-width="2.5" stroke-linejoin="round" marker-end="url(#arrow)" />
+  <rect x="232.5234375" y="1138" width="174.953125" height="19" rx="3" fill="#f8fafc" />
+  <text x="320" y="1152" font-family="DejaVu Sans, Arial, sans-serif" font-size="13" font-weight="400" fill="#475569" text-anchor="middle">Z + carried timing events</text>
+  <polyline points="940,1020 1250,1020 1250,1930 1210,1930" fill="none" stroke="#64748b" stroke-width="2.5" stroke-linejoin="round" marker-end="url(#arrow)" />
+  <rect x="967.140625" y="988" width="225.71875" height="19" rx="3" fill="#f8fafc" />
+  <text x="1080" y="1002" font-family="DejaVu Sans, Arial, sans-serif" font-size="13" font-weight="400" fill="#475569" text-anchor="middle">Z at independent lighting queries</text>
+  <polyline points="570,1270 710,1270" fill="none" stroke="#64748b" stroke-width="2.5" stroke-linejoin="round" marker-end="url(#arrow)" />
+  <rect x="599.0390625" y="1220" width="81.921875" height="19" rx="3" fill="#f8fafc" />
+  <text x="640" y="1234" font-family="DejaVu Sans, Arial, sans-serif" font-size="13" font-weight="400" fill="#475569" text-anchor="middle">Fixed times</text>
+  <rect x="599.375" y="1239" width="81.25" height="19" rx="3" fill="#f8fafc" />
+  <text x="640" y="1253" font-family="DejaVu Sans, Arial, sans-serif" font-size="13" font-weight="400" fill="#475569" text-anchor="middle">+ positions</text>
+  <polyline points="70,1350 48,1350 48,1155 110,1155 110,1180" fill="none" stroke="#64748b" stroke-width="2.5" stroke-linejoin="round" marker-end="url(#arrow)" stroke-dasharray="6 5" />
+  <polyline points="1210,1350 1228,1350 1228,1155 1170,1155 1170,1180" fill="none" stroke="#64748b" stroke-width="2.5" stroke-linejoin="round" marker-end="url(#arrow)" stroke-dasharray="6 5" />
+  <polyline points="960,1410 960,1460 640,1460 640,1515" fill="none" stroke="#64748b" stroke-width="2.5" stroke-linejoin="round" marker-end="url(#arrow)" />
+  <rect x="484.65625" y="1482" width="310.6875" height="19" rx="3" fill="#f8fafc" />
+  <text x="640" y="1496" font-family="DejaVu Sans, Arial, sans-serif" font-size="13" font-weight="400" fill="#475569" text-anchor="middle">Directed retained notes; at most one per hand</text>
+  <polyline points="640,1745 640,1790 320,1790 320,1855" fill="none" stroke="#64748b" stroke-width="2.5" stroke-linejoin="round" marker-end="url(#arrow)" />
+  <rect x="232.9375" y="1814" width="174.125" height="19" rx="3" fill="#f8fafc" />
+  <text x="320" y="1828" font-family="DejaVu Sans, Arial, sans-serif" font-size="13" font-weight="400" fill="#475569" text-anchor="middle">Expanded notes + chains</text>
+  <polyline points="640,1790 640,2160 710,2160 710,2220" fill="none" stroke="#64748b" stroke-width="2.5" stroke-linejoin="round" marker-end="url(#arrow)" />
+  <rect x="646.0078125" y="2188" width="127.984375" height="19" rx="3" fill="#f8fafc" />
+  <text x="710" y="2202" font-family="DejaVu Sans, Arial, sans-serif" font-size="13" font-weight="400" fill="#475569" text-anchor="middle">Existing endpoints</text>
+  <polyline points="320,2110 320,2160 570,2160 570,2220" fill="none" stroke="#64748b" stroke-width="2.5" stroke-linejoin="round" marker-end="url(#arrow)" />
+  <rect x="251.6484375" y="2123" width="136.703125" height="19" rx="3" fill="#f8fafc" />
+  <text x="320" y="2137" font-family="DejaVu Sans, Arial, sans-serif" font-size="13" font-weight="400" fill="#475569" text-anchor="middle">Hazards / clearance</text>
+  <polyline points="640,2425 640,2525" fill="none" stroke="#64748b" stroke-width="2.5" stroke-linejoin="round" marker-end="url(#arrow)" />
+  <rect x="579.8515625" y="2454" width="120.296875" height="19" rx="3" fill="#f8fafc" />
+  <text x="640" y="2468" font-family="DejaVu Sans, Arial, sans-serif" font-size="13" font-weight="400" fill="#475569" text-anchor="middle">Gameplay + arcs</text>
+  <polyline points="960,2110 960,2480 860,2480 860,2525" fill="none" stroke="#64748b" stroke-width="2.5" stroke-linejoin="round" marker-end="url(#arrow)" />
+  <rect x="996" y="2306" width="60.53125" height="19" rx="3" fill="#f8fafc" />
+  <text x="1000" y="2320" font-family="DejaVu Sans, Arial, sans-serif" font-size="13" font-weight="400" fill="#475569" text-anchor="start">Lighting</text>
+  <rect x="345.8046875" y="2654" width="588.390625" height="19" rx="3" fill="#f8fafc" />
+  <text x="640" y="2668" font-family="DejaVu Sans, Arial, sans-serif" font-size="13" font-weight="400" fill="#475569" text-anchor="middle">Z is shared by all downstream models; histories are stage-specific and strictly preceding.</text>
+  <rect x="303.640625" y="2787" width="672.71875" height="19" rx="3" fill="#f8fafc" />
+  <text x="640" y="2801" font-family="DejaVu Sans, Arial, sans-serif" font-size="13" font-weight="400" fill="#475569" text-anchor="middle">Solid arrows: data flow · dashed arrows: history feedback · v2 denotes the pipeline, not the file format</text>
+</svg>
