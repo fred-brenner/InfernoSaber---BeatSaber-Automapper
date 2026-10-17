@@ -262,6 +262,74 @@ and [remaining benchmark work](roadmap.md#human-map-timing-benchmark).
 The older three-song comparison included favorites and is retained as historical
 evidence only; use the curated-set results for subsequent decisions.
 
+
+### Trained intensity/timing versus legacy beats
+
+The comparison backend evaluates only beats. It does not load the trained notes
+checkpoint or call the later generation stages. Run it in the retained CPU
+profile with an explicitly selected trained run:
+
+```bash
+source /home/frede/.local/share/infernosaber-baseline/env.sh
+python -m evaluation.evaluate_beat_algorithms \
+  --evaluation-root "../Data/training/evaluate_beats" \
+  --backend compare \
+  --trained-run "../Data/training/beat_models_v2/runs/20261017-151437" \
+  --bps 3 5 7 --difficulty ExpertPlus --characteristic Standard \
+  --tolerance 0.02
+```
+
+Use `--backend intensity-timing` for the new pair alone. Alternatively supply
+`--intensity-artifact` and `--timing-artifact` instead of `--trained-run`.
+`--backend legacy` preserves the original command and report behavior, and
+remains the default for existing callers. `--prepare-only` refreshes the existing
+evaluation snapshot without loading any model, including with a new backend.
+
+The new pair uses the shared audio extractor, saved training normalization,
+predicted whole-song intensity, Info BPM as a separate tempo input, and requested
+retained colored notes/second. Timing emits each valid core frame once and
+preserves tails; count argmax selects zero/one/two notes. There is no subsequent
+threshold tuning, minimum-spacing pass, onset rematching, snapping or density
+forcing. A simultaneous pair is one onset and two retained notes. The extra
+reference-density scenario supplies only the human map's global retained NPS;
+its local intensity still comes from the trained model.
+
+The legacy observer records thresholded model onsets before spacing/filling,
+onset rematching and BPM alignment, and also retains the unchanged processed
+legacy result. Observation changes only an in-memory wrapper during a debug
+call and restores it on failure; generation source files and algorithms stay
+unchanged. The original legacy index-to-time convention is retained.
+
+All three stages are scored against the **same synchronized reference** using
+`config.min_time_diff` (currently 20 ms). Exact source-reference scores are also
+reported for continuity with older benchmark reports. The primary metric is
+pooled one-to-one onset F1 at the requested tolerance; saved metrics include
+10/20/35/50/100 ms tolerances, precision, recall, matched error and actual onset
+rate. Equal numeric legacy BPS and new colored NPS controls are not guaranteed
+to produce equal densities. The report records those units and a separate
+new-model run at each human map's retained NPS. It does not tune the model's
+predictions to a reference count or select a better decoder on benchmark songs.
+
+Schema-2 comparison reports contain per-stage summaries, matched-song paired
+comparisons, source/checkpoint hashes, normalization identity, overlap evidence,
+intensity errors, colored-note counts and per-frame class diagnostics. Adjacent
+`*-arrays/` directories contain non-executable NPZ probabilities/shares/counts;
+they require a new destination on each run. Per-map failures are recorded and
+produce a nonzero exit status. Shared preparation failures are excluded from
+paired comparisons, and summaries must be read together with their run counts.
+
+GPU-trained tf-keras 2.21 archives use a module name unavailable in the CPU Keras
+2.15 runtime. The adapter validates the recorded architecture and complete
+serialized execution graph against the current stage, then strictly loads its
+weights into that matching CPU model. Unknown graph/configuration changes or
+mismatched stages, statistics, statuses and checksums are rejected. This neither
+converts nor overwrites checkpoint files.
+
+Identifiable recording overlap must be checked separately from timing quality.
+The old model's training overlap remains unknown. Agreement on these seven human
+maps is not a measure of playability or general musical quality. Trained
+beat-only results are recorded in [the baseline](baseline.md).
+
 ## New beat-learning framework
 
 Use [the new training guide](beat-model-training.md) for dataset preparation,

@@ -91,19 +91,21 @@ It reads colored-note reference onsets directly from package JSON and keeps
 source audio and application configuration intact. See
 [usage and scoring rules](development.md#human-map-beat-benchmark).
 
-The evaluated stage remains processed timing proposals from `debug_beats=True`.
-Raw timing-model probabilities and final beatmap timings require separate
-instrumentation. References currently require constant BPM and zero song offset;
-unsupported timing metadata fails explicitly.
+The default legacy stage remains processed timing proposals from `debug_beats=True`.
+The trained-pair comparison additionally captures legacy thresholded raw outputs
+and the new intensity/timing frame probabilities, stopping before notes. Final
+serialized beatmap timings remain outside this comparison. References require
+constant BPM and zero song offset; unsupported timing metadata fails explicitly.
 
 Remaining benchmark work:
 
 1. Curate a stable evaluation set with documented training overlap and verified
-   audio alignment. The restored local set records overlap as unknown.
+   audio alignment. The new trained-pair check excludes identifiable curated
+   recordings from all learning splits; old-model overlap remains unknown.
 2. Choose BPS settings, tolerances, and acceptable density tradeoffs for each
    human difficulty. Reporting measured density alone does not normalize it.
-3. Compare raw model output, processed proposals, and final beatmap timings so
-   regressions can be attributed to their stage.
+3. Extend the implemented raw/processed beat comparison to final beatmap timings
+   after the later generation stages are rebuilt.
 4. Add musical-fit and repetitive-pattern criteria alongside timestamp agreement.
 5. Extend reference alignment to tempo changes/offsets when needed and tested.
 

@@ -321,6 +321,12 @@ python -m training.beat_models evaluate --backend keras \
   --output "$beat_data/test-evaluation"
 ```
 
+For the curated **beat-only** comparison of a trained intensity/timing pair
+against the old beat model, use [the beat benchmark](development.md#trained-intensitytiming-versus-legacy-beats).
+Its `--backend compare --trained-run <run>` command does not load a notes
+checkpoint or execute later generation stages. It reports raw and processed
+legacy beats separately, common-reference scores and actual output density.
+
 Evaluation saves per-stage teacher-forced metrics, composed autoregressive
 metrics, and compressed prediction arrays. `--requested-nps` overrides reference
 density. Optional `--max-events 8` bounds note decoding for execution diagnostics;

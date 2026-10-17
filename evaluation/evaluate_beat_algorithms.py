@@ -1,4 +1,4 @@
-"""Benchmark processed beat timings against human-authored map packages.
+"""Benchmark legacy and trained intensity/timing beats against human map packages.
 
 Run from the repository root with ``python -m evaluation.evaluate_beat_algorithms
 --help``. Importing this module does not load models or change configuration.
@@ -258,7 +258,13 @@ def main(argv=None):
     parser.add_argument("--difficulty", default="ExpertPlus", help="Exact human difficulty label")
     parser.add_argument("--characteristic", default="Standard")
     parser.add_argument("--tolerance", type=float, default=0.02, help="Matching tolerance in seconds")
-    parser.add_argument("--model-dir", type=Path, help="Override the configured model folder in memory")
+    parser.add_argument("--model-dir", type=Path, help="Override the legacy model folder in memory")
+    parser.add_argument("--backend", choices=("legacy", "intensity-timing", "compare"), default="legacy",
+                        help="Legacy processed beats, new raw beat pair, or both plus legacy raw diagnostics")
+    parser.add_argument("--trained-run", type=Path,
+                        help="Explicit run directory containing intensity/ and timing/ artifacts; notes are unused")
+    parser.add_argument("--intensity-artifact", type=Path, help="Explicit trained intensity stage artifact")
+    parser.add_argument("--timing-artifact", type=Path, help="Explicit trained timing stage artifact")
     parser.add_argument("--seed", type=int, default=3)
     parser.add_argument("--output", type=Path, help="New JSON report; evaluation-root defaults to results/")
     args = parser.parse_args(argv)
@@ -273,6 +279,25 @@ def main(argv=None):
         if output.exists():
             raise ValueError("Choose a new report path outside the input map packages")
         preprocessing = None
+        intensity_artifact, timing_artifact = args.intensity_artifact, args.timing_artifact
+        if args.trained_run is not None:
+            if intensity_artifact is not None or timing_artifact is not None:
+                raise ValueError("Choose --trained-run or explicit stage artifacts")
+            intensity_artifact, timing_artifact = args.trained_run / "intensity", args.trained_run / "timing"
+        if args.backend == "legacy" and (intensity_artifact is not None or timing_artifact is not None):
+            raise ValueError("Stage artifacts require --backend intensity-timing or compare")
+        prediction_dir = output.parent / (output.stem + "-arrays")
+        if args.backend != "legacy" and not args.prepare_only:
+            if intensity_artifact is None or timing_artifact is None:
+                raise ValueError("The new backend requires --trained-run or both stage artifacts")
+            if prediction_dir.exists():
+                raise ValueError("Choose a report path with a new prediction-array directory")
+            from training.beat_models.artifacts import load_model_manifest
+            _, intensity_manifest = load_model_manifest(intensity_artifact, "intensity")
+            _, timing_manifest = load_model_manifest(timing_artifact, "timing", intensity_manifest)
+            for metadata in (intensity_manifest, timing_manifest):
+                if metadata.get("status") != "trained":
+                    raise ValueError("Beat comparisons require explicitly trained checkpoints")
         if root is not None:
             managed = ("bs_map_input", "maps", "songs_egg", "maps_dict_all", "songs_diff", "archive")
             if any(output.is_relative_to(root / folder) for folder in managed):
@@ -296,8 +321,15 @@ def main(argv=None):
             packages = discover_packages(args.maps_dir)
             if any(output.is_relative_to(package) for package in packages):
                 raise ValueError("Choose a new report path outside the input map packages")
-        report = run_benchmark(packages, list(dict.fromkeys(args.bps)), args.tolerance,
-                               args.difficulty, args.characteristic, args.model_dir, args.seed)
+        if args.backend == "legacy":
+            report = run_benchmark(packages, list(dict.fromkeys(args.bps)), args.tolerance,
+                                   args.difficulty, args.characteristic, args.model_dir, args.seed)
+        else:
+            from evaluation.compare_beat_models import run_comparison
+            report = run_comparison(packages, list(dict.fromkeys(args.bps)), args.tolerance,
+                                    args.difficulty, args.characteristic, args.model_dir, args.seed,
+                                    backend=args.backend, intensity_artifact=intensity_artifact,
+                                    timing_artifact=timing_artifact, prediction_dir=prediction_dir)
         if preprocessing is not None:
             report["preprocessing"] = preprocessing
     except (OSError, ValueError) as exc:
@@ -321,7 +353,11 @@ def main(argv=None):
             "source_sha256": {str(path.relative_to(root)): file_sha256(path) for path in
                               (Path(__file__).resolve(), root / "evaluation/human_maps.py",
                                root / "evaluation/prepare_evaluation.py",
-                               root / "map_creation/gen_beats.py")},
+                               root / "map_creation/gen_beats.py",
+                               root / "evaluation/beat_pair.py",
+                               root / "evaluation/compare_beat_models.py",
+                               root / "evaluation/legacy_observer.py", *sorted(
+                                   (root / "training/beat_models").glob("*.py"))) if path.is_file()},
         }
     except (OSError, subprocess.CalledProcessError):
         report["code"] = {"revision": None, "dirty": None}
@@ -330,9 +366,14 @@ def main(argv=None):
         json.dump(report, handle, indent=2, allow_nan=False)
         handle.write("\n")
     for row in report["summary_by_bps"]:
-        print(f"BPS {row['bps_setting']:g}: P={row['precision']:.3f} "
+        prefix = f"{row['backend']} / " if "backend" in row else ""
+        print(f"{prefix}BPS/NPS {row['bps_setting']:g}: P={row['precision']:.3f} "
               f"R={row['recall']:.3f} F1={row['f1']:.3f}; "
               f"{row['successful_runs']} succeeded, {row['failed_runs']} failed")
+    if "reference_density_summary" in report:
+        reference_density = report["reference_density_summary"]
+        print(f"intensity_timing / reference retained NPS: P={reference_density['precision']:.3f} "
+              f"R={reference_density['recall']:.3f} F1={reference_density['f1']:.3f}")
     print(f"Saved report: {output}")
     return int(any(row["status"] != "ok" for row in report["results"])
                or bool(preprocessing and preprocessing["skipped"]))

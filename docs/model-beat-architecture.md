@@ -376,13 +376,21 @@ At the best intensity epoch, reported validation KL divergence improved by
 **32.26%** against the constant-NPS, duration-aware uniform baseline. This is a
 validation diagnostic, not a held-out test or gameplay-quality claim.
 
-The framework has passed **271 CPU tests**, including masks, time contracts,
+The full suite has passed **324 CPU tests**, including beat-only comparison,
+masks, time contracts,
 reduction/provenance, configurable networks, finite gradients and serialization.
 All seven curated maps passed preparation and bounded CPU model checks after
 synchronization; no favorites inputs were used for those comparisons.
 See [baseline.md](baseline.md) for evidence and the boundaries of each check.
 
-Still pending for these trained checkpoints: held-out stage metrics and composed
+The trained intensity/timing pair has now completed CPU evaluation on the seven
+curated maps with predicted intensity. The beat-only benchmark compares its raw
+frame argmax with both raw and processed legacy beats, using shared synchronized
+references and separate exact-reference scores. It never loads the note
+checkpoint. See [benchmark usage](development.md#trained-intensitytiming-versus-legacy-beats)
+and the dated [comparison evidence](baseline.md).
+
+Still pending: full internal test-split stage metrics and composed note-model
 autoregressive evaluation with predicted intensity and generated history.
 Timing evaluation includes onset precision/recall/F1 and note-rate error;
 intensity includes share/bin-count errors; notes includes hand, position and

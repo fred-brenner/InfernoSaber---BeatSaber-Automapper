@@ -846,3 +846,101 @@ Evidence is stored outside the checkout under
 `acceptance-summary.json`, `pytest-cpu.log`, `no-training-check.json`, and the three
 `dry-*/report.json` files. [The training guide](beat-model-training.md) explains
 parameter locations, CLI overrides and artifact compatibility.
+
+## Trained intensity/timing versus legacy beats: CPU comparison (2026-10-17)
+
+The curated `evaluate_beats` benchmark now supports `--backend compare` and
+`--backend intensity-timing`, with explicit `--trained-run` or separate stage
+artifacts. Run `20261017-151437` supplies only its trained intensity and timing
+checkpoints. The new adapter reuses the shared decoder/features and saved
+training normalization, predicts whole-song intensity, supplies Info BPM
+separately from requested colored NPS, and emits raw 100 Hz count argmax.
+It does not load the trained notes checkpoint or call the later pipeline.
+No threshold, spacing filter, rematching, snapping or forced count was added.
+
+For the old model, an evaluation-only observer captures thresholded neural
+outputs before existing spacing/filling/alignment and also retains its unchanged
+processed debug result. The wrapper is restored after each call, including on
+failure. The source generator, alignment, legacy preprocessing, training code,
+model definitions/settings, and checkpoint files were not changed.
+
+All seven Standard/ExpertPlus packages completed, with zero preprocessing skips
+or failed inference cases. Sources are the same seven packages as the corrected
+BPM baseline; no favorites are included. Primary scoring uses identical 20 ms
+synchronized human references for every stage: **4,709 onsets**. Exact-reference
+scores against **4,741 onsets** are retained for historical comparison. Models
+are evaluated with the configured decoder, without benchmark threshold tuning.
+
+Pooled onset F1 at an inclusive 20 ms tolerance:
+
+| Numeric setting | Old raw thresholded | Old processed beat path | New intensity + timing |
+| ---: | ---: | ---: | ---: |
+| 3 | 21.88% | 56.90% | 40.30% |
+| 5 | 21.87% | 64.06% | 51.41% |
+| 7 | 22.03% | 61.59% | 55.93% |
+
+The new pair beats the raw legacy output on all **21/21 song/setting cases**.
+Against the processed legacy path it wins 1/7 songs at settings 3 and 5, and 3/7
+at setting 7. At setting 5, Shut Up and Dance improves from 67.22% to 70.52%;
+the other six songs remain below the processed baseline. This supports improved
+raw proposals under each stage's existing decoding/time conventions, not an
+improved replacement for the complete current beat path.
+
+At setting 5, new precision/recall is **79.77% / 37.93%**, versus processed legacy
+**59.18% / 69.82%**. The new output has 2,239 onsets (1.821/second), versus 5,556
+processed old onsets (4.518/second) and 4,709 reference onsets (3.829/second).
+Including predicted doubles, the new output contains 2,649 retained colored
+notes, or 2.154 NPS. Its matched timing error averages 3.69 ms; old processed
+matches average 2.53 ms. These means use different matched populations.
+
+Equal numeric controls are not density-equivalent: legacy BPS is an approximate
+application control, while new NPS counts colored notes and counts doubles twice.
+The additional new run at each map's actual retained NPS still produces pooled
+**50.18% F1**, precision 81.26%, recall 36.29%. It emits **2,376 colored notes**
+against 5,773 retained reference notes. Requested density remains conditioning,
+not a forced budget. The dominant observed weakness is missing events/low output
+density, rather than poor placement of the emitted matches. This comparison does
+not isolate whether predicted intensity, conditioning, or timing decisions cause
+the omissions; a reference-intensity ablation on validation data remains a
+separate diagnostic. Notes, alignment and training were left untouched.
+
+Under the previous exact-reference convention, old processed pooled F1 remains
+**56.72% / 63.86% / 61.43%**, reproducing the corrected-BPM baseline. New exact
+F1 is **40.10% / 51.17% / 55.69%**. The small shift in the primary old numbers
+therefore comes from synchronized references, not a legacy behavior change.
+
+Overlap audit against the actual training dataset manifest found no matches for
+any curated song's audio bytes or mono-16k decoded PCM across train, validation
+or test, nor in either checkpoint's source list. Dataset preparation reserved
+22 matching difficulty variants. This supports identifiable-recording exclusion
+for the new run; arbitrary re-encodes without aliases and old-model training
+overlap remain limitations. The seven-map result is not a gameplay-quality or
+broad generalization claim.
+
+The trained tf-keras 2.21 archives cannot deserialize directly into the retained
+CPU Keras 2.15 package namespace. The adapter checks each manifest, architecture,
+normalization and checksum, compares the full serialized execution graph to the
+current model, then strictly restores the unchanged weights on CPU. Both trained
+models loaded and produced finite probabilities through every valid tail frame.
+No packages were installed or checkpoints converted.
+
+Validation used Python 3.10.19, TensorFlow 2.15.1/Keras 2.15.0, NumPy 1.26.4,
+and disabled GPU visibility. Full CPU suite: **324 passed**. There were **70**
+successful stage cases: 21 old raw, 21 old processed and 28 new runs, including
+seven reference-density runs. Guards rejected training/optimizer updates and
+non-beat model loading/construction during the benchmark. All 52 input files
+and nine checkpoint weight/metadata files, including the unused notes stage,
+retain their original hashes. A separate real pair-only CLI smoke confirms no
+legacy generator or new generation runner import. GPU evaluation and note
+inference were not performed.
+
+Evidence directory:
+`../Data/training/evaluate_beats/results/beat-pair-comparison-cpu-2026-10-17-91fa7c/`.
+`benchmark.json` contains the full comparison and adjacent `benchmark-arrays/`
+contains probabilities/intensity/counts. `comparison-summary.json` and
+`per-song-setting-5.csv` collect conclusions; `overlap-audit.py/.json` reproduce
+the source/split audit. `guarded_benchmark.py`, `benchmark.log`,
+`guarded_pair_only.py`, `pair-only-smoke.json`, and `pytest-cpu.log` retain the
+execution checks. Post-inference reporting fixes for failed-run totals and
+source-hash coverage passed focused tests; all measured inference cases had
+succeeded, so those fixes do not change their predictions or scores.

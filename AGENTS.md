@@ -27,7 +27,8 @@ platforms before implementing them unless the task already authorizes them.
 - For optional import fixes and small follow-ups, read [TODO.md](TODO.md).
 - For recorded baseline results or comparisons, read
   [docs/baseline.md](docs/baseline.md). It distinguishes verified checks from pending work.
-- For human-map beat benchmarks, reference timing rules, and reruns, read
+- For human-map beat benchmarks, trained intensity/timing comparisons, reference
+  timing rules, and reruns, read
   [docs/development.md](docs/development.md#human-map-beat-benchmark).
   Use only the curated `evaluate_beats/bs_map_input` packages for comparisons;
   exclude `favorites_bs_input` and report skipped packages individually.
