@@ -150,14 +150,17 @@ When using the app from `main_app`, a script will always be started to create th
 
 ## Training
 
-Run the training script:
+`main_training.py` now selects and sequentially trains all eight v2 model
+stages, including intensity and timing. Its old five-letter legacy workflow has been retired. Prepare the v2
+dataset first and activate the GPU environment as described in
+[the current training guide](docs/pipeline-v2.md#small-development-launcher), then run:
+
 ```bash
-python3 main_training.py
+python main_training.py
 ```
 
-You’ll be prompted five times—type `yyyyy` to run all stages consecutively.
-
-If interrupted or one stage fails, restart from where you left off (e.g., `nnnyy`).
+Choose model numbers/names separated by spaces or commas, or `all`. The script
+creates a new run directory; `--models positions` starts just that stage.
 
 ---
 

@@ -229,6 +229,12 @@ beat_models_mel_bins = 80
 beat_models_validation_fraction = 0.1
 beat_models_test_fraction = 0.1
 
+# Intensity/timing training execution (model and target contracts stay unchanged)
+beat_models_training_prefetch_batches = 2  # zero disables the explicit input buffer
+beat_models_training_compile_steps = True
+beat_models_training_steps_per_execution = 16  # sequential updates per graph call, not gradient accumulation
+beat_models_training_log_every_batches = 100  # progress rounds to graph-call boundaries
+
 # Intensity model configuration (new whole-song normalized note distribution)
 intensity_optimizer = 'Adam'
 intensity_learning_rate = 5e-4
@@ -333,6 +339,12 @@ pipeline_v2_lighting_onset_threshold = 1.0
 pipeline_v2_arc_min_gap_seconds = 0.15
 pipeline_v2_arc_max_gap_seconds = 0.8
 pipeline_v2_max_candidates = 10000
+
+# V2 training execution (does not alter model/data contracts)
+pipeline_v2_training_ram_cache_mib = 1024  # active stage only; zero streams every song
+pipeline_v2_training_prefetch_batches = 2  # bounded CPU producer; zero disables prefetch
+pipeline_v2_training_compile_steps = True
+pipeline_v2_training_log_every_batches = 100  # zero keeps epoch summaries only
 
 # V2 positions: training and network parameters
 positions_optimizer = 'Adam'

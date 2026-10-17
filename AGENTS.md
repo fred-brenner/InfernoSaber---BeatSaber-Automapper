@@ -20,7 +20,8 @@ platforms before implementing them unless the task already authorizes them.
   [docs/model-architecture.md](docs/model-architecture.md).
 - For v2 dataset preparation, individual stage training, concept composition,
   review stops and opt-in model comparisons, read [docs/pipeline-v2.md](docs/pipeline-v2.md).
-  Its new downstream models are untrained; corpus comparisons require an explicit request.
+  It also covers training throughput and the small `main_training.py` selection
+  script. Corpus comparisons require an explicit request.
 - For implemented intensity/timing/note contracts and training status, read
   [docs/model-beat-architecture.md](docs/model-beat-architecture.md).
 - For legacy generation calls, checkpoints, and preprocessing, read
@@ -38,6 +39,8 @@ platforms before implementing them unless the task already authorizes them.
 - For the existing user workflow, read [Readme.md](Readme.md).
 - For the new intensity/timing/note framework, training commands, data contracts,
   and verification limits, read [docs/beat-model-training.md](docs/beat-model-training.md).
+  It also documents intensity/timing input caching and grouped Keras execution;
+  these have separate settings from the six downstream trainers.
   Its acceptance stops at intermediate predictions; full map generation is separate.
 - For legacy training work, consult
   [the existing installation and training guide](How%20to%20-%20Linux%20install%20for%20training%20and%20app.md)
@@ -58,8 +61,9 @@ labels require verification before becoming current requirements.
   Keras through `TF_USE_LEGACY_KERAS=1`; standalone Keras imports select a different
   API in that environment and break the existing TCN loading path.
 - Inspect scripts before importing or running them: `main_app.py` performs a
-  GitHub update check at import, and `main_training.py` has top-level GPU checks
-  and interactive training orchestration.
+  GitHub update check at import. `main_training.py` is inert on import; running
+  it selects and sequentially launches all eight v2 training stages, routing
+  intensity/timing and downstream models to their respective datasets/trainers.
 
 ## Validation
 

@@ -6,6 +6,9 @@ independently against its own strictly preceding reference history.
 """
 
 import json
+from collections import deque
+from concurrent.futures import ThreadPoolExecutor
+from time import perf_counter
 import zipfile
 
 import numpy as np
@@ -15,7 +18,7 @@ from training.beat_models.artifacts import new_run_directory, write_json
 from .artifacts import execution_identity
 
 from .contracts import NEW_STAGES, StageExamples, validate_examples
-from .settings import architecture_settings, training_settings
+from .settings import architecture_settings, performance_settings, training_settings
 
 
 def _check_stage(stage):
@@ -36,20 +39,6 @@ def _merge(examples):
                          np.concatenate([item.times for item in examples]))
 
 
-def _selected_songs(dataset, split):
-    songs = dataset.songs
-    records = getattr(songs, "records", None)
-    if split is not None and records is not None:
-        # Immutable lazy datasets expose the split index without reading NPZs.
-        for index, record in enumerate(records):
-            if record["split"] == split:
-                yield songs[index]
-        return
-    for song in songs:
-        if split is None or song.base.metadata.get("split") == split:
-            yield song
-
-
 def batches(dataset, stage, split=None, batch_size=128, shuffle=False, rng=None):
     """Stream one stage at a time, retaining at most one song and one batch.
 
@@ -59,13 +48,16 @@ def batches(dataset, stage, split=None, batch_size=128, shuffle=False, rng=None)
     _check_stage(stage)
     if isinstance(batch_size, bool) or not isinstance(batch_size, int) or batch_size < 1:
         raise ValueError("Batch size must be a positive integer")
+    from .training_data import TrainingData, iter_stage_examples
+    if isinstance(dataset, TrainingData):
+        if dataset.stage != stage:
+            raise ValueError("Prepared training reader belongs to another stage")
+        examples_source = dataset.examples(split)
+    else:
+        examples_source = iter_stage_examples(dataset, stage, split)
     rng = np.random.default_rng(3) if rng is None else rng
     pending, size = [], 0
-    for song in _selected_songs(dataset, split):
-        examples = song.examples.get(stage)
-        if examples is None:
-            continue
-        validate_examples(examples, stage)
+    for examples in examples_source:
         order = np.arange(len(examples.times))
         if shuffle:
             rng.shuffle(order)
@@ -82,25 +74,28 @@ def batches(dataset, stage, split=None, batch_size=128, shuffle=False, rng=None)
         yield _merge(pending)
 
 
-def _split_counts(dataset, stage):
-    result = {split: {"songs": 0, "examples": 0, "supervised_values": 0}
-              for split in ("train", "validation", "test")}
-    groups = {}
-    for song in dataset.songs:
-        split = song.base.metadata.get("split")
-        group = song.base.metadata.get("group_id")
-        if split not in result or not group:
-            raise ValueError("V2 training requires recording groups and explicit dataset splits")
-        if group in groups and groups[group] != split:
-            raise ValueError("Recording group leaks across v2 training splits")
-        groups[group] = split
-        examples = song.examples.get(stage)
-        if examples is not None:
-            validate_examples(examples, stage)
-            result[split]["songs"] += 1
-            result[split]["examples"] += len(examples.times)
-            result[split]["supervised_values"] += sum(int(np.count_nonzero(value)) for value in examples.weights.values())
-    return result
+def prefetch_batches(source, count=2):
+    """Prepare bounded batches in one producer, preserving order and errors."""
+    if isinstance(count, bool) or not isinstance(count, int) or count < 0:
+        raise ValueError("Prefetch batch count must be a nonnegative integer")
+    if count == 0:
+        yield from source
+        return
+    iterator, end = iter(source), object()
+    executor = ThreadPoolExecutor(max_workers=1, thread_name_prefix="v2-batches")
+    pending = deque(executor.submit(next, iterator, end) for _ in range(count))
+    try:
+        while pending:
+            value = pending.popleft().result()
+            if value is end:
+                return
+            pending.append(executor.submit(next, iterator, end))
+            yield value
+    finally:
+        executor.shutdown(wait=True, cancel_futures=True)
+        close = getattr(iterator, "close", None)
+        if close is not None:
+            close()
 
 
 def _outputs(value):
@@ -220,36 +215,35 @@ def smoke_models(dataset, output, stages=None, max_examples=8):
     return report
 
 
-def _epoch(dataset, stage, model, batch_size, optimizer=None, shuffle=False, rng=None):
-    from . import models
-
-    totals = {}
-    for examples in batches(dataset, stage, "train" if optimizer is not None else "validation",
-                            batch_size, shuffle, rng):
-        if optimizer is None:
-            predicted = model(examples.inputs, training=False)
-            components = models.loss_components(stage, examples.targets, predicted, examples.weights)
-        else:
-            with models.tf.GradientTape() as tape:
-                predicted = model(examples.inputs, training=True)
-                components = models.loss_components(stage, examples.targets, predicted, examples.weights)
-                loss = models.combine_loss_components(stage, components)
-            if not np.isfinite(float(loss)):
-                raise ValueError(f"Nonfinite {stage} training loss")
-            gradients = tape.gradient(loss, model.trainable_variables)
-            for variable, gradient in zip(model.trainable_variables, gradients):
-                if gradient is None:
-                    raise ValueError(f"Disconnected {stage} training variable: {variable.name}")
-                value = gradient.values if isinstance(gradient, models.tf.IndexedSlices) else gradient
-                models.tf.debugging.assert_all_finite(value, f"Nonfinite gradient for {variable.name}")
-            optimizer.apply_gradients(zip(gradients, model.trainable_variables))
-        for key, pair in components.items():
-            totals.setdefault(key, np.zeros(2, np.float64))
-            totals[key] += [float(value) for value in pair]
-    result = float(models.combine_loss_components(stage, totals))
-    if not totals or not np.isfinite(result):
+def _epoch(dataset, stage, execution, batch_size, *, training=False, shuffle=False, rng=None,
+           prefetch=2, log_every=100, verbose=0, epoch=1):
+    split = "train" if training else "validation"
+    total_batches = (dataset.counts[split]["examples"] + batch_size - 1) // batch_size
+    source = prefetch_batches(batches(dataset, stage, split, batch_size, shuffle, rng), prefetch)
+    execution.reset()
+    start = perf_counter()
+    examples_seen = batch_count = 0
+    try:
+        for examples in source:
+            execution.step(examples, training=training)
+            examples_seen += len(examples.times)
+            batch_count += 1
+            if verbose and log_every and batch_count % log_every == 0:
+                current = execution.loss()
+                seconds = perf_counter() - start
+                print(f"{stage} epoch {epoch} {split}: batch {batch_count}/{total_batches}, "
+                      f"loss={current:.6f}, {seconds:.1f}s, {examples_seen / max(seconds, 1e-9):.1f} examples/s",
+                      flush=True)
+    finally:
+        source.close()
+    if not batch_count:
+        raise ValueError(f"No {stage} {split} batches")
+    result = execution.loss()
+    if not np.isfinite(result):
         raise ValueError(f"No finite {stage} epoch result")
-    return result
+    seconds = perf_counter() - start
+    return result, {"seconds": seconds, "batches": batch_count, "examples": examples_seen,
+                    "examples_per_second": examples_seen / max(seconds, 1e-9)}
 
 
 def train_stage(dataset, stage, output, dry_run=True, epochs=None, batch_size=None):
@@ -258,8 +252,8 @@ def train_stage(dataset, stage, output, dry_run=True, epochs=None, batch_size=No
     Prepared examples carry fixed upstream references and teacher-forced history.
     This entrypoint does not retrain intensity, timing, or the retained encoder.
     """
-    from . import models
     from .artifacts import compatibility, save_checkpoint_manifest
+    from .training_data import TrainingData
 
     _check_stage(stage)
     identity = compatibility(dataset, stage)
@@ -268,24 +262,26 @@ def train_stage(dataset, stage, output, dry_run=True, epochs=None, batch_size=No
         if (dataset.manifest.get("status") != "prepared" or encoder.get("status") != "retained"
                 or not encoder.get("checkpoint_fingerprint")):
             raise ValueError("Training requires real prepared examples from the explicit retained encoder")
-        for song in dataset.songs:
-            adapter = str(song.base.metadata.get("provenance", {}).get("adapter", ""))
-            if "dummy" in adapter.lower() or adapter == "v2_synthetic_fixture":
-                raise ValueError("Dummy examples cannot be used for training")
     settings = training_settings(stage)
+    performance = performance_settings()
     epochs = settings["epochs"] if epochs is None else epochs
     batch_size = settings["batch_size"] if batch_size is None else batch_size
     for name, value in (("Epoch count", epochs), ("Batch size", batch_size)):
         if isinstance(value, bool) or not isinstance(value, int) or value < 1:
             raise ValueError(f"{name} must be a positive integer")
-    counts = _split_counts(dataset, stage)
+    preparation_started = perf_counter()
+    data = TrainingData(dataset, stage, ram_cache_mib=performance["ram_cache_mib"],
+                        verbose=settings["verbose"], require_real=not dry_run)
+    preparation_seconds = perf_counter() - preparation_started
+    counts = data.counts
     if any(not counts[split]["supervised_values"] for split in ("train", "validation")):
         raise ValueError("Training requires separately supervised train and validation splits")
     if settings["monitor"] not in ("loss", "val_loss"):
         raise ValueError("V2 training currently monitors loss or val_loss")
+    from . import models
     models.keras.utils.set_random_seed(settings["seed"])
     model = models.build_model(stage, dataset.vocabularies)
-    preview = next(batches(dataset, stage, "train", batch_size))
+    preview = next(batches(data, stage, "train", batch_size))
     before = model.get_weights()
     preview_loss = float(models.stage_loss(stage, preview.targets, model(preview.inputs, training=False), preview.weights))
     if not np.isfinite(preview_loss):
@@ -296,6 +292,8 @@ def train_stage(dataset, stage, output, dry_run=True, epochs=None, batch_size=No
               "compatibility": identity, "architecture": architecture_settings(stage), **settings,
               "epochs": epochs, "batch_size": batch_size, "splits": counts,
               "parameters": model.count_params(), "preview_loss": preview_loss,
+              "performance": performance, "training_data": data.report,
+              "preparation_seconds": preparation_seconds,
               "input_shapes": {key: list(value.shape) for key, value in preview.inputs.items()}, **execution_identity()}
     if dry_run:
         report["weights_unchanged"] = all(np.array_equal(old, new) for old, new in zip(before, model.get_weights()))
@@ -307,17 +305,29 @@ def train_stage(dataset, stage, output, dry_run=True, epochs=None, batch_size=No
     optimizer = models.keras.optimizers.get({"class_name": settings["optimizer"],
                                             "config": {"learning_rate": settings["learning_rate"],
                                                        "clipnorm": settings["clipnorm"]}})
+    from .execution import StageExecution
+    execution = StageExecution(stage, model, preview, optimizer=optimizer, compiled=performance["compile_steps"])
     rng = np.random.default_rng(settings["seed"])
     history = {"loss": [], "val_loss": []}
+    epoch_performance = []
     mode = settings["monitor_mode"]
     maximize = mode == "max"
     best, stale = (-np.inf if maximize else np.inf), 0
     for epoch in range(epochs):
-        history["loss"].append(_epoch(dataset, stage, model, batch_size, optimizer, settings["shuffle"], rng))
-        history["val_loss"].append(_epoch(dataset, stage, model, batch_size))
+        train_loss, train_stats = _epoch(data, stage, execution, batch_size, training=True,
+            shuffle=settings["shuffle"], rng=rng, prefetch=performance["prefetch_batches"],
+            log_every=performance["log_every_batches"], verbose=settings["verbose"], epoch=epoch + 1)
+        val_loss, val_stats = _epoch(data, stage, execution, batch_size,
+            prefetch=performance["prefetch_batches"], log_every=performance["log_every_batches"],
+            verbose=settings["verbose"], epoch=epoch + 1)
+        history["loss"].append(train_loss)
+        history["val_loss"].append(val_loss)
+        epoch_performance.append({"epoch": epoch + 1, "train": train_stats, "validation": val_stats})
         if settings["verbose"]:
             print(f"{stage} epoch {epoch + 1}/{epochs}: loss={history['loss'][-1]:.6f} "
-                  f"val_loss={history['val_loss'][-1]:.6f}", flush=True)
+                  f"val_loss={history['val_loss'][-1]:.6f}, train={train_stats['seconds']:.1f}s "
+                  f"({train_stats['examples_per_second']:.1f} examples/s), validation={val_stats['seconds']:.1f}s",
+                  flush=True)
         current = history[settings["monitor"]][-1]
         delta = settings["early_stopping_min_delta"]
         improved = current > best + delta if maximize else current < best - delta
@@ -330,6 +340,7 @@ def train_stage(dataset, stage, output, dry_run=True, epochs=None, batch_size=No
                 break
     report.update(status="trained", optimizer_steps=int(optimizer.iterations.numpy()),
                   epochs_completed=len(history["loss"]), history=history,
+                  epoch_performance=epoch_performance,
                   best_monitored_value=float(best), best_validation_loss=float(min(history["val_loss"])))
     save_checkpoint_manifest(root, stage, dataset, "trained", extra=report)
     write_json(root / "report.json", report)

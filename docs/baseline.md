@@ -1012,3 +1012,138 @@ final synthetic checks. `final/pytest-cpu.log` and `final/pytest-cpu.xml` contai
 the CPU suite; `acceptance-summary.json` and `files-before.json`/`files-after.json`
 record the final result and source preservation. Exact preparation, stage-training
 and later comparison commands are in [the v2 handoff](pipeline-v2.md).
+
+
+## V2 training throughput and development launcher (2026-10-17)
+
+The first user-started positions run exposed two training bottlenecks. A batch
+needed 903,408 bytes of positions arrays but the full-song loader also decoded
+104,104,462 unrelated bytes, including lighting. The process repeatedly waited
+on `/mnt/c` filesystem access. The eager batch loop additionally dispatched
+model/loss/gradient operations and copied metrics to Python for every batch.
+
+The new training reader selects only the active stage, performs one combined
+integrity/provenance/validation/count scan, and uses a configurable 1,024 MiB
+RAM budget. Larger stages stream; a single producer prefetches two batches.
+Startup reports checked songs and cache usage. Reusable TensorFlow functions
+execute training and validation, accumulate per-head float64 sums/counts on the
+model's device, and synchronize at progress/epoch boundaries. The existing
+architecture, masks, shuffle, partial batches, objective, Adam/clipnorm settings,
+early stopping and best-checkpoint behavior are preserved. Existing datasets
+remain compatible and need no repeated preparation.
+
+The obsolete `main_training.py` now presents a small selection menu for the six
+new downstream stages and runs selected stages sequentially in separate child
+processes. It uses the activated Python and a fresh timestamped output root.
+`--models` skips the menu; `--dry-run` forwards validation-only requests.
+Import/help are inert, failure stops the queue and Ctrl+C returns 130. The old
+five-letter legacy selection has been retired. See [the launcher and performance
+settings](pipeline-v2.md#small-development-launcher) for exact commands.
+
+Read-only CPU measurements on the existing 875-map dataset:
+
+| Check | Measured result |
+| --- | --- |
+| Unrelated decoded arrays per positions batch | 104,104,462 bytes before; **0** after |
+| First selected batch, including source checks/metadata | median **0.304 s → 0.123 s** (2.46×) |
+| One-time complete positions input scan | **126.54 s**; **325,616,016 bytes** cached (310.53 MiB) |
+| Warm train + validation input passes | **555,127 examples / 4,338 batches** in **0.656 s** and **0.550 s** |
+| Archive/JSON opens during those warm passes | **0**, guarded against accidental access |
+| CPU forward + gradients, batch 128 | median **81.95 ms → 9.65 ms** (8.49×) |
+| Eager/compiled numeric comparison | identical loss; maximum gradient difference **1.49e-8**; unchanged weights |
+
+These are data-input and inference/differentiation measurements, not an
+end-to-end GPU training speedup. Model calls in the gradient timing used
+`training=False`; no optimizer updates ran. The real corpus input test performed
+no model inference or accuracy comparison. The source dataset manifest and all
+prepared artifact bytes were left unchanged.
+
+Final retained CPU suite: **494 passed**, **10 opt-in comparisons excluded**.
+All six models have eager/compiled output/loss/gradient and masked-target parity,
+dynamic final-batch graph reuse, weighted metric/precision and unchanged-weight
+checks. One real Adam graph was traced without execution: optimizer iterations
+remained **0**, weights were unchanged, and finite checks precede weight updates.
+The same 20 execution tests also passed using the TensorFlow **2.21.0** / legacy
+Keras training environment with `CUDA_VISIBLE_DEVICES=-1`; no GPU computation
+ran. Primary CPU checks used Python 3.10.19, TensorFlow 2.15.1 and NumPy 1.26.4.
+All 52 curated input files and nine files in trained run `20261017-151437` retained
+their hashes. The ongoing user-owned positions process was neither stopped nor
+restarted. Actual optimizer execution and GPU throughput of the optimized runner
+remain for the user's next explicitly started run.
+
+Evidence:
+`/home/frede/.local/share/infernosaber-baseline/diagnostics/v2-training-speed-20261017-221651/`.
+`reader-benchmark.json` and `execution-benchmark.json` contain individual timings;
+`benchmark_reader.py` and `benchmark_execution.py` reproduce them without training.
+`pytest-cpu.log`/`.xml` and `pytest-training-env-cpu.log` retain test results;
+`acceptance-summary.json` and `files-before.json`/`files-after.json` record the
+scope and source preservation. The user elected to start fresh, so the launcher
+creates a new run rather than restoring the previous positions weights.
+
+## Intensity/timing training input and dispatch (2026-10-17)
+
+Intensity/timing already used Keras-compiled training/validation steps and held
+prepared arrays in RAM. They did not have the six downstream models' eager-step
+or repeated-archive-loading bottleneck. Their remaining overhead is now reduced
+with stage-specific array loading, explicit two-batch prefetch and 16 sequential
+batch updates per graph call. The grouping preserves individual optimizer
+updates and batch sizes; it does not accumulate gradients. The launcher now
+selects all eight v2 stages and routes the beat pair to this trainer.
+
+Intensity retains only coarse audio, bin durations and normalized target shares,
+and no longer builds unused frame-level timing conditions. Timing retains its
+needed fine/coarse audio and count/event arrays, excluding original-note
+provenance arrays. Fixed reference/predicted conditions are cached; noisy
+reference conditions are regenerated once per epoch, preserving shuffle/noise
+RNG order. Checksums, selected target validation and split/normalization
+provenance are checked once. The full dataset reader and former joint notes
+trainer retain their existing behavior. Existing datasets remain compatible.
+
+Unlike the six downstream stages, the beat pair retains its existing complete
+RAM input cache: timing globally shuffles chunk references, so a small song cache
+would repeatedly reread archives. Only batch lookahead is capped at two here.
+Config uses `beat_models_training_` settings, separate from the downstream
+`pipeline_v2_training_` settings. Keras loss aggregation, masks, intensity
+diagnostics, optimizer settings, early stopping and best-checkpoint selection
+are unchanged. Batch progress rounds to graph-call boundaries; reports include
+effective execution settings, retained bytes and epoch throughput.
+
+Read-only CPU input checks on the existing 875-map beat dataset:
+
+| Check | Measured result |
+| --- | --- |
+| Intensity selected arrays, all 875 maps | **58,910,208 bytes (56.2 MiB)**; one-time checked load **58.52 s** |
+| Timing selected arrays, all 875 maps | **6,020,085,856 bytes (5,741.2 MiB)**; one-time checked load **93.38 s** |
+| Train + validation intensity input pass | **783 songs / 783 batches**, **0.027 s** then **0.011 s** |
+| Train + validation timing input pass | **30,869 chunks / 3,859 batches**, **2.593 s** then **1.617 s** |
+| File opens in either warm input pass | **0**, guarded against accidental archive/JSON access |
+| Previously unused intensity frame conditions, all maps | **279,829,408 bytes**, **0.297 s** to construct; now omitted |
+| Twelve-map sample retained arrays | full reader **106,799,052 bytes**; intensity **1,030,512 bytes**; timing **105,436,900 bytes** |
+
+These are input-only measurements, without model inference, optimizer updates
+or accuracy comparisons. The retained-byte figures exclude Python manifest
+objects and TensorFlow memory. The evidence also records sample array-loading
+times; the full-reader sample includes full provenance validation while selected
+sample timings cover decompression only, so they are not an end-to-end speedup
+comparison. All 875 prepared NPZ checksums were verified again after the checks.
+
+Retained CPU suite: **612 passed**, **10 comparisons excluded**. Seven additional
+execution-setting validation cases passed separately after that suite had
+already collected its tests. The 37 focused input, execution and configuration
+checks also passed using TensorFlow **2.21.0** / legacy Keras with
+`CUDA_VISIBLE_DEVICES=-1`. Primary CPU runtime was Python **3.10.19**, TensorFlow
+**2.15.1**, NumPy **1.26.4**. New checks cover eager/compiled predictions, losses,
+masked gradients, variable song lengths/final batches, profile caching, epoch
+noise, callback ordering, mocked training integration and serialization.
+Grouped optimizer graphs were traced without execution: iterations and train
+counters remained zero and weights stayed unchanged. No training was started;
+actual optimizer execution and GPU throughput remain unverified. The existing
+user-owned positions process was left running.
+
+Evidence:
+`/home/frede/.local/share/infernosaber-baseline/diagnostics/beat-pair-training-speed-20261017-223230/`.
+`benchmark_reader.py`, `reader-benchmark.json` and its log retain the reproducible
+input measurements; `pytest-cpu`, `pytest-settings` and
+`pytest-training-env-cpu` logs/XML retain the checks. Source snapshots and the
+acceptance summary record preservation of prior working-tree changes, curated
+inputs and trained checkpoints. Training and comparisons were not run.

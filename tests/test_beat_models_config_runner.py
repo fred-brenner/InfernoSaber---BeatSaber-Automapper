@@ -60,8 +60,10 @@ def test_dry_run_uses_stage_settings_and_explicit_overrides(stage, prepared_data
     assert report["status"] == "untrained"
     assert report["optimizer_steps"] == 0
     assert np.isfinite(report["preview_loss"])
-    assert profile_calls == [(selected["conditioning"], selected["intensity_noise_std"],
-                              np.random.default_rng(selected["seed"]).bit_generator.state)]
+    expected_calls = [] if stage == "intensity" else [
+        (selected["conditioning"], selected["intensity_noise_std"],
+         np.random.default_rng(selected["seed"]).bit_generator.state)]
+    assert profile_calls == expected_calls
     assert json.loads((tmp_path / "configured" / "report.json").read_text()) == json_value(report)
 
     override = runner.train_stage(songs, manifest, stage, tmp_path / "overridden", dry_run=True,
@@ -70,9 +72,30 @@ def test_dry_run_uses_stage_settings_and_explicit_overrides(stage, prepared_data
     assert override["batch_size"] == 1
     assert override["conditioning"] == (None if stage == "intensity" else "reference")
     assert override["input_shapes"]["audio"][0] == 1
-    assert profile_calls[-1][0] == "reference"
+    if stage == "intensity":
+        assert not profile_calls
+    else:
+        assert profile_calls[-1][0] == "reference"
     assert override["seed"] == selected["seed"]
     assert [path.name for path in (tmp_path / "overridden").iterdir()] == ["report.json"]
+
+
+@pytest.mark.parametrize("field,value", (("prefetch_batches", -1), ("prefetch_batches", True),
+                                         ("steps_per_execution", 0), ("steps_per_execution", 2.5),
+                                         ("compile_steps", 1), ("log_every_batches", -1)))
+def test_training_execution_settings_reject_invalid_values(field, value, monkeypatch):
+    monkeypatch.setattr(config, f"beat_models_training_{field}", value)
+    with pytest.raises(ValueError):
+        runner.performance_settings()
+
+
+def test_training_execution_settings_allow_explicit_buffer_and_progress_disable(monkeypatch):
+    monkeypatch.setattr(config, "beat_models_training_prefetch_batches", 0)
+    monkeypatch.setattr(config, "beat_models_training_log_every_batches", 0)
+    monkeypatch.setattr(config, "beat_models_training_compile_steps", False)
+    monkeypatch.setattr(config, "beat_models_training_steps_per_execution", 8)
+    assert runner.performance_settings() == {"prefetch_batches": 0, "log_every_batches": 0,
+                                              "compile_steps": False, "steps_per_execution": 8}
 
 
 def test_noisy_profiles_use_selected_noise_and_reproducible_seed(prepared_data, monkeypatch):
@@ -145,6 +168,7 @@ def test_smoke_and_evaluation_use_stage_batches_and_record_loss_settings(prepare
 def test_train_cli_inherits_configuration_and_forwards_explicit_overrides(prepared_data, monkeypatch):
     calls = []
     monkeypatch.setattr(command, "load_dataset", lambda path: prepared_data)
+    monkeypatch.setattr(command, "load_training_dataset", lambda path, stage: prepared_data)
     monkeypatch.setattr(runner, "train_stage", lambda *args, **kwargs: calls.append((args, kwargs)))
     required = ["train", "--dataset", "prepared", "--stage", "timing", "--run-dir", "run", "--dry-run"]
     command.main(required)

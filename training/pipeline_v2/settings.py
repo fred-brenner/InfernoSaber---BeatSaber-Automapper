@@ -71,6 +71,16 @@ def training_settings(stage):
     return result
 
 
+def performance_settings():
+    fields = ("ram_cache_mib", "prefetch_batches", "compile_steps", "log_every_batches")
+    values = {key: getattr(config, f"pipeline_v2_training_{key}") for key in fields}
+    for key in ("ram_cache_mib", "prefetch_batches", "log_every_batches"):
+        values[key] = _positive(values[key], key, integer=True, zero=True)
+    if not isinstance(values["compile_steps"], bool):
+        raise ValueError("Compiled training steps must be enabled or disabled")
+    return values
+
+
 def schedule_settings(overrides=None):
     from .scheduling import schedule_settings as resolve
     return resolve(overrides)

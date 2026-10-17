@@ -5,6 +5,7 @@ non-dry-run train command constructs an optimizer and calls fit.
 """
 
 from pathlib import Path
+from time import perf_counter
 
 import numpy as np
 
@@ -15,7 +16,7 @@ from .contracts import (CORE, FEATURES, FRAME_SECONDS, HISTORY, SCHEMA_VERSION, 
 from .features import normalize_songs
 from .metrics import summarize, timing_scores
 from .pipeline import generate
-from .settings import architecture_settings, training_settings
+from .settings import architecture_settings, performance_settings, training_settings
 from .training_metrics import (INTENSITY_METRIC_DEFINITIONS, add_intensity_metrics,
                               intensity_metrics_callback, intensity_reference)
 
@@ -306,7 +307,13 @@ def train_stage(songs, manifest, stage, run_dir, dry_run=False, conditioning=Non
 
     if stage not in STAGES:
         raise ValueError("Unknown model stage")
+    preparation_started = perf_counter()
+    beat_pair = stage in ("intensity", "timing")
     settings = training_settings(stage)
+    performance = performance_settings() if beat_pair else None
+    if beat_pair:
+        performance["effective_steps_per_execution"] = (performance["steps_per_execution"]
+                                                        if performance["compile_steps"] else 1)
     conditioning = settings["conditioning"] if conditioning is None else conditioning
     epochs = settings["epochs"] if epochs is None else epochs
     batch_size = settings["batch_size"] if batch_size is None else batch_size
@@ -341,17 +348,36 @@ def train_stage(songs, manifest, stage, run_dir, dry_run=False, conditioning=Non
               "intensity_artifact": str(intensity_artifact) if intensity_artifact else None,
               "train_examples": len(train_refs), "validation_examples": len(validation_refs),
               "parameters": model.count_params()}
+    if beat_pair:
+        config["performance"] = performance
+        config["training_input"] = manifest.get("training_input", {
+            "stage": stage, "mode": "ram", "source": "memory", "songs": len(songs),
+            "retained_bytes": sum(value.nbytes for song in songs for value in song.arrays.values())})
     if stage == "intensity":
         config["intensity_references"] = {
             split: intensity_reference(selected, models.keras.backend.epsilon())
             for split, selected in (("train", train), ("validation", validation))}
         config["metric_definitions"] = INTENSITY_METRIC_DEFINITIONS
-    preview_mode = conditioning if stage != "intensity" else "reference"
-    preview = _batch(stage, train_refs[:batch_size],
-                     _profiles(train, preview_mode, upstream, np.random.default_rng(settings["seed"]),
-                               noise_std=settings["intensity_noise_std"]))
+    if beat_pair and not dry_run:
+        from .training_input import BatchSource, training_callbacks
+        train_mode = conditioning if stage != "intensity" else "reference"
+        valid_mode = "predicted" if train_mode == "predicted" else "reference"
+        source = BatchSource(stage, train, train_refs, batch_size, mode=train_mode,
+                             shuffle=settings["shuffle"], seed=settings["seed"],
+                             noise_std=settings["intensity_noise_std"], intensity_model=upstream)
+        valid_source = BatchSource(stage, validation, validation_refs, batch_size, mode=valid_mode,
+                                   shuffle=False, seed=settings["seed"],
+                                   noise_std=settings["intensity_noise_std"], intensity_model=upstream)
+        preview = next(source.iter_batches())
+    else:
+        profiles = {} if stage == "intensity" else _profiles(
+            train, conditioning, upstream, np.random.default_rng(settings["seed"]),
+            noise_std=settings["intensity_noise_std"])
+        preview = _batch(stage, train_refs[:batch_size], profiles)
     config["input_shapes"] = {key: list(value.shape) for key, value in preview[0].items()}
     if dry_run:
+        if beat_pair:
+            config["preparation_seconds"] = perf_counter() - preparation_started
         config["optimizer_steps"] = 0
         config["preview_loss"] = float(_loss(stage, preview[1], model(preview[0], training=False), preview[2], preview[0]))
         if stage == "intensity":
@@ -398,7 +424,10 @@ def train_stage(songs, manifest, stage, run_dir, dry_run=False, conditioning=Non
         model.compile(optimizer=optimizer, loss=loss,
                       loss_weights={hand: config["architecture"][f"{hand}_loss_weight"] for hand in ("red", "blue")})
     else:
-        model.compile(optimizer=optimizer, loss=models.intensity_objective if stage == "intensity" else models.timing_objective)
+        model.compile(optimizer=optimizer,
+                      loss=models.intensity_objective if stage == "intensity" else models.timing_objective,
+                      run_eagerly=not performance["compile_steps"],
+                      steps_per_execution=performance["effective_steps_per_execution"])
     checkpoint = root / "best.keras"
     callbacks = [models.keras.callbacks.EarlyStopping(monitor=settings["monitor"],
                                                       mode=settings["monitor_mode"],
@@ -411,9 +440,17 @@ def train_stage(songs, manifest, stage, run_dir, dry_run=False, conditioning=Non
         callbacks.insert(0, intensity_metrics_callback(config["intensity_references"]))
     train_mode = conditioning if stage != "intensity" else "reference"
     valid_mode = "predicted" if train_mode == "predicted" else "reference"
-    history = model.fit(StageSequence(train, train_refs, train_mode, settings["shuffle"]),
-                        validation_data=StageSequence(validation, validation_refs, valid_mode, False),
-                        epochs=epochs, callbacks=callbacks, shuffle=False, verbose=settings["verbose"])
+    if beat_pair:
+        callbacks.append(training_callbacks(source, valid_source, epochs, config,
+                         log_every_batches=performance["log_every_batches"], verbose=settings["verbose"]))
+        config["preparation_seconds"] = perf_counter() - preparation_started
+        inputs = source.dataset(performance["prefetch_batches"])
+        validation_inputs = valid_source.dataset(performance["prefetch_batches"])
+    else:
+        inputs = StageSequence(train, train_refs, train_mode, settings["shuffle"])
+        validation_inputs = StageSequence(validation, validation_refs, valid_mode, False)
+    history = model.fit(inputs, validation_data=validation_inputs, epochs=epochs,
+                        callbacks=callbacks, shuffle=False, verbose=settings["verbose"])
     config["optimizer_steps"] = int(optimizer.iterations.numpy())
     config["epochs_completed"] = len(history.history["loss"])
     config["best_validation_loss"] = float(min(history.history["val_loss"]))

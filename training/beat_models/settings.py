@@ -68,6 +68,17 @@ def training_settings(stage):
     return values
 
 
+def performance_settings():
+    """Execution tuning for intensity/timing; independent of model contracts."""
+    fields = ("prefetch_batches", "compile_steps", "steps_per_execution", "log_every_batches")
+    values = {key: getattr(config, f"beat_models_training_{key}") for key in fields}
+    for key in ("prefetch_batches", "steps_per_execution", "log_every_batches"):
+        values[key] = _integer(values[key], key, minimum=1 if key == "steps_per_execution" else 0)
+    if not isinstance(values["compile_steps"], bool):
+        raise ValueError("Compiled training steps must be enabled or disabled")
+    return values
+
+
 def architecture_settings(stage):
     """Return validated widths, context sizes, regularization and loss weights."""
     values = _read(stage, ARCHITECTURE_FIELDS.get(stage, ()))

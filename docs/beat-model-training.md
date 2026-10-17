@@ -17,7 +17,9 @@ For the new positions, arrows, multiplier, hazards, lighting and arcs stages,
 use [the v2 concept framework](pipeline-v2.md). That composition reuses the
 trained intensity/timing pair and retained encoder; it does not use this
 framework's joint `notes` checkpoint. Existing commands and artifacts below
-remain supported.
+remain supported. The shared [development launcher](pipeline-v2.md#small-development-launcher)
+also accepts `python main_training.py --models intensity timing` and can queue
+all eight v2 stages with `--models all`.
 
 ## Targets and timing
 
@@ -210,6 +212,40 @@ changes to learning rate, batch size or channel widths alone do not change the
 prepared-data contract. With the original defaults, target-v2 dataset and model
 compatibility is preserved. Dry-run reports and training manifests record the
 effective stage settings, architecture and CLI overrides for reproducibility.
+
+### Intensity/timing training throughput
+
+Both trainers already used Keras graph execution and kept prepared songs in RAM.
+Their training input now selects only the active stage's arrays: intensity loads
+coarse audio, bin durations and target shares; timing additionally loads fine
+audio and its timing/count targets. Original-note provenance arrays are not
+decompressed for training. The unchanged full dataset reader remains available
+to `validate`, evaluation and the former joint notes trainer. Existing prepared
+datasets remain compatible.
+
+Checksums, normalization provenance, split assignments and selected targets are
+checked once at startup, with progress every 25 songs. Active arrays remain in
+RAM across epochs; the downstream six-model trainer's 1 GiB streaming budget
+does not apply to this existing globally shuffled beat-pair input. Intensity no
+longer computes unused per-frame timing conditions. Timing caches reference or
+predicted conditions, while noisy reference conditions are regenerated once per
+epoch with the existing seed and shuffle/noise order.
+
+Execution settings in `config.py` are separate from architecture settings:
+
+| Setting | Default | Effect |
+| --- | --- | --- |
+| `beat_models_training_prefetch_batches` | `2` | Explicit batch lookahead; automatic prefetch is disabled. Zero disables the buffer. |
+| `beat_models_training_compile_steps` | `True` | Use compiled Keras training and validation steps. False enables eager debugging. |
+| `beat_models_training_steps_per_execution` | `16` | Run sequential batch updates in one graph call; this is not gradient accumulation. Eager debugging uses one step. |
+| `beat_models_training_log_every_batches` | `100` | Print batch progress at the next graph-call boundary; zero disables batch messages. |
+
+Partial final batches, variable song lengths, masks, loss aggregation, optimizer,
+batch sizes, intensity diagnostics, early stopping and checkpoint selection are
+preserved. Reports and checkpoint manifests include effective execution settings,
+retained array bytes, input preparation time and epoch throughput. These changes
+reduce input/dispatch overhead; actual GPU training throughput must be measured
+in a user-started run. CPU acceptance performs no optimizer updates.
 
 ### Intensity training display
 

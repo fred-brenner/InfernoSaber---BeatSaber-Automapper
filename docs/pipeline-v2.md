@@ -123,7 +123,7 @@ the trained intensity/timing pair. `--prepared-root` explicitly selects the
 existing beatmap/Info/audio triple adapter. It is never selected implicitly.
 
 Datasets use JSON metadata and non-executable NPZ arrays. The writer emits one
-song at a time; the training loader streams songs and batches. Source hashes,
+song at a time; training reads only the selected stage's arrays. Source hashes,
 split groups, normalization, encoder identity, vocabularies, target coverage and
 skips are recorded. `--structure-only` substitutes marked zero latents for
 structural inspection and is rejected by actual training.
@@ -156,6 +156,76 @@ teacher-forced history during training. Defaults are Adam `5e-4`, clipping at 1,
 `--epochs` and `--batch-size` override config. Each run saves the best `.keras`
 checkpoint with its compatible encoder, vocabulary, data and architecture
 identity. Training itself and GPU execution remain unverified in this milestone.
+
+### Small development launcher
+
+`main_training.py` replaces the old interactive legacy-training launcher. Run it
+from the repository root in the GPU environment:
+
+```bash
+source /home/frede/.local/share/infernosaber-baseline/gpu/env.sh
+python main_training.py
+```
+
+Select models by number or name, separated by spaces or commas; `all`/`alle`
+selects all eight and an empty answer cancels. The menu order is intensity,
+timing, positions, arrows, multiplier, hazards, lighting and arcs. The selected
+models run in that order, one child process at a time, using the activated Python.
+Intensity/timing use their existing `training.beat_models` trainer and default
+dataset `../Data/training/beat_models_v2/full-2026-10-17/dataset`; the other six use
+`training.pipeline_v2` and `../Data/training/pipeline_v2/full/dataset`. Both
+trainers retain their settings from `config.py`, including timing conditioning.
+A new timestamped parent run directory contains one child directory per stage.
+An error stops the queue; Ctrl+C stops it with exit code 130. The script does not
+prepare data or train the retained encoder or the former joint `notes` model.
+
+For a noninteractive restart of positions, keeping the old run intact:
+
+```bash
+python main_training.py --models positions
+```
+
+Use `--models intensity timing` to train just the beat pair, or `--models all`
+for the full queue. `--beat-dataset` selects intensity/timing inputs; `--dataset`
+selects downstream inputs. Only datasets needed by the selection are required,
+and all required manifests are checked before any stage starts. `--run-dir`
+selects a new output root.
+`--dry-run` validates the selected stages without optimizer updates. Importing
+the script or requesting `--help` neither prompts nor starts model work.
+
+### Training throughput
+
+The six downstream stages perform one integrity, provenance, stage-validation and split-count
+scan at startup, with progress every 25 songs. It then reuses those checks.
+Only the chosen stage is retained: `pipeline_v2_training_ram_cache_mib = 1024`
+allows an automatic 1 GiB RAM cache. Larger stages stream one song at a time;
+changed streamed source files are rejected. The current 875-map positions data
+needs about 311 MiB, while lighting is too large for this budget. Preparation of
+the existing dataset does not need to be repeated.
+
+`pipeline_v2_training_prefetch_batches = 2` bounds the batch lookahead.
+`pipeline_v2_training_compile_steps = True` reuses separate TensorFlow graphs
+for training and validation, including partial final batches. Per-head masked
+loss sums/counts accumulate on the model's device; Python reads them at progress
+or epoch boundaries. Model definitions, Adam settings, batch sizes, shuffle and
+target semantics remain unchanged.
+
+`pipeline_v2_training_log_every_batches = 100` controls batch progress;
+epoch summaries report elapsed time and examples per second. Zero disables the
+RAM cache, prefetch, or batch progress respectively. Set `compile_steps` to
+`False` only to inspect eager execution. Effective settings, cache usage,
+startup duration and per-epoch throughput are stored in `report.json` and the
+checkpoint manifest. GPU throughput is established by a user-started training
+run, independently of CPU forward/gradient checks.
+
+Intensity/timing already used compiled Keras steps and retained arrays in RAM.
+They now also select only their active arrays, explicitly prefetch two batches,
+cache fixed conditioning profiles and group 16 sequential updates per graph
+call. Their execution settings use `beat_models_training_` names; their existing
+global shuffle keeps the active dataset in RAM rather than using the downstream
+streaming budget. See [beat-pair training throughput](beat-model-training.md#intensitytiming-training-throughput)
+for settings, preserved semantics and verification limits. The same launcher
+automatically uses these changes; no dataset preparation is needed again.
 
 ### Framework and concept commands
 

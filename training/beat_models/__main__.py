@@ -7,6 +7,7 @@ import numpy as np
 from .artifacts import (execution_identity, file_hash, load_dataset, load_statistics, new_run_directory, read_json, write_dataset,
                         write_json)
 from .contracts import SCHEMA_VERSION, SEED, STAGES
+from .training_data import load_training_dataset
 
 
 def parser():
@@ -138,7 +139,10 @@ def main(argv=None):
             command.error("Epochs and batch size must be positive")
         if args.conditioning == "predicted" and not args.intensity_artifact:
             command.error("Predicted conditioning requires --intensity-artifact")
-        songs, manifest = load_dataset(args.dataset)
+        if args.stage in ("intensity", "timing"):
+            songs, manifest = load_training_dataset(args.dataset, args.stage)
+        else:
+            songs, manifest = load_dataset(args.dataset)
         from .runner import train_stage
         train_stage(songs, manifest, args.stage, args.run_dir, dry_run=args.dry_run,
                     conditioning=args.conditioning, intensity_artifact=args.intensity_artifact,
