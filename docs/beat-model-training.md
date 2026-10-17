@@ -13,6 +13,12 @@ environment, with system site packages disabled. CPU verification uses the
 `TF_USE_LEGACY_KERAS=1` where specified by that profile. The framework does not
 change installed packages or application paths.
 
+For the new positions, arrows, multiplier, hazards, lighting and arcs stages,
+use [the v2 concept framework](pipeline-v2.md). That composition reuses the
+trained intensity/timing pair and retained encoder; it does not use this
+framework's joint `notes` checkpoint. Existing commands and artifacts below
+remain supported.
+
 ## Targets and timing
 
 The new difficulty value is **retained colored notes per second over the full

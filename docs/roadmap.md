@@ -43,9 +43,10 @@ Improve the quality and variety of generated gameplay, including obstacles,
 arcs, and other mapping options. Replace or extend the existing simple
 algorithms with AI models where learned behavior produces better results.
 
-Which options receive their own models, their training targets, and how they
-interact with note generation remain design questions. Existing playability
-checks should continue to guard generated output as these options evolve.
+The selected [v2 architecture](model-architecture.md) now has a
+[train-ready concept framework](pipeline-v2.md) for positions, arrows,
+multiplier, hazards, independent lighting and arcs. Adapting playability checks
+to each stage's ownership remains explicit review work before package export.
 
 ## 3. Fix the causes of postprocessing corrections
 
@@ -75,9 +76,9 @@ model definitions. Training, a full generation rebuild, and quality evaluation
 follow separately. Model size or successful untrained inference does not
 establish improved gameplay.
 
-A later multiplier can reconstruct additional same-hand notes using the original
-and reduced records retained by preprocessing. Bombs/obstacles and expansion
-remain separate future work. The existing seven-song CPU benchmark remains a
+The v2 multiplier now has train-ready targets from original/reduced relationships
+and explicit chains; the combined hazards model owns bombs and walls. These new
+models remain untrained. The existing seven-song CPU benchmark remains a
 regression reference rather than a sufficient training or generalization set.
 
 ## Human-map timing benchmark

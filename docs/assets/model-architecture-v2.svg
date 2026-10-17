@@ -9,11 +9,11 @@
   </defs>
   <rect width="1280" height="2820" fill="#f8fafc" />
   <text x="64" y="53" font-family="DejaVu Sans, Arial, sans-serif" font-size="32" font-weight="700" fill="#0f172a" text-anchor="start">InfernoSaber · model architecture v2</text>
-  <text x="64" y="86" font-family="DejaVu Sans, Arial, sans-serif" font-size="17" font-weight="400" fill="#334155" text-anchor="start">2026-10-17 · blue: implemented / retained · amber: planned · shapes include batch</text>
+  <text x="64" y="86" font-family="DejaVu Sans, Arial, sans-serif" font-size="17" font-weight="400" fill="#334155" text-anchor="start">2026-10-17 · blue: trained / retained · amber: untrained concept · shapes include batch</text>
   <rect x="340" y="120" width="600" height="90" rx="14" fill="#ffffff" stroke="#cbd5e1" stroke-width="2" />
   <text x="362" y="152" font-family="DejaVu Sans, Arial, sans-serif" font-size="20" font-weight="600" fill="#0f172a" text-anchor="start">App / CLI → one song × requested density</text>
   <text x="362" y="182" font-family="DejaVu Sans, Arial, sans-serif" font-size="16" font-weight="400" fill="#334155" text-anchor="start">Inputs: audio + requested retained NPS + separate BPM</text>
-  <text x="362" y="207" font-family="DejaVu Sans, Arial, sans-serif" font-size="16" font-weight="400" fill="#334155" text-anchor="start">Full pipeline integration is planned</text>
+  <text x="362" y="207" font-family="DejaVu Sans, Arial, sans-serif" font-size="16" font-weight="400" fill="#334155" text-anchor="start">Concept connected; gameplay review pending</text>
   <rect x="70" y="290" width="500" height="205" rx="14" fill="#ffffff" stroke="#cbd5e1" stroke-width="2" />
   <text x="92" y="322" font-family="DejaVu Sans, Arial, sans-serif" font-size="20" font-weight="600" fill="#0f172a" text-anchor="start">Shared beat features · implemented</text>
   <text x="92" y="352" font-family="DejaVu Sans, Arial, sans-serif" font-size="16" font-weight="400" fill="#334155" text-anchor="start">Mono 16 kHz · Hann FFT512 · hop160</text>
@@ -40,7 +40,7 @@
   <text x="85" y="751" font-family="DejaVu Sans, Arial, sans-serif" font-size="16" font-weight="400" fill="#334155" text-anchor="start">local NPS = share × D × duration / bin width</text>
   <text x="85" y="779" font-family="DejaVu Sans, Arial, sans-serif" font-size="15" font-weight="400" fill="#334155" text-anchor="start">BPM supplies tempo; requested D supplies density.</text>
   <rect x="70" y="810" width="500" height="80" rx="14" fill="#ffffff" stroke="#cbd5e1" stroke-width="2" />
-  <text x="92" y="842" font-family="DejaVu Sans, Arial, sans-serif" font-size="20" font-weight="600" fill="#0f172a" text-anchor="start">Independent lighting clock · planned</text>
+  <text x="92" y="842" font-family="DejaVu Sans, Arial, sans-serif" font-size="20" font-weight="600" fill="#0f172a" text-anchor="start">Independent lighting clock · implemented</text>
   <text x="92" y="872" font-family="DejaVu Sans, Arial, sans-serif" font-size="16" font-weight="400" fill="#334155" text-anchor="start">Audio / BPM candidates; independent of note counts</text>
   <rect x="340" y="900" width="600" height="180" rx="14" fill="#eff6ff" stroke="#60a5fa" stroke-width="2" />
   <text x="362" y="932" font-family="DejaVu Sans, Arial, sans-serif" font-size="20" font-weight="600" fill="#1d4ed8" text-anchor="start">3 · Audio encoder · retained · 68,576 params</text>
@@ -50,7 +50,7 @@
   <text x="362" y="1037" font-family="DejaVu Sans, Arial, sans-serif" font-size="16" font-weight="400" fill="#334155" text-anchor="start">Cache Z at each downstream model’s own query times</text>
   <text x="362" y="1062" font-family="DejaVu Sans, Arial, sans-serif" font-size="16" font-weight="600" fill="#1d4ed8" text-anchor="start">Standalone audio input for every model 4–9</text>
   <rect x="70" y="1180" width="500" height="230" rx="14" fill="#fffbeb" stroke="#fbbf24" stroke-width="2" />
-  <text x="92" y="1212" font-family="DejaVu Sans, Arial, sans-serif" font-size="20" font-weight="600" fill="#92400e" text-anchor="start">4 · Positions · planned replacement</text>
+  <text x="92" y="1212" font-family="DejaVu Sans, Arial, sans-serif" font-size="20" font-weight="600" fill="#92400e" text-anchor="start">4 · Positions · untrained</text>
   <text x="92" y="1242" font-family="DejaVu Sans, Arial, sans-serif" font-size="16" font-weight="400" fill="#334155" text-anchor="start">Z [B,16] + gap / count / density / BPM</text>
   <text x="92" y="1267" font-family="DejaVu Sans, Arial, sans-serif" font-size="16" font-weight="400" fill="#334155" text-anchor="start">Position history [B,32,2] + ages / mask</text>
   <text x="92" y="1292" font-family="DejaVu Sans, Arial, sans-serif" font-size="16" font-weight="400" fill="#334155" text-anchor="start">Output 2 × [B,13] · absent + 12 cells</text>
@@ -58,7 +58,7 @@
   <text x="92" y="1342" font-family="DejaVu Sans, Arial, sans-serif" font-size="16" font-weight="400" fill="#334155" text-anchor="start">Decode one or both hands per timing count</text>
   <text x="92" y="1367" font-family="DejaVu Sans, Arial, sans-serif" font-size="16" font-weight="400" fill="#334155" text-anchor="start">Owns hand occupancy and positions</text>
   <rect x="710" y="1180" width="500" height="230" rx="14" fill="#fffbeb" stroke="#fbbf24" stroke-width="2" />
-  <text x="732" y="1212" font-family="DejaVu Sans, Arial, sans-serif" font-size="20" font-weight="600" fill="#92400e" text-anchor="start">5 · Arrows · planned</text>
+  <text x="732" y="1212" font-family="DejaVu Sans, Arial, sans-serif" font-size="20" font-weight="600" fill="#92400e" text-anchor="start">5 · Arrows · untrained</text>
   <text x="732" y="1242" font-family="DejaVu Sans, Arial, sans-serif" font-size="16" font-weight="600" fill="#1d4ed8" text-anchor="start">Audio: Z [B,16] from encoder 3</text>
   <text x="732" y="1267" font-family="DejaVu Sans, Arial, sans-serif" font-size="16" font-weight="400" fill="#334155" text-anchor="start">Positions [B,2] + occupied-hand mask</text>
   <text x="732" y="1292" font-family="DejaVu Sans, Arial, sans-serif" font-size="16" font-weight="400" fill="#334155" text-anchor="start">Neighbor positions / gaps + arrow history</text>
@@ -67,7 +67,7 @@
   <text x="732" y="1367" font-family="DejaVu Sans, Arial, sans-serif" font-size="16" font-weight="400" fill="#334155" text-anchor="start">Keep times, hand occupancy and cells fixed</text>
   <text x="732" y="1392" font-family="DejaVu Sans, Arial, sans-serif" font-size="16" font-weight="400" fill="#334155" text-anchor="start">Owns cut directions only</text>
   <rect x="340" y="1515" width="600" height="230" rx="14" fill="#fffbeb" stroke="#fbbf24" stroke-width="2" />
-  <text x="362" y="1547" font-family="DejaVu Sans, Arial, sans-serif" font-size="20" font-weight="600" fill="#92400e" text-anchor="start">6 · Multiplier · planned</text>
+  <text x="362" y="1547" font-family="DejaVu Sans, Arial, sans-serif" font-size="20" font-weight="600" fill="#92400e" text-anchor="start">6 · Multiplier · untrained</text>
   <text x="362" y="1577" font-family="DejaVu Sans, Arial, sans-serif" font-size="16" font-weight="600" fill="#1d4ed8" text-anchor="start">Audio: Z [B,16] from encoder 3</text>
   <text x="362" y="1602" font-family="DejaVu Sans, Arial, sans-serif" font-size="16" font-weight="400" fill="#334155" text-anchor="start">Directed base notes + neighbors / gaps + history</text>
   <text x="362" y="1627" font-family="DejaVu Sans, Arial, sans-serif" font-size="16" font-weight="400" fill="#334155" text-anchor="start">Output 2 × [B,K_mult] · relative templates incl. NONE</text>
@@ -76,7 +76,7 @@
   <text x="362" y="1702" font-family="DejaVu Sans, Arial, sans-serif" font-size="16" font-weight="400" fill="#334155" text-anchor="start">Fixed configured offsets; copies inherit hand / cut</text>
   <text x="362" y="1727" font-family="DejaVu Sans, Arial, sans-serif" font-size="16" font-weight="400" fill="#334155" text-anchor="start">Base anchors survive; final density may increase</text>
   <rect x="70" y="1855" width="500" height="255" rx="14" fill="#fffbeb" stroke="#fbbf24" stroke-width="2" />
-  <text x="92" y="1887" font-family="DejaVu Sans, Arial, sans-serif" font-size="20" font-weight="600" fill="#92400e" text-anchor="start">7 · Obstacles + bombs · planned</text>
+  <text x="92" y="1887" font-family="DejaVu Sans, Arial, sans-serif" font-size="20" font-weight="600" fill="#92400e" text-anchor="start">7 · Obstacles + bombs · untrained</text>
   <text x="92" y="1917" font-family="DejaVu Sans, Arial, sans-serif" font-size="16" font-weight="600" fill="#1d4ed8" text-anchor="start">Audio: Z [B,16] from encoder 3</text>
   <text x="92" y="1942" font-family="DejaVu Sans, Arial, sans-serif" font-size="16" font-weight="400" fill="#334155" text-anchor="start">Expanded occupancy [B,2,2,12] · rank 4</text>
   <text x="92" y="1967" font-family="DejaVu Sans, Arial, sans-serif" font-size="16" font-weight="400" fill="#334155" text-anchor="start">Interval [B,2] + hazard history</text>
@@ -86,7 +86,7 @@
   <text x="92" y="2067" font-family="DejaVu Sans, Arial, sans-serif" font-size="16" font-weight="400" fill="#334155" text-anchor="start">Scheduler owns times; model owns placement</text>
   <text x="92" y="2092" font-family="DejaVu Sans, Arial, sans-serif" font-size="16" font-weight="400" fill="#334155" text-anchor="start">Existing rules → strobe rules → learned</text>
   <rect x="710" y="1855" width="500" height="255" rx="14" fill="#fffbeb" stroke="#fbbf24" stroke-width="2" />
-  <text x="732" y="1887" font-family="DejaVu Sans, Arial, sans-serif" font-size="20" font-weight="600" fill="#92400e" text-anchor="start">8 · Lighting · decoupling planned</text>
+  <text x="732" y="1887" font-family="DejaVu Sans, Arial, sans-serif" font-size="20" font-weight="600" fill="#92400e" text-anchor="start">8 · Lighting · untrained adaptation</text>
   <text x="732" y="1917" font-family="DejaVu Sans, Arial, sans-serif" font-size="16" font-weight="600" fill="#1d4ed8" text-anchor="start">Audio: Z [B,16] per lighting query</text>
   <text x="732" y="1942" font-family="DejaVu Sans, Arial, sans-serif" font-size="16" font-weight="400" fill="#334155" text-anchor="start">Independent audio / BPM candidate clock</text>
   <text x="732" y="1967" font-family="DejaVu Sans, Arial, sans-serif" font-size="16" font-weight="400" fill="#334155" text-anchor="start">Z blocks [B,16,16,1] + gaps [B,16,1]</text>
@@ -96,7 +96,7 @@
   <text x="732" y="2067" font-family="DejaVu Sans, Arial, sans-serif" font-size="16" font-weight="400" fill="#334155" text-anchor="start">Own times / history, independent of notes</text>
   <text x="732" y="2092" font-family="DejaVu Sans, Arial, sans-serif" font-size="16" font-weight="400" fill="#334155" text-anchor="start">*Measured fav_15 network: 38,264,640 params</text>
   <rect x="340" y="2220" width="600" height="205" rx="14" fill="#fffbeb" stroke="#fbbf24" stroke-width="2" />
-  <text x="362" y="2252" font-family="DejaVu Sans, Arial, sans-serif" font-size="20" font-weight="600" fill="#92400e" text-anchor="start">9 · Arcs · planned</text>
+  <text x="362" y="2252" font-family="DejaVu Sans, Arial, sans-serif" font-size="20" font-weight="600" fill="#92400e" text-anchor="start">9 · Arcs · untrained</text>
   <text x="362" y="2282" font-family="DejaVu Sans, Arial, sans-serif" font-size="16" font-weight="600" fill="#1d4ed8" text-anchor="start">Audio: Z [B,16] from encoder 3</text>
   <text x="362" y="2307" font-family="DejaVu Sans, Arial, sans-serif" font-size="16" font-weight="400" fill="#334155" text-anchor="start">Existing same-hand note IDs [B,2] + geometry / gap</text>
   <text x="362" y="2332" font-family="DejaVu Sans, Arial, sans-serif" font-size="16" font-weight="400" fill="#334155" text-anchor="start">Arc history + hazard clearance</text>

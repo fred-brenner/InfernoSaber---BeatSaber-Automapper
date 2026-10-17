@@ -304,6 +304,169 @@ notes_activation = 'relu'
 notes_red_loss_weight = 0.5
 notes_blue_loss_weight = 0.5
 
+# V2 concept pipeline configuration (independent downstream stages)
+# Intensity/timing and their existing checkpoints retain their current contracts.
+pipeline_v2_encoder_grid_seconds = 0.5
+pipeline_v2_encoder_batch_size = 128
+pipeline_v2_max_multiplier_templates = 256
+pipeline_v2_max_wall_templates = 64
+pipeline_v2_max_light_classes = 2048
+pipeline_v2_max_copies = 11
+pipeline_v2_max_chain_slices = 32
+pipeline_v2_max_chain_span_seconds = 2.0
+pipeline_v2_expansion_time_quantum = 0.005
+pipeline_v2_chain_span_quantum = 0.02
+pipeline_v2_lighting_match_tolerance = 0.02
+pipeline_v2_wall_min_gap_seconds = 0.8
+pipeline_v2_wall_margin_before_seconds = 0.3
+pipeline_v2_wall_margin_after_seconds = 0.3
+pipeline_v2_wall_strobe_grid_beats = 1.0  # zero disables candidate proposals
+pipeline_v2_wall_strobe_duration_seconds = 0.1
+pipeline_v2_wall_strobe_min_gap_seconds = 0.3
+pipeline_v2_clearance_seconds = 0.1  # occupancy context; gameplay clearance still requires review
+pipeline_v2_bomb_threshold = 0.5
+pipeline_v2_lighting_threshold = 0.5
+pipeline_v2_bomb_grid_beats = 0.5
+pipeline_v2_bomb_min_gap_seconds = 0.3
+pipeline_v2_lighting_grid_beats = 0.5
+pipeline_v2_lighting_onset_threshold = 1.0
+pipeline_v2_arc_min_gap_seconds = 0.15
+pipeline_v2_arc_max_gap_seconds = 0.8
+pipeline_v2_max_candidates = 10000
+
+# V2 positions: training and network parameters
+positions_optimizer = 'Adam'
+positions_learning_rate = 0.0005
+positions_n_epochs = 80
+positions_batch_size = 128
+positions_clipnorm = 1.0
+positions_early_stopping_patience = 10
+positions_early_stopping_min_delta = 0.0
+positions_monitor = 'val_loss'
+positions_monitor_mode = 'min'
+positions_shuffle = True
+positions_verbose = 2
+positions_random_seed = random_seed
+positions_history_length = 32
+positions_embedding_dim = 16
+positions_audio_dense_units = 64
+positions_gru_units = 64
+positions_shared_dense_units = 128
+positions_activation = 'relu'
+positions_history_dropout = 0.1
+positions_loss_weights = {'red': 1.0, 'blue': 1.0}
+
+# V2 arrows: training and network parameters
+arrows_optimizer = 'Adam'
+arrows_learning_rate = 0.0005
+arrows_n_epochs = 80
+arrows_batch_size = 128
+arrows_clipnorm = 1.0
+arrows_early_stopping_patience = 10
+arrows_early_stopping_min_delta = 0.0
+arrows_monitor = 'val_loss'
+arrows_monitor_mode = 'min'
+arrows_shuffle = True
+arrows_verbose = 2
+arrows_random_seed = random_seed
+arrows_history_length = 32
+arrows_embedding_dim = 16
+arrows_audio_dense_units = 64
+arrows_gru_units = 64
+arrows_shared_dense_units = 128
+arrows_activation = 'relu'
+arrows_history_dropout = 0.1
+arrows_loss_weights = {'red': 1.0, 'blue': 1.0}
+
+# V2 multiplier: training and network parameters
+multiplier_optimizer = 'Adam'
+multiplier_learning_rate = 0.0005
+multiplier_n_epochs = 80
+multiplier_batch_size = 128
+multiplier_clipnorm = 1.0
+multiplier_early_stopping_patience = 10
+multiplier_early_stopping_min_delta = 0.0
+multiplier_monitor = 'val_loss'
+multiplier_monitor_mode = 'min'
+multiplier_shuffle = True
+multiplier_verbose = 2
+multiplier_random_seed = random_seed
+multiplier_history_length = 32
+multiplier_embedding_dim = 16
+multiplier_audio_dense_units = 64
+multiplier_gru_units = 64
+multiplier_shared_dense_units = 128
+multiplier_activation = 'relu'
+multiplier_history_dropout = 0.1
+multiplier_loss_weights = {'red': 1.0, 'blue': 1.0}
+
+# V2 hazards: training and network parameters
+hazards_optimizer = 'Adam'
+hazards_learning_rate = 0.0005
+hazards_n_epochs = 80
+hazards_batch_size = 128
+hazards_clipnorm = 1.0
+hazards_early_stopping_patience = 10
+hazards_early_stopping_min_delta = 0.0
+hazards_monitor = 'val_loss'
+hazards_monitor_mode = 'min'
+hazards_shuffle = True
+hazards_verbose = 2
+hazards_random_seed = random_seed
+hazards_history_length = 32
+hazards_embedding_dim = 16
+hazards_audio_dense_units = 64
+hazards_gru_units = 64
+hazards_shared_dense_units = 128
+hazards_activation = 'relu'
+hazards_history_dropout = 0.1
+hazards_loss_weights = {'wall': 1.0, 'bombs': 1.0}
+
+# V2 lighting: training and network parameters
+lighting_optimizer = 'Adam'
+lighting_learning_rate = 0.0005
+lighting_n_epochs = 80
+lighting_batch_size = 8
+lighting_clipnorm = 1.0
+lighting_early_stopping_patience = 10
+lighting_early_stopping_min_delta = 0.0
+lighting_monitor = 'val_loss'
+lighting_monitor_mode = 'min'
+lighting_shuffle = True
+lighting_verbose = 2
+lighting_random_seed = random_seed
+lighting_block_length = 16
+lighting_conv_filters = 32
+lighting_time_lstm_units = 32
+lighting_history_lstm_units = 64
+lighting_combined_lstm_units = 64
+lighting_dense_units = 1024
+lighting_dropout = 0.05
+lighting_loss_weights = {'events': 1.0}
+
+# V2 arcs: training and network parameters
+arcs_optimizer = 'Adam'
+arcs_learning_rate = 0.0005
+arcs_n_epochs = 80
+arcs_batch_size = 128
+arcs_clipnorm = 1.0
+arcs_early_stopping_patience = 10
+arcs_early_stopping_min_delta = 0.0
+arcs_monitor = 'val_loss'
+arcs_monitor_mode = 'min'
+arcs_shuffle = True
+arcs_verbose = 2
+arcs_random_seed = random_seed
+arcs_history_length = 32
+arcs_embedding_dim = 16
+arcs_audio_dense_units = 64
+arcs_gru_units = 64
+arcs_shared_dense_units = 128
+arcs_activation = 'relu'
+arcs_history_dropout = 0.1
+arcs_loss_weights = {'attach': 1.0, 'shape': 1.0, 'anchor': 1.0}
+arcs_shape_bounds = (0.0, 2.0)  # mu/tmu; out-of-range source controls are masked and reported
+
 # Event prediction model configuration
 event_learning_rate = 1e-3
 event_n_epochs = 180

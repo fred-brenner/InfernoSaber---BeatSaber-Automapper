@@ -944,3 +944,71 @@ the source/split audit. `guarded_benchmark.py`, `benchmark.log`,
 execution checks. Post-inference reporting fixes for failed-run totals and
 source-hash coverage passed focused tests; all measured inference cases had
 succeeded, so those fixes do not change their predictions or scores.
+
+
+## V2 concept framework: CPU acceptance without training (2026-10-17)
+
+Implemented `training.pipeline_v2` following the agreed
+[architecture](model-architecture.md). The connected concept uses the existing
+intensity/timing pair and retained audio encoder, followed by separate positions,
+arrows, multiplier, hazards and arcs models; lighting uses its own candidate
+timeline. New model and preparation parameters live in `tools/config/config.py`.
+Existing intensity/timing targets and checkpoints, the former joint-notes model,
+legacy generation and source preprocessing remain unchanged.
+
+The approved decisions are implemented: synchronized copies and explicit chains
+for the multiplier, fixed per-song encoder normalization, simultaneous multi-label
+lighting, and native human hazard positives in addition to scheduler candidates.
+Hazard query provenance and scheduler coverage remain separate. Training-only
+vocabularies and normalization are frozen for later curated comparisons.
+Unsupported objects are preserved with masked targets and diagnostics; base-reader,
+reservation and downstream preparation skips all reach the comparison report.
+
+The framework provides immutable JSON/NPZ datasets, streamed stage batches,
+explicit checkpoint compatibility, future training commands and guarded concept
+composition. Independent encoder and six downstream comparisons are prepared,
+require explicit execution, and were **not run**. No real-song accuracy result
+is claimed. No full corpus preparation was run for these new stages.
+
+Synthetic CLI acceptance completed under guards that reject `fit`, optimizer
+construction and optimizer steps. It exercised four prepared dummy songs,
+dataset validation, the complete dummy composition, all six untrained neural
+models and the default named review stop. Every new network produced finite
+outputs, losses and gradients; model weights remained unchanged. All six strict
+`.keras` reloads reproduced predictions exactly (maximum difference **0.0**).
+Additional tests exercise active audio/history/output gradient branches and
+rejection of structural/synthetic fixtures by actual training entry points.
+
+Synthetic-vocabulary parameter counts are positions 40,970; arrows 53,362;
+multiplier 64,054; hazards 50,062; arcs 51,559; lighting 6,584,928. Lighting retains
+the agreed legacy network topology; its multi-label class count, and template
+heads in other stages, depend on the frozen real training vocabulary.
+
+A separate generated 3.25-second waveform passed the actual retained encoder on
+CPU with unchanged checkpoint/model weights. It exposed a 16-sample shortfall in
+the native 14,800 Hz resampled tail. Encoder representation v2 now validates query
+times against the beat framework's canonical duration and zero-pads unavailable
+samples within the centered patch. Native samples, source hashes and event times
+remain unchanged; both durations and the tail difference are recorded. A query
+at 3.249 seconds succeeds, while the exact 3.25-second end remains excluded.
+
+Final CPU suite: **405 passed**, with **10 opt-in comparison tests excluded**.
+All 52 curated input files and nine files in trained run `20261017-151437` retain
+their original hashes. Pre-existing working-tree edits and configuration values
+were preserved; only a new v2 config section was inserted.
+
+Runtime: Python 3.10.19, TensorFlow 2.15.1/Keras 2.15.0, NumPy 1.26.4, GPU
+visibility disabled. Training, optimizer updates, GPU execution, independent
+model comparisons and gameplay quality remain unverified. The default concept
+stops at `bpm_alignment`; movement, swing, hazard/arc clearance and export also
+have explicit review stops. Diagnostic traversal records bypasses and never
+marks the result playable or export-ready.
+
+Evidence is outside the checkout in
+`../Data/training/pipeline_v2/runs/framework-cpu-2026-10-17-ed24f6/`.
+`final/acceptance-status.json`, `final/keras-smoke/report.json`,
+`final/review-stop/concept.json`, and `retained-encoder-synthetic.json` contain the
+final synthetic checks. `final/pytest-cpu.log` and `final/pytest-cpu.xml` contain
+the CPU suite; `acceptance-summary.json` and `files-before.json`/`files-after.json`
+record the final result and source preservation. Exact preparation, stage-training
+and later comparison commands are in [the v2 handoff](pipeline-v2.md).

@@ -18,6 +18,9 @@ platforms before implementing them unless the task already authorizes them.
 - For RTX 5080 GPU execution, read [docs/gpu-execution.md](docs/gpu-execution.md).
 - For the v2 target stages and their output responsibilities, read
   [docs/model-architecture.md](docs/model-architecture.md).
+- For v2 dataset preparation, individual stage training, concept composition,
+  review stops and opt-in model comparisons, read [docs/pipeline-v2.md](docs/pipeline-v2.md).
+  Its new downstream models are untrained; corpus comparisons require an explicit request.
 - For implemented intensity/timing/note contracts and training status, read
   [docs/model-beat-architecture.md](docs/model-beat-architecture.md).
 - For legacy generation calls, checkpoints, and preprocessing, read
@@ -63,6 +66,9 @@ labels require verification before becoming current requirements.
 - For small code changes, run focused tests covering the affected behavior.
 - For major or framework changes, run the full `python -m pytest -q` suite in the
   relevant environment(s). The suite covers song metadata and legacy TCN model loading.
+- For v2 framework-only acceptance, exclude opt-in model comparisons with
+  `python -m pytest -q -m 'not comparison'`. Keep training and corpus comparisons
+  separate from synthetic forward/gradient/serialization checks.
 - For documentation-only changes, limit validation to reviewing the text,
   relevant links, and the final diff; runtime tests are not required.
 - For substantial changes to audio processing, map generation, or export behavior,

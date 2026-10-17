@@ -10,6 +10,11 @@ existing application generator remains separate; integration, final alignment,
 grid snapping, map export, lighting, obstacles/bombs, and a future multiplier
 are outside this architecture milestone.
 
+The subsequent [v2 concept framework](pipeline-v2.md) now implements separate
+positions, arrows, multiplier, hazards, lighting and arcs stages with explicit
+review stops. It reuses this trained intensity/timing pair; the joint `notes`
+checkpoint described here remains a separate earlier model.
+
 The previous generator, autoencoder, H5 checkpoints, learned pattern
 dictionaries, and lighting architecture are documented in the preserved
 [legacy reference](model-architecture_old.md). Those checkpoints are incompatible
