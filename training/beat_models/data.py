@@ -10,6 +10,7 @@ from evaluation.human_maps import _check_timing, _number, _package_file, _read_j
 from tools.config import config
 from .contracts import FRAME_SECONDS, SAMPLE_RATE, SEED, Song, encode_note, synchronize_events, validate_song
 from .features import decode_audio, extract_features, fit_normalization, normalize_songs
+from .settings import split_fractions
 
 
 def hash_file(path):
@@ -307,7 +308,7 @@ def _tokens(song):
 
 
 def assign_splits(songs, reserved=(), aliases=None, seed=SEED):
-    """Group byte/decoded duplicates and explicit aliases before 80/10/10 splits.
+    """Group byte/decoded duplicates and aliases before configured song splits.
 
     Alias groups are lists of source audio paths, hashes, or song IDs. A mapping
     alias->canonical identifier is accepted as a convenient equivalent.
@@ -345,8 +346,12 @@ def assign_splits(songs, reserved=(), aliases=None, seed=SEED):
     if available:
         available = [available[index] for index in rng.permutation(len(available))]
     count = len(available)
-    test_count = max(1, int(round(count * .1))) if count >= 3 else 0
-    validation_count = max(1, int(round(count * .1))) if count >= 3 else 0
+    _, validation_fraction, test_fraction = split_fractions()
+    test_count = max(1, int(round(count * test_fraction))) if count >= 3 and test_fraction > 0 else 0
+    validation_count = max(1, int(round(count * validation_fraction))) if count >= 3 and validation_fraction > 0 else 0
+    # Rounding on small sets must still leave a training group.
+    test_count = min(test_count, max(0, count - 1 - int(validation_count > 0)))
+    validation_count = min(validation_count, max(0, count - test_count - 1))
     splits = {}
     for index, group in enumerate(available):
         splits[group] = "test" if index < test_count else "validation" if index < test_count + validation_count else "train"
@@ -383,7 +388,7 @@ def prepare_songs(source_root=None, prepared_root=None, dummy=False, reserved_ro
     """Prepare raw packages or explicitly selected flattened sources, read-only."""
     report = {"schema_version": 1, "songs": [], "skipped": [], "reserved": [], "reserved_skipped": [],
               "filename_fallbacks": [],
-              "warnings": [], "split_seed": seed, "split_ratio": [0.8, 0.1, 0.1],
+              "warnings": [], "split_seed": seed, "split_ratio": list(split_fractions()),
               "overlap_policy": "audio_byte_hash_and_decoded_float32_hash_plus_explicit_aliases",
               "role": "evaluation" if evaluation_only else "training", "difficulty": difficulty}
     if prepared_root is not None and difficulty is not None:

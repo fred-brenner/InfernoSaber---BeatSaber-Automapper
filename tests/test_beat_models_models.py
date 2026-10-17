@@ -182,4 +182,10 @@ def test_training_dry_run_never_constructs_optimizer_or_calls_fit(stage, tmp_pat
     assert report["status"] == "untrained"
     assert report["optimizer_steps"] == 0
     assert np.isfinite(report["preview_loss"])
+    if stage == "intensity":
+        assert report["intensity_references"]["train"]["valid_songs"] == report["train_examples"]
+        assert report["intensity_references"]["validation"]["valid_songs"] == report["validation_examples"]
+        assert np.isfinite(report["preview_metrics"]["kl_divergence"])
+        assert np.isfinite(report["preview_metrics"]["uniform_rate_loss"])
+        assert "uniform_rate_improvement_pct" in report["metric_definitions"]
     assert [path.name for path in (tmp_path / stage).iterdir()] == ["report.json"]

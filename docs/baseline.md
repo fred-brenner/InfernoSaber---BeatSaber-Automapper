@@ -791,3 +791,58 @@ Evidence: `../Data/training/beat_models_v2/import-compat-cpu-2026-10-17/` contai
 `acceptance-summary.json`, `filename-audit.json`, `real-package-check.json`,
 `pytest-cpu.log`, native raw/filtered stderr logs and reproducible decode/import
 probes. See [the framework guide](beat-model-training.md) for current policies.
+
+## Intensity epoch diagnostics (2026-10-17)
+
+Intensity training now reports KL divergence, duration-aware uniform-note-rate
+reference loss, and percentage reduction in KL relative to that reference, for
+both training and validation. Reference entropy/loss are computed from nonempty
+targets in each respective split, averaging songs equally; no new model passes
+are required. A zero-reference-KL percentage is omitted. The metrics are added
+before Keras History/progress callbacks, so console output and `report.json`
+history contain the same values. Baselines and definitions are recorded in the
+run configuration, and dry runs report preview-batch diagnostics. See the
+[training guide](beat-model-training.md#intensity-training-display).
+
+CPU acceptance: **246 tests passed** in TensorFlow 2.15.1; **4 targeted metric
+checks also passed** on CPU using TensorFlow/tf-keras 2.21. The tests simulate
+callback events without `fit` or optimizer construction and verify console
+output, history, partial-bin weighting, empty-target exclusion, negative gains,
+undefined percentages, NaN preservation, and unchanged model weights. The
+existing completed intensity checkpoint still matches its saved manifest hash.
+No training, optimizer update, dataset/preprocessing change, or model-architecture
+change was performed. GPU execution of the new display was not exercised.
+
+## Centralized new-model training configuration: CPU acceptance (2026-10-17)
+
+The existing DNN section in `tools/config/config.py` now holds separate
+`intensity_*`, `timing_*`, and `notes_*` blocks. They configure optimizer name,
+learning rate, epoch and batch limits, clipping, seeds, shuffling, verbosity,
+monitor/direction, early stopping, network widths/kernels/dropout/activation,
+context lengths, conditioning noise, and loss weights. Shared new-model audio
+and recording split fractions use `beat_models_*`, separate from legacy audio
+settings. Existing configuration entries and CRLF line endings were preserved
+byte-for-byte; the legacy import/format handling was not rewritten.
+
+Builders and training/preview/evaluation paths use the configured stage values.
+CLI epochs, batch size and conditioning override config only when explicitly
+provided. Reports/manifests retain effective training and architecture settings.
+The configured epoch count replaces the old hardcoded 100-epoch ceiling. Timing
+context margins derive from the receptive field; incompatible context changes
+require restarting the process and preparing compatible artifacts.
+
+CPU verification: **271 tests passed**. New tests cover model-specific settings,
+CLI priority, seeds/noise, non-default architectures and losses, grouped split
+fractions, and fresh-process audio/context dimension consistency. All three
+CLI training dry runs completed with optimizer constructors and `fit` forbidden.
+The default representation is exactly unchanged, and seven existing target-v2
+curated songs plus their previous untrained checkpoints still load. Bounded
+forward/loss checks kept weights unchanged: seven intensity examples, 14 timing
+windows and seven reference note events. Default parameter counts remain
+60,481 / 180,483 / 173,450. No training, optimizer updates, or GPU execution ran.
+
+Evidence is stored outside the checkout under
+`../Data/training/evaluate_beats/results/beat-model-config-cpu-2026-10-17-3s3neh2s/`:
+`acceptance-summary.json`, `pytest-cpu.log`, `no-training-check.json`, and the three
+`dry-*/report.json` files. [The training guide](beat-model-training.md) explains
+parameter locations, CLI overrides and artifact compatibility.

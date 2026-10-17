@@ -4,6 +4,7 @@ import tensorflow as tf
 
 from .contracts import (CLASSES, CORE, FEATURES, FRAME_SECONDS, HALO, HISTORY,
                         MELS, PAD, PATCH, TIMING_WINDOW)
+from .settings import architecture_settings
 
 keras = tf.keras
 
@@ -30,18 +31,19 @@ class DurationSoftmax(keras.layers.Layer):
         return tf.math.divide_no_nan(mass, tf.reduce_sum(mass, axis=1, keepdims=True))
 
 
-def _temporal_stack(values, mask, channels, dilations, prefix):
+def _temporal_stack(values, mask, settings, prefix):
+    channels = settings["channels"]
     values = keras.layers.Conv1D(channels, 1, name=f"{prefix}_projection")(values)
     values = ApplyMask(name=f"{prefix}_input_mask")([values, mask])
-    for dilation in dilations:
+    for dilation in settings["dilations"]:
         residual = values
-        for index in range(2):
+        for index in range(settings["convolutions_per_block"]):
             name = f"{prefix}_d{dilation}_{index}"
-            values = keras.layers.Conv1D(channels, 3, padding="same", dilation_rate=dilation,
+            values = keras.layers.Conv1D(channels, settings["kernel_size"], padding="same", dilation_rate=dilation,
                                          name=f"{name}_conv")(values)
             values = keras.layers.LayerNormalization(name=f"{name}_norm")(values)
-            values = keras.layers.Activation("relu", name=f"{name}_relu")(values)
-            values = keras.layers.Dropout(0.1, name=f"{name}_dropout")(values)
+            values = keras.layers.Activation(settings["activation"], name=f"{name}_relu")(values)
+            values = keras.layers.Dropout(settings["dropout"], name=f"{name}_dropout")(values)
             values = ApplyMask(name=f"{name}_mask")([values, mask])
         values = keras.layers.Add(name=f"{prefix}_d{dilation}_residual")([residual, values])
         values = ApplyMask(name=f"{prefix}_d{dilation}_mask")([values, mask])
@@ -49,29 +51,37 @@ def _temporal_stack(values, mask, channels, dilations, prefix):
 
 
 def build_intensity_model():
+    settings = architecture_settings("intensity")
     inputs = {"audio": keras.Input((None, FEATURES), name="audio"),
               "durations": keras.Input((None,), name="durations"),
               "mask": keras.Input((None,), dtype="bool", name="mask")}
     values = ApplyMask()([inputs["audio"], inputs["mask"]])
-    values = _temporal_stack(values, inputs["mask"], 48, (1, 2, 4, 8), "intensity")
+    values = _temporal_stack(values, inputs["mask"], settings, "intensity")
     logits = keras.layers.Conv1D(1, 1, name="log_density")(values)
     shares = DurationSoftmax(name="shares")([logits, inputs["durations"], inputs["mask"]])
     return keras.Model(inputs, shares, name="intensity")
 
 
 def build_timing_model():
+    settings = architecture_settings("timing")
+    halo = settings["convolutions_per_block"] * (settings["kernel_size"] - 1) * sum(settings["dilations"]) // 2
+    if (settings["chunk_frames"], halo) != (CORE, HALO):
+        raise ValueError("Timing dimensions changed after contracts were loaded; restart before building the model")
     inputs = {"audio": keras.Input((TIMING_WINDOW, FEATURES), name="audio"),
               "conditions": keras.Input((TIMING_WINDOW, 4), name="conditions"),
               "mask": keras.Input((TIMING_WINDOW,), dtype="bool", name="mask")}
     values = keras.layers.Concatenate()([inputs["audio"], inputs["conditions"]])
     values = ApplyMask()([values, inputs["mask"]])
-    values = _temporal_stack(values, inputs["mask"], 64, (1, 2, 4, 8, 16, 32, 64), "timing")
+    values = _temporal_stack(values, inputs["mask"], settings, "timing")
     values = keras.layers.Cropping1D((HALO, HALO), name="valid_core")(values)
     probabilities = keras.layers.Conv1D(3, 1, activation="softmax", name="counts")(values)
     return keras.Model(inputs, probabilities, name="timing")
 
 
 def build_notes_model():
+    settings = architecture_settings("notes")
+    if (settings["patch_frames"], settings["history_length"]) != (PATCH, HISTORY):
+        raise ValueError("Note dimensions changed after contracts were loaded; restart before building the model")
     inputs = {"audio": keras.Input((PATCH, MELS, 1), name="audio"),
               "audio_mask": keras.Input((PATCH,), dtype="bool", name="audio_mask"),
               "history": keras.Input((HISTORY, 2), dtype="int32", name="history"),
@@ -80,19 +90,21 @@ def build_notes_model():
               "conditions": keras.Input((6,), name="conditions")}
     audio_mask = keras.layers.Reshape((PATCH, 1))(inputs["audio_mask"])
     audio = ApplyMask(name="audio_valid_frames")([inputs["audio"], audio_mask])
-    audio = keras.layers.Conv2D(16, 3, padding="same", activation="relu")(audio)
-    audio = keras.layers.MaxPooling2D((4, 4))(audio)
-    audio = keras.layers.Conv2D(32, 3, padding="same", activation="relu")(audio)
-    audio = keras.layers.MaxPooling2D((5, 4))(audio)
+    for filters, pool_size in zip(settings["cnn_filters"], settings["pool_sizes"]):
+        audio = keras.layers.Conv2D(filters, settings["cnn_kernel_size"], padding="same",
+                                    activation=settings["activation"])(audio)
+        audio = keras.layers.MaxPooling2D(pool_size)(audio)
     audio = keras.layers.Flatten()(audio)
-    audio = keras.layers.Dense(64, activation="relu", name="audio_features")(audio)
-    history = keras.layers.Embedding(PAD + 1, 16, name="hand_embedding")(inputs["history"])
-    history = keras.layers.Reshape((HISTORY, 32))(history)
-    history = keras.layers.Dropout(0.1, name="history_dropout")(history)
+    audio = keras.layers.Dense(settings["audio_dense_units"], activation=settings["activation"],
+                                name="audio_features")(audio)
+    history = keras.layers.Embedding(PAD + 1, settings["embedding_dim"], name="hand_embedding")(inputs["history"])
+    history = keras.layers.Reshape((HISTORY, 2 * settings["embedding_dim"]))(history)
+    history = keras.layers.Dropout(settings["history_dropout"], name="history_dropout")(history)
     history = keras.layers.Concatenate()([history, inputs["history_age"]])
-    history = keras.layers.GRU(64, name="history_gru")(history, mask=inputs["history_mask"])
+    history = keras.layers.GRU(settings["gru_units"], name="history_gru")(history, mask=inputs["history_mask"])
     joined = keras.layers.Concatenate()([audio, history, inputs["conditions"]])
-    joined = keras.layers.Dense(128, activation="relu", name="shared_features")(joined)
+    joined = keras.layers.Dense(settings["shared_dense_units"], activation=settings["activation"],
+                                 name="shared_features")(joined)
     outputs = {hand: keras.layers.Dense(CLASSES, activation="softmax", name=hand)(joined)
                for hand in ("red", "blue")}
     return keras.Model(inputs, outputs, name="notes")
@@ -128,15 +140,17 @@ def intensity_loss(target, predicted, mask=None, target_valid=None):
 
 def timing_loss_components(target, predicted, mask):
     """Return CE/frame and rate-Huber/chunk numerators and denominators."""
+    settings = architecture_settings("timing")
     target = tf.cast(target, tf.int32)
     mask = tf.cast(mask, predicted.dtype)
     cross_entropy = keras.losses.sparse_categorical_crossentropy(target, predicted)
     expected = tf.reduce_sum(predicted * tf.cast([0, 1, 2], predicted.dtype), axis=-1)
     frames = tf.reduce_sum(mask, axis=-1)
     error = tf.math.divide_no_nan(tf.reduce_sum((expected - tf.cast(target, predicted.dtype)) * mask,
-                                                axis=-1), 10 * FRAME_SECONDS * frames)
+                                                axis=-1), settings["count_rate_scale"] * FRAME_SECONDS * frames)
     absolute = tf.abs(error)
-    huber = tf.where(absolute <= 1, 0.5 * tf.square(error), absolute - 0.5)
+    delta = tf.cast(settings["count_huber_delta"], predicted.dtype)
+    huber = tf.where(absolute <= delta, 0.5 * tf.square(error), delta * (absolute - 0.5 * delta))
     valid_chunks = tf.cast(frames > 0, predicted.dtype)
     return (tf.reduce_sum(cross_entropy * mask), tf.reduce_sum(mask),
             tf.reduce_sum(huber * valid_chunks), tf.reduce_sum(valid_chunks))
@@ -144,14 +158,16 @@ def timing_loss_components(target, predicted, mask):
 
 def timing_loss(target, predicted, mask):
     ce_sum, frames, huber_sum, chunks = timing_loss_components(target, predicted, mask)
-    return tf.math.divide_no_nan(ce_sum, frames) + 0.1 * tf.math.divide_no_nan(huber_sum, chunks)
+    return (tf.math.divide_no_nan(ce_sum, frames)
+            + architecture_settings("timing")["count_loss_weight"] * tf.math.divide_no_nan(huber_sum, chunks))
 
 
 def notes_loss(target, predicted, mask=None):
+    settings = architecture_settings("notes")
     target = tf.cast(target, tf.int32)
     losses = [keras.losses.sparse_categorical_crossentropy(target[:, hand], predicted[name])
               for hand, name in enumerate(("red", "blue"))]
-    per_event = (losses[0] + losses[1]) / 2
+    per_event = settings["red_loss_weight"] * losses[0] + settings["blue_loss_weight"] * losses[1]
     return tf.reduce_mean(per_event) if mask is None else _masked_mean(per_event, mask)
 
 

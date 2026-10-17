@@ -58,7 +58,7 @@ still skip the affected map with a reason. The filter is scoped to decoding;
 waveform samples and timestamps are unchanged. Deferred import work, including
 optional BPM-change support, is tracked in [TODO.md](../TODO.md).
 
-Every stage uses one audio timeline: mono 16 kHz, a 512-sample centered Hann FFT,
+Every stage uses one audio timeline, defaulting to mono 16 kHz, a 512-sample centered Hann FFT,
 hop 160 (100 frames/second), 80 log-mel channels, volume, and onset strength.
 Padding is explicit; the last decoder block is trimmed to its real sample count.
 Normalization is fitted only on training groups, with separate fine/coarse
@@ -152,11 +152,82 @@ evaluation are distinct; only the latter exercises predicted note history.
 The checkpoint must have `trained` status for predicted downstream training;
 explicit untrained checkpoints are accepted for diagnostic evaluation.
 
-Future training defaults are Adam at 0.001, gradient clipping at 1, at most 100
+Future training defaults are Adam at 0.001, gradient clipping at 1, a maximum of 100
 epochs, early stopping after 10 epochs without validation-loss improvement, and
 best-checkpoint saving. Default batches are one song, eight timing chunks, and
 128 note events. These defaults are configurable and are not measured quality
 results.
+
+### Training and model configuration
+
+All new-model defaults live in [tools/config/config.py](../tools/config/config.py),
+under `Do not change unless you change the DNN models`. The existing legacy
+autoencoder, mapper, beat-prediction and lighting settings keep their original
+names and values. The new models have separate sections:
+
+| Model | Prefix | Examples |
+| --- | --- | --- |
+| Intensity | `intensity_` | `intensity_learning_rate`, `intensity_n_epochs`, `intensity_batch_size`, `intensity_channels` |
+| Timing | `timing_` | `timing_learning_rate`, `timing_dilations`, `timing_chunk_frames`, `timing_count_loss_weight` |
+| Notes | `notes_` | `notes_learning_rate`, `notes_history_length`, `notes_embedding_dim`, `notes_gru_units` |
+
+Each section includes optimizer name, learning rate, epochs, batch size,
+gradient clipping, seed, shuffling, console verbosity, validation monitor and
+its min/max direction, plus early-stopping patience and minimum improvement.
+Network widths, kernels, dropout, activation and relevant loss weights are
+configured alongside the training defaults. Timing and notes separately define
+their intensity-conditioning mode and noise standard deviation.
+
+Shared new-model audio settings use `beat_models_` names, keeping them separate
+from the legacy `samplerate_music` and `hop_size`. Data splitting uses the
+existing `random_seed`, `beat_models_validation_fraction`, and
+`beat_models_test_fraction`; the remaining fraction is training data. Timing
+context margins are derived from the configured
+kernel, convolution count and dilation schedule, so changing the receptive field
+cannot silently leave a shorter context window. Class definitions and timing/
+density units remain fixed contracts, not tuning parameters.
+
+Explicit `--epochs`, `--batch-size`, and `--conditioning` arguments override the
+selected model's config values. Omit these flags to control the run entirely
+from config. The configured epoch count is the maximum for that run; it is not
+subject to a separate hardcoded 100-epoch ceiling. For example:
+
+```python
+intensity_learning_rate = 3e-4
+intensity_n_epochs = 150
+intensity_batch_size = 2
+```
+
+Start a new Python process after changing input/context dimensions. A changed
+representation requires a newly prepared dataset and compatible checkpoints;
+changes to learning rate, batch size or channel widths alone do not change the
+prepared-data contract. With the original defaults, target-v2 dataset and model
+compatibility is preserved. Dry-run reports and training manifests record the
+effective stage settings, architecture and CLI overrides for reproducibility.
+
+### Intensity training display
+
+Each intensity epoch reports these diagnostics for training and, with the
+`val_` prefix, validation:
+
+- `kl_divergence`: cross-entropy loss minus the mean target entropy, in nats.
+  Lower is better; an exact prediction has zero divergence.
+- `uniform_rate_loss`: reference cross entropy for a constant notes-per-second
+  rate. Its shares are proportional to bin duration, including partial tails.
+- `uniform_rate_improvement_pct`: percentage reduction in KL divergence relative
+  to that reference: `100 * (reference_KL - model_KL) / reference_KL`.
+  Zero matches the reference, positive values improve on it, and negative values
+  are worse. If reference KL is at most `1e-7`, the undefined percentage is omitted.
+
+Reference values average nonempty songs equally within each split. Empty
+intensity targets are excluded. The diagnostics reuse the epoch's existing loss
+and add no inference passes or optimizer updates. Early stopping continues to
+monitor `val_loss` with the same patience.
+
+The additional curves are saved in `report.json` under `history`; target entropy
+and reference values are recorded under `intensity_references`, with explanations
+under `metric_definitions`. Intensity dry runs also record `preview_metrics` for
+their preview batch. Existing completed runs and checkpoints are not rewritten.
 
 ## Commands
 

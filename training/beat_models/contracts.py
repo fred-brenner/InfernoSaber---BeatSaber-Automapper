@@ -24,26 +24,30 @@ from dataclasses import dataclass, field
 
 import numpy as np
 from tools.config import config
+from .settings import architecture_settings, feature_settings
 
 SCHEMA_VERSION = 1
 FEATURE_VERSION = 1
 TARGET_VERSION = 2
-SAMPLE_RATE = 16000
-HOP = 160
-FFT = 512
-MELS = 80
-FEATURES = 82
+_features = feature_settings()
+SAMPLE_RATE = _features["sample_rate"]
+HOP = _features["hop"]
+FFT = _features["fft"]
+MELS = _features["mels"]
+FEATURES = MELS + 2  # mel power, volume and onset strength
 FRAME_SECONDS = HOP / SAMPLE_RATE
 BIN_SECONDS = 1.0
-CORE = 512
-HALO = 254
+_timing = architecture_settings("timing")
+_notes = architecture_settings("notes")
+CORE = _timing["chunk_frames"]
+HALO = _timing["convolutions_per_block"] * (_timing["kernel_size"] - 1) * sum(_timing["dilations"]) // 2
 TIMING_WINDOW = CORE + 2 * HALO
-PATCH = 200
-HISTORY = 32
+PATCH = _notes["patch_frames"]
+HISTORY = _notes["history_length"]
 CLASSES = 109
 START = 109
 PAD = 110
-SEED = 3
+SEED = config.random_seed
 STAGES = ("intensity", "timing", "notes")
 REPRESENTATION = {"schema_version": SCHEMA_VERSION, "feature_version": FEATURE_VERSION,
                   "target_version": TARGET_VERSION, "sample_rate": SAMPLE_RATE,

@@ -220,6 +220,90 @@ delete_offbeats = 0.6  # < 1 delete non-beats to free ram
 # tcn_skip = 10
 beat_song_limit = 240    # maximum number of songs used for training, to not overload RAM
 
+# New beat models: shared audio input (separate from legacy samplerate_music/hop_size)
+# Changing these inputs requires preparing a new dataset; dimensions are recorded in its manifest.
+beat_models_samplerate_music = 16000
+beat_models_hop_size = 160
+beat_models_fft_size = 512
+beat_models_mel_bins = 80
+beat_models_validation_fraction = 0.1
+beat_models_test_fraction = 0.1
+
+# Intensity model configuration (new whole-song normalized note distribution)
+intensity_optimizer = 'Adam'
+intensity_learning_rate = 5e-4
+intensity_n_epochs = 80
+intensity_batch_size = 1  # whole songs
+intensity_clipnorm = 1.0
+intensity_early_stopping_patience = 10
+intensity_early_stopping_min_delta = 0.0
+intensity_monitor = 'val_loss'
+intensity_monitor_mode = 'min'  # min / max / auto
+intensity_random_seed = random_seed
+intensity_shuffle = True
+intensity_verbose = 2
+intensity_channels = 48
+intensity_kernel_size = 3
+intensity_convolutions_per_block = 2
+intensity_dilations = (1, 2, 4, 8)
+intensity_dropout = 0.1
+intensity_activation = 'relu'
+
+# Timing model configuration (new zero/one/two-note frame counts)
+timing_optimizer = 'Adam'
+timing_learning_rate = 5e-4
+timing_n_epochs =80
+timing_batch_size = 8  # context windows
+timing_clipnorm = 1.0
+timing_early_stopping_patience = 10
+timing_early_stopping_min_delta = 0.0
+timing_monitor = 'val_loss'
+timing_monitor_mode = 'min'  # min / max / auto
+timing_random_seed = random_seed
+timing_shuffle = True
+timing_verbose = 2
+timing_conditioning = 'noisy-reference'  # reference / noisy-reference / predicted
+timing_intensity_noise_std = 0.1
+timing_channels = 64
+timing_kernel_size = 3
+timing_convolutions_per_block = 2
+timing_dilations = (1, 2, 4, 8, 16, 32, 64)
+timing_dropout = 0.1
+timing_activation = 'relu'
+timing_chunk_frames = 512  # context margins are derived from the receptive field
+timing_count_loss_weight = 0.1
+timing_count_huber_delta = 1.0
+timing_count_rate_scale = 10.0  # NPS unit for the auxiliary count loss
+
+# Notes model configuration (new per-hand position/direction categories)
+notes_optimizer = 'Adam'
+notes_learning_rate = 5e-4
+notes_n_epochs = 80
+notes_batch_size = 128  # note events
+notes_clipnorm = 1.0
+notes_early_stopping_patience = 10
+notes_early_stopping_min_delta = 0.0
+notes_monitor = 'val_loss'
+notes_monitor_mode = 'min'  # min / max / auto
+notes_random_seed = random_seed
+notes_shuffle = True
+notes_verbose = 2
+notes_conditioning = 'noisy-reference'  # reference / noisy-reference / predicted
+notes_intensity_noise_std = 0.1
+notes_patch_frames = 200  # centered audio patch; must be even
+notes_history_length = 32
+notes_cnn_filters = (16, 32)
+notes_cnn_kernel_size = 3
+notes_pool_sizes = ((4, 4), (5, 4))
+notes_audio_dense_units = 64
+notes_embedding_dim = 16
+notes_gru_units = 64
+notes_shared_dense_units = 128
+notes_history_dropout = 0.1
+notes_activation = 'relu'
+notes_red_loss_weight = 0.5
+notes_blue_loss_weight = 0.5
+
 # Event prediction model configuration
 event_learning_rate = 1e-3
 event_n_epochs = 180

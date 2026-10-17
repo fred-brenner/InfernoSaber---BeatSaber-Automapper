@@ -15,8 +15,10 @@ from .contracts import (CORE, FEATURES, FRAME_SECONDS, HISTORY, SCHEMA_VERSION, 
 from .features import normalize_songs
 from .metrics import summarize, timing_scores
 from .pipeline import generate
+from .settings import architecture_settings, training_settings
+from .training_metrics import (INTENSITY_METRIC_DEFINITIONS, add_intensity_metrics,
+                              intensity_metrics_callback, intensity_reference)
 
-DEFAULT_BATCHES = {"intensity": 1, "timing": 8, "notes": 128}
 CONDITIONING = ("reference", "noisy-reference", "predicted")
 
 
@@ -66,11 +68,13 @@ def _load_model(path, stage, manifest, require_trained=False):
     return models.keras.models.load_model(checkpoint, compile=False), metadata
 
 
-def _profiles(songs, conditioning="reference", intensity_model=None, rng=None):
+def _profiles(songs, conditioning="reference", intensity_model=None, rng=None, noise_std=None):
     if conditioning not in CONDITIONING:
         raise ValueError("Unknown intensity conditioning mode")
     if conditioning == "predicted" and intensity_model is None:
         raise ValueError("Predicted conditioning requires an explicit intensity artifact")
+    if conditioning == "noisy-reference" and noise_std is None:
+        noise_std = training_settings("timing")["intensity_noise_std"]
     rng = np.random.default_rng(SEED) if rng is None else rng
     profiles = {}
     for song in songs:
@@ -80,7 +84,7 @@ def _profiles(songs, conditioning="reference", intensity_model=None, rng=None):
         elif not song.metadata.get("intensity_target_valid", bool(shares.sum())):
             shares = song.arrays["bin_durations"] / song.metadata["duration"]
         if conditioning == "noisy-reference":
-            shares = shares * np.exp(rng.normal(0, 0.1, len(shares)))
+            shares = shares * np.exp(rng.normal(0, noise_std, len(shares)))
         if not np.isfinite(shares).all() or np.any(shares < 0) or shares.sum() <= 0:
             raise ValueError("Invalid conditioning profile")
         shares = (shares / shares.sum()).astype(np.float32)
@@ -248,7 +252,6 @@ def smoke_models(songs, manifest, output, max_events=8):
         raise ValueError("Smoke note batches require between one and eight events per song")
     songs = _normalized(songs, manifest)
     root = new_run_directory(output)
-    models.keras.utils.set_random_seed(SEED)
     profiles = _profiles(songs)
     report = {"kind": "model_smoke", "status": "untrained", "optimizer_steps": 0,
               "device": "CPU", "songs": len(songs), "max_note_events_per_song": max_events,
@@ -256,6 +259,11 @@ def smoke_models(songs, manifest, output, max_events=8):
               "stages": {}}
     with models.tf.device("/CPU:0"):
         for stage in STAGES:
+            settings = training_settings(stage)
+            batch_size = settings["batch_size"]
+            models.keras.utils.set_random_seed(settings["seed"])
+            configuration = {"batch_size": batch_size, "seed": settings["seed"],
+                             "architecture": architecture_settings(stage), "conditioning": "reference"}
             model = models.build_model(stage)
             before = [value.copy() for value in model.get_weights()]
             refs = _references(songs, stage, max_events, bounded=True)
@@ -263,8 +271,8 @@ def smoke_models(songs, manifest, output, max_events=8):
                 raise ValueError(f"No valid {stage} smoke targets")
             checks = []
             first = None
-            for offset in range(0, len(refs), DEFAULT_BATCHES[stage]):
-                batch = _batch(stage, refs[offset:offset + DEFAULT_BATCHES[stage]], profiles)
+            for offset in range(0, len(refs), batch_size):
+                batch = _batch(stage, refs[offset:offset + batch_size], profiles)
                 first = batch if first is None else first
                 checks.append(_gradient_check(model, stage, batch))
             if not all(np.array_equal(old, new) for old, new in zip(before, model.get_weights())):
@@ -273,7 +281,7 @@ def smoke_models(songs, manifest, output, max_events=8):
             checkpoint = stage_dir / "model.keras"
             model.save(checkpoint)
             write_model_manifest(stage_dir, stage, checkpoint, manifest,
-                                 {"status": "untrained", "optimizer_steps": 0, "purpose": "smoke"})
+                                 {"status": "untrained", "optimizer_steps": 0, "purpose": "smoke", **configuration})
             restored, _ = _load_model(stage_dir, stage, manifest)
             expected = _numpy_outputs(model(first[0], training=False))
             actual = _numpy_outputs(restored(first[0], training=False))
@@ -281,6 +289,7 @@ def smoke_models(songs, manifest, output, max_events=8):
             if max_error > 1e-6 or not all(np.array_equal(old, new) for old, new in zip(before, restored.get_weights())):
                 raise ValueError(f"{stage} checkpoint round trip changed predictions or weights")
             report["stages"][stage] = {"parameters": model.count_params(), "batches": len(checks),
+                                       **configuration,
                                        "examples": len(refs), "checks": checks,
                                        "input_shapes": {key: list(value.shape) for key, value in first[0].items()},
                                        "output_shapes": {key: list(value.shape) for key, value in expected.items()},
@@ -290,17 +299,22 @@ def smoke_models(songs, manifest, output, max_events=8):
     return report
 
 
-def train_stage(songs, manifest, stage, run_dir, dry_run=False, conditioning="noisy-reference",
-                intensity_artifact=None, epochs=100, batch_size=None):
+def train_stage(songs, manifest, stage, run_dir, dry_run=False, conditioning=None,
+                intensity_artifact=None, epochs=None, batch_size=None):
     """Future explicit training entrypoint; dry runs never create an optimizer."""
     from . import models
 
-    if stage not in STAGES or conditioning not in CONDITIONING:
+    if stage not in STAGES:
+        raise ValueError("Unknown model stage")
+    settings = training_settings(stage)
+    conditioning = settings["conditioning"] if conditioning is None else conditioning
+    epochs = settings["epochs"] if epochs is None else epochs
+    batch_size = settings["batch_size"] if batch_size is None else batch_size
+    if conditioning not in CONDITIONING:
         raise ValueError("Unknown stage or conditioning mode")
-    if not isinstance(epochs, int) or not 1 <= epochs <= 100:
-        raise ValueError("Epoch count must be between one and 100")
-    batch_size = DEFAULT_BATCHES[stage] if batch_size is None else batch_size
-    if not isinstance(batch_size, int) or batch_size < 1:
+    if isinstance(epochs, bool) or not isinstance(epochs, int) or epochs < 1:
+        raise ValueError("Epoch count must be a positive integer")
+    if isinstance(batch_size, bool) or not isinstance(batch_size, int) or batch_size < 1:
         raise ValueError("Batch size must be a positive integer")
     songs = _normalized(songs, manifest)
     train = [song for song in songs if song.metadata.get("split") == "train"]
@@ -316,23 +330,35 @@ def train_stage(songs, manifest, stage, run_dir, dry_run=False, conditioning="no
     if not train_refs or not validation_refs:
         raise ValueError("Training and validation need valid stage targets")
     root = new_run_directory(run_dir)
-    models.keras.utils.set_random_seed(SEED)
+    models.keras.utils.set_random_seed(settings["seed"])
     model = models.build_model(stage)
     config = {"stage": stage, "status": "untrained" if dry_run else "trained", "dry_run": dry_run,
               **_report_context(manifest),
-              "optimizer": "Adam", "learning_rate": 0.001, "clipnorm": 1.0, "epochs": epochs,
-              "early_stopping_patience": 10, "batch_size": batch_size,
+              **settings, "epochs": epochs, "batch_size": batch_size,
+              "architecture": architecture_settings(stage),
               "conditioning": conditioning if stage != "intensity" else None,
-              "validation_conditioning": "predicted" if conditioning == "predicted" else "reference",
+              "validation_conditioning": "predicted" if stage != "intensity" and conditioning == "predicted" else "reference",
               "intensity_artifact": str(intensity_artifact) if intensity_artifact else None,
               "train_examples": len(train_refs), "validation_examples": len(validation_refs),
-              "parameters": model.count_params(), "seed": SEED}
+              "parameters": model.count_params()}
+    if stage == "intensity":
+        config["intensity_references"] = {
+            split: intensity_reference(selected, models.keras.backend.epsilon())
+            for split, selected in (("train", train), ("validation", validation))}
+        config["metric_definitions"] = INTENSITY_METRIC_DEFINITIONS
     preview_mode = conditioning if stage != "intensity" else "reference"
-    preview = _batch(stage, train_refs[:batch_size], _profiles(train, preview_mode, upstream))
+    preview = _batch(stage, train_refs[:batch_size],
+                     _profiles(train, preview_mode, upstream, np.random.default_rng(settings["seed"]),
+                               noise_std=settings["intensity_noise_std"]))
     config["input_shapes"] = {key: list(value.shape) for key, value in preview[0].items()}
     if dry_run:
         config["optimizer_steps"] = 0
         config["preview_loss"] = float(_loss(stage, preview[1], model(preview[0], training=False), preview[2], preview[0]))
+        if stage == "intensity":
+            # A preview covers one batch, so its entropy/reference must match that batch.
+            reference = intensity_reference([song for song, _ in train_refs[:batch_size]], models.keras.backend.epsilon())
+            config["preview_metrics"] = {"loss": config["preview_loss"]}
+            add_intensity_metrics(config["preview_metrics"], {"train": reference})
         write_json(root / "report.json", config)
         return config
 
@@ -342,7 +368,7 @@ def train_stage(songs, manifest, stage, run_dir, dry_run=False, conditioning="no
         def __init__(self, selected, references, mode, shuffle):
             self.songs, self.references, self.mode = selected, references, mode
             self.shuffle = shuffle
-            self.rng = np.random.default_rng(SEED)
+            self.rng = np.random.default_rng(settings["seed"])
             self.order = np.arange(len(references))
             self.on_epoch_end()
 
@@ -352,7 +378,8 @@ def train_stage(songs, manifest, stage, run_dir, dry_run=False, conditioning="no
         def on_epoch_end(self):
             if self.shuffle:
                 self.rng.shuffle(self.order)
-            self.profiles = _profiles(self.songs, self.mode, upstream, self.rng)
+            self.profiles = _profiles(self.songs, self.mode, upstream, self.rng,
+                                      noise_std=settings["intensity_noise_std"])
 
         def __getitem__(self, index):
             chosen = self.order[index * batch_size:(index + 1) * batch_size]
@@ -363,20 +390,30 @@ def train_stage(songs, manifest, stage, run_dir, dry_run=False, conditioning="no
                 target = {"red": target[:, 0], "blue": target[:, 1]}
             return inputs, target
 
-    optimizer = models.keras.optimizers.Adam(learning_rate=0.001, clipnorm=1.0)
+    optimizer = models.keras.optimizers.get({"class_name": settings["optimizer"],
+                                            "config": {"learning_rate": settings["learning_rate"],
+                                                       "clipnorm": settings["clipnorm"]}})
     if stage == "notes":
         loss = {hand: models.keras.losses.SparseCategoricalCrossentropy() for hand in ("red", "blue")}
-        model.compile(optimizer=optimizer, loss=loss, loss_weights={"red": 0.5, "blue": 0.5})
+        model.compile(optimizer=optimizer, loss=loss,
+                      loss_weights={hand: config["architecture"][f"{hand}_loss_weight"] for hand in ("red", "blue")})
     else:
         model.compile(optimizer=optimizer, loss=models.intensity_objective if stage == "intensity" else models.timing_objective)
     checkpoint = root / "best.keras"
-    callbacks = [models.keras.callbacks.EarlyStopping(monitor="val_loss", patience=10, restore_best_weights=True),
-                 models.keras.callbacks.ModelCheckpoint(str(checkpoint), monitor="val_loss", save_best_only=True)]
+    callbacks = [models.keras.callbacks.EarlyStopping(monitor=settings["monitor"],
+                                                      mode=settings["monitor_mode"],
+                                                      patience=settings["early_stopping_patience"],
+                                                      min_delta=settings["early_stopping_min_delta"],
+                                                      restore_best_weights=True),
+                 models.keras.callbacks.ModelCheckpoint(str(checkpoint), monitor=settings["monitor"],
+                                                        mode=settings["monitor_mode"], save_best_only=True)]
+    if stage == "intensity":
+        callbacks.insert(0, intensity_metrics_callback(config["intensity_references"]))
     train_mode = conditioning if stage != "intensity" else "reference"
     valid_mode = "predicted" if train_mode == "predicted" else "reference"
-    history = model.fit(StageSequence(train, train_refs, train_mode, True),
+    history = model.fit(StageSequence(train, train_refs, train_mode, settings["shuffle"]),
                         validation_data=StageSequence(validation, validation_refs, valid_mode, False),
-                        epochs=epochs, callbacks=callbacks, shuffle=False, verbose=2)
+                        epochs=epochs, callbacks=callbacks, shuffle=False, verbose=settings["verbose"])
     config["optimizer_steps"] = int(optimizer.iterations.numpy())
     config["epochs_completed"] = len(history.history["loss"])
     config["best_validation_loss"] = float(min(history.history["val_loss"]))
@@ -406,10 +443,11 @@ def evaluate_models(songs, manifest, artifacts, output, requested_nps=None, max_
                                      np.zeros(len(song.arrays["frame_times"]), dtype=bool)) for song in songs}
     note_outputs = {song.song_id: ([], []) for song in songs}
     for stage in STAGES:
+        batch_size = training_settings(stage)["batch_size"]
         refs = _references(songs, stage, max_events)
         losses, weights = [], []
-        for offset in range(0, len(refs), DEFAULT_BATCHES[stage]):
-            selected = refs[offset:offset + DEFAULT_BATCHES[stage]]
+        for offset in range(0, len(refs), batch_size):
+            selected = refs[offset:offset + batch_size]
             batch = _batch(stage, selected, profiles)
             inputs, target, mask = batch
             predicted = loaded[stage](inputs, training=False)
@@ -434,6 +472,7 @@ def evaluate_models(songs, manifest, artifacts, output, requested_nps=None, max_
                     note_outputs[song.song_id][0].append(target[row])
                     note_outputs[song.song_id][1].append(classes[row])
         teacher_forced[stage] = {"loss": float(np.average(losses, weights=weights)) if losses else None,
+                                  "batch_size": batch_size, "configured_architecture": architecture_settings(stage),
                                   "examples": len(refs), "conditioning": "reference",
                                   "history": "reference" if stage == "notes" else None}
     teacher_forced["intensity"].update({"songs": intensity_reports,
@@ -443,7 +482,8 @@ def evaluate_models(songs, manifest, artifacts, output, requested_nps=None, max_
     timing_reports = [_timing_stage_scores(song, *timing_outputs[song.song_id]) for song in songs]
     ce_sum, frames, huber_sum, chunks = timing_loss_totals
     ce, huber = ce_sum / frames if frames else 0, huber_sum / chunks if chunks else 0
-    teacher_forced["timing"].update({"loss": float(ce + 0.1 * huber), "cross_entropy": float(ce),
+    count_loss_weight = teacher_forced["timing"]["configured_architecture"]["count_loss_weight"]
+    teacher_forced["timing"].update({"loss": float(ce + count_loss_weight * huber), "cross_entropy": float(ce),
                                     "normalized_count_huber": float(huber),
                                     "songs": timing_reports, "summary": _timing_stage_summary(timing_reports)})
     all_targets = [item for truth, _ in note_outputs.values() for item in truth]
@@ -483,7 +523,8 @@ def evaluate_models(songs, manifest, artifacts, output, requested_nps=None, max_
               "partial_diagnostic": any(item["partial_diagnostic"] for item in reports) or teacher_forced["notes"]["partial_diagnostic"],
               "interpretation": interpretation,
               "checkpoints": {stage: {"path": str(artifacts[stage]),
-                                      "status": statuses[stage]}
+                                      "status": statuses[stage],
+                                      "architecture": checkpoint_metadata[stage].get("training", {}).get("architecture")}
                               for stage in STAGES}}
     write_json(root / "report.json", report)
     return report

@@ -23,7 +23,7 @@ def parser():
     prepare.add_argument("--evaluation-only", action="store_true", help="Keep curated recordings as test-only examples; requires existing normalization")
     prepare.add_argument("--difficulty", help="Select a raw Standard difficulty, for example ExpertPlus")
     prepare.add_argument("--aliases", help="JSON recording alias groups or alias-to-canonical mapping")
-    prepare.add_argument("--seed", type=int, default=3)
+    prepare.add_argument("--seed", type=int, default=SEED)
     validate = sub.add_parser("validate", help="Check persisted arrays, hashes and representation")
     validate.add_argument("--dataset", required=True)
     smoke = sub.add_parser("smoke", help="Inference checks; keras also checks gradients and serialization without updates")
@@ -36,10 +36,11 @@ def parser():
     train.add_argument("--stage", choices=STAGES, required=True)
     train.add_argument("--run-dir", required=True)
     train.add_argument("--dry-run", action="store_true", help="Save configuration and a forward-check report; no optimizer steps")
-    train.add_argument("--conditioning", choices=("reference", "noisy-reference", "predicted"), default="noisy-reference")
+    train.add_argument("--conditioning", choices=("reference", "noisy-reference", "predicted"),
+                       help="Override the selected stage's tools/config/config.py default")
     train.add_argument("--intensity-artifact", "--intensity-checkpoint", dest="intensity_artifact")
-    train.add_argument("--epochs", type=int, default=100)
-    train.add_argument("--batch-size", type=int)
+    train.add_argument("--epochs", type=int, help="Override the selected stage's configured epoch count")
+    train.add_argument("--batch-size", type=int, help="Override the selected stage's configured batch size")
     evaluate = sub.add_parser("evaluate", help="Compare new predictions with original and retained colored notes")
     evaluate.add_argument("--dataset", required=True)
     evaluate.add_argument("--output", required=True)
@@ -133,7 +134,7 @@ def main(argv=None):
             smoke_models(songs, manifest, args.output, max_events=args.max_events)
         print(f"{args.backend} smoke artifacts saved in {args.output}")
     elif args.command == "train":
-        if args.epochs <= 0 or (args.batch_size is not None and args.batch_size <= 0):
+        if (args.epochs is not None and args.epochs <= 0) or (args.batch_size is not None and args.batch_size <= 0):
             command.error("Epochs and batch size must be positive")
         if args.conditioning == "predicted" and not args.intensity_artifact:
             command.error("Predicted conditioning requires --intensity-artifact")
