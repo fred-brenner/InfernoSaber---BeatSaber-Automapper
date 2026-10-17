@@ -193,6 +193,43 @@ def _failure(report, path, error, **extra):
     report["skipped"].append({"path": str(path), "reason": f"{type(error).__name__}: {error}", **extra})
 
 
+def _beatmap_file(package, filename, difficulty, references):
+    """Resolve exact/case-only names and the legacy Standard filename pair."""
+    try:
+        return _package_file(package, filename), "declared"
+    except FileNotFoundError:
+        requested = Path(filename.replace("\\", "/"))
+        parent = (package / requested.parent).resolve()
+        if not parent.is_dir():
+            raise
+        names = [requested.name.casefold()]
+        if difficulty in ("Easy", "Normal", "Hard", "Expert", "ExpertPlus"):
+            aliases = (f"{difficulty}.dat".casefold(), f"{difficulty}Standard.dat".casefold())
+            if names[0] in aliases:
+                names.append(next(name for name in aliases if name != names[0]))
+        files = [path for path in parent.iterdir() if path.is_file()]
+        for index, name in enumerate(names):
+            matches = [path for path in files if path.name.casefold() == name]
+            if len(matches) > 1:
+                raise ValueError(f"Ambiguous beatmap filename fallback for {filename}: {[path.name for path in matches]}")
+            if matches:
+                relative = matches[0].relative_to(package).as_posix()
+                candidate = _package_file(package, relative)
+                if index:
+                    for ref in references:
+                        if not isinstance(ref, str):
+                            continue
+                        try:
+                            claimed = (package / ref.replace("\\", "/")).resolve()
+                        except (ValueError, OSError, RuntimeError):
+                            # Report malformed sibling references on their own maps.
+                            continue
+                        if claimed.as_posix().casefold() == candidate.as_posix().casefold():
+                            raise ValueError(f"Ambiguous beatmap filename fallback for {filename}: {relative} is referenced by another beatmap")
+                return candidate, "standard_filename_alias" if index else "case_insensitive"
+        raise
+
+
 def _raw_songs(root, report, audio_cache, difficulty=None):
     packages = [root] if any(path.name.lower() == "info.dat" for path in root.iterdir()) else sorted(path for path in root.iterdir() if path.is_dir())
     result = []
@@ -209,6 +246,9 @@ def _raw_songs(root, report, audio_cache, difficulty=None):
             groups = _objects(info, "_difficultyBeatmapSets")
             if not groups:
                 raise ValueError("No difficulty beatmap sets")
+            references = [item.get("_beatmapFilename") for group in groups
+                          if isinstance(group.get("_difficultyBeatmaps"), list)
+                          for item in group["_difficultyBeatmaps"] if isinstance(item, dict)]
             selected = 0
             for group in groups:
                 characteristic = group.get("_beatmapCharacteristicName")
@@ -220,12 +260,17 @@ def _raw_songs(root, report, audio_cache, difficulty=None):
                     try:
                         if characteristic != "Standard":
                             raise ValueError(f"Unsupported gameplay characteristic: {characteristic!r}")
-                        beatmap_path = _package_file(package.resolve(), filename)
+                        beatmap_path, resolution = _beatmap_file(package.resolve(), filename, item.get("_difficulty"), references)
                         provenance = {"adapter": "raw_package", "metadata_verified": True,
                                       "package_path": str(package), "difficulty": item.get("_difficulty"),
-                                      "characteristic": characteristic}
+                                      "characteristic": characteristic,
+                                      "beatmap_filename_declared": filename,
+                                      "beatmap_filename_resolved": beatmap_path.relative_to(package.resolve()).as_posix(),
+                                      "beatmap_filename_resolution": resolution}
                         result.append(_load_song(info_path, beatmap_path, audio_path,
                                                  str(beatmap_path), provenance, audio_cache))
+                        if resolution != "declared":
+                            report["filename_fallbacks"].append(provenance.copy())
                     except (ValueError, OSError, RuntimeError) as error:
                         _failure(report, package, error, beatmap_filename=filename)
             if selected == 0:
@@ -337,6 +382,7 @@ def prepare_songs(source_root=None, prepared_root=None, dummy=False, reserved_ro
                   evaluation_only=False, difficulty=None):
     """Prepare raw packages or explicitly selected flattened sources, read-only."""
     report = {"schema_version": 1, "songs": [], "skipped": [], "reserved": [], "reserved_skipped": [],
+              "filename_fallbacks": [],
               "warnings": [], "split_seed": seed, "split_ratio": [0.8, 0.1, 0.1],
               "overlap_policy": "audio_byte_hash_and_decoded_float32_hash_plus_explicit_aliases",
               "role": "evaluation" if evaluation_only else "training", "difficulty": difficulty}

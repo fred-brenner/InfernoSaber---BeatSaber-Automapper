@@ -20,6 +20,7 @@ platforms before implementing them unless the task already authorizes them.
   [docs/model-architecture.md](docs/model-architecture.md).
 - For feature priorities or planning model and pipeline improvements, read
   [docs/roadmap.md](docs/roadmap.md).
+- For optional import fixes and small follow-ups, read [TODO.md](TODO.md).
 - For recorded baseline results or comparisons, read
   [docs/baseline.md](docs/baseline.md). It distinguishes verified checks from pending work.
 - For human-map beat benchmarks, reference timing rules, and reruns, read
@@ -92,3 +93,4 @@ labels require verification before becoming current requirements.
 - You are editing the development branch, and are free to (hard) adjust settings if needed.
 - Update the AGENTS.md file according to my usage and the current state of the project. If you find any outdated information, please correct it.
 - For large tasks, use subagents with GPT-6.1 Sol XHigh for specific tasks.
+- Carefull when changing beatsaber map preprocessing tasks, I've put a lot of work into the current preprocessing pipeline, because beatsaber allows multiple different formats. 

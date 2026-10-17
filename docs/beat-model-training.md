@@ -41,8 +41,22 @@ BPM, zero offset/shuffle, integer 4-by-3 positions, and directions 0 through 8.
 Unsupported timing, direction-angle offsets, geometry, versions, missing files,
 and decode errors are reported individually. A prepared-input adapter uses exact
 beatmap/Info/audio basename triples; it records original difficulty and
-characteristic provenance as unverified. Missing package references are never
-repaired by guessing another filename.
+characteristic provenance as unverified. Raw Standard maps first use the exact
+Info filename. If missing, the reader accepts an unambiguous case-only match or
+the conventional `<difficulty>.dat` / `<difficulty>Standard.dat` pair, in either
+direction. This restores compatibility with the old cleanup's filename renames
+without modifying source files. Arbitrary replacement names, ambiguous matches,
+and aliases referenced by another beatmap remain unsupported. Declared/resolved
+names and resolution policy are recorded in provenance and
+`preparation.filename_fallbacks`. Audio references and prepared triples retain
+their exact-reference policy.
+
+During audio decoding, only the complete native FFmpeg line
+`[vorbis @ 0x...] Could not update timestamps for discarded samples.` is filtered.
+Other decoder warnings/errors are forwarded unchanged, and decode exceptions
+still skip the affected map with a reason. The filter is scoped to decoding;
+waveform samples and timestamps are unchanged. Deferred import work, including
+optional BPM-change support, is tracked in [TODO.md](../TODO.md).
 
 Every stage uses one audio timeline: mono 16 kHz, a 512-sample centered Hann FFT,
 hop 160 (100 frames/second), 80 log-mel channels, volume, and onset strength.

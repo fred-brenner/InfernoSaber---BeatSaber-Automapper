@@ -11,25 +11,27 @@ import hashlib
 import numpy as np
 
 from .contracts import FFT, FEATURES, HOP, MELS, SAMPLE_RATE, Song
+from .audio_logging import filter_vorbis_timestamp_warning
 
 
 def decode_audio(path):
     """Decode mono with aubio, discarding padding in the last decoder block."""
     import aubio
 
-    source = aubio.source(str(path), samplerate=SAMPLE_RATE, hop_size=4096, channels=1)
     blocks = []
-    try:
-        while True:
-            samples, read = source()
-            block = np.asarray(samples[:read], dtype=np.float32).copy()
-            if not np.isfinite(block).all():
-                raise ValueError("Decoded audio contains nonfinite samples")
-            blocks.append(block)
-            if read < source.hop_size:
-                break
-    finally:
-        del source
+    with filter_vorbis_timestamp_warning():
+        source = aubio.source(str(path), samplerate=SAMPLE_RATE, hop_size=4096, channels=1)
+        try:
+            while True:
+                samples, read = source()
+                block = np.asarray(samples[:read], dtype=np.float32).copy()
+                if not np.isfinite(block).all():
+                    raise ValueError("Decoded audio contains nonfinite samples")
+                blocks.append(block)
+                if read < source.hop_size:
+                    break
+        finally:
+            del source
     audio = np.concatenate(blocks)
     if not len(audio):
         raise ValueError("Decoded audio is empty")

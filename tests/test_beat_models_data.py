@@ -2,6 +2,7 @@
 
 from copy import deepcopy
 import json
+from pathlib import Path
 import wave
 
 import numpy as np
@@ -215,6 +216,118 @@ def test_prepared_adapter_requires_exact_triples_and_marks_metadata_unverified(t
     assert report["skip_count"] == 1
     assert songs[0].metadata["provenance"]["metadata_verified"] is False
     assert songs[0].metadata["provenance"]["difficulty"] is None
+
+
+@pytest.mark.parametrize("declared,actual", [
+    ("ExpertPlusStandard.dat", "ExpertPlus.dat"),
+    ("ExpertPlus.dat", "ExpertPlusStandard.dat"),
+    ("ExpertPlusStandard.dat", "expertplus.dat"),
+    ("ExpertPlus.dat", "EXPERTPLUS.DAT"),
+    ("HardStandard.dat", "Hard.dat"),
+])
+def test_raw_import_resolves_standard_aliases_without_changing_sources(tmp_path, declared, actual):
+    package = _package(tmp_path, beatmaps={actual: {"_version": "2.2.0", "_notes": [_v2_note()]}})
+    path = package / "Info.dat"
+    info = json.loads(path.read_text())
+    item = info["_difficultyBeatmapSets"][0]["_difficultyBeatmaps"][0]
+    item.update({"_difficulty": "Hard" if declared.startswith("Hard") else "ExpertPlus",
+                 "_beatmapFilename": declared})
+    _json(path, info)
+    before = {p.name: hash_file(p) for p in package.iterdir()}
+    songs, report = prepare_songs(tmp_path, reserved_root=tmp_path / "absent")
+    assert len(songs) == 1 and report["skip_count"] == 0
+    provenance = songs[0].metadata["provenance"]
+    assert provenance["beatmap_filename_declared"] == declared
+    assert provenance["beatmap_filename_resolved"] == actual
+    assert provenance["beatmap_filename_resolution"] in ("standard_filename_alias", "case_insensitive")
+    assert Path(songs[0].metadata["sources"][1]["path"]).name == actual
+    assert {p.name: hash_file(p) for p in package.iterdir()} == before
+
+
+def test_exact_declared_beatmap_wins_over_legacy_alias(tmp_path):
+    exact = {"_version": "2.2.0", "_notes": [_v2_note(color=1)]}
+    other = {"_version": "2.2.0", "_notes": [_v2_note(color=0)]}
+    package = _package(tmp_path, beatmaps={"ExpertPlusStandard.dat": exact, "ExpertPlus.dat": other})
+    path = package / "Info.dat"
+    info = json.loads(path.read_text())
+    info["_difficultyBeatmapSets"][0]["_difficultyBeatmaps"] = [
+        {"_difficulty": "ExpertPlus", "_beatmapFilename": "ExpertPlusStandard.dat"}]
+    _json(path, info)
+    songs, report = prepare_songs(tmp_path, reserved_root=tmp_path / "absent")
+    assert len(songs) == 1 and report["skip_count"] == 0
+    assert songs[0].metadata["provenance"]["beatmap_filename_resolution"] == "declared"
+    assert songs[0].arrays["note_classes"][0, 0] == 0
+
+
+@pytest.mark.parametrize("declared", ["CustomExpertPlus.dat", "../ExpertPlusStandard.dat"])
+def test_filename_fallback_never_guesses_arbitrary_or_external_references(tmp_path, declared):
+    package = _package(tmp_path, beatmaps={"ExpertPlus.dat": {"_version": "2.2.0", "_notes": [_v2_note()]}})
+    path = package / "Info.dat"
+    info = json.loads(path.read_text())
+    info["_difficultyBeatmapSets"][0]["_difficultyBeatmaps"][0]["_beatmapFilename"] = declared
+    _json(path, info)
+    songs, report = prepare_songs(tmp_path, reserved_root=tmp_path / "absent")
+    assert not songs and report["skip_count"] == 1
+    assert "Missing map package file" in report["skipped"][0]["reason"] or "inside the map package" in report["skipped"][0]["reason"]
+
+
+def test_alias_referenced_by_another_characteristic_is_not_reused(tmp_path):
+    package = _package(tmp_path, beatmaps={"ExpertPlus.dat": {"_version": "2.2.0", "_notes": [_v2_note()]}})
+    path = package / "Info.dat"
+    info = json.loads(path.read_text())
+    info["_difficultyBeatmapSets"] = [
+        {"_beatmapCharacteristicName": "Standard", "_difficultyBeatmaps": [
+            {"_difficulty": "ExpertPlus", "_beatmapFilename": "ExpertPlusStandard.dat"}]},
+        {"_beatmapCharacteristicName": "OneSaber", "_difficultyBeatmaps": [
+            {"_difficulty": "ExpertPlus", "_beatmapFilename": "ExpertPlus.dat"}]},
+    ]
+    _json(path, info)
+    songs, report = prepare_songs(tmp_path, reserved_root=tmp_path / "absent")
+    assert not songs
+    assert any("Ambiguous" in row["reason"] for row in report["skipped"])
+
+
+def test_case_ambiguous_fallback_is_reported_without_selecting_a_map(tmp_path):
+    good = {"_version": "2.2.0", "_notes": [_v2_note()]}
+    package = _package(tmp_path, beatmaps={"ExpertPlus.dat": good, "expertplus.dat": good})
+    matches = [p for p in package.iterdir() if p.name.casefold() == "expertplus.dat"]
+    if len(matches) != 2:
+        pytest.skip("Filesystem does not support names differing only by case")
+    path = package / "Info.dat"
+    info = json.loads(path.read_text())
+    info["_difficultyBeatmapSets"][0]["_difficultyBeatmaps"] = [
+        {"_difficulty": "ExpertPlus", "_beatmapFilename": "ExpertPlusStandard.dat"}]
+    _json(path, info)
+    songs, report = prepare_songs(tmp_path, reserved_root=tmp_path / "absent")
+    assert not songs and report["skip_count"] == 1
+    assert "Ambiguous" in report["skipped"][0]["reason"]
+
+
+def test_malformed_sibling_reference_does_not_block_valid_alias(tmp_path):
+    package = _package(tmp_path, beatmaps={"ExpertPlus.dat": {"_version": "2.2.0", "_notes": [_v2_note()]}})
+    path = package / "Info.dat"
+    info = json.loads(path.read_text())
+    info["_difficultyBeatmapSets"][0]["_difficultyBeatmaps"] = [
+        {"_difficulty": "ExpertPlus", "_beatmapFilename": "ExpertPlusStandard.dat"},
+        {"_difficulty": "Hard", "_beatmapFilename": "invalid\0.dat"},
+    ]
+    _json(path, info)
+    songs, report = prepare_songs(tmp_path, reserved_root=tmp_path / "absent")
+    assert len(songs) == 1 and report["skip_count"] == 1
+    assert report["skipped"][0]["beatmap_filename"] == "invalid\0.dat"
+    assert songs[0].metadata["provenance"]["beatmap_filename_resolved"] == "ExpertPlus.dat"
+
+
+def test_alias_collection_does_not_preempt_valid_group_with_malformed_sibling(tmp_path):
+    package = _package(tmp_path, beatmaps={"ExpertPlus.dat": {"_version": "2.2.0", "_notes": [_v2_note()]}})
+    path = package / "Info.dat"
+    info = json.loads(path.read_text())
+    info["_difficultyBeatmapSets"][0]["_difficultyBeatmaps"][0]["_beatmapFilename"] = "ExpertPlusStandard.dat"
+    info["_difficultyBeatmapSets"].append({"_beatmapCharacteristicName": "OneSaber", "_difficultyBeatmaps": None})
+    _json(path, info)
+    songs, report = prepare_songs(tmp_path, reserved_root=tmp_path / "absent")
+    assert len(songs) == 1 and report["skip_count"] == 1
+    assert "_difficultyBeatmaps" in report["skipped"][0]["reason"]
 
 
 def test_curated_recording_and_aliases_are_reserved(tmp_path):

@@ -744,3 +744,50 @@ Evidence: `../Data/training/evaluate_beats/results/beat-model-sync-cpu-2026-10-1
 for all 52 input-package files. The existing setting, neural model definitions,
 legacy generator and alignment files were left unchanged. GPU execution and
 trained-model quality were not evaluated.
+
+## Import filename compatibility and native Vorbis logging (2026-10-17)
+
+The new raw-package reader now accepts the old cleanup's known Standard filename
+pair in either direction: `<difficulty>.dat` and `<difficulty>Standard.dat`.
+Exact Info references take precedence; unique case-only matches are also
+accepted. Arbitrary replacements, ambiguous case matches, external references,
+and alias files explicitly claimed by another beatmap remain rejected. Declared
+and resolved names are recorded in source provenance and preparation reports.
+Original packages are read without renaming maps or rewriting Info files.
+Malformed sibling references are reported individually and do not invalidate a
+valid fallback. The legacy cleanup itself was left unchanged.
+
+Only the complete native FFmpeg stderr line
+`[vorbis @ 0x...] Could not update timestamps for discarded samples.` is filtered
+while aubio constructs, reads and closes the audio source. Other bytes and
+warnings/errors are forwarded unchanged, including other codecs, different
+Vorbis messages, and incomplete lines; decoder exceptions propagate. A scoped
+fd2 pipe filter is used because native writes bypass Python stderr redirection.
+Decode scopes are serialized; stderr is restored on exceptions, and failed
+output sinks cannot deadlock decoding. Descriptor redirection applies within the
+process during that decode scope. Sample extraction and normalization are
+unchanged. Optional BPM-change support and further import follow-ups are tracked
+in [TODO.md](../TODO.md).
+
+CPU acceptance: **242 tests passed** (27 new logging/import regressions), with the
+same upstream deprecation and legacy-save warnings. The real package
+`162e4 (Up & Down - cat_using_a_toaster)` now fully prepares its Standard/ExpertPlus
+map through `ExpertPlusStandard.dat` → `ExpertPlus.dat`: 1,121 original colored
+notes, 1,036 retained notes and 742 synchronized onsets. Its 2,643,687 decoded
+samples (165.2304375 seconds) are bit-identical with and without the filter; the
+matching native warning falls from one occurrence to zero. All files in that
+source package retain their hashes.
+
+A read-only audit of the existing full-dataset preparation report found **111**
+missing filename references, all `ExpertPlusStandard.dat`. All 111 now resolve;
+89 pass the note reader and 22 remain unsupported for BPM changes. This audit
+checks file resolution and note parsing; full decoding/target preparation was
+verified for the real sample above. Full dataset preparation must be rerun into
+a fresh output directory to include recovered maps. The existing full dataset,
+checkpoints and training runs were not modified. No model training or optimizer
+step was executed; new native Windows/GPU execution was not exercised.
+
+Evidence: `../Data/training/beat_models_v2/import-compat-cpu-2026-10-17/` contains
+`acceptance-summary.json`, `filename-audit.json`, `real-package-check.json`,
+`pytest-cpu.log`, native raw/filtered stderr logs and reproducible decode/import
+probes. See [the framework guide](beat-model-training.md) for current policies.
