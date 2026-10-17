@@ -1,10 +1,11 @@
-"""Choose and train all eight v2 models sequentially."""
+"""Choose v2 models to train sequentially or with bounded parallelism."""
 
 import argparse
 from datetime import datetime
 from pathlib import Path
 import subprocess
 import sys
+import time
 
 
 BEAT_STAGES = ("intensity", "timing")
@@ -37,13 +38,54 @@ def parser():
                          help="New queue output directory (default: ../Data/training/pipeline_v2/runs/<timestamp>)")
     command.add_argument("--models", nargs="+", metavar="MODEL",
                          help="Model names or menu numbers; all selects all eight and skips the menu")
+    command.add_argument("--parallel", type=int, default=1, metavar="N",
+                         help="Maximum simultaneous model processes (default: 1, sequential)")
     command.add_argument("--dry-run", action="store_true", help="Pass --dry-run to each stage training command")
     return command
+
+
+def run_parallel(jobs, limit, cwd):
+    """Start up to limit processes; stop this queue's children on failure/Ctrl+C."""
+    pending = iter(enumerate(jobs, 1))
+    running = []
+    try:
+        while True:
+            for stage, process in running[:]:
+                code = process.poll()
+                if code is None:
+                    continue
+                running.remove((stage, process))
+                if code:
+                    print(f"{stage} failed (exit code {code}); stopping remaining model processes.",
+                          file=sys.stderr)
+                    return code if code > 0 else 128 - code
+            while len(running) < limit:
+                job = next(pending, None)
+                if job is None:
+                    break
+                number, (stage, training) = job
+                print(f"[{number}/{len(jobs)}] {stage}", flush=True)
+                running.append((stage, subprocess.Popen(training, cwd=cwd)))
+            if not running:
+                return 0
+            time.sleep(0.1)
+    finally:
+        for _, process in running:
+            if process.poll() is None:
+                process.terminate()
+        for _, process in running:
+            try:
+                process.wait(timeout=5)
+            except subprocess.TimeoutExpired:
+                process.kill()
+                process.wait()
 
 
 def main(argv=None):
     command = parser()
     args = command.parse_args(argv)
+    if args.parallel < 1:
+        command.error("--parallel must be at least 1")
     try:
         if args.models is None:
             print("Choose v2 models to train (spaces/commas; all/alle selects all; blank cancels):")
@@ -72,19 +114,27 @@ def main(argv=None):
             print(f"Dataset: {dataset}")
         print(f"Queue output: {root}")
         repo = Path(__file__).resolve().parent
-        for number, stage in enumerate(models, 1):
+        jobs = []
+        for stage in models:
             stage_output = root / stage
-            print(f"[{number}/{len(models)}] {stage}: {stage_output}", flush=True)
             module = "training.beat_models" if stage in BEAT_STAGES else "training.pipeline_v2"
             training = [sys.executable, "-m", module, "train", "--stage", stage,
                         "--dataset", str(datasets[stage]), "--run-dir", str(stage_output)]
             if args.dry_run:
                 training.append("--dry-run")
-            result = subprocess.run(training, cwd=repo)
-            if result.returncode:
-                print(f"{stage} failed (exit code {result.returncode}); remaining models were not started.",
-                      file=sys.stderr)
-                return result.returncode if result.returncode > 0 else 128 - result.returncode
+            jobs.append((stage, training))
+        if args.parallel > 1:
+            code = run_parallel(jobs, args.parallel, repo)
+            if code:
+                return code
+        else:
+            for number, (stage, training) in enumerate(jobs, 1):
+                print(f"[{number}/{len(models)}] {stage}: {root / stage}", flush=True)
+                result = subprocess.run(training, cwd=repo)
+                if result.returncode:
+                    print(f"{stage} failed (exit code {result.returncode}); remaining models were not started.",
+                          file=sys.stderr)
+                    return result.returncode if result.returncode > 0 else 128 - result.returncode
         print(f"Completed {len(models)} model(s): {root}")
         return 0
     except (ValueError, OSError) as error:

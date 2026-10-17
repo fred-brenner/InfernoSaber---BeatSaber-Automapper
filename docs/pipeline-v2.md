@@ -170,20 +170,34 @@ python main_training.py
 Select models by number or name, separated by spaces or commas; `all`/`alle`
 selects all eight and an empty answer cancels. The menu order is intensity,
 timing, positions, arrows, multiplier, hazards, lighting and arcs. The selected
-models run in that order, one child process at a time, using the activated Python.
+models start in that order, using the activated Python. By default they run one
+child process at a time; `--parallel N` allows up to N simultaneous models.
 Intensity/timing use their existing `training.beat_models` trainer and default
 dataset `../Data/training/beat_models_v2/full-2026-10-17/dataset`; the other six use
 `training.pipeline_v2` and `../Data/training/pipeline_v2/full/dataset`. Both
 trainers retain their settings from `config.py`, including timing conditioning.
 A new timestamped parent run directory contains one child directory per stage.
-An error stops the queue; Ctrl+C stops it with exit code 130. The script does not
-prepare data or train the retained encoder or the former joint `notes` model.
+An error stops the queue; in parallel mode it also terminates this queue's other
+active children. Ctrl+C stops those children and returns exit code 130. The script
+does not prepare data or train the retained encoder or the former joint `notes`
+model.
 
 For a noninteractive restart of positions, keeping the old run intact:
 
 ```bash
 python main_training.py --models positions
 ```
+
+For the stages after positions, with two models running at a time:
+
+```bash
+python main_training.py --models arrows multiplier hazards lighting arcs --parallel 2
+```
+
+Omit `--parallel` or use `--parallel 1` for sequential execution. It also works
+with the interactive menu: `python main_training.py --parallel 2`. Each model
+keeps its own stage output directory. Parallel GPU throughput has not been
+measured; the launcher shares the activated environment between child processes.
 
 Use `--models intensity timing` to train just the beat pair, or `--models all`
 for the full queue. `--beat-dataset` selects intensity/timing inputs; `--dataset`

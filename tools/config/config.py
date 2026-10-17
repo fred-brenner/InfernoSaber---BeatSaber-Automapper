@@ -348,7 +348,7 @@ pipeline_v2_training_log_every_batches = 100  # zero keeps epoch summaries only
 
 # V2 positions: training and network parameters
 positions_optimizer = 'Adam'
-positions_learning_rate = 0.0005
+positions_learning_rate = 0.001
 positions_n_epochs = 80
 positions_batch_size = 128
 positions_clipnorm = 1.0

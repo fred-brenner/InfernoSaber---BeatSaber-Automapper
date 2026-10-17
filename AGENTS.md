@@ -62,8 +62,9 @@ labels require verification before becoming current requirements.
   API in that environment and break the existing TCN loading path.
 - Inspect scripts before importing or running them: `main_app.py` performs a
   GitHub update check at import. `main_training.py` is inert on import; running
-  it selects and sequentially launches all eight v2 training stages, routing
-  intensity/timing and downstream models to their respective datasets/trainers.
+  it selects from all eight v2 training stages, sequentially by default or with
+  bounded parallelism via `--parallel N`, routing intensity/timing and downstream
+  models to their respective datasets/trainers.
 
 ## Validation
 

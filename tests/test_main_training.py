@@ -227,4 +227,162 @@ for name in ('tensorflow', 'tools.config.config', 'training.helpers', 'main_app'
     result = subprocess.run([sys.executable, "-B", "-c", code, str(repo)], cwd=tmp_path,
                             check=True, capture_output=True, text=True)
     assert "--models" in result.stdout
+    assert "--parallel" in result.stdout
     assert list(tmp_path.iterdir()) == []
+
+
+class SimulatedProcess:
+    def __init__(self, command):
+        self.command = command
+        self.returncode = None
+        self.terminated = self.killed = False
+        self.waits = []
+
+    def poll(self):
+        return self.returncode
+
+    def terminate(self):
+        self.terminated = True
+        self.returncode = -15
+
+    def kill(self):
+        self.killed = True
+        self.returncode = -9
+
+    def wait(self, timeout=None):
+        self.waits.append(timeout)
+        return self.returncode
+
+
+@pytest.mark.parametrize("parallel", [2, 3, 12])
+@pytest.mark.parametrize("dry_run", [False, True])
+def test_parallel_queue_refills_free_slots_and_preserves_commands(queue_paths, monkeypatch, parallel, dry_run):
+    dataset, beat_dataset, root = queue_paths
+    processes, overlaps = [], []
+
+    def active():
+        return [process for process in processes if process.returncode is None]
+
+    def popen(command, *, cwd):
+        assert cwd == Path(main_training.__file__).resolve().parent
+        assert len(active()) < parallel
+        process = SimulatedProcess(command)
+        processes.append(process)
+        return process
+
+    def advance(seconds):
+        assert seconds == .1
+        live = active()
+        overlaps.append(len(live))
+        # Complete the most recently launched job first. The first job remains
+        # busy while subsequent jobs use the other available slot(s).
+        live[-1].returncode = 0
+
+    monkeypatch.setattr(main_training.subprocess, "Popen", popen)
+    monkeypatch.setattr(main_training.subprocess, "run", lambda *_, **__: pytest.fail("Parallel queue used run"))
+    monkeypatch.setattr(main_training.time, "sleep", advance)
+    args = ["--dataset", str(dataset), "--beat-dataset", str(beat_dataset),
+            "--run-dir", str(root), "--models", "all", "--parallel", str(parallel)]
+    if dry_run:
+        args.append("--dry-run")
+    assert main_training.main(args) == 0
+    assert [process.command[5] for process in processes] == list(main_training.STAGES)
+    assert max(overlaps) == min(parallel, len(main_training.STAGES))
+    for process in processes:
+        stage = process.command[5]
+        beat = stage in main_training.BEAT_STAGES
+        expected = [sys.executable, "-m", "training.beat_models" if beat else "training.pipeline_v2",
+                    "train", "--stage", stage, "--dataset", str((beat_dataset if beat else dataset).resolve()),
+                    "--run-dir", str(root.resolve() / stage)]
+        assert process.command == expected + (["--dry-run"] if dry_run else [])
+        assert not process.terminated and not process.killed
+    if parallel == 2:
+        assert overlaps[:-1] == [2] * (len(main_training.STAGES) - 1)
+
+
+@pytest.mark.parametrize("returncode,expected", [(9, 9), (-2, 130)])
+def test_parallel_failure_stops_active_children_and_pending_jobs(queue_paths, monkeypatch, returncode, expected):
+    dataset, _, root = queue_paths
+    processes = []
+
+    def popen(command, **kwargs):
+        process = SimulatedProcess(command)
+        processes.append(process)
+        return process
+
+    def fail_one(seconds):
+        assert len(processes) == 2
+        processes[1].returncode = returncode
+
+    monkeypatch.setattr(main_training.subprocess, "Popen", popen)
+    monkeypatch.setattr(main_training.time, "sleep", fail_one)
+    assert main_training.main(["--dataset", str(dataset), "--run-dir", str(root),
+                               "--models", "positions", "arrows", "multiplier", "hazards",
+                               "--parallel", "2"]) == expected
+    assert [process.command[5] for process in processes] == ["positions", "arrows"]
+    assert processes[0].terminated and processes[0].waits == [5]
+    assert not processes[1].terminated
+
+
+@pytest.mark.parametrize("unresponsive", [False, True])
+def test_parallel_interrupt_cleans_up_children_and_returns_130(queue_paths, monkeypatch, unresponsive):
+    dataset, _, root = queue_paths
+    processes = []
+
+    def popen(command, **kwargs):
+        process = SimulatedProcess(command)
+        if unresponsive and not processes:
+            original_wait = process.wait
+
+            def wait(timeout=None):
+                if timeout is not None:
+                    raise subprocess.TimeoutExpired(command, timeout)
+                return original_wait(timeout)
+
+            process.wait = wait
+        processes.append(process)
+        return process
+
+    def interrupt(seconds):
+        raise KeyboardInterrupt
+
+    monkeypatch.setattr(main_training.subprocess, "Popen", popen)
+    monkeypatch.setattr(main_training.time, "sleep", interrupt)
+    assert main_training.main(["--dataset", str(dataset), "--run-dir", str(root),
+                               "--models", "positions", "arrows", "multiplier", "--parallel", "2"]) == 130
+    assert len(processes) == 2 and all(process.terminated for process in processes)
+    assert processes[0].killed == unresponsive
+
+
+def test_parallel_launch_error_cleans_up_already_started_child(queue_paths, monkeypatch):
+    dataset, _, root = queue_paths
+    processes = []
+
+    def popen(command, **kwargs):
+        if processes:
+            raise OSError("Cannot start next process")
+        process = SimulatedProcess(command)
+        processes.append(process)
+        return process
+
+    monkeypatch.setattr(main_training.subprocess, "Popen", popen)
+    with pytest.raises(SystemExit) as error:
+        main_training.main(["--dataset", str(dataset), "--run-dir", str(root),
+                            "--models", "positions", "arrows", "--parallel", "2"])
+    assert error.value.code == 2
+    assert processes[0].terminated and processes[0].waits == [5]
+
+
+@pytest.mark.parametrize("value", ["0", "-1", "abc"])
+def test_invalid_parallelism_is_rejected_before_any_work(queue_paths, monkeypatch, value):
+    dataset, _, root = queue_paths
+    monkeypatch.setattr("builtins.input", lambda _: pytest.fail("No prompt expected"))
+    monkeypatch.setattr(main_training.subprocess, "Popen", lambda *_, **__: pytest.fail("No processes expected"))
+    with pytest.raises(SystemExit) as error:
+        main_training.main(["--dataset", str(dataset), "--run-dir", str(root), "--parallel", value])
+    assert error.value.code == 2
+    assert not root.exists()
+
+
+def test_parallelism_defaults_to_one():
+    assert main_training.parser().parse_args([]).parallel == 1
