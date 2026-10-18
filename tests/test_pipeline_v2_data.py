@@ -54,7 +54,7 @@ def test_vocabularies_fit_train_only_and_unknown_targets_are_masked():
     validation = next(song for song in songs if song.metadata["split"] != "train")
     validation.metadata["raw_beatmap"]["basicBeatmapEvents"].append({"b": 0, "et": 999, "i": 123, "f": 1})
     validation.metadata["raw_beatmap"]["obstacles"][0]["w"] = 9
-    result = prepare_dataset(songs)
+    result = prepare_dataset(songs, settings={})
     assert {record["type"] for record in result.vocabularies["lighting"]} == {0, 1}
     assert not any(record.get("width") == 9 for record in result.vocabularies["walls"])
     prepared = next(song for song in result.songs if song.base.song_id == validation.song_id)
@@ -96,7 +96,7 @@ def test_raw_source_hash_changes_and_bad_maps_are_reported_individually(tmp_path
     path = tmp_path / "source.dat"
     path.write_text(json.dumps(raw), encoding="utf-8")
     bad.metadata["sources"] = [{"role": "beatmap", "path": str(path), "sha256": "wrong-hash"}]
-    result = prepare_dataset(songs)
+    result = prepare_dataset(songs, settings={})
     assert len(result.songs) == len(songs) - 1
     assert result.manifest["skipped"][0]["song_id"] == bad.song_id
     assert "changed" in result.manifest["skipped"][0]["reason"]
@@ -115,7 +115,7 @@ def test_all_test_evaluation_uses_frozen_training_vocabulary_without_refit(datas
     bases[0].metadata["split"] = "test"
     bases[0].metadata["raw_beatmap"]["basicBeatmapEvents"].append({"b": 0, "et": 999, "i": 7})
     original = deepcopy(dataset.vocabularies)
-    result = prepare_dataset(bases, vocabularies=dataset.vocabularies)
+    result = prepare_dataset(bases, settings={}, vocabularies=dataset.vocabularies)
     assert result.vocabularies == original == dataset.vocabularies
     assert result.manifest["vocabulary_origin"] == "explicit_frozen_train"
     assert result.songs[0].examples["lighting"].weights["events"][0, 0] == 0
@@ -131,7 +131,7 @@ def test_native_hazard_positives_augment_scheduler_and_keep_coverage_separate():
         raw = base.metadata["raw_beatmap"]
         raw["obstacles"][0].update(b=4.8, d=1.2)
         raw["bombNotes"][0]["b"] = .246
-    result = prepare_dataset(songs)
+    result = prepare_dataset(songs, settings={})
     for song in result.songs:
         diagnostic = song.diagnostics["targets"]
         assert diagnostic["hazard_scheduler_coverage"]["walls"]["matched_source_objects"] == 0

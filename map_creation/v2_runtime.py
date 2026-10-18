@@ -93,8 +93,15 @@ def validate_bundle(bundle_path=None):
         if manifest.get("status") != "trained" or manifest.get("training", {}).get("status", "trained") != "trained":
             raise ValueError(f"V2 generation requires a trained {stage} checkpoint")
         manifests[stage] = manifest
+    calibrations = {}
+    from training.pipeline_v2.calibration import load_calibration
+    for stage, filename in bundle.get("calibrations", {}).items():
+        if stage not in ("hazards", "lighting", "arcs"):
+            raise ValueError(f"Unsupported calibrated stage: {stage}")
+        calibrations[stage] = load_calibration(_local(root, filename), stage, manifests[stage])
     return {"root": root, "bundle": bundle, "normalization": statistics,
-            "vocabularies": vocabularies, "encoder_identity": identity, "manifests": manifests}
+            "vocabularies": vocabularies, "encoder_identity": identity, "manifests": manifests,
+            "calibrations": calibrations}
 
 
 @dataclass
@@ -136,6 +143,9 @@ class V2Runtime:
         self.root, self.bundle = validated["root"], validated["bundle"]
         self.statistics, self.vocabularies = validated["normalization"], validated["vocabularies"]
         self.settings = deepcopy(self.bundle["data_settings"])
+        for stage, record in validated["calibrations"].items():
+            key = {"hazards": "bomb_threshold", "lighting": "lighting_threshold", "arcs": "arc_threshold"}[stage]
+            self.settings[key] = record["threshold"]
         import tensorflow as tf
         threads = getattr(config, "v2_inference_threads", 2)
         if isinstance(threads, bool) or not isinstance(threads, int) or threads < 1:

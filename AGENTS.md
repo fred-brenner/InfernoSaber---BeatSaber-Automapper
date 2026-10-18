@@ -24,6 +24,11 @@ platforms before implementing them unless the task already authorizes them.
   and the evaluated `v2_expert` inference bundle. Completed training does not
   establish positive-case or gameplay quality; read the recorded limitations.
   Corpus comparisons require an explicit request.
+- For repaired hazards/lighting/arcs datasets, masks, arc split overlays,
+  calibration, or mixed legacy/replacement bundles, read
+  [docs/sparse-stage-repair.md](docs/sparse-stage-repair.md). New preparation uses
+  versioned sparse-stage policies. Preserve existing datasets and inference
+  bundles; repair implementation alone does not establish replacement quality.
 - For implemented intensity/timing/note contracts and training status, read
   [docs/model-beat-architecture.md](docs/model-beat-architecture.md).
 - For production v2 generation, model caching, worker settings, package formats,

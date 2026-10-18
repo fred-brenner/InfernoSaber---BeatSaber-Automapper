@@ -176,6 +176,11 @@ def test_recording_audio_cannot_leak_across_splits(disk_dataset):
 
     _rewrite_metadata(disk_dataset, 0, lambda meta: meta["metadata"].update(audio_sha256="same-recording"))
     _rewrite_metadata(disk_dataset, 1, lambda meta: meta["metadata"].update(audio_sha256="same-recording"))
+    # Keep the declared aliases consistent so this exercises cross-split leakage,
+    # independently of the stricter indexed-alias integrity check.
+    for record in disk_dataset.songs.records[:2]:
+        record["audio_sha256"] = "same-recording"
+    disk_dataset.manifest.pop("stage_splits", None)
     with pytest.raises(ValueError, match="leaks"):
         TrainingData(disk_dataset, "positions")
 

@@ -8,5 +8,9 @@
 - [ ] V2: Legacy Timing-/Noten-Nachverarbeitung anhand kontrollierter Vergleiche schrittweise reduzieren; Rohmodell-Ausgabe, heuristische Ergänzungen und Multiplier getrennt bewerten.
 - [ ] V2: Nach Profiling Modellfusion und TensorFlow-native Vorverarbeitung untersuchen. Aktuell bleiben neun Netze pro CPU-Worker geladen; Timing/Encoder sind gebatcht und Aufrufe kompiliert.
 - [ ] V2: Slider-Turbo-Start neu prüfen. Er bleibt deaktiviert, weil er einen nicht vorhandenen Noten-Endpunkt erfindet; Arcs dürfen nur bestehende gleichhändige Noten verbinden.
-- [ ] V2: Seltene Lighting-Ausgaben und fehlende Arc-Anhänge mit echten positiven Fällen verbessern; keine versteckten prozeduralen Fallbacks hinzufügen.
+- [ ] V2: Reparierte Hazards-/Lighting-/Arc-Verträge trainieren, validieren und erst nach positiven Vergleichsergebnissen als neues Bundle übernehmen; siehe docs/sparse-stage-repair.md. Keine versteckten prozeduralen Fallbacks hinzufügen.
+- [ ] V2: Custom-/Chroma-Lighting als eigene unterstützte Repräsentation untersuchen; der reparierte portable Basis-Modus bewahrt und meldet ausgeschlossene Kommandos.
+- [ ] V2: Unbekannte Aufnahmen mit positiven Arcs für eine saubere End-to-End-Evaluation sammeln. Der Arc-Train/Validation-Overlay enthält vorheriges Upstream-Training; TEST hat nur eine positive Aufnahmegruppe.
 - [ ] V2: Arc-Clearance für native Kurven-Handles geometrisch prüfen; aktuell wird die Verbindung zwischen den vorhandenen Endpunkten abgetastet. In-Game-Prüfung bleibt separat.
+
+- [ ] V2: Retained-Encoder-Vorverarbeitung nach Paritätsprüfung batchen. CPU-Probe mit 1.024 echten Ausschnitten: identische Patches und ca. 23 % weniger Spektrogrammzeit; größere Recording-/Edge-Parität und Gesamtlaufzeit separat prüfen.

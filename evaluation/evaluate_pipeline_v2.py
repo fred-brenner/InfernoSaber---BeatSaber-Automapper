@@ -60,7 +60,8 @@ def main(argv=None):
             raise RuntimeError("Independent v2 comparisons require CPU execution") from error
     with models.tf.device("/CPU:0"):
         evaluation_dataset = load_dataset(args.evaluation_dataset, lazy=True)
-        curated = validate_curated_dataset(evaluation_dataset, split=args.split, evaluation_root=args.evaluation_root)
+        curated = validate_curated_dataset(evaluation_dataset, split=args.split, evaluation_root=args.evaluation_root,
+                                           stage=None if args.stage == "encoder" else args.stage)
         if args.stage == "encoder":
             from training.pipeline_v2.encoder import FixedEncoder, decode_encoder_audio
             checkpoint = Path(args.artifact)
@@ -92,7 +93,7 @@ def main(argv=None):
             from training.pipeline_v2.runner import load_stage_artifact
             dataset = load_dataset(args.dataset, lazy=True)
             model, manifest = load_stage_artifact(args.artifact, args.stage, dataset)
-            predictor = lambda inputs: {key: value.numpy() for key, value in model(inputs, training=False).items()}
+            predictor = models.tf.function(lambda inputs: model(inputs, training=False), reduce_retracing=True)
             report = evaluate_stage(evaluation_dataset, args.stage, predictor, split=args.split, batch_size=args.batch_size,
                                     threshold=args.threshold, artifact_metadata=manifest, baseline_dataset=dataset,
                                     evaluation_root=args.evaluation_root)

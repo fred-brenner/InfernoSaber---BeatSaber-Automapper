@@ -346,6 +346,15 @@ pipeline_v2_arc_min_gap_seconds = 0.15
 pipeline_v2_arc_max_gap_seconds = 0.8
 pipeline_v2_max_candidates = 10000
 
+# Repaired sparse-stage targets; recorded in each new dataset, never applied to old artifacts.
+pipeline_v2_repair_sparse_stages = True
+pipeline_v2_hazard_section_beats = 0.25
+pipeline_v2_sparse_max_candidates = 50000
+pipeline_v2_lighting_coverage_target = 0.95
+pipeline_v2_arc_use_legacy_gap = False
+pipeline_v2_positive_weight_cap = 100.0
+pipeline_v2_metric_thresholds = 512
+
 # V2 training execution (does not alter model/data contracts)
 pipeline_v2_training_ram_cache_mib = 1024  # active stage only; zero streams every song
 pipeline_v2_training_prefetch_batches = 2  # bounded CPU producer; zero disables prefetch

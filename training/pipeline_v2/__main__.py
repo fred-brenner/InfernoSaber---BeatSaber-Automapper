@@ -37,6 +37,12 @@ def parser():
     train.add_argument("--dry-run", action="store_true")
     train.add_argument("--epochs", type=int)
     train.add_argument("--batch-size", type=int)
+    calibrate = sub.add_parser("calibrate", help="Calibrate one trained sparse stage on validation data only")
+    calibrate.add_argument("--dataset", required=True)
+    calibrate.add_argument("--stage", choices=("hazards", "lighting", "arcs"), required=True)
+    calibrate.add_argument("--artifact", required=True)
+    calibrate.add_argument("--output", required=True)
+    calibrate.add_argument("--batch-size", type=int, default=128)
     concept = sub.add_parser("concept", help="Intermediate concept objects, with explicit review stops")
     concept.add_argument("--dataset", required=True)
     concept.add_argument("--song-id", help="Defaults to the first prepared song")
@@ -90,7 +96,8 @@ def _prepare(args, command):
     if args.beat_dataset:
         songs = BeatSongs(args.beat_dataset)
         normalization = songs.manifest["normalization"]
-        base_report = {"base_dataset": str(Path(args.beat_dataset).resolve()),
+        base_report = {**songs.manifest.get("preparation", {}),
+                       "base_dataset": str(Path(args.beat_dataset).resolve()),
                        "base_manifest_sha256": file_hash(Path(args.beat_dataset) / "manifest.json")}
     else:
         from training.beat_models.data import prepare_songs
@@ -117,7 +124,13 @@ def _prepare(args, command):
     if args.evaluation_only and args.structure_only != (training.manifest.get("status") == "structural_dummy"):
         command.error("Evaluation and training datasets must use the same real or structural encoder mode")
     writer = DatasetWriter(args.output)
-    dataset = prepare_dataset(songs, settings=settings, encoder=factory, emit=writer.add, collect=False, vocabularies=frozen)
+    try:
+        dataset = prepare_dataset(songs, settings=settings, encoder=factory, emit=writer.add, collect=False, vocabularies=frozen)
+    except ValueError as error:
+        if hasattr(error, "preparation_audit"):
+            from training.beat_models.artifacts import write_json
+            write_json(writer.root / "preparation-audit.json", error.preparation_audit)
+        raise
     dataset.manifest["base_preparation"] = base_report
     dataset.manifest["beat_normalization"] = normalization
     dataset.manifest["evaluation_only"] = args.evaluation_only
@@ -149,6 +162,12 @@ def main(argv=None):
         for song in dataset.songs:
             validate(song)
         print(f"Validated {len(dataset.songs)} songs and six downstream stage contracts")
+        return 0
+    if args.command == "calibrate":
+        from .artifacts import load_dataset
+        from .calibration import calibrate_stage
+        calibrate_stage(load_dataset(args.dataset), args.stage, args.artifact, args.output, batch_size=args.batch_size)
+        print(f"Validation calibration saved: {args.output}; no training or bundle changes")
         return 0
     if args.command == "smoke":
         from .data import make_dummy_dataset

@@ -8,6 +8,9 @@ from training.beat_models.artifacts import file_hash, read_json
 
 from .artifacts import _Songs, _local
 from .contracts import NEW_STAGES, StageExamples, validate_examples
+from .arc_policy import stage_split
+from .supervision import support, add_support, describe_support
+from .policies import SPARSE_STAGES
 
 
 SPLITS = ("train", "validation", "test")
@@ -61,6 +64,10 @@ def _stage_arrays(path, stage):
                     zip(("inputs", "targets", "weights"), families) for key in family)
     if set(arrays) != expected:
         raise ValueError(f"Unexpected {stage} array keys")
+    if stage == "arcs":
+        from .arc_policy import canonical_history_inputs
+        validate_examples(examples, stage)
+        examples.inputs = canonical_history_inputs(examples.inputs)
     return examples, estimated
 
 
@@ -74,6 +81,9 @@ def _disk_song(songs, record, stage, identities):
     if (meta["song_id"] != record["song_id"] or metadata.get("split") != record["split"]
             or metadata.get("group_id") != record["group_id"]):
         raise ValueError("Dataset song identity/split mismatch")
+    for key in ("audio_sha256", "decoded_sha256"):
+        if record.get(key) and metadata.get(key) != record[key]:
+            raise ValueError("Dataset recording alias disagrees with indexed identity")
     _metadata(metadata, meta["song_id"], identities)
     stages = meta.get("stages", [])
     if not isinstance(stages, list) or len(set(stages)) != len(stages) or any(s not in NEW_STAGES for s in stages):
@@ -96,7 +106,7 @@ def iter_stage_examples(dataset, stage, split=None):
     identities = {}
     if isinstance(songs, _Songs):
         for record in songs.records:
-            if split is None or record["split"] == split:
+            if split is None or stage_split(getattr(dataset, "manifest", {}), stage, record) == split:
                 examples, estimated, metadata = _disk_song(songs, record, stage, identities)
                 del estimated, metadata
                 if examples is not None:
@@ -105,9 +115,9 @@ def iter_stage_examples(dataset, stage, split=None):
         return
     records = getattr(songs, "records", None)
     selected = (songs[index] for index, record in enumerate(records)
-                if split is None or record["split"] == split) if records is not None else iter(songs)
+                if split is None or stage_split(getattr(dataset, "manifest", {}), stage, record) == split) if records is not None else iter(songs)
     for song in selected:
-        if split is None or song.base.metadata.get("split") == split:
+        if split is None or stage_split(getattr(dataset, "manifest", {}), stage, song.base.metadata) == split:
             _metadata(song.base.metadata, song.base.song_id, identities)
             examples = song.examples.get(stage)
             if examples is not None:
@@ -120,6 +130,8 @@ class TrainingData:
 
     def __init__(self, dataset, stage, ram_cache_mib=1024, verbose=0, require_real=False):
         _selection(stage)
+        from .arc_policy import validate_split_overlay
+        validate_split_overlay(dataset.manifest)
         if (isinstance(ram_cache_mib, bool) or not isinstance(ram_cache_mib, Real)
                 or not np.isfinite(ram_cache_mib) or ram_cache_mib < 0):
             raise ValueError("RAM cache budget must be a finite nonnegative MiB value")
@@ -129,6 +141,8 @@ class TrainingData:
                     or not encoder.get("checkpoint_fingerprint")):
                 raise ValueError("Training requires real prepared examples from the explicit retained encoder")
         self.stage = stage
+        self.support = {split: {} for split in SPLITS}
+        effective_identities = {}
         self.counts = {split: {"songs": 0, "examples": 0, "supervised_values": 0} for split in SPLITS}
         self._entries = []
         self._cache = []
@@ -169,7 +183,10 @@ class TrainingData:
                     raise ValueError("Dummy examples cannot be used for training")
             scanned += 1
             if examples is not None:
-                split = metadata["split"]
+                split = stage_split(getattr(dataset, "manifest", {}), stage, {**metadata, "song_id": song_id})
+                _metadata({**metadata, "split": split}, song_id, effective_identities)
+                if stage in SPARSE_STAGES:
+                    add_support(self.support[split], support(examples, stage), metadata["group_id"])
                 count = self.counts[split]
                 count["songs"] += 1
                 count["examples"] += len(examples.times)
@@ -196,16 +213,21 @@ class TrainingData:
                 del song
         if disk or caching:
             self._songs = None
-        self.report = {"stage": stage, "mode": "ram" if caching else "stream",
+        self.support = {split: describe_support(value) for split, value in self.support.items()}
+        self.report = {"supervision": self.support, "stage": stage, "mode": "ram" if caching else "stream",
                        "source": "npz" if disk else "memory", "ram_cache_mib": float(ram_cache_mib),
                        "budget_bytes": budget, "retained_bytes": retained, "stage_bytes": stage_bytes,
                        "estimated_stage_bytes": estimated_bytes, "songs_scanned": scanned,
                        "integrity_passes": 1}
 
-    def examples(self, split=None):
+    def examples(self, split=None, rng=None):
         """Yield original song order, reusing checks from construction."""
         _selection(self.stage, split)
-        for index, (song_split, source, snapshot) in enumerate(self._entries):
+        order = np.arange(len(self._entries))
+        if rng is not None:
+            rng.shuffle(order)
+        for index in order:
+            song_split, source, snapshot = self._entries[index]
             if split is not None and split != song_split:
                 continue
             if self.report["mode"] == "ram":

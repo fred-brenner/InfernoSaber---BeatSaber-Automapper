@@ -74,7 +74,7 @@ def test_real_reference_sources_must_be_curated_and_exclude_favorites():
 def test_augmented_hazard_scores_keep_scheduler_coverage_separate():
     from training.pipeline_v2.data import make_dummy_dataset
     from training.pipeline_v2.evaluation import ReferenceBaseline, evaluate_stage, fit_reference_baselines
-    dataset = make_dummy_dataset()
+    dataset = make_dummy_dataset(settings={})
     fitted = fit_reference_baselines(dataset, "hazards")
     report = evaluate_stage(dataset, "hazards", ReferenceBaseline("hazards", dataset.vocabularies, fitted),
                             batch_size=2, allow_synthetic=True)

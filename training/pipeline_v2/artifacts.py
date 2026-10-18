@@ -1,6 +1,10 @@
 """Explicit v2 datasets/checkpoints with lazy songs and JSON/NPZ provenance."""
 
 from collections.abc import Sequence
+from collections import Counter
+from copy import deepcopy
+import hashlib
+import json
 from pathlib import Path
 
 import numpy as np
@@ -28,6 +32,114 @@ def _local(root, filename, suffix):
     if path.resolve().parent != root.resolve():
         raise ValueError("Artifact file escapes its directory")
     return path
+
+
+def _audit_reference(reference):
+    if not isinstance(reference, dict):
+        raise ValueError("Preparation audit requires a file and SHA256 reference")
+    filename, digest = reference.get("file"), reference.get("sha256")
+    if "version" in reference and (type(reference["version"]) is not int or reference["version"] != 1):
+        raise ValueError("Unsupported preparation audit reference version")
+    if (not isinstance(filename, str) or Path(filename).name != filename or not filename.endswith(".json")
+            or not isinstance(digest, str) or len(digest) != 64
+            or any(character not in "0123456789abcdef" for character in digest)):
+        raise ValueError("Invalid preparation audit file or SHA256 reference")
+    return {"version": 1, "file": filename, "sha256": digest}
+
+
+def _external_audit(audit):
+    return isinstance(audit, dict) and ("file" in audit or "sha256" in audit)
+
+
+def _lighting_audit_summary(lighting):
+    if not isinstance(lighting, dict):
+        return lighting
+    summary = {key: deepcopy(value) for key, value in lighting.items()
+               if key not in ("candidate_schedules", "selected", "unsupported_records")}
+    for key in ("candidate_schedules", "selected"):
+        if key not in lighting:
+            continue
+        records = lighting[key] if key == "candidate_schedules" else [lighting[key]]
+        compact = [{name: deepcopy(value) for name, value in record.items() if name not in ("songs", "collisions")}
+                   for record in records]
+        summary[key] = compact if key == "candidate_schedules" else compact[0]
+    if "unsupported_records" in lighting:
+        records = lighting["unsupported_records"]
+        summary["unsupported_record_count"] = len(records)
+        summary["unsupported_reasons"] = dict(Counter(record.get("reason", "unspecified") for record in records))
+    return summary
+
+
+def compact_preparation_metadata(manifest, audit_reference):
+    """Return compact metadata referencing an already preserved detailed audit.
+
+    This pure helper never writes files or changes the supplied metadata. File
+    existence and checksum validation belong to the writer or explicit loader.
+    """
+    reference = _audit_reference(audit_reference)
+    audit = manifest.get("preparation_audit")
+    if not isinstance(audit, dict) or not audit:
+        raise ValueError("Cannot compact metadata without a detailed preparation audit")
+    if _external_audit(audit):
+        if _audit_reference(audit) != reference:
+            raise ValueError("Already compact metadata refers to a different preparation audit")
+        summary = deepcopy(audit)
+    else:
+        records = audit.get("songs", [])
+        summary = {**reference, "song_count": len(records),
+                   "lighting": _lighting_audit_summary(audit.get("lighting")),
+                   "support": deepcopy(audit.get("support", {})),
+                   "source_exclusion_count": sum(len(record.get("source_exclusions", [])) for record in records)}
+    result = {**manifest, "preparation_audit": summary}
+    if "preparation_songs" in manifest:
+        result["preparation_songs"] = [{key: value for key, value in record.items() if key != "source_exclusions"}
+                                       for record in manifest["preparation_songs"]]
+    return result
+
+
+def _verified_audit_path(root, reference):
+    reference = _audit_reference(reference)
+    path = _local(Path(root), reference["file"], ".json")
+    if not path.is_file():
+        raise ValueError("Missing detailed preparation audit sidecar")
+    if file_hash(path) != reference["sha256"]:
+        raise ValueError("Preparation audit sidecar checksum mismatch")
+    return path
+
+
+def load_preparation_audit(root, manifest=None):
+    """Explicitly read detailed audit evidence, checking an external reference.
+
+    Ordinary dataset loading leaves this potentially large sidecar unopened.
+    Legacy inline audits and datasets without an audit remain readable.
+    """
+    root = Path(root)
+    manifest = read_json(root / "manifest.json") if manifest is None else manifest
+    audit = manifest.get("preparation_audit", {})
+    if not _external_audit(audit):
+        return audit
+    detailed = read_json(_verified_audit_path(root, audit))
+    if not isinstance(detailed, dict) or _external_audit(detailed):
+        raise ValueError("Detailed preparation audit sidecar must contain the full audit")
+    return detailed
+
+
+def _write_preparation_audit(root, audit):
+    """Stream the full audit without recursively cloning its exclusion lists."""
+    path = _local(root, "preparation-audit.json", ".json")
+    if path.exists():
+        digest = hashlib.sha256()
+        encoder = json.JSONEncoder(indent=2, sort_keys=True, allow_nan=False, default=json_value)
+        for piece in encoder.iterencode(audit):
+            digest.update(piece.encode("utf-8"))
+        digest.update(b"\n")
+        if file_hash(path) != digest.hexdigest():
+            raise ValueError("Existing detailed preparation audit differs; it was not overwritten")
+    else:
+        with path.open("x", encoding="utf-8", newline="\n") as stream:
+            json.dump(audit, stream, indent=2, sort_keys=True, allow_nan=False, default=json_value)
+            stream.write("\n")
+    return {"file": path.name, "sha256": file_hash(path)}
 
 
 class DatasetWriter:
@@ -77,6 +189,8 @@ class DatasetWriter:
                    "stages": list(song.examples), "latents_metadata": {
                        k: v for k, v in song.latents.items() if not isinstance(v, np.ndarray)}})
         self.records.append({"song_id": base.song_id, "split": split, "group_id": base.metadata["group_id"],
+                             "audio_sha256": base.metadata.get("audio_sha256"),
+                             "decoded_sha256": base.metadata.get("decoded_sha256"),
                              "file": filename, "sha256": file_hash(self.root / filename),
                              "metadata_file": metadata_file, "metadata_sha256": file_hash(self.root / metadata_file)})
         self.ids.add(base.song_id)
@@ -90,6 +204,14 @@ class DatasetWriter:
                   "vocabularies_sha256": statistics_hash(vocabularies),
                   "splits": {split: [r["song_id"] for r in self.records if r["split"] == split]
                              for split in ("train", "validation", "test")}, **execution_identity()}
+        audit = result.get("preparation_audit")
+        if isinstance(audit, dict) and audit:
+            if _external_audit(audit):
+                _verified_audit_path(self.root, audit)
+                reference = audit
+            else:
+                reference = _write_preparation_audit(self.root, audit)
+            result = compact_preparation_metadata(result, reference)
         write_json(self.root / "manifest.json", result)
         return json_value(result)
 
@@ -120,6 +242,9 @@ class _Songs(Sequence):
         if (meta["song_id"] != record["song_id"] or meta["metadata"]["split"] != record["split"]
                 or meta["metadata"]["group_id"] != record["group_id"]):
             raise ValueError("Dataset song identity/split mismatch")
+        for key in ("audio_sha256", "decoded_sha256"):
+            if record.get(key) and meta["metadata"].get(key) != record[key]:
+                raise ValueError("Dataset recording alias disagrees with indexed identity")
         with np.load(path, allow_pickle=False) as archive:
             arrays = {key: archive[key] for key in archive.files}
         base = Song(meta["song_id"], meta["metadata"], {
@@ -133,6 +258,9 @@ class _Songs(Sequence):
         latents.update({key.split("::", 1)[1]: value for key, value in arrays.items() if key.startswith("latents::")})
         song = V2Song(base, meta["objects"], stages, meta["diagnostics"], latents)
         validate(song)
+        if "arcs" in song.examples:
+            from .arc_policy import canonical_history_inputs
+            song.examples["arcs"].inputs = canonical_history_inputs(song.examples["arcs"].inputs)
         return song
 
 
@@ -156,6 +284,8 @@ def load_dataset(path, lazy=True):
     expected = {s: [r["song_id"] for r in records if r["split"] == s] for s in ("train", "validation", "test")}
     if expected != manifest.get("splits"):
         raise ValueError("Split index disagrees with song records")
+    from .arc_policy import validate_split_overlay
+    validate_split_overlay(manifest)
     songs = _Songs(root, records)
     return V2Dataset(songs if lazy else list(songs), vocabularies, manifest)
 
@@ -188,6 +318,7 @@ class BeatSongs(Sequence):
 
 
 def compatibility(dataset, stage):
+    from .policies import stage_data
     if stage not in STAGES:
         raise ValueError("Unknown v2 checkpoint stage")
     manifest = dataset.manifest if hasattr(dataset, "manifest") else dataset
@@ -197,7 +328,8 @@ def compatibility(dataset, stage):
               "beat_representation": manifest.get("beat_representation"),
               "normalization_sha256": manifest.get("normalization_sha256"),
               "encoder_identity": manifest.get("encoder_identity"),
-              "data_settings": manifest.get("data_settings"),
+              "contract_version": 2,
+              "stage_data": stage_data(manifest.get("data_settings") or {}, stage),
               "vocabulary": vocabularies.get(relevant) if relevant else None,
               "architecture": architecture_settings(stage)}
     result = json_value(result)
@@ -241,6 +373,8 @@ def load_checkpoint_manifest(path, stage, dataset=None):
         raise ValueError("Checkpoint vocabulary disagrees with its compatibility identity")
     if digest != statistics_hash(saved) or saved.get("architecture") != json_value(architecture_settings(stage)):
         raise ValueError("Checkpoint architecture/configuration fingerprint mismatch")
-    if dataset is not None and compatibility(dataset, stage) != manifest["compatibility"]:
-        raise ValueError("Checkpoint does not match the selected encoder, vocabulary or dataset contract")
+    if dataset is not None:
+        from .policies import semantic_identity
+        if semantic_identity(compatibility(dataset, stage)) != semantic_identity(manifest["compatibility"]):
+            raise ValueError("Checkpoint does not match the selected encoder, vocabulary or dataset contract")
     return root, manifest

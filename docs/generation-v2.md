@@ -101,8 +101,12 @@ Single-note mode suppresses emphasis/mirroring conflicts and multiplier expansio
 V2 supplies all bombs, walls and arcs, filtered by applicable legacy options and
 clearance against final notes and chain occupancy. Arcs require existing same-hand
 endpoints. The old synthetic slider turbo start is disabled. Current learned
-thresholds remain unchanged; sparse lighting or absent arcs are reported, with
-no procedural fallback. These conservative checks do not prove gameplay safety.
+thresholds remain unchanged for legacy bundles; sparse lighting or absent arcs
+are reported, with no procedural fallback. Repaired replacement artifacts select
+versioned hazard, lighting and arc policies. A candidate bundle may include
+checkpoint-bound validation calibration sidecars; runtime verifies their hashes
+and contracts before applying thresholds. Stage-specific compatibility keeps
+unchanged upstream checkpoints usable. See [repair workflow](sparse-stage-repair.md). These conservative checks do not prove gameplay safety.
 
 ## Packages and diagnostics
 

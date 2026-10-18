@@ -33,6 +33,12 @@ Training completion alone does not establish generation quality. In particular,
 the arc validation split contains no positive attachments, so its tiny loss is
 not a positive-generation success metric.
 
+For the repaired hazards/lighting/arcs contracts and exact later training,
+calibration, comparison and candidate-bundle commands, read
+[sparse-stage-repair.md](sparse-stage-repair.md). Existing datasets and bundles
+retain their recorded legacy policies. The repaired contracts require new runs;
+this implementation does not train or promote models.
+
 ## Data and model contracts
 
 All times are elapsed seconds. Requested NPS counts retained colored notes before
@@ -99,10 +105,10 @@ with the real training vocabulary. These are untrained model sizes.
   an all-zero vector means no command. Current audio/time blocks predict their
   own targets, including partial tails. Unsupported brightness/custom events are
   retained in diagnostics rather than squeezed into type/value labels.
-- **Hazard positives:** human wall intervals and bomb times supplement scheduler
-  proposals during supervised preparation. Their origin is recorded. Inference
-  uses scheduler proposals only; reports separate source-conditioned accuracy,
-  scheduler-conditioned accuracy and scheduler coverage.
+- **Legacy hazard positives:** original datasets supplement scheduler proposals
+  with human wall intervals and bomb times; their provenance remains readable.
+  Repaired datasets replace this with shared quarter-beat section/bomb queries,
+  spatial masks and wall merging, without source-only queries.
 
 Multiplier, wall and lighting vocabularies are fitted on training recordings
 only, capped by configuration, frozen in JSON, and fingerprinted. Validation,
@@ -111,9 +117,10 @@ and reported. Arc handles use `mu`/`tmu`, initially bounded to `[0,2]`; out-of-r
 controls are reported. Native source arcs need two identifiable existing
 same-hand endpoints. Synthetic start arcs and invented endpoints are excluded.
 
-Schedulers provide explicit candidate times: wall-gap and note-aware strobe
-proposals, an independent bomb grid, audio-onset/BPM lighting candidates and
-adjacent same-hand arc endpoint pairs. They do not establish collision clearance
+Recorded legacy schedulers provide wall-gap/strobe proposals, a bomb grid,
+lighting candidates and adjacent same-hand arc pairs. Repaired policies use
+quarter-beat hazard queries, a coverage-selected lighting schedule and shared
+inclusive 0.15–0.8-second arc eligibility. They do not establish collision clearance
 or gameplay quality. Exceeding the configured candidate cap raises a reported
 error instead of silently trimming the song.
 

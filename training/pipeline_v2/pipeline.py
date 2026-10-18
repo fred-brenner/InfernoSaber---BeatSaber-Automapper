@@ -12,7 +12,10 @@ import numpy as np
 from training.beat_models.contracts import (CORE, frame_conditions, intensity_inputs,
                                           timing_inputs)
 
-from .scheduling import arc_candidates, hazard_candidates, lighting_candidates, schedule_settings
+from .scheduling import hazard_candidates, lighting_candidates
+from .arc_policy import arc_candidates, history_value
+from .policies import repaired
+from .scheduling import schedule_settings
 
 
 STAGES = ("intensity", "timing", "positions", "arrows", "multiplier", "hazards", "arcs", "lighting")
@@ -228,9 +231,8 @@ def generate(song, requested_nps, predictors=None, encoder=None, settings=None, 
         raise ValueError("Requested retained NPS must be finite and nonnegative")
     if max_events is not None and (isinstance(max_events, bool) or not isinstance(max_events, int) or max_events < 1):
         raise ValueError("max_events must be a positive integer")
-    from .settings import preparation_settings
-    selected = preparation_settings()
-    selected.update(deepcopy(settings or {}))
+    from .contracts import preparation_defaults
+    selected = preparation_defaults(settings)
     vocabularies = vocabularies or selected.get("vocabularies")
     if not vocabularies or any(not vocabularies.get(key) for key in ("multiplier", "walls", "lighting")):
         raise ValueError("Explicit frozen multiplier, wall and lighting vocabularies are required")
@@ -317,40 +319,48 @@ def generate(song, requested_nps, predictors=None, encoder=None, settings=None, 
                                     "chains": len(result.state["chains"]),
                                     "chain_slices": sum(chain["slices"] for chain in result.state["chains"])}
     from .contracts import expansion_occupancy_notes
-    hazard_queries = hazard_candidates(expansion_occupancy_notes(result.state), duration, bpm, schedule)
-    result.stages["hazards"] = {"queries": len(hazard_queries),
-                                "wall_queries": sum(query["kind"] == "wall" for query in hazard_queries),
-                                "strobe_queries": sum(bool(query.get("strobe")) for query in hazard_queries),
-                                "bomb_queries": sum(query["kind"] == "bomb" for query in hazard_queries)}
-    _review(result, "hazard_clearance", bypass)
-    history = []
-    bomb_threshold = float(selected.get("bomb_threshold", .5))
-    if not 0 <= bomb_threshold <= 1:
-        raise ValueError("bomb_threshold must be between zero and one")
-    for candidate in hazard_queries:
-        output = _predict(predictors["hazards"], _inputs("hazards", song, result.state, candidate, history, encoder, selected))
-        wall = int(_distribution(output["wall"], (1, len(vocabularies["walls"])), "wall")[0].argmax())
-        bombs = _multilabel(output["bombs"], (1, 12), "bomb")[0] >= bomb_threshold
-        if candidate["kind"] == "wall" and wall:
-            template = vocabularies["walls"][wall]
-            result.state["walls"].append({**deepcopy(template), "time": candidate["time"],
-                                           "end_time": candidate["end_time"], "template_id": wall})
-        elif candidate["kind"] == "bomb":
-            for cell in np.flatnonzero(bombs):
-                result.state["bombs"].append({"time": candidate["time"], "x": int(cell % 4), "y": int(cell // 4)})
-        actual_wall = wall if candidate["kind"] == "wall" else 0
-        actual_bombs = bombs.astype(int).tolist() if candidate["kind"] == "bomb" else [0] * 12
-        history.append({"time": candidate["time"], "value": [actual_wall, *actual_bombs]})
-    result.stages["hazards"].update(walls=len(result.state["walls"]), bombs=len(result.state["bombs"]))
+    if repaired(selected, "hazards"):
+        from .hazard_sections import rollout
+        report = rollout(song, result.state, vocabularies, selected,
+                         lambda inputs: _predict(predictors["hazards"], inputs), encoder)
+        bomb_threshold = float(selected.get("bomb_threshold", .5))
+        result.stages["hazards"] = {**report, "walls": len(result.state["walls"]), "bombs": len(result.state["bombs"])}
+    else:
+        hazard_queries = hazard_candidates(expansion_occupancy_notes(result.state), duration, bpm, schedule)
+        result.stages["hazards"] = {"queries": len(hazard_queries),
+                                    "wall_queries": sum(query["kind"] == "wall" for query in hazard_queries),
+                                    "strobe_queries": sum(bool(query.get("strobe")) for query in hazard_queries),
+                                    "bomb_queries": sum(query["kind"] == "bomb" for query in hazard_queries)}
+        _review(result, "hazard_clearance", bypass)
+        history = []
+        bomb_threshold = float(selected.get("bomb_threshold", .5))
+        if not 0 <= bomb_threshold <= 1:
+            raise ValueError("bomb_threshold must be between zero and one")
+        for candidate in hazard_queries:
+            output = _predict(predictors["hazards"], _inputs("hazards", song, result.state, candidate, history, encoder, selected))
+            wall = int(_distribution(output["wall"], (1, len(vocabularies["walls"])), "wall")[0].argmax())
+            bombs = _multilabel(output["bombs"], (1, 12), "bomb")[0] >= bomb_threshold
+            if candidate["kind"] == "wall" and wall:
+                template = vocabularies["walls"][wall]
+                result.state["walls"].append({**deepcopy(template), "time": candidate["time"],
+                                               "end_time": candidate["end_time"], "template_id": wall})
+            elif candidate["kind"] == "bomb":
+                for cell in np.flatnonzero(bombs):
+                    result.state["bombs"].append({"time": candidate["time"], "x": int(cell % 4), "y": int(cell // 4)})
+            actual_wall = wall if candidate["kind"] == "wall" else 0
+            actual_bombs = bombs.astype(int).tolist() if candidate["kind"] == "bomb" else [0] * 12
+            history.append({"time": candidate["time"], "value": [actual_wall, *actual_bombs]})
+        result.stages["hazards"].update(walls=len(result.state["walls"]), bombs=len(result.state["bombs"]))
     _review(result, "arc_clearance", bypass)
     history = []
-    arc_queries = arc_candidates(result.state["notes"], schedule)
+    arc_queries = arc_candidates(result.state["notes"], selected)
     lower_shape, upper_shape = selected.get("arc_shape_bounds", [0., 2.])
     if not np.isfinite([lower_shape, upper_shape]).all() or not 0 <= lower_shape < upper_shape:
         raise ValueError("Arc shape bounds must be finite, nonnegative and ordered")
     for candidate in arc_queries:
         output = _predict(predictors["arcs"], _inputs("arcs", song, result.state, candidate, history, encoder, selected))
-        attach = int(_distribution(output["attach"], (1, 2), "arc attachment")[0].argmax())
+        attach_scores = _distribution(output["attach"], (1, 2), "arc attachment")[0]
+        attach = int(attach_scores[1] >= selected.get("arc_threshold", .5)) if repaired(selected, "arcs") else int(attach_scores.argmax())
         shape = np.asarray(output["shape"], dtype=np.float32)
         if shape.shape != (1, 2) or not np.isfinite(shape).all() or np.any((shape < lower_shape) | (shape > upper_shape)):
             raise ValueError("Arc shape must contain mu/tmu within the configured bounds")
@@ -358,10 +368,14 @@ def generate(song, requested_nps, predictors=None, encoder=None, settings=None, 
         if attach:
             result.state["arcs"].append({**deepcopy(candidate), "mu": float(shape[0, 0]),
                                           "tmu": float(shape[0, 1]), "anchor_mode": anchor})
-        history.append({"time": candidate["time"], "value": [attach, *shape[0].tolist(), anchor]})
+        history.append({"time": candidate["time"], "value": history_value({"attach": attach, "shape": shape[0].tolist(), "anchor": anchor})})
     result.stages["arcs"] = {"queries": len(arc_queries), "arcs": len(result.state["arcs"])}
     history = []
-    light_queries = lighting_candidates(song, duration, bpm, schedule)
+    if repaired(selected, "lighting"):
+        from .basic_lighting import candidates as light_candidates, decode
+        light_queries = light_candidates(song, selected)
+    else:
+        light_queries = lighting_candidates(song, duration, bpm, schedule)
     light_threshold = float(selected.get("lighting_threshold", .5))
     if not 0 <= light_threshold <= 1:
         raise ValueError("lighting_threshold must be between zero and one")
@@ -376,7 +390,7 @@ def generate(song, requested_nps, predictors=None, encoder=None, settings=None, 
         output = _predict(predictors["lighting"], _inputs("lighting", song, result.state, candidate, history, encoder, selected))
         probabilities = _multilabel(_output(output, "events"), (1, block, len(vocabularies["lighting"])), "lighting")[0]
         for index, query in enumerate(queries):
-            labels = probabilities[index] >= light_threshold
+            labels = decode(probabilities[index], vocabularies, light_threshold) if repaired(selected, "lighting") else probabilities[index] >= light_threshold
             for category in np.flatnonzero(labels):
                 result.state["lighting"].append({"time": query["time"], **deepcopy(vocabularies["lighting"][int(category)])})
             history.append({"time": query["time"], "value": labels.astype(np.float32).tolist()})

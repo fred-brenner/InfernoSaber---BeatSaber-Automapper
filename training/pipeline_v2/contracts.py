@@ -43,8 +43,17 @@ class V2Dataset:
 def preparation_defaults(settings=None):
     from .settings import preparation_settings
 
-    defaults = preparation_settings()
-    defaults.update(settings or {})
+    required = ("history_length", "lighting_block_length", "encoder_batch_size", "encoder_grid_seconds",
+                "max_multiplier_templates", "max_wall_templates", "max_light_classes", "max_copies",
+                "max_chain_slices", "max_chain_span_seconds", "expansion_time_quantum", "chain_span_quantum",
+                "lighting_match_tolerance", "arc_shape_bounds", "schedule", "bomb_threshold", "lighting_threshold")
+    if settings is not None and all(key in settings for key in required):
+        defaults = dict(settings)
+    else:
+        defaults = preparation_settings()
+        if settings is not None and "stage_policies" not in settings:
+            defaults.pop("stage_policies", None)
+        defaults.update(settings or {})
     for key in ("history_length", "lighting_block_length", "encoder_batch_size",
                 "max_multiplier_templates", "max_wall_templates", "max_light_classes",
                 "max_copies", "max_chain_slices"):
@@ -67,6 +76,9 @@ def _base(song):
 
 
 def _history_value(stage, record, width):
+    if stage == "arcs":
+        from .arc_policy import history_value
+        return np.asarray(history_value(record), np.float32)
     if "value" in record:
         return np.asarray(record["value"]).reshape(width)
     if stage in ("positions", "arrows", "multiplier"):
@@ -126,10 +138,16 @@ def build_inputs(stage, song, state, candidate, own_history, encoder=None, setti
     now = float(candidate["time"])
     if not np.isfinite(now) or not 0 <= now < base.metadata["duration"]:
         raise ValueError("Candidate time is outside decoded audio")
-    # Histories are chronological outputs of the same stage. Bound work before
-    # filtering; equal-time queries do not become their siblings' history.
-    histories = [item for item in own_history[-max(options["history_length"], options["lighting_block_length"]):]
-                 if float(item["time"]) < now]
+    # Select strictly preceding records first so equal-time sibling decisions do
+    # not evict valid history. Stop as soon as the bounded input is full.
+    histories = []
+    limit = max(options["history_length"], options["lighting_block_length"])
+    for item in reversed(own_history):
+        if float(item["time"]) < now:
+            histories.append(item)
+            if len(histories) == limit:
+                break
+    histories.reverse()
     get_audio = encoder or (lambda times: np.zeros((len(times), 16), np.float32))
     if stage == "lighting":
         length = options["lighting_block_length"]
@@ -285,7 +303,9 @@ def validate_examples(examples, stage):
         shapes = {"audio": (count, length, 16, 1), "gaps": (count, length, 1),
                   "history": (count, length, classes), "history_mask": (count, length), "mask": (count, length)}
         target_shapes = {"events": (count, length, classes)}
-        weight_shapes = {"events": (count, length)}
+        weight_shapes = {"events": examples.weights["events"].shape}
+        if weight_shapes["events"] not in ((count, length), (count, length, classes)):
+            raise ValueError("Lighting masks require [N,L] or [N,L,C]")
     else:
         history = examples.inputs.get("history")
         if history is None or history.ndim != 3 or not history.shape[1]:
@@ -303,6 +323,8 @@ def validate_examples(examples, stage):
             target_shapes = {"attach": (count,), "shape": (count, 2), "anchor": (count,)}
             shapes.update(endpoints=(count, 2), endpoint_features=(count, 2, 3), gap=(count, 1))
         weight_shapes = {key: (count,) for key in target_shapes}
+        if stage == "hazards" and examples.weights["bombs"].ndim == 2:
+            weight_shapes["bombs"] = (count, 12)
         if stage == "arrows":
             shapes.update(current_positions=(count, 2), occupied=(count, 2), neighbors=(count, 2, 2, 2))
         elif stage == "multiplier":

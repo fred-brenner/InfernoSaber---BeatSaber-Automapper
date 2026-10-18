@@ -14,7 +14,9 @@ from training.beat_models.contracts import CORE, FRAME_SECONDS, frame_conditions
 from training.pipeline_v2.contracts import build_inputs, expansion_occupancy_notes, index_state
 from training.pipeline_v2.pipeline import (PipelineResult, _decode_positions, _distribution,
                                            _expand, _multilabel, _output, _predict)
-from training.pipeline_v2.scheduling import arc_candidates, hazard_candidates, lighting_candidates
+from training.pipeline_v2.scheduling import hazard_candidates, lighting_candidates
+from training.pipeline_v2.arc_policy import arc_candidates, history_value
+from training.pipeline_v2.policies import repaired
 
 
 def _log(logger, message):
@@ -312,49 +314,63 @@ def generate(song, requested_nps, predictors, encoder, settings, vocabularies, *
     result.stages["multiplier"]["elapsed_seconds"] = perf_counter() - started
     started = perf_counter()
     index_state(state)
-    queries = hazard_candidates(expansion_occupancy_notes(state), duration, bpm, schedule)
-    encoder(np.asarray([query["time"] for query in queries], np.float64))
-    history, hazard_rejections = [], {}
-    _log(logger, "V2 hazards")
-    for index, candidate in enumerate(queries):
-        output = _predict(predictors["hazards"], _inputs("hazards", song, state, candidate, history, encoder, options))
-        wall = int(_distribution(output["wall"], (1, len(vocabularies["walls"])), "wall")[0].argmax())
-        bombs = _multilabel(output["bombs"], (1, 12), "bomb")[0] >= options["bomb_threshold"]
-        previous_walls, previous_bombs = len(state["walls"]), len(state["bombs"])
-        if candidate["kind"] == "wall" and wall:
-            raw["wall_proposals"] += 1
-            state["walls"].append({**deepcopy(vocabularies["walls"][wall]), "time": candidate["time"],
-                                   "end_time": candidate["end_time"], "template_id": wall})
-        elif candidate["kind"] == "bomb":
-            raw["bomb_proposals"] += int(bombs.sum())
-            state["bombs"].extend({"time": candidate["time"], "x": int(cell % 4), "y": int(cell // 4)} for cell in np.flatnonzero(bombs))
-        # Clearance is applied before accepted outputs enter the next history.
-        _rejections(hazard_rejections, postprocessors.validate_hazards(state, song, logger=None))
-        accepted_wall = state["walls"][-1]["template_id"] if len(state["walls"]) > previous_walls else 0
-        accepted_bombs = np.zeros(12, np.int32)
-        for bomb in state["bombs"][previous_bombs:]:
-            accepted_bombs[4 * bomb["y"] + bomb["x"]] = 1
-        for record in history:
-            if record["time"] == candidate["time"] and record.get("kind") == "bomb":
-                record["value"][1:] = [int(any(bomb["time"] == candidate["time"] and 4 * bomb["y"] + bomb["x"] == cell
-                                                for bomb in state["bombs"])) for cell in range(12)]
-        _history(history, {"time": candidate["time"], "kind": candidate["kind"],
-                           "value": [accepted_wall, *accepted_bombs.tolist()]}, length)
-        _progress(logger, "hazards", index, len(queries))
-    result.diagnostics["hazard_clearance"] = postprocessors.validate_hazards(state, song, logger=logger)
-    _rejections(hazard_rejections, result.diagnostics["hazard_clearance"])
-    result.diagnostics["hazard_clearance"].update(hazard_rejections)
-    result.stages["hazards"] = {"queries": len(queries), "walls": len(state["walls"]), "bombs": len(state["bombs"]),
-                                 "elapsed_seconds": perf_counter() - started}
+    if repaired(options, "hazards"):
+        from training.pipeline_v2.hazard_sections import rollout
+        report = rollout(song, state, vocabularies, options,
+                         lambda inputs: _predict(predictors["hazards"], inputs), encoder,
+                         progress=lambda index, total: _progress(logger, "hazards", index, total))
+        raw["wall_proposals"] = report["wall_section_proposals"]
+        raw["bomb_proposals"] = report["bomb_proposals"]
+        report["application_filters"] = postprocessors.validate_hazards(state, song, logger=logger)
+        result.diagnostics["hazard_clearance"] = report
+        result.stages["hazards"] = {**report, "walls": len(state["walls"]), "bombs": len(state["bombs"]),
+                                     "elapsed_seconds": perf_counter() - started}
+    else:
+        queries = hazard_candidates(expansion_occupancy_notes(state), duration, bpm, schedule)
+        encoder(np.asarray([query["time"] for query in queries], np.float64))
+        history, hazard_rejections = [], {}
+        _log(logger, "V2 hazards")
+        for index, candidate in enumerate(queries):
+            output = _predict(predictors["hazards"], _inputs("hazards", song, state, candidate, history, encoder, options))
+            wall = int(_distribution(output["wall"], (1, len(vocabularies["walls"])), "wall")[0].argmax())
+            bombs = _multilabel(output["bombs"], (1, 12), "bomb")[0] >= options["bomb_threshold"]
+            previous_walls, previous_bombs = len(state["walls"]), len(state["bombs"])
+            if candidate["kind"] == "wall" and wall:
+                raw["wall_proposals"] += 1
+                state["walls"].append({**deepcopy(vocabularies["walls"][wall]), "time": candidate["time"],
+                                       "end_time": candidate["end_time"], "template_id": wall})
+            elif candidate["kind"] == "bomb":
+                raw["bomb_proposals"] += int(bombs.sum())
+                state["bombs"].extend({"time": candidate["time"], "x": int(cell % 4), "y": int(cell // 4)} for cell in np.flatnonzero(bombs))
+            # Clearance is applied before accepted outputs enter the next history.
+            _rejections(hazard_rejections, postprocessors.validate_hazards(state, song, logger=None))
+            accepted_wall = state["walls"][-1]["template_id"] if len(state["walls"]) > previous_walls else 0
+            accepted_bombs = np.zeros(12, np.int32)
+            for bomb in state["bombs"][previous_bombs:]:
+                accepted_bombs[4 * bomb["y"] + bomb["x"]] = 1
+            for record in history:
+                if record["time"] == candidate["time"] and record.get("kind") == "bomb":
+                    record["value"][1:] = [int(any(bomb["time"] == candidate["time"] and 4 * bomb["y"] + bomb["x"] == cell
+                                                    for bomb in state["bombs"])) for cell in range(12)]
+            _history(history, {"time": candidate["time"], "kind": candidate["kind"],
+                               "value": [accepted_wall, *accepted_bombs.tolist()]}, length)
+            _progress(logger, "hazards", index, len(queries))
+        result.diagnostics["hazard_clearance"] = postprocessors.validate_hazards(state, song, logger=logger)
+        _rejections(hazard_rejections, result.diagnostics["hazard_clearance"])
+        result.diagnostics["hazard_clearance"].update(hazard_rejections)
+        result.stages["hazards"] = {"queries": len(queries), "walls": len(state["walls"]), "bombs": len(state["bombs"]),
+                                     "elapsed_seconds": perf_counter() - started}
     started = perf_counter()
-    queries = arc_candidates(state["notes"], schedule)
+    queries = arc_candidates(state["notes"], options)
+    state["_arc_options"] = options
     encoder(np.asarray([query["time"] for query in queries], np.float64))
     history, arc_rejections = [], {}
     _log(logger, "V2 arcs")
     lower, upper = options["arc_shape_bounds"]
     for index, candidate in enumerate(queries):
         output = _predict(predictors["arcs"], _inputs("arcs", song, state, candidate, history, encoder, options))
-        attach = int(_distribution(output["attach"], (1, 2), "arc attachment")[0].argmax())
+        attach_probabilities = _distribution(output["attach"], (1, 2), "arc attachment")[0]
+        attach = int(attach_probabilities[1] >= options.get("arc_threshold", .5)) if repaired(options, "arcs") else int(attach_probabilities.argmax())
         raw["arc_attachments"] += attach
         shape = np.asarray(output["shape"], np.float32)
         if shape.shape != (1, 2) or not np.isfinite(shape).all() or np.any((shape < lower) | (shape > upper)):
@@ -365,14 +381,18 @@ def generate(song, requested_nps, predictors, encoder, settings, vocabularies, *
             state["arcs"].append({**deepcopy(candidate), "mu": float(shape[0, 0]), "tmu": float(shape[0, 1]), "anchor_mode": anchor})
             _rejections(arc_rejections, postprocessors.validate_arcs(state, song, logger=None))
         attach = int(len(state["arcs"]) > previous)
-        _history(history, {"time": candidate["time"], "value": [attach, *shape[0].tolist(), anchor]}, length)
+        _history(history, {"time": candidate["time"], "value": history_value({"attach": attach, "shape": shape[0].tolist(), "anchor": anchor})}, length)
         _progress(logger, "arcs", index, len(queries))
     result.diagnostics["arc_clearance"] = postprocessors.validate_arcs(state, song, logger=logger)
     _rejections(arc_rejections, result.diagnostics["arc_clearance"])
     result.diagnostics["arc_clearance"].update(arc_rejections)
     result.stages["arcs"] = {"queries": len(queries), "arcs": len(state["arcs"]), "elapsed_seconds": perf_counter() - started}
     started = perf_counter()
-    queries = lighting_candidates(song, duration, bpm, schedule)
+    if repaired(options, "lighting"):
+        from training.pipeline_v2.basic_lighting import candidates as light_candidates, decode
+        queries = light_candidates(song, options)
+    else:
+        queries = lighting_candidates(song, duration, bpm, schedule)
     encoder(np.asarray([query["time"] for query in queries], np.float64))
     history, block = [], options["lighting_block_length"]
     _log(logger, "V2 lighting")
@@ -383,7 +403,8 @@ def generate(song, requested_nps, predictors, encoder, settings, vocabularies, *
         output = _predict(predictors["lighting"], _inputs("lighting", song, state, candidate, history, encoder, options))
         values = _multilabel(_output(output, "events"), (1, block, len(vocabularies["lighting"])), "lighting")[0]
         for index, query in enumerate(selected):
-            labels = values[index] >= options["lighting_threshold"]
+            labels = (decode(values[index], vocabularies, options["lighting_threshold"]) if repaired(options, "lighting")
+                      else values[index] >= options["lighting_threshold"])
             raw["lighting_commands"] += int(labels.sum())
             state["lighting"].extend({"time": query["time"], **deepcopy(vocabularies["lighting"][int(category)])}
                                      for category in np.flatnonzero(labels))
@@ -404,6 +425,7 @@ def generate(song, requested_nps, predictors, encoder, settings, vocabularies, *
         "chains": len(state["chains"]), "chain_slices": sum(chain["slices"] for chain in state["chains"]),
         "walls": len(state["walls"]), "bombs": len(state["bombs"]),
         "arcs": len(state["arcs"]), "lighting_events": len(state["lighting"])}
+    state.pop("_arc_options", None)
     state.pop("_tracks", None)
     state.pop("_occupancy", None)
     result.diagnostics.update(export_ready=True, production_validated=True, safety_reviewed=False,

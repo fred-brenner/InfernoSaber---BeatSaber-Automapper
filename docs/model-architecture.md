@@ -152,10 +152,12 @@ avoidance objects; neither head changes colored notes or their arrows.
 **Example:** an eligible 10.10–10.40 s interval → left-lane wall + no bombs;
 another query can select a bomb at `(3,1)`. A deterministic scheduler supplies
 wall bounds and bomb candidate times; heads select geometry/occupancy, not time.
-The concept scheduler implements deterministic gap, strobe and bomb proposals.
-Adapting the complete legacy obstacle/clearance rules remains a named review
-stop. Human wall intervals and bomb times supplement positive training queries;
-inference uses scheduler proposals only, with coverage reported separately.
+Repaired preparation and both composition paths share quarter-beat wall sections
+and bomb times, with spatial eligibility. Matching consecutive cleared sections
+merge; NONE ends a wall. The duration minimum applies after merging. Per-cell
+bomb masks and canonical cleared-section history preserve local supervision.
+Existing legacy artifacts retain their original gap/source-query policy.
+The repaired contracts need separately trained replacement checkpoints.
 
 ## 8. Lighting events — retained topology, independent scheduling implemented
 
@@ -164,7 +166,10 @@ gaps `[B,L,1]`, lighting history `[B,L,C_light]`
 → `[B,L,C_light]` type/value scores. `L=16`; the measured legacy `fav_15` vocabulary
 has `C_light=1904`. The new training-only vocabulary is frozen separately. Each
 active class decodes to a lighting type/value pair; multiple classes may be
-active at one query, and an all-zero target means no command.
+active at one query, and an all-zero target means no command. The repaired
+portable profile fits only effective TRAIN positives and selects at most one
+value per type. It uses per-class supervision masks and a frozen schedule meeting
+95% eligible-command coverage within 20 ms. Every real query enters history.
 
 **NN:** retain Conv2D32 audio + LSTM32 time / LSTM64 class history → LSTM64
 → Dense1024 → Dense(`L*C_light`)/sigmoid → reshape.
@@ -197,7 +202,13 @@ new endpoints remain an extension. Burst chains belong to the multiplier.
 
 The completed run's validation split has no positive arc attachments, although
 training has positive examples. Its near-zero validation loss measures negative
-decisions and cannot establish attachment, handle or anchor quality.
+decisions and cannot establish attachment, handle or anchor quality. Repaired
+preparation adds an arc-only positive recording-group holdout, explicitly recording
+previous upstream exposure, and leaves global TEST unchanged. Gap eligibility is
+shared at inclusive 0.15–0.8 seconds; the stricter legacy slider gate is optional.
+Rejected/NONE history is always `[0,0,0,0]`. See
+[repair contracts and validation](sparse-stage-repair.md) for balanced objectives,
+positive-sensitive checkpoint selection and validation-only calibration.
 
 ## Composition boundary
 

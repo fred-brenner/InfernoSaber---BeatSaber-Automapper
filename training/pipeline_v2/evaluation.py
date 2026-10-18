@@ -1,7 +1,8 @@
 """Opt-in stage comparisons against fixed reference-conditioned examples.
 
 Importing this module performs no file traversal, checkpoint loading, inference,
-or training. Evaluation never composes downstream stages to score one model.
+or training. Repaired sparse stages also replay their own accepted decisions;
+upstream stages remain reference conditioned and are never composed here.
 """
 
 from datetime import datetime, timezone
@@ -14,9 +15,33 @@ from training.beat_models.artifacts import statistics_hash
 
 from .artifacts import compatibility, execution_identity
 from .contracts import NEW_STAGES
+from .arc_policy import stage_split, validate_split_overlay
+from .policies import repaired
 
 
 COMPARISON_STAGES = ("encoder", *NEW_STAGES)
+
+
+def _selected_songs(dataset, split, stage=None):
+    """Select saved records before opening arrays; retain at most one song."""
+    records = getattr(dataset.songs, "records", None)
+    if records is not None:
+        for index, record in enumerate(records):
+            effective = record["split"] if stage is None else stage_split(dataset.manifest, stage, record)
+            if effective != split:
+                continue
+            song = dataset.songs[index]
+            if song.base.song_id != record["song_id"] or any(
+                    key in record and song.base.metadata.get(key) != record[key]
+                    for key in ("split", "group_id", "audio_sha256", "decoded_sha256")):
+                raise ValueError("Evaluation song identity disagrees with its saved recording record")
+            yield song
+        return
+    for song in dataset.songs:
+        record = {**song.base.metadata, "song_id": song.base.song_id}
+        effective = record["split"] if stage is None else stage_split(dataset.manifest, stage, record)
+        if effective == split:
+            yield song
 
 
 def preparation_reports(dataset):
@@ -40,7 +65,7 @@ def preparation_reports(dataset):
             "skipped": skipped, "skip_counts": {origin: len(records) for origin, records in origins.items()}}
 
 
-def validate_curated_dataset(dataset, *, split="test", evaluation_root=None, allow_synthetic=False):
+def validate_curated_dataset(dataset, *, split="test", evaluation_root=None, allow_synthetic=False, stage=None):
     """Require the curated package sources; favorites never enter comparisons.
 
     A relocated copy of the curated folder must be named explicitly. Synthetic
@@ -50,9 +75,7 @@ def validate_curated_dataset(dataset, *, split="test", evaluation_root=None, all
     if root and "favorites_bs_input" in root.split("/"):
         raise ValueError("favorites_bs_input cannot be a curated evaluation root")
     records = []
-    for song in dataset.songs:
-        if song.base.metadata.get("split") != split:
-            continue
+    for song in _selected_songs(dataset, split, stage):
         metadata = song.base.metadata
         sources = metadata.get("sources", [])
         fixture = metadata.get("provenance", {}).get("adapter") == "v2_synthetic_fixture"
@@ -130,8 +153,9 @@ def fit_reference_baselines(dataset, stage):
     if stage not in NEW_STAGES:
         raise ValueError("Select one independently evaluated v2 stage")
     totals, counts, songs, recordings = {}, {}, [], []
-    for song in dataset.songs:
-        if song.base.metadata.get("split") != "train" or stage not in song.examples:
+    validate_split_overlay(dataset.manifest)
+    for song in _selected_songs(dataset, "train", stage):
+        if stage not in song.examples:
             continue
         songs.append(song.base.song_id)
         recordings.append({"song_id": song.base.song_id, "group_id": song.base.metadata.get("group_id"),
@@ -259,8 +283,16 @@ def _source_coverage(song, stage):
     if stage == "lighting":
         for identity in diagnostics.get("unknown_lighting", []):
             missing[str(identity)] = {"id": identity, "family": "lighting", "reason": "unknown vocabulary or unsupported float value"}
+        for collision in diagnostics.get("lighting_collisions", []):
+            for identity in collision.get("source_ids", []):
+                missing[str(identity)] = {"id": identity, "family": "lighting", "reason": "same_type_collision"}
     total = sum(len(song.objects.get(family, [])) for family in families)
-    ignored = [record for record in song.objects.get("ignored", []) if record.get("family") in families]
+    if stage == "hazards":
+        from .hazard_sections import source_family
+        ignored = [{**record, "family": source_family(record)} for record in song.objects.get("ignored", [])
+                   if source_family(record) in families]
+    else:
+        ignored = [record for record in song.objects.get("ignored", []) if record.get("family") in families]
     return {"reference_objects": total, "unrepresented_objects": len(missing),
             "unrepresented_records": list(missing.values()), "ignored_source_records": ignored}
 
@@ -304,6 +336,186 @@ def _scheduler_coverage(songs):
     return result
 
 
+def _positive_scores(targets, predicted, weights, *, categorical=False):
+    """Exact positive geometry/classes count as matches; NONE is never a TP."""
+    target, predicted = np.asarray(targets), np.asarray(predicted)
+    weight = _weights(weights, target.shape)
+    truth = target != 0 if categorical else target > .5
+    positive = predicted != 0 if categorical else predicted > .5
+    matched = truth & positive & (target == predicted) if categorical else truth & positive
+    return {"true_positive": float((matched * weight).sum()),
+            "false_positive": float(((positive & ~matched) * weight).sum()),
+            "false_negative": float(((truth & ~matched) * weight).sum())}
+
+
+def _add_positive(total, heads):
+    for head, values in heads.items():
+        target = total.setdefault(head, {key: 0. for key in ("true_positive", "false_positive", "false_negative")})
+        for key in target:
+            target[key] += values[key]
+
+
+def _summarize_positive(heads):
+    result = {}
+    for head, values in heads.items():
+        tp, fp, fn = (values[key] for key in ("true_positive", "false_positive", "false_negative"))
+        reference, predicted = tp + fn, tp + fp
+        result[head] = {**values, "reference_positives": reference, "predicted_positives": predicted,
+                        "precision": tp / predicted if predicted else 0.,
+                        "recall": tp / reference if reference else 0.,
+                        "f1": 2 * tp / (2 * tp + fp + fn) if 2 * tp + fp + fn else 0.,
+                        "positive_cases_detected": bool(reference and tp),
+                        "all_empty_failure": bool(reference and not predicted)}
+    return result
+
+
+def _positive_status(heads):
+    references = [values for values in heads.values() if values["reference_positives"] > 0]
+    if not references:
+        return "no_supported_positive_reference"
+    if any(values["all_empty_failure"] for values in references):
+        return "failed_all_empty"
+    if all(values["positive_cases_detected"] for values in references):
+        return "positive_matches_detected"
+    return "positive_matches_missing"
+
+
+def _sparse_diagnostics(song, stage):
+    """Keep compact source accounting instead of retaining every query record."""
+    targets = song.diagnostics.get("targets", {})
+    if stage == "hazards":
+        keys = ("hazard_raw_source_counts", "hazard_parsed_source_counts", "hazard_supported_reference",
+                "hazard_exclusion_counts", "hazard_source_exclusions", "hazard_reference_rollout")
+        result = {key: deepcopy(targets[key]) for key in keys if key in targets}
+        errors = targets.get("hazard_quantization_errors", [])
+        values = [abs(record[key]) for record in errors for key in ("start_error_seconds", "end_error_seconds") if key in record]
+        result["quantization_error_seconds"] = {"endpoints": len(values), "maximum_absolute": max(values, default=0.),
+                                                "mean_absolute": sum(values) / len(values) if values else 0.}
+        return result
+    if stage == "lighting":
+        return {key: deepcopy(targets[key]) for key in ("lighting_scheduler_coverage", "lighting_collisions",
+                                                       "unsupported_lighting", "unscheduled_lighting") if key in targets}
+    return {"raw_source_arcs": len(song.objects.get("arcs", [])),
+            "unscheduled_arcs": deepcopy(targets.get("unscheduled_arcs", [])),
+            "ignored_source_arcs": [deepcopy(record) for record in song.objects.get("ignored", []) if record.get("family") == "arcs"]}
+
+
+def _sparse_source_coverage(song, stage):
+    coverage = _source_coverage(song, stage)
+    missing = {(record["family"], record["id"]): record for record in coverage["unrepresented_records"]}
+    ignored = coverage["ignored_source_records"]
+    for record in ignored:
+        missing[(record["family"], record["id"])] = {
+            "id": record["id"], "family": record["family"], "reason": record.get("reason", "unsupported source record")}
+    coverage.update(reference_objects=coverage["reference_objects"] + len(ignored),
+                    unrepresented_objects=len(missing), unrepresented_records=list(missing.values()))
+    if stage == "hazards":
+        diagnostics = song.diagnostics.get("targets", {})
+        supported = diagnostics.get("hazard_supported_reference", {})
+        if "fully_supported_wall_source_objects" in supported:
+            raw = diagnostics.get("hazard_raw_source_counts", {}).get("walls", len(song.objects.get("walls", [])))
+            complete = supported["fully_supported_wall_source_objects"]
+            partial = supported["wall_source_objects"] - complete
+            coverage["wall_source_coverage"] = {"raw_objects": raw, "fully_represented_objects": complete,
+                                                 "partially_represented_objects": partial,
+                                                 "unrepresented_objects": raw - complete - partial}
+    return coverage
+
+
+def _evaluate_sparse(dataset, stage, predictors, fitted, *, split, threshold, batch_size,
+                     status, artifact_metadata, sources):
+    """Score raw reference inputs and two actual-decoder replays, one song at a time."""
+    from .calibration import OBJECTIVE_HEAD, replay_stage, teacher_forced_outputs
+
+    options = dataset.manifest["data_settings"]
+    raw_totals, positives = {name: {} for name in predictors}, {name: {} for name in predictors}
+    decoded = {conditioning: {name: {} for name in predictors} for conditioning in ("teacher_forced", "autoregressive")}
+    training_hashes = {digest for recording in fitted["training_recordings"] for digest in recording["source_sha256"] if digest}
+    training_decoded = {recording["decoded_audio_sha256"] for recording in fitted["training_recordings"] if recording["decoded_audio_sha256"]}
+    overlay = dataset.manifest.get("stage_splits", {}).get(stage, {})
+    selected_songs, examples_count = [], 0
+    object_heads = {"hazards": ("wall", "bombs"), "arcs": ("attach",), "lighting": ("events",)}[stage]
+    for song in _selected_songs(dataset, split, stage):
+        examples = song.examples.get(stage)
+        item = {"song_id": song.base.song_id, "group_id": song.base.metadata.get("group_id"),
+                "source_split": song.base.metadata["split"], "evaluated_split": split,
+                "diagnostics": _sparse_diagnostics(song, stage), "source_coverage": _sparse_source_coverage(song, stage),
+                "upstream_training_exposure": song.base.metadata.get("group_id") in overlay.get("moved_group_ids", []),
+                "training_overlap": {"source_hash_match": any(source.get("sha256") in training_hashes for source in song.base.metadata.get("sources", [])),
+                                     "decoded_audio_hash_match": song.base.metadata.get("decoded_sha256") in training_decoded,
+                                     "arbitrary_reencodes": "unknown unless recording aliases were supplied during preparation"},
+                "decoded_scores": {}}
+        selected_songs.append(item)
+        if examples is None or not len(examples.times):
+            item["skip_reason"] = "no prepared stage queries"
+            continue
+        examples_count += len(examples.times)
+        for name, selected in predictors.items():
+            outputs = teacher_forced_outputs(song, stage, selected, dataset.vocabularies, options, batch_size)
+            for start in range(0, len(examples.times), batch_size):
+                selection = slice(start, start + batch_size)
+                for head, target in examples.targets.items():
+                    row = _head_scores(stage, head, target[selection], outputs[head][selection],
+                                       examples.weights[head][selection], threshold)
+                    _add_scores(raw_totals[name].setdefault(head, {}), row)
+                    if head in object_heads:
+                        predicted = outputs[head][selection].argmax(axis=-1) if head in ("wall", "attach") else outputs[head][selection] >= threshold
+                        _add_positive(positives[name], {head: _positive_scores(target[selection], predicted,
+                                      examples.weights[head][selection], categorical=head in ("wall", "attach"))})
+            item["decoded_scores"][name] = {}
+            for conditioning in decoded:
+                replay = replay_stage(song, stage, selected, dataset.vocabularies, options, threshold,
+                                      conditioning=conditioning, outputs=outputs if conditioning == "teacher_forced" else None,
+                                      retain_objects=False)
+                _add_positive(decoded[conditioning][name], replay["heads"])
+                item["decoded_scores"][name][conditioning] = {
+                    "heads": _summarize_positive(replay["heads"]), "diagnostics": replay["diagnostics"]}
+            del outputs
+    if not examples_count:
+        raise ValueError(f"No {stage} examples in the requested {split} split")
+    positive_scores = {name: _summarize_positive(heads) for name, heads in positives.items()}
+    decoded_scores = {}
+    for conditioning, predictions in decoded.items():
+        decoded_scores[conditioning] = {}
+        for name, heads in predictions.items():
+            summarized = _summarize_positive(heads)
+            decoded_scores[conditioning][name] = {
+                "heads": summarized, "objective_head": OBJECTIVE_HEAD[stage], "objective": summarized[OBJECTIVE_HEAD[stage]],
+                "positive_case_status": _positive_status(summarized),
+                "all_empty_failure": any(values["all_empty_failure"] for values in summarized.values())}
+    source_total = sum(song["source_coverage"]["reference_objects"] for song in selected_songs)
+    missing_total = sum(song["source_coverage"]["unrepresented_objects"] for song in selected_songs)
+    source_coverage = {"reference_objects": source_total, "unrepresented_objects": missing_total,
+                       "represented_fraction": (source_total - missing_total) / source_total if source_total else None,
+                       "interpretation": "Decoded metrics use supported reference queries; raw-source exclusions remain separate misses."}
+    wall_coverage = [song["source_coverage"]["wall_source_coverage"] for song in selected_songs
+                     if "wall_source_coverage" in song["source_coverage"]]
+    if wall_coverage:
+        source_coverage["wall_source_coverage"] = {key: sum(row[key] for row in wall_coverage) for key in wall_coverage[0]}
+        source_coverage["represented_fraction_basis"] = "Any supported source-object portion; complete and partial wall coverage are reported separately."
+    return {"kind": "v2_independent_stage_comparison", "status": status, "stage": stage, "evaluated_split": split,
+            "created_at_utc": datetime.now(timezone.utc).isoformat(), "examples": examples_count,
+            "conditioning": "fixed upstream reference; raw teacher-forced scores and decoded own-stage replays",
+            "threshold": threshold, "scores": {name: _summarize_heads(total) for name, total in raw_totals.items()},
+            "positive_sensitive_scores": positive_scores, "decoded_scores": decoded_scores,
+            "positive_case_status": decoded_scores["autoregressive"]["model"]["positive_case_status"],
+            "all_empty_failure": decoded_scores["autoregressive"]["model"]["all_empty_failure"],
+            "baseline": fitted, "artifact": artifact_metadata or {}, "songs": selected_songs,
+            "sources": sources, "reference_policy": "curated_bs_map_input_only_excluding_favorites",
+            "source_coverage": source_coverage,
+            "stage_split_fingerprint": overlay.get("fingerprint"), "upstream_exposure": deepcopy(overlay.get("provenance", {}).get("previous_upstream_exposure")),
+            **preparation_reports(dataset),
+            "dataset_identity": {key: dataset.manifest.get(key) for key in
+                                 ("status", "encoder_identity", "normalization_sha256", "vocabularies_fingerprint", "data_settings")},
+            "limitations": ["Reference agreement does not establish composed generation or playability.",
+                            "Raw scores use fixed own-stage reference histories; both decoded scores apply the actual stage decoder.",
+                            "Autoregressive replay changes only this stage's own history; upstream notes remain reference conditioned.",
+                            "Zero predicted positives fail positive-case evaluation when supported positive reference objects exist.",
+                            "Hazard wall metrics count cleared positive sections after merged-wall validation; NONE contributes no positive matches.",
+                            "Arc replay disables probability thinning; application user controls and full generation remain separate checks."],
+            "optimizer_steps": 0, **execution_identity()}
+
+
 def evaluate_stage(dataset, stage, predictor, *, split="test", batch_size=128,
                    threshold=.5, baseline_names=("frequency", "none"), artifact_metadata=None,
                    baseline_dataset=None, evaluation_root=None, allow_synthetic=False):
@@ -320,7 +532,11 @@ def evaluate_stage(dataset, stage, predictor, *, split="test", batch_size=128,
         raise ValueError("Independent comparisons require one v2 stage and a held-out split")
     if not np.isfinite(threshold) or not 0 < threshold < 1:
         raise ValueError("Comparison threshold must be between zero and one")
-    sources = validate_curated_dataset(dataset, split=split, evaluation_root=evaluation_root, allow_synthetic=allow_synthetic)
+    if isinstance(batch_size, bool) or not isinstance(batch_size, int) or batch_size < 1:
+        raise ValueError("Comparison batch_size must be a positive integer")
+    validate_split_overlay(dataset.manifest)
+    sources = validate_curated_dataset(dataset, split=split, evaluation_root=evaluation_root,
+                                       allow_synthetic=allow_synthetic, stage=stage)
     if baseline_dataset is None:
         if not allow_synthetic or any(not source["synthetic"] for source in sources):
             raise ValueError("An explicit original training dataset is required for reference baseline statistics")
@@ -331,6 +547,9 @@ def evaluate_stage(dataset, stage, predictor, *, split="test", batch_size=128,
     baseline_names = tuple(name for name in baseline_names if name != "none" or stage not in ("positions", "arrows"))
     predictors = {"model": predictor, **{name: ReferenceBaseline(stage, dataset.vocabularies, fitted, name)
                                           for name in baseline_names}}
+    if stage in ("hazards", "arcs", "lighting") and repaired(dataset.manifest.get("data_settings", {}), stage):
+        return _evaluate_sparse(dataset, stage, predictors, fitted, split=split, threshold=threshold,
+                                batch_size=batch_size, status=status, artifact_metadata=artifact_metadata, sources=sources)
     totals = {name: {} for name in predictors}
     scheduler_totals = {name: {} for name in predictors}
     positive_totals = {name: {} for name in predictors}

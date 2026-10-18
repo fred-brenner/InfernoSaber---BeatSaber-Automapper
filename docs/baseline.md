@@ -1321,3 +1321,95 @@ user's installed game. Legacy v2 and all object families were exercised by dummy
 integration; the two full-song packages use v3. Further reduction of legacy
 postprocessing, curved-arc clearance review and model/preprocessing fusion remain
 follow-up work in `TODO.md`.
+
+## Sparse-stage repair: CPU acceptance (2026-10-18)
+
+Hazards, lighting and arcs now have versioned repaired preparation/inference
+contracts, stage-specific compatibility, positive-sensitive checkpoint metrics,
+and an explicit validation-only calibration command. Hidden network widths,
+learning rates, batch sizes and upstream models remain unchanged. Existing
+datasets and `Data/model/v2_expert` retain their legacy policies and thresholds;
+canonical arc NONE history is corrected on read without changing stored arrays.
+Hazards retain the existing 17-category wall output and 19-row history embedding;
+only lighting's class-dependent dimensions change. Repaired wall eligibility is
+expressed through masks and clearance rather than vocabulary pruning.
+See [contracts and later training commands](sparse-stage-repair.md).
+
+Verified on the pinned WSL CPU environment (Python 3.10, TensorFlow/tf.keras 2.15):
+
+- `python -m pytest -q -m 'not comparison'`: **940 passed, 10 deselected**
+  in 154.28 seconds. Comparisons were not run.
+- Synthetic production integration exercises notes, native chains, walls, bombs,
+  arcs and independent simultaneous lighting through both v3 and legacy v2
+  serializers. Chain occupancy correctly rejects conflicting attachments;
+  legacy omissions remain explicit.
+- Weighted/unweighted loss aggregation, finite eager/compiled gradients,
+  bounded streaming PR-AUC parity, serialization and unchanged-weight checks
+  pass. Metrics use histograms rather than allocating a threshold-by-example
+  matrix. Stage-only caching and the training launcher remain covered.
+- Calibration rejects disabled arc generation before loading a model and records
+  its effective clearance controls. Sidecars bind checkpoints to exact learning
+  split identities; generation still allows explicit user-option changes.
+- SHA-256 verification of **1,510 source and bundle files** found no changes.
+  No training, optimizer update, GPU execution, checkpoint promotion or library
+  export was performed.
+
+Full repaired preparation accepted **875/875 maps**, with no new downstream
+skips. The **307 earlier base-import exclusions** remain listed individually.
+The new output root is `Data/training/pipeline_v2/sparse-repair-20261018-r2`.
+
+- Lighting selected the **1/16-beat** grid plus onsets/tail: **97.78%** of eligible
+  TRAIN source commands are represented within 20 ms after collision handling.
+  This is eligible-command coverage, not raw-source coverage. It yields **88
+  effective classes** and **7,410,655 TRAIN queries**. Duplicate commands can
+  share a target; TRAIN contains 2,919,544 positive class decisions.
+- Effective wall sections: **100,594 TRAIN / 12,508 validation**; bomb cells:
+  **21,070 TRAIN / 2,002 validation**. Across all splits, reference coalescing
+  accepts **20,843 walls** and **24,984 bomb cells**. Source counts, partial wall
+  coverage, exclusions and merged outputs are separate audit fields.
+- Arc attachment positives: **960 across nine TRAIN recording groups**, **358
+  across two validation groups**, and **18 in one TEST group**. The two moved
+  groups retain their documented previous upstream exposure; global TEST and
+  every other stage's assignments remain unchanged.
+- Maximum wall endpoint displacement is **0.125 beat** (within floating-point
+  tolerance). Unsupported custom geometry remains conservatively masked;
+  missing normalized onsets affect wall supervision for 19 source maps. Raw
+  records remain available rather than being guessed into supported geometry.
+- Compressed arrays occupy **6.05 GB** (26.79 GB unpacked across all stages).
+  Detailed evidence remains in the **613 MB** `preparation-audit.json`. Moving
+  duplicated exclusions there reduced the training manifest from **1.09 GB to
+  8.73 MB**; the manifest hashes the sidecar, which training does not parse.
+
+The [full-data audit summary](../../Data/training/pipeline_v2/sparse-repair-20261018-r2/acceptance-audit.json)
+links these counts to the exact dataset. Detailed per-map exclusions, masks,
+quantization and coverage remain in its dataset audit and song metadata.
+
+All 875 finalized archives passed validation of their six downstream contracts.
+`main_training.py --models hazards lighting arcs --dry-run` completed all three
+stages with finite previews, unchanged weights and zero optimizer steps. Hazards
+and lighting use bounded streaming; arcs fit within the configured RAM budget.
+Three real-map hazard reconstructions exactly match the finalized targets,
+histories, masks and diagnostics. Bounded real-data forward/gradient checks for
+all three models passed, including `.keras` save/reload parity and unchanged
+weights. The retained position, arrow and multiplier checkpoint manifests are
+compatible with the repaired dataset. Reports are in this output root's
+`dry-run/` and `real-smoke/` directories; these are untrained verification
+artifacts, not replacement inference checkpoints.
+
+A disposable full CPU package check with the unchanged bundle generated Bad
+Hatter at requested 3/5 NPS. The maps contain 329/640 colored notes and 277/533
+unique onsets. Both still contain one lighting command and no walls, bombs, arcs
+or chains. This verifies legacy compatibility and package generation, not an
+improvement in model quality. JSON, asset references, timing/geometry bounds
+and ZIP contents passed inspection.
+
+- [Finished regression ZIP](../../Data/prediction/v2_sparse_repair_acceptance/20261018-181007/new_map/12345_Bad%20Hatter.zip)
+- [Package inspection](../../Data/prediction/v2_sparse_repair_acceptance/20261018-181007/package-inspection.json)
+
+CPU logs, source hashes and review evidence are stored outside the repository at
+`/home/frede/.local/share/infernosaber-baseline/diagnostics/sparse-repair-20261018-175250`.
+
+Replacement training, validation calibration, reference-conditioned and
+autoregressive model comparisons, and candidate-bundle playtests remain later
+user-run work. Promotion requires positive-case improvement over empty/frequency
+baselines and valid exported objects. There is no procedural fallback.

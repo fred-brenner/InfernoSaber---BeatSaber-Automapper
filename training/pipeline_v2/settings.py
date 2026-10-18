@@ -87,6 +87,7 @@ def schedule_settings(overrides=None):
 
 
 def preparation_settings():
+    from .policies import preparation_policies
     fields = ("encoder_grid_seconds", "encoder_batch_size", "max_multiplier_templates", "max_wall_templates",
               "max_light_classes", "max_copies", "max_chain_slices", "max_chain_span_seconds",
               "expansion_time_quantum", "chain_span_quantum", "lighting_match_tolerance",
@@ -105,4 +106,7 @@ def preparation_settings():
         result[key] = _positive(value, key, integer=integer)
         if key.endswith("threshold") and result[key] > 1:
             raise ValueError(f"{key} must not exceed one")
+    policies = preparation_policies()
+    if policies:
+        result["stage_policies"] = policies
     return result

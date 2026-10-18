@@ -420,11 +420,14 @@ def validate_hazards(state, song, logger=None):
     return diagnostics
 
 
-def validate_arcs(state, song, logger=None):
+def validate_arcs(state, song, logger=None, *, settings=None, probability=None):
     """Accept only existing endpoints and clear, configured arc connections."""
     notes = {note["id"]: note for note in state["notes"]}
     occupied = _occupied_notes(state)
     original = state.get("arcs", [])
+    options = settings if settings is not None else state.get("_arc_options", {})
+    from training.pipeline_v2.policies import repaired
+    from training.pipeline_v2.arc_policy import eligible_gap
     accepted = []
     for arc in original:
         if not config.add_slider_flag:
@@ -437,7 +440,9 @@ def validate_arcs(state, song, logger=None):
             continue
         head, tail = (notes[identity] for identity in ids)
         gap = tail["time"] - head["time"]
-        if head["hand"] != tail["hand"] or not config.slider_time_gap[0] < gap < config.slider_time_gap[1]:
+        gap_allowed = (eligible_gap(gap, options) if repaired(options, "arcs") else
+                       config.slider_time_gap[0] < gap < config.slider_time_gap[1])
+        if head["hand"] != tail["hand"] or not gap_allowed:
             continue
         if config.slider_movement_minimum > 0:
             speed = calc_note_speed([head[key] for key in ("x", "y", "hand", "d")],
@@ -462,7 +467,8 @@ def validate_arcs(state, song, logger=None):
         if any(abs(sample["time"] - note["time"]) <= config.min_time_diff and _same_cell(sample, note)
                for sample in samples for note in neighbors):
             continue
-        if 0 <= config.slider_probability < 1 and random.random() > config.slider_probability:
+        chance = config.slider_probability if probability is None else probability
+        if 0 <= chance < 1 and random.random() > chance:
             continue
         arc["_legacy_clearance_checked"] = True
         accepted.append(arc)

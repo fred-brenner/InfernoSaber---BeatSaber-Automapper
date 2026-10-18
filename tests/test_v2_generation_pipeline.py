@@ -89,6 +89,7 @@ def test_production_pipeline_uses_only_audio_and_keeps_all_output_families(monke
         return np.zeros((len(times), 16), np.float32)
 
     settings = preparation_settings()
+    settings.pop("stage_policies", None)  # Exercise the retained legacy decoder.
     settings["schedule"]["arc_max_gap_seconds"] = 6.
     result = generate(song, 4., predictors, encoder, settings, vocab,
                       postprocessors=processors(), random_factor=0, logger=lambda message: None)
@@ -176,6 +177,7 @@ def test_raw_hazard_and_arc_choices_survive_clearance_rejection_in_diagnostics(m
     predictors = dummy_predictors(vocab)
     predictors["timing"] = Timing()
     settings = preparation_settings()
+    settings.pop("stage_policies", None)  # Exercise the retained legacy decoder.
     settings["schedule"]["arc_max_gap_seconds"] = 6.
     hooks = processors()
 

@@ -12,7 +12,7 @@ from training.pipeline_v2.scheduling import arc_candidates, hazard_candidates, l
 @pytest.fixture(scope="module")
 def dummy_dataset():
     from training.pipeline_v2.data import make_dummy_dataset
-    return make_dummy_dataset()
+    return make_dummy_dataset(settings={})
 
 
 def _settings():
@@ -185,7 +185,7 @@ def test_lighting_scheduler_is_independent_of_notes_and_retains_tail(dummy_datas
     assert first == lighting_candidates(alternate)
     assert first[0]["time"] == 0
     assert first[-1]["time"] < song.base.metadata["duration"]
-    result = generate(song, 0., contract_mode=True, vocabularies=dummy_dataset.vocabularies)
+    result = generate(song, 0., settings={}, contract_mode=True, vocabularies=dummy_dataset.vocabularies)
     assert result.stages["lighting"]["queries"] == len(first)
 
 

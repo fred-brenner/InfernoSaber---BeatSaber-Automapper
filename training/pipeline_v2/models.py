@@ -252,7 +252,7 @@ def _weighted_terms(values, weights):
     return tf.reduce_sum(values * weights), tf.reduce_sum(weights)
 
 
-def loss_components(stage, targets, predicted, weights):
+def loss_components(stage, targets, predicted, weights, balance=None):
     """Return per-head sums/counts so validation is invariant to batch partition."""
     if stage not in STAGES or set(targets) != set(predicted) or set(targets) != set(weights):
         raise ValueError("Stage loss requires matching target, prediction, and weight heads")
@@ -271,6 +271,11 @@ def loss_components(stage, targets, predicted, weights):
             target = tf.cast(target, tf.int32)
             target = tf.where(weight > 0, target, tf.zeros_like(target))
             values = keras.losses.sparse_categorical_crossentropy(target, output)
+        if balance and head in balance:
+            factors = balance[head]
+            factor = tf.where(target > 0, tf.cast(factors["positive"], values.dtype),
+                              tf.cast(factors["negative"], values.dtype))
+            values = values * factor
         components[head] = _weighted_terms(values, weight)
     return components
 

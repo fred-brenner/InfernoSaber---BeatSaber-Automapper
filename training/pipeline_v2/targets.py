@@ -81,7 +81,7 @@ def light_template(record):
     return {key: record[key] for key in ("type", "value")}
 
 
-def fit_vocabularies(songs, options, skipped=None):
+def fit_vocabularies(songs, options, skipped=None, lighting=None):
     from .contracts import V2Song
     from .data import read_objects
 
@@ -102,6 +102,8 @@ def fit_vocabularies(songs, options, skipped=None):
         for record in expansion_targets(song, options).values():
             if record["reason"] is None and record["template"]["kind"] != "none":
                 counters["multiplier"][_key(record["template"])] += 1
+        # Keep wall IDs and both hazard layer widths stable. The repaired target
+        # builder masks unsupported originals without changing this vocabulary.
         counters["walls"].update(_key(wall_template(record)) for record in objects["walls"])
         counters["lighting"].update(_key(light_template(record)) for record in objects["lighting"] if record["float_value"] == 1)
     if not training:
@@ -114,6 +116,9 @@ def fit_vocabularies(songs, options, skipped=None):
         selected = ordered[:max(0, maximum - len(prefix))]
         result[family] = prefix + [json.loads(key) for key in selected]
         result["counts"][family] = {"observed": len(ordered), "kept": len(selected), "dropped": len(ordered) - len(selected)}
+    if lighting is not None:
+        result["lighting"] = deepcopy(lighting)
+        result["counts"]["lighting"] = {"observed": len(lighting), "kept": len(lighting), "dropped": 0}
     if not result["lighting"]:
         result["lighting"] = [{"type": 0, "value": 0, "structural_placeholder": True}]
     result["fingerprint"] = hashlib.sha256(_key(result).encode()).hexdigest()
@@ -164,8 +169,28 @@ def reference_state(song, vocab):
             "multiplier_classes": len(vocab["multiplier"])}
 
 
+def reference_expanded_state(song, vocab, options):
+    """Representable upstream reference notes/chains, shared by stage replays."""
+    from .contracts import V2Song
+    song = V2Song(song.base, deepcopy(song.objects), diagnostics=song.diagnostics)
+    state = reference_state(song, vocab)
+    expansions = expansion_targets(song, options)
+    known = {_key(item) for item in vocab["multiplier"]}
+    supported = [item for item in expansions.values() if item["reason"] is None and _key(item["template"]) in known]
+    allowed = {identity for item in supported for identity in item["source_ids"]}
+    retained = {note["id"] for note in state["notes"]}
+    state["notes"].extend({key: record[key] for key in ("id", "time", "hand", "x", "y", "d")}
+                          for record in song.objects["notes"] if record["id"] in allowed and record["id"] not in retained)
+    state["notes"].sort(key=lambda note: (note["time"], note["hand"], note["id"]))
+    chains = {identity for item in supported for identity in item["chain_ids"]}
+    state["chains"] = [record for record in song.objects["chains"] if record["id"] in chains]
+    return index_state(state)
+
+
 def build_examples(song, vocab, options, encoder=None):
-    from .scheduling import arc_candidates, hazard_candidates, lighting_candidates
+    from .scheduling import hazard_candidates, lighting_candidates
+    from .arc_policy import arc_candidates, history_value
+    from .policies import repaired
 
     state = index_state(reference_state(song, vocab))
     expansions = expansion_targets(song, options)
@@ -232,85 +257,90 @@ def build_examples(song, vocab, options, encoder=None):
     duration, bpm = song.base.metadata["duration"], song.base.metadata["bpm"]
     tolerance = options["lighting_match_tolerance"]
     complete = song.diagnostics["source_objects_complete"]
-    scheduled = hazard_candidates(expansion_occupancy_notes(state), duration, bpm, options["schedule"])
-    queries = [{**query, "origin": "scheduler", "source_ids": []} for query in scheduled]
-    scheduled_matches = {"walls": set(), "bombs": set()}
-    for family, kind in (("walls", "wall"), ("bombs", "bomb")):
-        for record in song.objects[family]:
-            end = record.get("end_time", record["time"])
-            matches = [query for query in queries if query["kind"] == kind and query["origin"] != "source"
-                       and abs(query["time"] - record["time"]) <= tolerance
-                       and abs(query["end_time"] - end) <= tolerance]
-            if matches:
-                query = min(matches, key=lambda item: abs(item["time"] - record["time"]) + abs(item["end_time"] - end))
-                query["origin"] = "scheduler_and_source"
-                query["source_ids"].append(record["id"])
-                scheduled_matches[family].add(record["id"])
-            else:
-                matches = [query for query in queries if query["kind"] == kind and query["time"] == record["time"] and query["end_time"] == end]
+    if repaired(options, "hazards"):
+        from .hazard_sections import build_examples as build_hazards
+        output["hazards"], hazard_diagnostics = build_hazards(song, state, vocab, options, encoder)
+        diagnostics.update(hazard_diagnostics)
+    else:
+        scheduled = hazard_candidates(expansion_occupancy_notes(state), duration, bpm, options["schedule"])
+        queries = [{**query, "origin": "scheduler", "source_ids": []} for query in scheduled]
+        scheduled_matches = {"walls": set(), "bombs": set()}
+        for family, kind in (("walls", "wall"), ("bombs", "bomb")):
+            for record in song.objects[family]:
+                end = record.get("end_time", record["time"])
+                matches = [query for query in queries if query["kind"] == kind and query["origin"] != "source"
+                           and abs(query["time"] - record["time"]) <= tolerance
+                           and abs(query["end_time"] - end) <= tolerance]
                 if matches:
-                    matches[0]["source_ids"].append(record["id"])
+                    query = min(matches, key=lambda item: abs(item["time"] - record["time"]) + abs(item["end_time"] - end))
+                    query["origin"] = "scheduler_and_source"
+                    query["source_ids"].append(record["id"])
+                    scheduled_matches[family].add(record["id"])
                 else:
-                    queries.append({"kind": kind, "time": record["time"], "end_time": end,
-                                    "origin": "source", "source_ids": [record["id"]]})
-    queries.sort(key=lambda query: (query["time"], query["kind"], query["end_time"]))
-    diagnostics["hazard_query_provenance"] = deepcopy(queries)
-    song.diagnostics["hazard_query_origins"] = ["human_positive" if query["origin"] == "source" else "scheduler" for query in queries]
-    song.diagnostics["hazard_query_provenance"] = deepcopy(queries)
-    diagnostics["hazard_scheduler_coverage"] = {family: {"source_objects": len(song.objects[family]),
-                                                         "matched_source_objects": len(scheduled_matches[family]),
-                                                         "unmatched_source_ids": [record["id"] for record in song.objects[family]
-                                                                                  if record["id"] not in scheduled_matches[family]]}
-                                                for family in ("walls", "bombs")}
-    diagnostics["hazard_query_policy"] = "source_positive_queries_plus_inference_scheduler_queries"
-    song.diagnostics["hazard_scheduler_coverage"] = deepcopy(diagnostics["hazard_scheduler_coverage"])
-    history, inputs, walls, bombs, wall_weights, bomb_weights, used_walls, used_bombs = [], [], [], [], [], [], set(), set()
-    for candidate in queries:
-        inputs.append(build_inputs("hazards", song, state, candidate, history, encoder, options))
-        wall, cells, ww, bw = 0, np.zeros(12, np.float32), 0., 0.
-        if candidate["kind"] == "wall":
-            matches = [record for record in song.objects["walls"] if abs(record["time"] - candidate["time"]) <= tolerance
-                       and abs(record["end_time"] - candidate["end_time"]) <= tolerance]
-            ww = float(complete)
-            overlaps = [record for record in song.objects["walls"] if record["time"] < candidate["end_time"]
-                        and record["end_time"] > candidate["time"]]
-            if overlaps and not matches:
-                ww = 0.
-            if len(matches) > 1:
-                ww = 0.
-            elif matches:
-                record = matches[0]
-                category = indices["walls"].get(_key(wall_template(record)))
-                if category is None:
+                    matches = [query for query in queries if query["kind"] == kind and query["time"] == record["time"] and query["end_time"] == end]
+                    if matches:
+                        matches[0]["source_ids"].append(record["id"])
+                    else:
+                        queries.append({"kind": kind, "time": record["time"], "end_time": end,
+                                        "origin": "source", "source_ids": [record["id"]]})
+        queries.sort(key=lambda query: (query["time"], query["kind"], query["end_time"]))
+        diagnostics["hazard_query_provenance"] = deepcopy(queries)
+        song.diagnostics["hazard_query_origins"] = ["human_positive" if query["origin"] == "source" else "scheduler" for query in queries]
+        song.diagnostics["hazard_query_provenance"] = deepcopy(queries)
+        diagnostics["hazard_scheduler_coverage"] = {family: {"source_objects": len(song.objects[family]),
+                                                             "matched_source_objects": len(scheduled_matches[family]),
+                                                             "unmatched_source_ids": [record["id"] for record in song.objects[family]
+                                                                                      if record["id"] not in scheduled_matches[family]]}
+                                                    for family in ("walls", "bombs")}
+        diagnostics["hazard_query_policy"] = "source_positive_queries_plus_inference_scheduler_queries"
+        song.diagnostics["hazard_scheduler_coverage"] = deepcopy(diagnostics["hazard_scheduler_coverage"])
+        history, inputs, walls, bombs, wall_weights, bomb_weights, used_walls, used_bombs = [], [], [], [], [], [], set(), set()
+        for candidate in queries:
+            inputs.append(build_inputs("hazards", song, state, candidate, history, encoder, options))
+            wall, cells, ww, bw = 0, np.zeros(12, np.float32), 0., 0.
+            if candidate["kind"] == "wall":
+                matches = [record for record in song.objects["walls"] if abs(record["time"] - candidate["time"]) <= tolerance
+                           and abs(record["end_time"] - candidate["end_time"]) <= tolerance]
+                ww = float(complete)
+                overlaps = [record for record in song.objects["walls"] if record["time"] < candidate["end_time"]
+                            and record["end_time"] > candidate["time"]]
+                if overlaps and not matches:
                     ww = 0.
-                else:
-                    wall = category
-                    used_walls.add(record["id"])
-        else:
-            bw = float(complete)
-            for record in song.objects["bombs"]:
-                if abs(record["time"] - candidate["time"]) <= tolerance:
-                    cells[4 * record["y"] + record["x"]] = 1
-                    used_bombs.add(record["id"])
-        for ignored in song.objects["ignored"]:
-            if "time" not in ignored or abs(ignored["time"] - candidate["time"]) <= tolerance:
-                if ignored.get("family") == "walls":
+                if len(matches) > 1:
                     ww = 0.
-                elif ignored.get("family") in ("bombs", "notes"):
-                    bw = 0.
-        walls.append(wall); bombs.append(cells); wall_weights.append(ww); bomb_weights.append(bw)
-        if (candidate["kind"] == "wall" and ww > 0) or (candidate["kind"] == "bomb" and bw > 0):
-            history.append({"time": candidate["time"], "value": [wall, *cells.tolist()]})
-    template = build_inputs("hazards", song, state, {"time": 0., "end_time": 0.}, [], encoder, options)
-    output["hazards"] = _stack("hazards", [query["time"] for query in queries], inputs,
-                                 {"wall": np.asarray(walls, np.int32), "bombs": np.asarray(bombs, np.float32).reshape(-1, 12)},
-                                 {"wall": np.asarray(wall_weights, np.float32), "bombs": np.asarray(bomb_weights, np.float32)}, template)
-    diagnostics["unscheduled_walls"] = [record["id"] for record in song.objects["walls"] if record["id"] not in used_walls]
-    diagnostics["unscheduled_bombs"] = [record["id"] for record in song.objects["bombs"] if record["id"] not in used_bombs]
-    diagnostics["hazard_positive_query_coverage"] = {"walls": len(used_walls), "bombs": len(used_bombs),
-                                                      "scheduler_queries": len(scheduled), "augmented_queries": len(queries),
-                                                      "source_only_queries": sum(query["origin"] == "source" for query in queries)}
-    queries = arc_candidates(state["notes"], options["schedule"])
+                elif matches:
+                    record = matches[0]
+                    category = indices["walls"].get(_key(wall_template(record)))
+                    if category is None:
+                        ww = 0.
+                    else:
+                        wall = category
+                        used_walls.add(record["id"])
+            else:
+                bw = float(complete)
+                for record in song.objects["bombs"]:
+                    if abs(record["time"] - candidate["time"]) <= tolerance:
+                        cells[4 * record["y"] + record["x"]] = 1
+                        used_bombs.add(record["id"])
+            for ignored in song.objects["ignored"]:
+                if "time" not in ignored or abs(ignored["time"] - candidate["time"]) <= tolerance:
+                    if ignored.get("family") == "walls":
+                        ww = 0.
+                    elif ignored.get("family") in ("bombs", "notes"):
+                        bw = 0.
+            walls.append(wall); bombs.append(cells); wall_weights.append(ww); bomb_weights.append(bw)
+            if (candidate["kind"] == "wall" and ww > 0) or (candidate["kind"] == "bomb" and bw > 0):
+                history.append({"time": candidate["time"], "value": [wall, *cells.tolist()]})
+        template = build_inputs("hazards", song, state, {"time": 0., "end_time": 0.}, [], encoder, options)
+        output["hazards"] = _stack("hazards", [query["time"] for query in queries], inputs,
+                                     {"wall": np.asarray(walls, np.int32), "bombs": np.asarray(bombs, np.float32).reshape(-1, 12)},
+                                     {"wall": np.asarray(wall_weights, np.float32), "bombs": np.asarray(bomb_weights, np.float32)}, template)
+        diagnostics["unscheduled_walls"] = [record["id"] for record in song.objects["walls"] if record["id"] not in used_walls]
+        diagnostics["unscheduled_bombs"] = [record["id"] for record in song.objects["bombs"] if record["id"] not in used_bombs]
+        diagnostics["hazard_positive_query_coverage"] = {"walls": len(used_walls), "bombs": len(used_bombs),
+                                                          "scheduler_queries": len(scheduled), "augmented_queries": len(queries),
+                                                          "source_only_queries": sum(query["origin"] == "source" for query in queries)}
+    queries = arc_candidates(state["notes"], options)
     source_pairs = {}
     for arc in song.objects["arcs"]:
         pair = []
@@ -342,8 +372,8 @@ def build_examples(song, vocab, options, encoder=None):
                for record in song.objects["ignored"]):
             weight, shape_weight = 0., 0.
         labels.append(attach); shapes.append(shape); anchors.append(anchor); attach_weights.append(weight); shape_weights.append(shape_weight)
-        if weight:
-            history.append({"time": candidate["time"], "value": [attach, *shape, anchor]})
+        history.append({"time": candidate["time"], "value": history_value(
+            {"attach": attach if weight else 0, "shape": shape, "anchor": anchor})})
     # No synthetic endpoints are invented for an empty arc schedule.
     if inputs:
         template = inputs[0]
@@ -356,54 +386,59 @@ def build_examples(song, vocab, options, encoder=None):
                               {"attach": np.asarray(labels, np.int32), "shape": np.asarray(shapes, np.float32).reshape(-1, 2), "anchor": np.asarray(anchors, np.int32)},
                               {"attach": np.asarray(attach_weights, np.float32), "shape": np.asarray(shape_weights, np.float32), "anchor": np.asarray(shape_weights, np.float32)}, template)
     diagnostics["unscheduled_arcs"] = [record["id"] for record in song.objects["arcs"] if record["id"] not in used_arcs]
-    queries = lighting_candidates(song, settings=options["schedule"])
-    assigned = {}
-    ignored_lighting = set()
-    mask_all_lighting = False
-    query_times = np.asarray([query["time"] for query in queries])
-    for record in song.objects["lighting"]:
-        index = int(np.argmin(np.abs(query_times - record["time"]))) if len(query_times) else -1
-        if index >= 0 and abs(query_times[index] - record["time"]) <= tolerance:
-            assigned.setdefault(index, []).append(record)
-        else:
-            diagnostics["unscheduled_lighting"].append(record["id"])
-    for record in song.objects["ignored"]:
-        if record.get("family") != "lighting":
-            continue
-        if "time" not in record:
-            mask_all_lighting = True
-        elif len(query_times):
-            index = int(np.argmin(np.abs(query_times - record["time"])))
-            if abs(query_times[index] - record["time"]) <= tolerance:
-                ignored_lighting.add(index)
-    history, inputs, labels, masks, times = [], [], [], [], []
-    length, count = options["lighting_block_length"], len(vocab["lighting"])
-    for start in range(0, len(queries), length):
-        block = queries[start:start + length]
-        candidate = {"time": block[0]["time"], "times": [query["time"] for query in block]}
-        inputs.append(build_inputs("lighting", song, state, candidate, history, encoder, options))
-        target, weight, time = np.zeros((length, count), np.float32), np.zeros(length, np.float32), np.full(length, -1., np.float64)
-        pending = []
-        for offset, query in enumerate(block):
-            time[offset] = query["time"]
-            weight[offset] = float(complete and not vocab["lighting"][0].get("structural_placeholder", False))
-            if mask_all_lighting or start + offset in ignored_lighting:
-                weight[offset] = 0.
-            for record in assigned.get(start + offset, []):
-                category = indices["lighting"].get(_key(light_template(record)))
-                if category is None or record["float_value"] != 1:
+    if repaired(options, "lighting"):
+        from .basic_lighting import build_examples as build_lighting
+        output["lighting"], light_diagnostics = build_lighting(song, state, vocab, options, encoder)
+        diagnostics.update(light_diagnostics)
+    else:
+        queries = lighting_candidates(song, settings=options["schedule"])
+        assigned = {}
+        ignored_lighting = set()
+        mask_all_lighting = False
+        query_times = np.asarray([query["time"] for query in queries])
+        for record in song.objects["lighting"]:
+            index = int(np.argmin(np.abs(query_times - record["time"]))) if len(query_times) else -1
+            if index >= 0 and abs(query_times[index] - record["time"]) <= tolerance:
+                assigned.setdefault(index, []).append(record)
+            else:
+                diagnostics["unscheduled_lighting"].append(record["id"])
+        for record in song.objects["ignored"]:
+            if record.get("family") != "lighting":
+                continue
+            if "time" not in record:
+                mask_all_lighting = True
+            elif len(query_times):
+                index = int(np.argmin(np.abs(query_times - record["time"])))
+                if abs(query_times[index] - record["time"]) <= tolerance:
+                    ignored_lighting.add(index)
+        history, inputs, labels, masks, times = [], [], [], [], []
+        length, count = options["lighting_block_length"], len(vocab["lighting"])
+        for start in range(0, len(queries), length):
+            block = queries[start:start + length]
+            candidate = {"time": block[0]["time"], "times": [query["time"] for query in block]}
+            inputs.append(build_inputs("lighting", song, state, candidate, history, encoder, options))
+            target, weight, time = np.zeros((length, count), np.float32), np.zeros(length, np.float32), np.full(length, -1., np.float64)
+            pending = []
+            for offset, query in enumerate(block):
+                time[offset] = query["time"]
+                weight[offset] = float(complete and not vocab["lighting"][0].get("structural_placeholder", False))
+                if mask_all_lighting or start + offset in ignored_lighting:
                     weight[offset] = 0.
-                    diagnostics["unknown_lighting"].append(record["id"])
-                else:
-                    target[offset, category] = 1.
-            if weight[offset]:
-                pending.append({"time": query["time"], "value": target[offset].tolist()})
-        history.extend(pending)
-        labels.append(target); masks.append(weight); times.append(time)
-    template = build_inputs("lighting", song, state, {"time": 0., "times": []}, [], encoder, options)
-    output["lighting"] = _stack("lighting", np.asarray(times, np.float64).reshape(-1, length), inputs,
-                                  {"events": np.asarray(labels, np.float32).reshape(-1, length, count)},
-                                  {"events": np.asarray(masks, np.float32).reshape(-1, length)}, template)
+                for record in assigned.get(start + offset, []):
+                    category = indices["lighting"].get(_key(light_template(record)))
+                    if category is None or record["float_value"] != 1:
+                        weight[offset] = 0.
+                        diagnostics["unknown_lighting"].append(record["id"])
+                    else:
+                        target[offset, category] = 1.
+                if weight[offset]:
+                    pending.append({"time": query["time"], "value": target[offset].tolist()})
+            history.extend(pending)
+            labels.append(target); masks.append(weight); times.append(time)
+        template = build_inputs("lighting", song, state, {"time": 0., "times": []}, [], encoder, options)
+        output["lighting"] = _stack("lighting", np.asarray(times, np.float64).reshape(-1, length), inputs,
+                                      {"events": np.asarray(labels, np.float32).reshape(-1, length, count)},
+                                      {"events": np.asarray(masks, np.float32).reshape(-1, length)}, template)
     song.diagnostics["targets"] = diagnostics
     song.diagnostics["expansion_relationships"] = [{"event_index": event, "hand": hand, **deepcopy(target)} for (event, hand), target in expansions.items()]
     song.diagnostics["coverage"] = {stage: {"examples": len(examples.times),

@@ -46,13 +46,14 @@ def batches(dataset, stage, split=None, batch_size=128, shuffle=False, rng=None)
     within each song; complete recording groups keep their prepared split.
     """
     _check_stage(stage)
+    rng = np.random.default_rng(3) if rng is None else rng
     if isinstance(batch_size, bool) or not isinstance(batch_size, int) or batch_size < 1:
         raise ValueError("Batch size must be a positive integer")
     from .training_data import TrainingData, iter_stage_examples
     if isinstance(dataset, TrainingData):
         if dataset.stage != stage:
             raise ValueError("Prepared training reader belongs to another stage")
-        examples_source = dataset.examples(split)
+        examples_source = dataset.examples(split, rng=rng if shuffle and stage in ("hazards", "lighting", "arcs") else None)
     else:
         examples_source = iter_stage_examples(dataset, stage, split)
     rng = np.random.default_rng(3) if rng is None else rng
@@ -242,7 +243,7 @@ def _epoch(dataset, stage, execution, batch_size, *, training=False, shuffle=Fal
     if not np.isfinite(result):
         raise ValueError(f"No finite {stage} epoch result")
     seconds = perf_counter() - start
-    return result, {"seconds": seconds, "batches": batch_count, "examples": examples_seen,
+    return result, {"unweighted_loss": execution.unweighted_loss() if hasattr(execution, "unweighted_loss") else result, "metrics": execution.metrics.result() if getattr(execution, "metrics", None) is not None else {}, "seconds": seconds, "batches": batch_count, "examples": examples_seen,
                     "examples_per_second": examples_seen / max(seconds, 1e-9)}
 
 
@@ -263,6 +264,10 @@ def train_stage(dataset, stage, output, dry_run=True, epochs=None, batch_size=No
                 or not encoder.get("checkpoint_fingerprint")):
             raise ValueError("Training requires real prepared examples from the explicit retained encoder")
     settings = training_settings(stage)
+    from .policies import repaired, split_identity, SPARSE_STAGES
+    sparse = repaired(dataset.manifest.get("data_settings", {}), stage)
+    if sparse:
+        settings.update(monitor="val_pr_auc", monitor_mode="max")
     performance = performance_settings()
     epochs = settings["epochs"] if epochs is None else epochs
     batch_size = settings["batch_size"] if batch_size is None else batch_size
@@ -276,8 +281,16 @@ def train_stage(dataset, stage, output, dry_run=True, epochs=None, batch_size=No
     counts = data.counts
     if any(not counts[split]["supervised_values"] for split in ("train", "validation")):
         raise ValueError("Training requires separately supervised train and validation splits")
-    if settings["monitor"] not in ("loss", "val_loss"):
-        raise ValueError("V2 training currently monitors loss or val_loss")
+    if settings["monitor"] not in ("loss", "val_loss", "val_pr_auc"):
+        raise ValueError("V2 training monitors loss, val_loss or val_pr_auc")
+    balance = None
+    if stage in SPARSE_STAGES:
+        from .supervision import validate_support
+        validate_support(data.support, stage)
+    if sparse:
+        from tools.config import config
+        from .supervision import class_balance
+        balance = class_balance(data.support, stage, config.pipeline_v2_positive_weight_cap)
     from . import models
     models.keras.utils.set_random_seed(settings["seed"])
     model = models.build_model(stage, dataset.vocabularies)
@@ -293,6 +306,7 @@ def train_stage(dataset, stage, output, dry_run=True, epochs=None, batch_size=No
               "epochs": epochs, "batch_size": batch_size, "splits": counts,
               "parameters": model.count_params(), "preview_loss": preview_loss,
               "performance": performance, "training_data": data.report,
+              "class_balance": balance, "positive_weight_cap": config.pipeline_v2_positive_weight_cap if sparse else None, "split_identity": split_identity(dataset.manifest, stage) if sparse else None, "stage_split": dataset.manifest.get("stage_splits", {}).get(stage),
               "preparation_seconds": preparation_seconds,
               "input_shapes": {key: list(value.shape) for key, value in preview.inputs.items()}, **execution_identity()}
     if dry_run:
@@ -306,9 +320,10 @@ def train_stage(dataset, stage, output, dry_run=True, epochs=None, batch_size=No
                                             "config": {"learning_rate": settings["learning_rate"],
                                                        "clipnorm": settings["clipnorm"]}})
     from .execution import StageExecution
-    execution = StageExecution(stage, model, preview, optimizer=optimizer, compiled=performance["compile_steps"])
+    execution = StageExecution(stage, model, preview, optimizer=optimizer, compiled=performance["compile_steps"],
+                               balance=balance, vocabularies=dataset.vocabularies if sparse else None)
     rng = np.random.default_rng(settings["seed"])
-    history = {"loss": [], "val_loss": []}
+    history = {"loss": [], "val_loss": [], "val_pr_auc": []}
     epoch_performance = []
     mode = settings["monitor_mode"]
     maximize = mode == "max"
@@ -322,10 +337,11 @@ def train_stage(dataset, stage, output, dry_run=True, epochs=None, batch_size=No
             verbose=settings["verbose"], epoch=epoch + 1)
         history["loss"].append(train_loss)
         history["val_loss"].append(val_loss)
+        history["val_pr_auc"].append(val_stats["metrics"].get("pr_auc", 0.))
         epoch_performance.append({"epoch": epoch + 1, "train": train_stats, "validation": val_stats})
         if settings["verbose"]:
             print(f"{stage} epoch {epoch + 1}/{epochs}: loss={history['loss'][-1]:.6f} "
-                  f"val_loss={history['val_loss'][-1]:.6f}, train={train_stats['seconds']:.1f}s "
+                  f"val_loss={history['val_loss'][-1]:.6f}, val_pr_auc={history['val_pr_auc'][-1]:.6f}, train={train_stats['seconds']:.1f}s "
                   f"({train_stats['examples_per_second']:.1f} examples/s), validation={val_stats['seconds']:.1f}s",
                   flush=True)
         current = history[settings["monitor"]][-1]
@@ -333,6 +349,8 @@ def train_stage(dataset, stage, output, dry_run=True, epochs=None, batch_size=No
         improved = current > best + delta if maximize else current < best - delta
         if improved:
             best, stale = current, 0
+            report["best_epoch"] = epoch + 1
+            report["best_validation_metrics"] = val_stats["metrics"]
             model.save(root / "best.keras")
         else:
             stale += 1

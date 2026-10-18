@@ -85,3 +85,53 @@ def test_preparation_reports_keep_every_skip_without_comparing_models():
     assert [row["report_origin"] for row in report["skipped"]] == list(report["skip_counts"])
     report["skipped"][0]["reason"] = "changed report"
     assert manifest == original
+
+
+@pytest.mark.parametrize("reader", ["song", "stage"])
+def test_recording_alias_cannot_disagree_with_index_even_with_updated_file_hash(tmp_path, reader):
+    from training.beat_models.artifacts import read_json, write_json, file_hash
+    from training.pipeline_v2.training_data import TrainingData
+    original = make_dummy_dataset()
+    write_dataset(tmp_path / "dataset", original)
+    restored = load_dataset(tmp_path / "dataset")
+    record = restored.songs.records[0]
+    record["decoded_sha256"] = "indexed-original-recording"
+    path = restored.songs.root / record["metadata_file"]
+    metadata = read_json(path)
+    metadata["metadata"]["decoded_sha256"] = "different-recording"
+    import json
+    path.write_text(json.dumps(metadata), encoding="utf-8")
+    record["metadata_sha256"] = file_hash(path)
+    # Test the reader binding independently of the overlay's own guard.
+    restored.manifest.pop("stage_splits", None)
+    with pytest.raises(ValueError, match="recording alias"):
+        if reader == "song":
+            restored.songs[0]
+        else:
+            TrainingData(restored, "positions")
+
+
+def test_repaired_lighting_compatibility_binds_onset_candidate_policy():
+    dataset = make_dummy_dataset()
+    before = compatibility(dataset, "lighting")
+    dataset.manifest["data_settings"]["schedule"]["lighting_onset_threshold"] += .1
+    assert compatibility(dataset, "lighting") != before
+
+
+def test_legacy_arc_none_history_is_normalized_without_changing_stored_arrays(tmp_path):
+    from training.beat_models.artifacts import file_hash
+    from training.pipeline_v2.training_data import TrainingData
+    dataset = make_dummy_dataset(settings={})
+    original = dataset.songs[0].examples["arcs"].inputs["history"]
+    original[0, 0] = [0, 1.2, .8, 2]
+    write_dataset(tmp_path / "dataset", dataset)
+    restored = load_dataset(tmp_path / "dataset")
+    path = restored.songs.root / restored.songs.records[0]["file"]
+    before = file_hash(path)
+    np.testing.assert_array_equal(restored.songs[0].examples["arcs"].inputs["history"][0, 0], [0, 0, 0, 0])
+    cached = TrainingData(restored, "arcs", ram_cache_mib=64)
+    streamed = TrainingData(restored, "arcs", ram_cache_mib=0)
+    for reader in (cached, streamed):
+        np.testing.assert_array_equal(next(reader.examples()).inputs["history"][0, 0], [0, 0, 0, 0])
+    assert file_hash(path) == before
+    np.testing.assert_allclose(original[0, 0], [0, 1.2, .8, 2])
