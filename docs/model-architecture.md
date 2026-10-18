@@ -1,9 +1,11 @@
 # Model architecture v2
 
-Target design, agreed **2026-10-17**, now implemented as a train-ready concept
-framework. Intensity and timing are trained; the audio autoencoder is retained.
-Amber stages have untrained implementations. See [v2 commands and review
-boundaries](pipeline-v2.md) for the current acceptance limits.
+Target design, agreed **2026-10-17**, now implemented as a concept framework.
+As of **2026-10-18**, all eight model stages have completed training runs; the
+audio encoder is retained. Completed training is separate from positive-case
+quality and playable generation. See [v2 commands and review boundaries](pipeline-v2.md)
+and the [completed-run evaluation](baseline.md#v2-completed-runs-and-inference-bundle-2026-10-18).
+The drawing's amber colors describe the original implementation milestone.
 The trained joint position/direction model is documented in
 [the implemented beat framework](model-beat-architecture.md); v2 separates it
 into **positions → arrows**. Composition stops at explicit review boundaries;
@@ -33,8 +35,8 @@ playable package generation remains separate.
   source-to-retained relationships remain available as expansion targets.
 - Downstream stages reuse the existing **16-float** encoder, not a 24-bit code.
   Its preprocessing remains separate from the implemented 16 kHz beat features.
-  Network widths below are starting designs; only intensity/timing have trained
-  v2 checkpoints. New-stage quality is unverified.
+  Network widths below describe the implemented models. Trained checkpoints
+  have CPU comparisons; full composed gameplay quality remains unverified.
 
 ## 1. Intensity — implemented / trained
 
@@ -83,30 +85,31 @@ Dense128/640 and Conv2DTranspose32/1 to recover `[B,24,20,1]`:
 **Example:** the audio patch centered at 10.00 seconds becomes
 `[0.12, 0.00, …, 0.43]`, a vector of 16 continuous features.
 
-## 4. Positions — implemented / untrained replacement
+## 4. Positions — implemented / trained replacement
 
 **I/O:** latent `[B,16]`, previous position IDs `[B,H,2]`, ages/mask,
 and six conditions (gap, required count, then timing's four conditions) →
 red and blue `[B,13]` softmax heads: **absent + 12 grid cells**, without directions.
 Decode the best pair preserving count one or two; zero-count frames skip this model.
 
-**NN, initial untrained:** latent → Dense64; position Embedding16 + history ages → masked
+**NN:** latent → Dense64; position Embedding16 + history ages → masked
 GRU64. Concatenate both branches with conditions → Dense128 → two Dense13 heads.
 
 **Example:** `(10.00 s, count=2)` → red `(x=0,y=2)`, blue `(x=3,y=2)`.
 Position ID is `1 + 4*y + x`; zero means absent. These have pending directions,
 not forced dot labels. Movement constraints are an explicit implementation review
 stop; the concept decoder preserves the timing count.
-The current two Dense109 heads still predict position **and** direction and
-require replacement/retraining; their checkpoint does not implement this stage.
+The former joint model's two Dense109 heads predict position **and** direction.
+That checkpoint is excluded from the v2 inference bundle; the trained positions
+model uses the separate 13-category heads above.
 
-## 5. Arrows — implemented / untrained
+## 5. Arrows — implemented / trained
 
 **I/O:** fixed current red/blue positions `[B,2]`, occupied-hand mask, neighboring
 positions/gaps, audio **`Z [B,16]`**, density/BPM, and preceding arrow history → two `[B,9]`
 softmax heads: **eight cut directions + dot**. Ignore heads for absent hands.
 
-**NN, initial untrained:** position embeddings + audio Dense64 + masked history GRU64
+**NN:** position embeddings + audio Dense64 + masked history GRU64
 → Dense128 → separate red/blue Dense9 heads. Future positions may provide
 lookahead because the position pass finishes first; future arrows are not inputs.
 
@@ -114,14 +117,14 @@ lookahead because the position pass finishes first; future arrows are not inputs
 Times, positions and count stay fixed. Swing feasibility is an explicit review
 stop; bomb placement belongs to the hazards stage.
 
-## 6. Multiplier — implemented / untrained
+## 6. Multiplier — implemented / trained
 
 **I/O:** directed retained notes, neighboring notes/gaps, audio **`Z [B,16]`** and expansion
 history → per-hand `[B,K_mult]` softmax over **relative expansion templates**.
 Templates cover NONE, simultaneous stacks, staggered copies and burst chains;
 include relative geometry, copy/slice count and chain span where applicable.
 
-**NN, initial untrained:** note/template embeddings + audio Dense64 + history GRU64
+**NN:** note/template embeddings + audio Dense64 + history GRU64
 → Dense128 → two template heads. Use bounded relative templates instead of a
 vocabulary of complete two-hand maps. Added notes inherit the hand and cut
 of their retained anchor; expansion follows that swing. Supervised expansion
@@ -135,14 +138,14 @@ staggered copies. The expansion interval is distinct from the 20 ms preprocessin
 merge threshold. Chain templates add a burst chain, not an arc. Preserve base
 anchors and report retained notes, added notes, and chain slices separately.
 
-## 7. Hazards: obstacles + bombs — implemented / untrained combined model
+## 7. Hazards: obstacles + bombs — implemented / trained combined model
 
 **I/O:** neighboring expanded-note occupancy `[B,2,2,12]`, candidate interval
 `[B,2]`, audio **`Z [B,16]`**, density/BPM and previous hazards → wall-template probabilities
 `[B,K_wall]` (including NONE) and bomb-cell probabilities `[B,12]` (multi-label).
 Use the complete expanded-note sequence for clearance checks, including chains.
 
-**NN, initial untrained:** occupancy/audio Dense branches + hazard-history GRU64
+**NN:** occupancy/audio Dense branches + hazard-history GRU64
 → Dense128 → wall softmax and bomb sigmoid heads. One object family owns all
 avoidance objects; neither head changes colored notes or their arrows.
 
@@ -166,17 +169,17 @@ active at one query, and an all-zero target means no command.
 **NN:** retain Conv2D32 audio + LSTM32 time / LSTM64 class history → LSTM64
 → Dense1024 → Dense(`L*C_light`)/sigmoid → reshape.
 The measured legacy model has **38,264,640 parameters**. The adapted model size
-depends on the newly fitted class count.
+depends on the newly fitted class count. The evaluated v2 checkpoint has
+**2,048 classes and 40,663,104 parameters**.
 
 **Example:** an independent audio/BPM candidate at 10.25 seconds → `(type=0,
 value=1)`, even if there is no note there. The lighting scheduler supplies its
 own timestamps, patches, masks and history. Align current audio/time blocks
 with their targets and retain tails; do not inherit the legacy note-count
-trimming or next-block offset. This scheduling/training adaptation is implemented;
-new training is required. The old checkpoint is not compatible with these
-independent multi-label targets.
+trimming or next-block offset. The independent multi-label model has now been
+trained. The old lighting checkpoint remains incompatible with these targets.
 
-## 9. Arcs — implemented / untrained
+## 9. Arcs — implemented / trained, positive-case quality unverified
 
 **I/O:** existing same-hand endpoint pairs `[B,2]` (note IDs), endpoint
 positions/directions, gap, audio **`Z [B,16]`** and preceding arcs → attachment probabilities
@@ -184,13 +187,17 @@ positions/directions, gap, audio **`Z [B,16]`** and preceding arcs → attachmen
 `A=2` covers the existing writer's `mu` and `tmu` controls, initially bounded to
 `[0,2]`; anchor modes are 0/1/2. Unsupported controls are preserved and masked.
 
-**NN, initial untrained:** endpoint position/direction embeddings + audio Dense64 + history GRU64
+**NN:** endpoint position/direction embeddings + audio Dense64 + history GRU64
 → Dense128 → attachment softmax, bounded shape head and anchor-mode softmax.
 
 **Example:** connect red note 17 at 10.00 seconds to red note 23 at 10.50 seconds,
 with selected curve handles. Use expanded notes and hazard clearance; keep
 endpoint positions/times fixed and add no cuts. Early-stop variants that need
 new endpoints remain an extension. Burst chains belong to the multiplier.
+
+The completed run's validation split has no positive arc attachments, although
+training has positive examples. Its near-zero validation loss measures negative
+decisions and cannot establish attachment, handle or anchor quality.
 
 ## Composition boundary
 
@@ -205,6 +212,6 @@ file-format version; preserve the v3 writer and existing legacy v2 option.
 
 The measured intensity/timing/joint-notes implementation, training run
 `20261017-151437`, verification evidence and pending quality checks remain in
-[model-beat-architecture.md](model-beat-architecture.md). The new downstream
-models have synthetic CPU framework checks and measured untrained sizes in [the v2 handoff](pipeline-v2.md). Training, independent
-comparisons and gameplay quality remain unverified.
+[model-beat-architecture.md](model-beat-architecture.md). Completed downstream
+runs, independent CPU comparisons and the `v2_expert` inference bundle are
+documented in [the v2 handoff](pipeline-v2.md). Gameplay quality remains unverified.

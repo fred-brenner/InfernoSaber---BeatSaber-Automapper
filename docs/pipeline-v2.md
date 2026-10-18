@@ -12,6 +12,25 @@ Movement, swing, clearance, final BPM alignment and package export still need
 review. A diagnostic bypass records those unresolved boundaries in the output;
 it does not produce a playable map or approve its safety.
 
+## Completed runs and inference bundle
+
+The eight stages have completed user-run training as of **2026-10-18**. Their
+best checkpoints, original manifests and reports are copied into
+`../Data/model/v2_expert/<stage>/`, with the unchanged retained audio encoder in
+`encoder/encoder.h5`. The former joint `notes` model is excluded. `bundle.json`
+records explicit source runs, hashes, compatibility and CPU loading checks;
+`evaluation.json` records model-quality limitations. Normalization statistics
+and frozen vocabularies are included, without training datasets.
+
+Use `v2_expert` as `--beat-run`, its stage directories as the corresponding
+`--<stage>-artifact`, and `encoder/encoder.h5` as `--encoder-checkpoint` in the
+concept command. This does not switch the legacy application or remove concept
+review stops. Independent comparisons use the seven curated songs only;
+see [the completed-run evaluation](baseline.md#v2-completed-runs-and-inference-bundle-2026-10-18).
+Training completion alone does not establish generation quality. In particular,
+the arc validation split contains no positive attachments, so its tiny loss is
+not a positive-generation success metric.
+
 ## Data and model contracts
 
 All times are elapsed seconds. Requested NPS counts retained colored notes before
@@ -155,7 +174,8 @@ teacher-forced history during training. Defaults are Adam `5e-4`, clipping at 1,
 80 epochs, validation early stopping after 10 epochs, batch 128 (lighting 8).
 `--epochs` and `--batch-size` override config. Each run saves the best `.keras`
 checkpoint with its compatible encoder, vocabulary, data and architecture
-identity. Training itself and GPU execution remain unverified in this milestone.
+identity. Completed user-run training and CPU artifact evaluation are recorded
+above; the original framework acceptance did not run training.
 
 ### Small development launcher
 
@@ -258,14 +278,14 @@ traversal with all unresolved reviews recorded. Dummy smoke uses a dummy-only
 contract mode to exercise the entire sequence. Keras smoke builds untrained
 networks, differentiates losses and checks serialization; it makes no optimizer.
 
-After later training, `concept --backend keras` requires `--beat-run` selecting
+With trained artifacts, `concept --backend keras` requires `--beat-run` selecting
 the retained intensity/timing run, `--encoder-checkpoint`, and each of
 `--positions-artifact`, `--arrows-artifact`, `--multiplier-artifact`,
 `--hazards-artifact`, `--lighting-artifact`, `--arcs-artifact`. It checks
 compatibility before composition. There is no implicit newest-model selection.
 `--max-events` is an explicitly marked partial diagnostic.
 
-## Independent comparisons — prepared, not executed
+## Independent comparisons
 
 The existing intensity/timing comparison remains `evaluation.evaluate_beat_algorithms`.
 The new `evaluation.evaluate_pipeline_v2` command compares one downstream stage
@@ -277,7 +297,8 @@ autoencoder reconstruction. These are not end-to-end gameplay scores or claims
 that a new stage beats the old complete generator.
 
 Prepare the curated seven songs using the **frozen training** vocabulary,
-normalization and encoder. This is a later command, not an executed comparison:
+normalization and encoder. The completed-run evaluation above reused a prepared
+curated dataset; these commands show how to prepare a separate new copy:
 
 ```bash
 python -m training.pipeline_v2 prepare --evaluation-only \
@@ -304,4 +325,5 @@ cannot be inferred from hashes and remains a stated limitation.
 
 Comparison tests carry the `comparison` marker and are opt-in. Framework
 acceptance uses `python -m pytest -q -m 'not comparison'`; neither the comparison
-tests nor the seven-song model comparisons are run in this milestone.
+tests nor corpus comparisons run implicitly during framework acceptance. The
+explicit completed-run comparison is recorded separately above.

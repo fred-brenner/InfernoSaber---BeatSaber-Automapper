@@ -20,8 +20,10 @@ platforms before implementing them unless the task already authorizes them.
   [docs/model-architecture.md](docs/model-architecture.md).
 - For v2 dataset preparation, individual stage training, concept composition,
   review stops and opt-in model comparisons, read [docs/pipeline-v2.md](docs/pipeline-v2.md).
-  It also covers training throughput and the small `main_training.py` selection
-  script. Corpus comparisons require an explicit request.
+  It also covers training throughput, the `main_training.py` selection script,
+  and the evaluated `v2_expert` inference bundle. Completed training does not
+  establish positive-case or gameplay quality; read the recorded limitations.
+  Corpus comparisons require an explicit request.
 - For implemented intensity/timing/note contracts and training status, read
   [docs/model-beat-architecture.md](docs/model-beat-architecture.md).
 - For legacy generation calls, checkpoints, and preprocessing, read

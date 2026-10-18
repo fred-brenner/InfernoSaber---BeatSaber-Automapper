@@ -1147,3 +1147,76 @@ input measurements; `pytest-cpu`, `pytest-settings` and
 `pytest-training-env-cpu` logs/XML retain the checks. Source snapshots and the
 acceptance summary record preservation of prior working-tree changes, curated
 inputs and trained checkpoints. Training and comparisons were not run.
+
+## V2 completed runs and inference bundle (2026-10-18)
+
+All eight selected user-run trainings completed with finite histories, matching
+checkpoint hashes and report/manifest consistency. Each stopped after ten
+epochs without validation improvement. Official artifact loaders verify their
+current architecture, encoder, normalization and frozen-vocabulary identities.
+The outdated joint `notes` model is excluded throughout this evaluation and
+from the copied inference bundle.
+
+| Stage | Best epoch / completed epochs | Best validation loss | Selected run |
+| --- | --- | --- | --- |
+| Intensity | 3 / 13 | 5.194017 | beat `20261017-151437` |
+| Timing | 2 / 12 | 0.109131 | beat `20261017-151437` |
+| Positions | 23 / 33 | 1.079350 | downstream `20261018-114213-618262` |
+| Arrows | 15 / 25 | 0.509317 | downstream `20261017-225050-484720` |
+| Multiplier | 6 / 16 | 0.059555 | downstream `20261017-225050-484720` |
+| Hazards | 10 / 20 | 0.452233 | downstream `20261018-114213-618262` |
+| Lighting | 2 / 12 | 0.002638 | downstream `20261018-112404-720174` |
+| Arcs | 13 / 23 | 2.13e-8 | downstream `20261018-112404-720174` |
+
+Independent CPU comparisons used all seven curated `bs_map_input` packages,
+with no skips or exact source/decoded-hash overlap with learning groups. Frozen
+normalization, the retained encoder and vocabularies were reused. Frequency
+baselines use only the 695 training-map records. Arbitrary re-encoded recording
+overlap remains unknown. All downstream comparisons retain human upstream
+objects and preceding human history, except the explicitly isolated Positions
+own-history rollout.
+
+| Stage | Curated result | Interpretation |
+| --- | --- | --- |
+| Intensity | Mean KL 0.06423 vs uniform-rate 0.11091: **42.08% improvement** | Useful intensity distribution learning; CE 5.10093 vs 5.14760. |
+| Timing | Composed onset F1 **50.18%** at 20 ms; **2,376 / 5,773** retained colored notes | Density is **58.84% below** the supplied reference request. Reference intensity still produces only 2,468 notes. |
+| Positions | Occupied-cell agreement **37.66%** with human history, **16.04%** with own history; frequency **12.82%** | Substantial sensitivity to preceding prediction errors. Entire-pair own-history agreement is 10.72%. |
+| Arrows | Occupied-hand accuracy **78.66%**, frequency **24.32%** | Useful conditional direction learning; generated positions/directions remain separate checks. |
+| Multiplier | **22 TP / 10 FP / 24 FN**, positive recall **47.83%**, F1 **56.41%** | Only 46 supported positive expansions; NONE dominates headline accuracy. |
+| Hazards | Bomb precision **95.45%**, recall **52.50%**, F1 **67.74%**; positive wall exact geometry **48/97** | Conditional on scheduler/native-positive queries. The scheduler matches 0/156 source walls and 20/80 bombs; 59 walls are outside supported templates. |
+| Lighting | **72 TP / 71 FP / 10,583 FN**; represented-label recall **0.676%**, F1 **1.334%** at threshold 0.5 | Very weak positive recovery despite low BCE. Source coverage is 56.87%; labels can coalesce source commands. |
+| Arcs | **0/66** positive attachments recovered; shape MAE **0.4862** | All 66 positives are rejected. Validation has zero positive arcs, so its near-zero loss is misleading for positive quality. |
+
+The complete arc preparation audit found 1,318 positive attachments across 31
+training maps, zero validation positives, and 18 positives in one non-curated
+test map. No non-curated model comparison was run. Anchor labels are zero in
+the audited supervision. Multiplier validation is 96.81% NONE. Lighting has
+2,048 frozen classes and 40,663,104 parameters; only 0.056% of supervised
+training binary labels are positive. These findings describe data/selection
+and positive-output limitations, not corrupt checkpoints. No thresholds,
+architectures, weights, alignment or generation semantics were changed.
+
+The requested inference copy is `../Data/model/v2_expert/`. It contains one
+directory per stage with the original `best.keras`, `manifest.json` and
+`report.json`, plus `encoder/encoder.h5`, its identity, normalization statistics,
+vocabularies, `evaluation.json`, `bundle.json` and a usage note. All eight models
+and the unchanged retained encoder load from the copied locations and pass
+finite CPU forward checks. Checkpoints are byte-for-byte copies; normalization
+and encoder identities match. The bundle was verified in a sibling staging
+directory before publication into the originally empty destination. No source
+checkpoint or training dataset was changed.
+
+Runtime: Python **3.10.19**, TensorFlow **2.15.1**, NumPy **1.26.4**, CPU only.
+The ten opt-in comparison contract tests passed with
+`INFERNOSABER_RUN_V2_COMPARISONS=1 python -m pytest -q tests/test_pipeline_v2_evaluation.py`.
+There were no training or optimizer updates. GPU inference, full composition,
+collision clearance, final alignment/export and in-game quality were not tested.
+
+Evidence:
+`../Data/training/evaluate_beats/results/v2-completed-runs-20261018-140958/`.
+`evaluation-summary.json` combines the audit and model quality findings;
+`run-audit.json`, `beat-summary.json`, `downstream-summary.json` and their
+per-song reports preserve the metrics and supervision counts. The beat outputs
+are bit-identical to the earlier comparison of this same pair.
+`copied-inference-bundle.json`, `package.log` and file snapshots record the
+verified inference copy and source preservation.
