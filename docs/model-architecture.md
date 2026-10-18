@@ -1,6 +1,6 @@
 # Model architecture v2
 
-Target design, agreed **2026-10-17**, now implemented as a concept framework.
+Target design, agreed **2026-10-17**, implemented for training and application generation.
 As of **2026-10-18**, all eight model stages have completed training runs; the
 audio encoder is retained. Completed training is separate from positive-case
 quality and playable generation. See [v2 commands and review boundaries](pipeline-v2.md)
@@ -8,8 +8,8 @@ and the [completed-run evaluation](baseline.md#v2-completed-runs-and-inference-b
 The drawing's amber colors describe the original implementation milestone.
 The trained joint position/direction model is documented in
 [the implemented beat framework](model-beat-architecture.md); v2 separates it
-into **positions → arrows**. Composition stops at explicit review boundaries;
-playable package generation remains separate.
+into **positions → arrows**. The production generator connects these stages through
+retained legacy cleanup; the concept command retains its isolated review boundaries.
 
 ![V2 model stages, input/output contracts, and neural networks](assets/model-architecture-v2.svg)
 
@@ -204,11 +204,19 @@ decisions and cannot establish attachment, handle or anchor quality.
 **Intensity → timing → positions → arrows → multiplier → hazards → arcs**;
 lighting runs on its independent timeline. The shared encoder supplies downstream
 audio. Each stage owns its output objects/attributes and passes upstream data on.
-Array/count/bounds validators are implemented. Movement, swing flow, collision
-clearance and final alignment are explicit review stops; export later converts
-seconds to beat times and assembles the package. Full playable generation
-integration remains future work. V2 here names the pipeline design, not Beat Saber's
-file-format version; preserve the v3 writer and existing legacy v2 option.
+The production order is **intensity/timing → timing cleanup → positions/arrows →
+legacy note cleanup → multiplier → hazards → arcs → export**. Lighting keeps its
+own timeline. Legacy movement/direction changes finish before stable note IDs and
+learned expansions. Training reduction chooses one representative per hand;
+heuristic extra notes remain separate. Downstream clearance rejects additions
+without moving those anchors. Export converts seconds to beats once, writing
+3.2.0 by default or the existing 2.0.0 legacy option. Native chains belong to the
+multiplier; v2 export keeps their colored heads and reports omitted bodies/arcs.
+
+The concept command still has explicit review stops. Successful production
+serialization establishes package validity, not in-game playability. V2 names the
+pipeline design, not Beat Saber's file-format version. See
+[generation details](generation-v2.md) for settings, lifecycle and limitations.
 
 The measured intensity/timing/joint-notes implementation, training run
 `20261017-151437`, verification evidence and pending quality checks remain in

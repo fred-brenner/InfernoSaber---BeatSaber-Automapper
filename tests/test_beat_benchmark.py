@@ -229,7 +229,7 @@ def test_lazy_generator_import_preserves_callers_state(input_packages, monkeypat
     original_threshold = config.thresh_beat
 
     def importing(name, *args, **kwargs):
-        if name == "map_creation.gen_beats":
+        if name == "evaluation.legacy_generator":
             np.random.seed(42)  # Existing preprocessing modules seed at import.
             config.thresh_beat = -1
             if fail_import:

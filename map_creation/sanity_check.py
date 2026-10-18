@@ -17,6 +17,9 @@ def sanity_check_notes(notes: list, timings: list):
     # last sanity check for notes,
     # result is written to map
 
+    if not notes:
+        return notes
+
     [notes_r, notes_l, notes_b] = split_notes_rl(notes)
 
     notes_r = set_first_note_dir(notes_r)
@@ -104,7 +107,9 @@ def sanity_check_beat(beat):
     return beat
 
 
-def sanity_check_timing2(name, timings):
+def sanity_check_timing2(name, timings, audio_path=None):
+    if not len(timings):
+        return timings
     samplerate_music = 44100
     factor = config.thresh_onbeat / config.thresh_onbeat_orig
     pre_max = 1 if int(5 * factor) <= 0 else int(5 * factor)
@@ -116,7 +121,7 @@ def sanity_check_timing2(name, timings):
     wait = int(8 * factor)
     max_time_diff = 1.0
 
-    file = paths.songs_pred + name + ".egg"
+    file = str(audio_path) if audio_path is not None else paths.songs_pred + name + ".egg"
     # Load the audio file
     y, sr = librosa.load(file, sr=samplerate_music)
 
@@ -129,6 +134,8 @@ def sanity_check_timing2(name, timings):
                                             backtrack=False, pre_max=pre_max, post_max=post_max,
                                             pre_avg=pre_avg, post_avg=post_avg, delta=delta, wait=wait)
     except Exception as e:
+        if audio_path is not None:
+            raise ValueError(f"Onset detection failed for {file}: {e}") from e
         print(f"Error: {type(e).__name__}")
         print(f"Error message: {e}")
         print(f"Error in onset detection for song: {file}\nPlease remove song and restart.")
@@ -136,6 +143,8 @@ def sanity_check_timing2(name, timings):
 
     # Convert frame indices to time (in seconds)
     onsets_sec = librosa.frames_to_time(onsets, sr=sr, hop_length=512)
+    if not len(onsets_sec):
+        return np.zeros_like(timings)
 
     # two loops, first using original timings, second with added half steps
     onsets_sec_temp = np.copy(onsets_sec)
@@ -470,6 +479,8 @@ def set_first_note_dir(notes_x):
     for idx, first_note in enumerate(notes_x):
         if len(first_note) > 0:
             break
+    else:
+        return notes_x
 
     if not config.allow_double_first_notes:
         if len(first_note) > 4:
@@ -945,8 +956,12 @@ def correct_notes(notes, timings):
     decrease_range.extend(list(range(len(notes) - se_idx, len(notes))))
     # decrease_val = config.decr_speed_val
     decrease_val = np.ones(len(notes))
-    decrease_val[:se_idx_start] = np.linspace(config.decr_speed_val, 1, se_idx_start)
-    decrease_val[-se_idx:] = np.linspace(1, config.decr_speed_val, se_idx)
+    start_count, end_count = min(se_idx_start, len(notes)), min(se_idx, len(notes))
+    if start_count:
+        decrease_val[:start_count] = np.linspace(config.decr_speed_val, 1, start_count)
+    if end_count:
+        decrease_val[-end_count:] = np.minimum(decrease_val[-end_count:],
+                                               np.linspace(1, config.decr_speed_val, end_count))
 
     for idx in range(len(notes)):
         if len(notes[idx]) == 0:
@@ -1165,13 +1180,13 @@ def get_cut_dir_xy(cut_dir):
     mov_x = cut_dir_x[cut_dir_order == cut_dir]
     mov_y = cut_dir_y[cut_dir_order == cut_dir]
 
-    return mov_x, mov_y
+    return int(mov_x[0]), int(mov_y[0])
 
 
 def reverse_cut_dir_xy(old_cut):
     cut_dir_order = np.asarray([[4, 0, 5], [2, 8, 3], [6, 1, 7]]).flatten()
     new_cat = cut_dir_order[cut_dir_order[::-1] == old_cut]
-    return int(new_cat)
+    return int(new_cat[0])
 
 
 def reverse_get_cut_dir(mov_x, mov_y):
@@ -1188,7 +1203,7 @@ def reverse_get_cut_dir(mov_x, mov_y):
 def remove_silent_times(map_times, silent_times):
     threshold_timing = 0.03
     for silent in silent_times:
-        while min(abs(map_times - silent)) < threshold_timing:
+        while len(map_times) and min(abs(map_times - silent)) < threshold_timing:
             # remove this value
             index = np.argmin(abs(map_times - silent))
             map_times = np.delete(map_times, index)
@@ -1511,6 +1526,8 @@ def apply_waveform_pattern(notes_l, notes_r):
             return f_pos_start
 
     def calc_pos_from_left(wave_index_array: np.ndarray, cur_idx):
+        if not len(wave_index_array):
+            return 0
         array_index = np.argmin(abs(wave_index_array[:, 0] - cur_idx))
         array_value = wave_index_array[array_index, 1]
         return array_value

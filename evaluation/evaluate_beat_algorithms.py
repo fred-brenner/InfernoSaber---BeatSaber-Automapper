@@ -171,7 +171,7 @@ def run_benchmark(packages, bps_values, tolerance=0.02, difficulty="ExpertPlus",
               "songs": [], "results": []}
     try:
         if generate_beats is None:
-            from map_creation.gen_beats import main as generate_beats
+            from evaluation.legacy_generator import main as generate_beats
         if model_dir is not None:
             paths.model_path = Path(model_dir).expanduser().resolve().as_posix() + "/"
         model_path = Path(get_full_model_path(config.beat_gen_version))
@@ -353,7 +353,7 @@ def main(argv=None):
             "source_sha256": {str(path.relative_to(root)): file_sha256(path) for path in
                               (Path(__file__).resolve(), root / "evaluation/human_maps.py",
                                root / "evaluation/prepare_evaluation.py",
-                               root / "map_creation/gen_beats.py",
+                               root / "evaluation/legacy_generator.py",
                                root / "evaluation/beat_pair.py",
                                root / "evaluation/compare_beat_models.py",
                                root / "evaluation/legacy_observer.py", *sorted(

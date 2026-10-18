@@ -39,17 +39,19 @@ https://discord.com/invite/cdV6HhpufY
 
 ### Built With
 
-Generation uses four learned stages in execution order:
+Generation uses the local `v2_expert` bundle: intensity, timing, positions,
+arrows, multiplier, hazards, arcs, and independent lighting, plus the retained
+audio encoder. Legacy timing and note cleanup remain between the learned stages.
 
-1. Temporal Convolutional Network (TCN) - proposes beat timings from audio features
-2. Convolutional audio encoder - compresses audio patches around candidate timings
-3. Note-pattern classifier - generates note/bomb patterns with block feedback
-4. Lighting classifier - generates lighting event type/value pairs
+Existing `main.py`, `main_multi.py`, and `main_app.py` commands and map folders
+remain available. Difficulty 5 requests 5 retained colored notes per second;
+postprocessing and expansion can change the final density. Legacy model arguments
+are still accepted and select v2. Configure `v2_model_bundle_path` in
+`tools/config/config.py`; generation never downloads a replacement model.
 
-The full audio autoencoder is used for training and reconstruction evaluation.
-See the [model architecture and call reference](docs/model-beat-architecture.md) for
-the architecture drawing, input/output shapes and tensor ranks, measured model
-sizes, preprocessing, execution order, and training/evaluation calls.
+See [generation commands](docs/generation-v2.md),
+[model architecture](docs/model-architecture.md), and
+[training instructions](docs/pipeline-v2.md).
 
 ## Getting Started
 

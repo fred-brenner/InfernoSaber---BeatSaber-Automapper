@@ -132,8 +132,8 @@ def intensity_inputs(song):
             "mask": np.ones((1, len(song.arrays["bin_durations"])), dtype=bool)}
 
 
-def timing_inputs(song, conditions, start):
-    """Return one context window, core labels and mask, including partial tails."""
+def timing_window(song, conditions, start):
+    """Build audio-only context and core validity, including partial tails."""
     features = song.arrays["features"]
     if start < 0 or start >= len(features):
         raise ValueError("Timing start is outside the song")
@@ -145,10 +145,16 @@ def timing_inputs(song, conditions, start):
     audio[0, dest:dest + hi - lo] = features[lo:hi]
     cond[0, dest:dest + hi - lo] = conditions[lo:hi]
     mask[0, dest:dest + hi - lo] = True
+    return {"audio": audio, "conditions": cond, "mask": mask}, mask[:, HALO:HALO + CORE]
+
+
+def timing_inputs(song, conditions, start):
+    """Return the shared context window with training labels and core mask."""
+    inputs, mask = timing_window(song, conditions, start)
     labels = np.zeros((1, CORE), dtype=np.int32)
-    valid = min(CORE, len(features) - start)
+    valid = min(CORE, len(song.arrays["features"]) - start)
     labels[0, :valid] = song.arrays["timing"][start:start + valid]
-    return {"audio": audio, "conditions": cond, "mask": mask}, labels, mask[:, HALO:HALO + CORE]
+    return inputs, labels, mask
 
 
 def note_inputs(song, frame, count, conditions, history_times, history_classes):

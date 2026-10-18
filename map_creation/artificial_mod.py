@@ -59,4 +59,4 @@ def gimme_more_notes(notes: list):
                 section_mirror = mirror_notes(section.copy())
                 notes[i].extend(section_mirror)
 
-        return notes
+    return notes

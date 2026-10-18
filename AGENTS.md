@@ -2,8 +2,8 @@
 
 ## Direction
 
-Revive the existing Beat Saber automapper incrementally. App startup, pretrained
-model loading, and map generation have been verified on CPU and GPU.
+Revive the existing Beat Saber automapper incrementally. App startup and legacy model generation were verified on CPU and GPU.
+V2 application generation uses CPU; GPU remains the training runtime.
 WSL/Linux is the primary development environment; preserve Windows app
 compatibility. Complete the requested task, including small supporting 
 refactors when they simplify the change. Keep unrelated cleanup separate. 
@@ -26,6 +26,8 @@ platforms before implementing them unless the task already authorizes them.
   Corpus comparisons require an explicit request.
 - For implemented intensity/timing/note contracts and training status, read
   [docs/model-beat-architecture.md](docs/model-beat-architecture.md).
+- For production v2 generation, model caching, worker settings, package formats,
+  and unchanged external commands, read [docs/generation-v2.md](docs/generation-v2.md).
 - For legacy generation calls, checkpoints, and preprocessing, read
   [docs/model-architecture_old.md](docs/model-architecture_old.md).
 - For feature priorities or planning model and pipeline improvements, read
@@ -43,7 +45,8 @@ platforms before implementing them unless the task already authorizes them.
   and verification limits, read [docs/beat-model-training.md](docs/beat-model-training.md).
   It also documents intensity/timing input caching and grouped Keras execution;
   these have separate settings from the six downstream trainers.
-  Its acceptance stops at intermediate predictions; full map generation is separate.
+  Its training-framework acceptance stops at intermediate predictions; production
+  composition and package export are documented separately in generation-v2.md.
 - For legacy training work, consult
   [the existing installation and training guide](How%20to%20-%20Linux%20install%20for%20training%20and%20app.md)
   and verify its assumptions against the current code and environment.
@@ -62,8 +65,11 @@ labels require verification before becoming current requirements.
 - Use `tensorflow.keras` consistently. The GPU activation profile selects legacy
   Keras through `TF_USE_LEGACY_KERAS=1`; standalone Keras imports select a different
   API in that environment and break the existing TCN loading path.
-- Inspect scripts before importing or running them: `main_app.py` performs a
-  GitHub update check at import. `main_training.py` is inert on import; running
+- Main-script imports are inert: `main_app.build_app()` explicitly builds the UI
+  and checks for updates; its guarded launch is spawn-safe. Generation loads the
+  validated local `v2_expert` bundle once per CPU worker and caches one recording.
+  Preserve explicit current-run completion records when combining packages; never
+  infer success from output-folder existence. `main_training.py` is inert on import; running
   it selects from all eight v2 training stages, sequentially by default or with
   bounded parallelism via `--parallel N`, routing intensity/timing and downstream
   models to their respective datasets/trainers.

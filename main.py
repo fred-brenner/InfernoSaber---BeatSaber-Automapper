@@ -2,17 +2,15 @@
 # This file is needed to find the working directory
 ###################################################
 import os
-import shutil
 import time
-import tensorflow as tf
 # import sys
 
 from tools.config import paths, config
-import map_creation.gen_beats as beat_generator
+from map_creation.v2_generation import generate_song, scoped_settings
+from map_creation.v2_export import write_zip
+from map_creation.v2_runtime import validate_bundle
 from bs_shift.export_map import check_music_files, shutil_copy_maps
 
-from tools.config.mapper_selection import update_model_file_paths
-from tools.utils.huggingface import model_download
 
 
 def main(use_model=None, diff=None, export_results_to_bs=True,
@@ -24,108 +22,98 @@ def main(use_model=None, diff=None, export_results_to_bs=True,
          slider_end_time=None, slider_probability=None,
          slider_movement_min=None, legacy_mode=None, single_mode=None,
          logger_callback=None):
-    if use_model is not None:
-        config.use_mapper_selection = use_model
-    # change difficulty
-    if diff is not None:
-        config.max_speed = diff
-        config.max_speed_orig = diff
-    if gimme_more is not None:
-        config.gimme_more_notes_prob = gimme_more
-    if quick_start is not None:
-        config.quick_start = quick_start
-    if beat_intensity is not None:
-        config.add_beat_intensity = beat_intensity
-        config.add_beat_intensity_orig = beat_intensity
-    if random_factor is not None:
-        config.random_note_map_factor = random_factor
-    if js_offset is not None:
-        config.jump_speed_offset += js_offset
-        config.jump_speed_offset_orig += js_offset
-    if allow_no_dir_flag is not None:
-        config.allow_dot_notes = allow_no_dir_flag
-    if silence_factor is not None:
-        config.silence_threshold *= silence_factor
-        config.silence_threshold_orig *= silence_factor
-    if add_obstacles is not None:
-        config.add_obstacle_flag = add_obstacles
-    if sporty_obstacles is not None:
-        config.sporty_obstacles = sporty_obstacles
-    if add_sliders is not None:
-        config.add_slider_flag = add_sliders
-    if slider_start_time is not None:
-        config.slider_time_gap[0] = slider_start_time
-    if slider_end_time is not None:
-        config.slider_time_gap[1] = slider_end_time
-    if slider_probability is not None:
-        config.slider_probability = slider_probability
-    if slider_movement_min is not None:
-        config.slider_movement_minimum = slider_movement_min
-    if single_mode is not None:
-        if single_mode:
-            config.emphasize_beats_flag = False
-            config.single_notes_only_flag = True
-        else:
-            config.emphasize_beats_flag = True
-            config.single_notes_only_flag = False
-    if legacy_mode is not None:
-        if legacy_mode:
-            config.bs_mapping_version = 'v2'
-        else:
-            config.bs_mapping_version = 'v3'
-    update_model_file_paths(check_model_exists=False)
+    with scoped_settings():
+        config.use_mapper_selection = "v2_expert"
+        # change difficulty
+        if diff is not None:
+            config.max_speed = diff
+            config.max_speed_orig = diff
+        if gimme_more is not None:
+            config.gimme_more_notes_prob = gimme_more
+        if quick_start is not None:
+            config.quick_start = quick_start
+        if beat_intensity is not None:
+            config.add_beat_intensity = beat_intensity
+            config.add_beat_intensity_orig = beat_intensity
+        if random_factor is not None:
+            config.random_note_map_factor = random_factor
+        if js_offset is not None:
+            config.jump_speed_offset += js_offset
+            config.jump_speed_offset_orig += js_offset
+        if allow_no_dir_flag is not None:
+            config.allow_dot_notes = allow_no_dir_flag
+        if silence_factor is not None:
+            config.silence_threshold *= silence_factor
+            config.silence_threshold_orig *= silence_factor
+        if add_obstacles is not None:
+            config.add_obstacle_flag = add_obstacles
+        if sporty_obstacles is not None:
+            config.sporty_obstacles = sporty_obstacles
+        if add_sliders is not None:
+            config.add_slider_flag = add_sliders
+        if slider_start_time is not None:
+            config.slider_time_gap[0] = slider_start_time
+        if slider_end_time is not None:
+            config.slider_time_gap[1] = slider_end_time
+        if slider_probability is not None:
+            config.slider_probability = slider_probability
+        if slider_movement_min is not None:
+            config.slider_movement_minimum = slider_movement_min
+        if single_mode is not None:
+            if single_mode:
+                config.emphasize_beats_flag = False
+                config.single_notes_only_flag = True
+            else:
+                config.emphasize_beats_flag = True
+                config.single_notes_only_flag = False
+        if legacy_mode is not None:
+            if legacy_mode:
+                config.bs_mapping_version = 'v2'
+            else:
+                config.bs_mapping_version = 'v3'
+        validate_bundle()
+        if logger_callback:
+            logger_callback("V2 model bundle verified")
+        results, failures = [], []
+        song_list = os.listdir(paths.songs_pred)
+        song_list = check_music_files(song_list, paths.songs_pred)
+        print(f"Found {len(song_list)} songs. Iterating...")
+        if len(song_list) == 0:
+            print("No songs found!")
+            log_message = "No songs found! Please go to first tab."
+            if logger_callback:
+                logger_callback(log_message)
 
-    # Download AI Model from huggingface
-    log_message = "Loading AI Model [if not yet done, ~1GB will be downloaded (see second tab)]"
-    if logger_callback:
-        logger_callback(log_message)
-    model_download()
-    log_message = "Model Found"
-    if logger_callback:
-        logger_callback(log_message)
+        for i, song_name in enumerate(song_list):
+            start_time = time.time()
+            song_name = song_name[:-4]
+            print(f"Analyzing song: {song_name} ({i + 1} of {len(song_list)})")
+            try:
+                result = generate_song(song_name, logger=logger_callback)
+                # Count a completed song only after its archive is available.
+                result["zip_path"] = write_zip(result["path"],
+                    f'{paths.new_map_path}{config.max_speed_orig:.1f}_{song_name}.zip')
+                if export_results_to_bs:
+                    if shutil_copy_maps(f"{config.max_speed_orig:.1f}_{song_name}"):
+                        log_message = "Copied map(s) to BeatSaber directory."
+                        if logger_callback:
+                            logger_callback(log_message)
+            except Exception as error:
+                message = f"Failed {song_name}: {type(error).__name__}: {error}"
+                print(message)
+                if logger_callback:
+                    logger_callback(message)
+                failures.append({"song": song_name, "error": message})
+                continue
+            results.append(result)
+            end_time = time.time()
+            print(f"Time needed: {end_time - start_time:.1f}s")
 
-    # # limit gpu ram usage
-    # conf = tf.compat.v1.ConfigProto()
-    # conf.gpu_options.allow_growth = True
-    # sess = tf.compat.v1.Session(config=conf)
-    # tf.compat.v1.keras.backend.set_session(sess)
-
-    # MAP GENERATOR
-    ###############
-    song_list = os.listdir(paths.songs_pred)
-    song_list = check_music_files(song_list, paths.songs_pred)
-    print(f"Found {len(song_list)} songs. Iterating...")
-    if len(song_list) == 0:
-        print("No songs found!")
-        log_message = "No songs found! Please go to first tab."
+        log_message = f"Finished map generator: {len(results)} succeeded, {len(failures)} failed"
+        print(log_message)
         if logger_callback:
             logger_callback(log_message)
-
-    for i, song_name in enumerate(song_list):
-        start_time = time.time()
-        song_name = song_name[:-4]
-        print(f"Analyzing song: {song_name} ({i + 1} of {len(song_list)})")
-        fail_flag = beat_generator.main([song_name])
-        if fail_flag:
-            print("Continue with next song")
-            continue
-        end_time = time.time()
-        print(f"Time needed: {end_time - start_time:.1f}s")
-
-        # create zip archive for online viewer
-        shutil.make_archive(f'{paths.new_map_path}{config.max_speed_orig:.1f}_{song_name}',
-                            'zip', f'{paths.new_map_path}1234_{config.max_speed_orig:.1f}_{song_name}')
-        # export map to beat saber
-        if export_results_to_bs:
-            if shutil_copy_maps(f"{config.max_speed_orig:.1f}_{song_name}"):
-                log_message = "Copied map(s) to BeatSaber directory."
-                if logger_callback:
-                    logger_callback(log_message)
-
-    print("Finished map generator")
-    log_message = "Finished map generator"
-    if logger_callback:
-        logger_callback(log_message)
+        return {"status": "failed" if failures else "ok", "results": results, "failures": failures}
 
 
 # ############################################################
@@ -248,5 +236,6 @@ if __name__ == "__main__":
 
     export_results_to_bs = False
 
-    main(use_model, diff, export_results_to_bs, gm, qs, bi, rf, jso,
-         ndf, sf, aof, sof, asf, sst, se, sp, smm, lm)
+    result = main(use_model, diff, export_results_to_bs, gm, qs, bi, rf, jso,
+                  ndf, sf, aof, sof, asf, sst, se, sp, smm, lm)
+    raise SystemExit(1 if result["failures"] else 0)

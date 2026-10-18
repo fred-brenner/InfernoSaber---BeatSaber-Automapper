@@ -1,4 +1,4 @@
-# V2 concept pipeline and training
+# V2 generation, concept pipeline and training
 
 The concept pipeline implements the stage contracts in
 [model-architecture.md](model-architecture.md). It connects the retained
@@ -6,11 +6,12 @@ intensity/timing pair and audio encoder to **positions → arrows → multiplier
 hazards → arcs**, with lighting on its own timeline. The former joint `notes`
 checkpoint is not used by this composition.
 
-This milestone prepares training and intermediate predictions. The default
-concept command stops at a named review boundary and saves its partial result.
-Movement, swing, clearance, final BPM alignment and package export still need
-review. A diagnostic bypass records those unresolved boundaries in the output;
-it does not produce a playable map or approve its safety.
+Application generation now uses the production path in `map_creation/v2_runtime.py`,
+`v2_pipeline.py`, `v2_postprocessing.py` and `v2_export.py`. It connects the trained
+models to retained legacy cleanup and structured package export. The separate
+training **concept command** retains its named review stops and diagnostic bypass;
+that command still produces intermediate predictions, not a packaged map.
+See [generation commands and lifecycle](generation-v2.md).
 
 ## Completed runs and inference bundle
 
@@ -24,8 +25,9 @@ and frozen vocabularies are included, without training datasets.
 
 Use `v2_expert` as `--beat-run`, its stage directories as the corresponding
 `--<stage>-artifact`, and `encoder/encoder.h5` as `--encoder-checkpoint` in the
-concept command. This does not switch the legacy application or remove concept
-review stops. Independent comparisons use the seven curated songs only;
+concept command. The application uses the bundle directly and independently of
+that concept command; its review stops remain useful for isolated diagnostics.
+Independent comparisons use the seven curated songs only;
 see [the completed-run evaluation](baseline.md#v2-completed-runs-and-inference-bundle-2026-10-18).
 Training completion alone does not establish generation quality. In particular,
 the arc validation split contains no positive attachments, so its tiny loss is

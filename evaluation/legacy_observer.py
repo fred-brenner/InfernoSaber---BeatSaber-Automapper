@@ -23,7 +23,7 @@ class LegacyBeatObserver:
 
         generator = self.generator_module
         if generator is None:
-            from map_creation import gen_beats as generator
+            from evaluation import legacy_generator as generator
 
         record = {"name": names[0] if names else None,
                   "bps_setting": float(config.max_speed_orig) / 4,

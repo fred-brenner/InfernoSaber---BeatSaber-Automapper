@@ -1220,3 +1220,104 @@ per-song reports preserve the metrics and supervision counts. The beat outputs
 are bit-identical to the earlier comparison of this same pair.
 `copied-inference-bundle.json`, `package.log` and file snapshots record the
 verified inference copy and source preservation.
+
+
+## V2 production generator acceptance — 2026-10-18
+
+The application now uses the local evaluated `v2_expert` bundle for all generation.
+`main.py`, `main_multi.py`, `main_app.py`, their external arguments and environment
+variables remain available. Legacy model names select v2; there is no downloader
+or active v1 generation fallback. The historical runner is isolated in
+`evaluation/legacy_generator.py` for explicitly requested comparisons. Training
+entry points remain unchanged. See [generation commands and lifecycle](generation-v2.md).
+
+Production composition applies retained timing cleanup before position/arrow
+inference, and legacy note movement/flow before multiplier, hazards and arcs.
+Heuristic extra notes remain separate from retained anchors. V2 owns hazards,
+arcs, chains and independent lighting; no procedural fallback fills absent
+predictions. Structured export writes v3 3.2.0 or legacy v2 2.0.0. Automatic Expert
+uses a separate reduced-density model pass and preserves its legacy jump settings.
+
+Validation used the recorded WSL CPU environment (Python 3.10, TensorFlow/Keras
+2.15). The full `python -m pytest -q -m 'not comparison'` suite passed **751 tests**,
+with **10 opt-in comparisons deselected**, in **121.41 seconds**. After the final
+automatic-Expert metadata correction, **70 focused entry/export/metadata tests**
+also passed. Existing dependency deprecation/legacy-format warnings remain. Checks cover dummy composition with all
+object families, both serializers, audio-only inference, masks/tails, propagation
+of counts and timestamps, zero/short maps, collision rejection, independent
+lighting, checkpoint compatibility, resident caches, spawn configuration,
+failure reporting, metadata assembly and retained training-launcher behavior.
+The app built its 115 Gradio components without an update check; importing the
+main scripts built no UI, loaded no TensorFlow, and made no update request.
+
+The final full-song acceptance used **two CPU workers**, disposable copies of
+**Bad Hatter** and **Shut Up and Dance**, and requested retained NPS **3 and 5**.
+Library export was disabled. Both complete combined ZIPs were published with
+**zero failures or format omissions**. Ascending requested difficulties retain
+the existing **Easy** and **Normal** labels in the combined metadata.
+
+Final run elapsed: **37.26 seconds** including worker loading and packaging,
+after input preparation. Each worker loaded the bundle once, prepared its recording
+once, and reused audio/BPM/intensity/encoder state for the second difficulty.
+
+| Song | Requested NPS | Raw timing events | Cleaned timing events | Final colored notes | Unique onsets | Variant seconds |
+|---|---:|---:|---:|---:|---:|---:|
+| Bad Hatter | 3 | 197 | 475 | 326 | 273 | 25.93 |
+| Bad Hatter | 5 | 346 | 803 | 637 | 527 | 9.71 |
+| Shut Up and Dance | 3 | 335 | 403 | 340 | 249 | 25.74 |
+| Shut Up and Dance | 5 | 471 | 805 | 683 | 537 | 10.10 |
+
+Per-stage seconds in the same run (timing/arrow stages include their associated
+cleanup; first variants include graph warm-up):
+
+| Stage | Bad Hatter 3 | Bad Hatter 5 | Shut Up and Dance 3 | Shut Up and Dance 5 |
+|---|---:|---:|---:|---:|
+| intensity | 0.241 | 0.000 | 0.244 | 0.000 |
+| timing | 2.272 | 1.845 | 1.643 | 1.554 |
+| positions | 1.660 | 1.582 | 1.322 | 1.660 |
+| arrows | 1.378 | 1.786 | 1.223 | 1.716 |
+| multiplier | 0.928 | 1.009 | 0.943 | 1.056 |
+| hazards | 2.296 | 0.634 | 3.094 | 0.966 |
+| arcs | 0.704 | 1.020 | 0.599 | 1.034 |
+| lighting | 3.517 | 1.675 | 3.907 | 1.972 |
+
+Both workers reported one bundle load (~10.4–10.5 s), one audio preparation
+(~2.0–2.2 s), and a cache hit for the second difficulty. Predicted intensity reuse
+was explicit. The requested NPS is conditioning, not an exact final-count promise;
+retained legacy cleanup still changes the final density substantially.
+
+The final Bad Hatter variants contain 20 heuristic extra notes each, no accepted
+learned copies, and one lighting command each. Shut Up and Dance contains 29/44
+heuristic notes, 0/2 learned copies, and no lighting commands. All four predictions
+contain no bombs, walls, arcs or chains. Raw hazard and arc decisions were already
+NONE; those absences were not introduced by the clearance filters. Non-NONE
+multiplier choices and rejected additions are recorded separately. Sparse lighting
+and absent objects remain model limitations; no accuracy improvement is claimed.
+
+Inspection parsed every Info/beatmap JSON, checked version/difficulty metadata,
+audio/cover references, finite numbers, coordinates, durations, timing bounds,
+chronological notes and ZIP contents against the published folders. Synthetic
+checks additionally exercise chain/arc endpoints and legacy omissions. Companion
+NPZ files were reopened with `allow_pickle=False`, validating normalized intensity
+and timing probabilities, pre-cleanup notes and final note counts. SHA-256 hashes
+of all **83 bundle and curated source files** match the pre-run snapshot. No
+training, optimizer update, checkpoint change, library export, or package change
+was performed on those source assets.
+
+Artifacts (outside source control):
+
+- [Bad Hatter — finished ZIP](../../Data/prediction/v2_acceptance/20261018-170043/new_map/12345_Bad%20Hatter.zip)
+- [Shut Up and Dance — finished ZIP](../../Data/prediction/v2_acceptance/20261018-170043/new_map/12345_Shut%20Up%20and%20Dance.zip)
+- [Complete generation report](../../Data/prediction/v2_acceptance/20261018-170043/acceptance.json)
+- [Package inspection](../../Data/prediction/v2_acceptance/20261018-170043/package-inspection.json)
+
+CPU logs and before/after asset evidence: `/home/frede/.local/share/infernosaber-baseline/diagnostics/v2-generation-20261018-164614`.
+
+Gameplay and native Windows execution remain unverified. Arc clearance currently
+samples the endpoint segment rather than reconstructing the native curved-handle
+trajectory; reports explicitly distinguish production validation from gameplay
+validation. Optional library export was tested with disposable targets, not the
+user's installed game. Legacy v2 and all object families were exercised by dummy
+integration; the two full-song packages use v3. Further reduction of legacy
+postprocessing, curved-arc clearance review and model/preprocessing fusion remain
+follow-up work in `TODO.md`.

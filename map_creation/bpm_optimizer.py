@@ -8,6 +8,11 @@ def align_beats_on_bpm(timings_in_s, bpm):
     :param bpm: beats per minute
     :return: list of timings in seconds aligned to the nearest beat of the given bpm
     """
+    timings_in_s = np.asarray(timings_in_s, dtype=float)
+    if not np.isfinite(bpm) or bpm <= 0:
+        raise ValueError("BPM must be finite and positive")
+    if len(timings_in_s) < 2:
+        return np.round(timings_in_s * bpm / 60) * 60 / bpm
     average_bpm = (timings_in_s[-1] - timings_in_s[0]) / len(timings_in_s) * 60
     timings_bs = timings_in_s * bpm / 60
 

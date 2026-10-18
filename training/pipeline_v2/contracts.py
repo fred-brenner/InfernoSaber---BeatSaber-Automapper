@@ -174,7 +174,9 @@ def build_inputs(stage, song, state, candidate, own_history, encoder=None, setti
     elif categorical:
         history[0, 0] = start
         mask[0, 0] = True
-    shares = state.get("shares", state.get("intensity", base.arrays["intensity"]))
+    shares = state.get("shares", state.get("intensity"))
+    if shares is None:
+        shares = base.arrays.get("intensity", np.zeros_like(base.arrays["bin_durations"]))
     if not np.sum(shares):
         shares = base.arrays["bin_durations"] / base.metadata["duration"]
     density = float(state.get("requested_nps", base.metadata.get("difficulty_nps", 0.)))
@@ -189,7 +191,9 @@ def build_inputs(stage, song, state, candidate, own_history, encoder=None, setti
            "conditions": np.r_[gap, count, conditions][None].astype(np.float32)}
     notes = state.get("notes", [])
     tracks = state.get("_tracks")
-    if tracks is None:
+    if stage not in ("arrows", "multiplier"):
+        current = []
+    elif tracks is None:
         current = [next((item for item in notes if item.get("hand") == hand and abs(item["time"] - now) < 1e-8), None)
                    for hand in (0, 1)]
     else:

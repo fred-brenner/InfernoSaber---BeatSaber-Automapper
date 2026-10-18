@@ -18,8 +18,7 @@ from app_helper.update_dir_path import update_dir_path
 # from main import main
 from main_multi import main_multi_par
 from tools.config import paths, config
-from tools.config.mapper_selection import update_model_file_paths
-from tools.utils.huggingface import model_download
+from map_creation.v2_runtime import validate_bundle
 
 data_folder_name = 'Data'
 bs_folder_name = "Beat Saber_Data/CustomLevels"
@@ -37,7 +36,7 @@ def check_for_updates():
             repo_name = "InfernoSaber-App"
             github_url = f"https://api.github.com/repos/{repo_owner}/{repo_name}/releases"
 
-            response = requests.get(github_url)
+            response = requests.get(github_url, timeout=10)
             latest_version = response.json()[0]['tag_name']
             requires_reinstall = latest_version.endswith('-reinstall')
             latest_display_version = latest_version[:-len('-reinstall')] if requires_reinstall else latest_version
@@ -74,8 +73,7 @@ def check_for_updates():
     return "Could not reach GitHub for update check."
 
 
-# call update check once to mitigate rate limiting
-update_status = check_for_updates()
+# Update checks run only when the app is explicitly built.
 
 
 # update_status = "Currently not available. Please wait for app5 release in Discord."
@@ -300,24 +298,16 @@ def run_process(num_workers, use_model, diff1, diff2, diff3, diff4, diff5):
         time.sleep(1)
         return
 
-    config.use_mapper_selection = use_model
-    update_dir_path('tools/config/config.py', 'use_mapper_selection', use_model)
-    progress_log = []  # List to store logs
-    log_queue = queue.Queue()  # Thread-safe queue for logs
-
-    # Download InfernoSaber AI Model
-    update_model_file_paths(check_model_exists=False)
-    # Download AI Model from huggingface
-    progress_log.append(f"Loading AI Model: {use_model}")
+    config.use_mapper_selection = "v2_expert"
+    progress_log = ["Checking local v2_expert bundle"]
+    log_queue = queue.Queue()
     yield "\n".join(progress_log)
     try:
-        update_model_file_paths()
-    except:
-        progress_log.append("Downloading Model from HuggingFace (~1GB, see second tab)")
-        yield "\n".join(progress_log)
-    model_download(use_model)
-    progress_log.append("Model Found")
-    yield "\n".join(progress_log)
+        validate_bundle()
+    except Exception as error:
+        yield f"Error: {type(error).__name__}: {error}"
+        return
+    progress_log.append("V2 model bundle verified")
 
     def logger_callback(message):
         log_queue.put(message)
@@ -330,16 +320,17 @@ def run_process(num_workers, use_model, diff1, diff2, diff3, diff4, diff5):
         progress_log.append("Activated automatic export to Beat Saber")
         yield "\n".join(progress_log)
 
-    # Run main() in a separate thread and pass the logger callback
-    thread = threading.Thread(
-        target=main_multi_par,
-        kwargs={
-            "n_workers": num_workers,
-            "diff_list": diff,
-            "logger_callback": logger_callback,
-            "export_results_to_bs": export_results_to_bs,
-        }
-    )
+    outcome = {}
+
+    def generate():
+        try:
+            outcome["report"] = main_multi_par(
+                int(num_workers), diff, export_results_to_bs, logger_callback)
+        except Exception as error:
+            outcome["error"] = f"{type(error).__name__}: {error}"
+            logger_callback(f"Error: {outcome['error']}")
+
+    thread = threading.Thread(target=generate)
     thread.start()
 
     # Collect logs in real-time
@@ -351,7 +342,12 @@ def run_process(num_workers, use_model, diff1, diff2, diff3, diff4, diff5):
         time.sleep(0.2)  # Prevent busy-waiting
 
     # Final message after completion
-    progress_log.append("Process finished!")
+    thread.join()
+    failures = outcome.get("report", {}).get("failures", [])
+    if "error" in outcome or failures:
+        progress_log.append(f"Process failed: {outcome.get('error', str(len(failures)) + ' failed variants/packages')}")
+    else:
+        progress_log.append("Process finished successfully!")
     yield "\n".join(progress_log)
     return
 
@@ -567,346 +563,352 @@ def import_urls(urls):
 
 
 # Gradio App Setup Section
-with gr.Blocks() as demo:
-    ################################
-    # TAB 1: Setup
-    ################################
-    # Setup Tab
-    with gr.Tab("Setup"):
-        with gr.Row():
-            with gr.Column():
-                gr.Markdown("## Setup")
-                gr.Markdown(f"""Version: {config.get_clean_version()} | InfernoSaber is free and OpenSource.
-                If you encounter problems, please check the Discord channel.
-                [GitHub Repo](https://github.com/fred-brenner/InfernoSaber---BeatSaber-Automapper/tree/main_app): View the code
-                [Discord Channel](https://discord.com/invite/cdV6HhpufY): Questions, suggestions, and improvements are welcome
+def build_app(check_updates=True):
+    """Build the UI only on an explicit app start, never in spawned workers."""
+    update_status = check_for_updates() if check_updates else "Update check disabled"
+    with gr.Blocks() as demo:
+        ################################
+        # TAB 1: Setup
+        ################################
+        # Setup Tab
+        with gr.Tab("Setup"):
+            with gr.Row():
+                with gr.Column():
+                    gr.Markdown("## Setup")
+                    gr.Markdown(f"""Version: {config.get_clean_version()} | InfernoSaber is free and OpenSource.
+                    If you encounter problems, please check the Discord channel.
+                    [GitHub Repo](https://github.com/fred-brenner/InfernoSaber---BeatSaber-Automapper/tree/main_app): View the code
+                    [Discord Channel](https://discord.com/invite/cdV6HhpufY): Questions, suggestions, and improvements are welcome
 
-                Info: All your changes will be applied immediately and saved for the next runs. Only updates will reset the settings.
-                """)
-            with gr.Column():
-                gr.Markdown("### Check for updates")
-                version_info = gr.Textbox(label="Version Info", interactive=False,
-                                          value=update_status)
+                    Info: All your changes will be applied immediately and saved for the next runs. Only updates will reset the settings.
+                    """)
+                with gr.Column():
+                    gr.Markdown("### Check for updates")
+                    version_info = gr.Textbox(label="Version Info", interactive=False,
+                                              value=update_status)
 
-        # Two-column layout
-        with gr.Row():
-            # Left Column
-            with gr.Column():
-                # Folder Selection
-                gr.Markdown("**Folder Selection**")
-                gr.Markdown("Please create a new folder (once) for the InfernoSaber input to "
-                            "make sure you do not lose any music/data.")
-                input_path = gr.Textbox(label='InfernoSaber Input Folder', interactive=False, value=paths.dir_path)
-                image_browse_btn = gr.Button('Browse', min_width=1)
-                path_status = gr.Textbox(label='Folder Status', value='not set', interactive=False)
-                image_browse_btn.click(on_browse_input_path, inputs=[], outputs=[input_path, path_status])
+            # Two-column layout
+            with gr.Row():
+                # Left Column
+                with gr.Column():
+                    # Folder Selection
+                    gr.Markdown("**Folder Selection**")
+                    gr.Markdown("Please create a new folder (once) for the InfernoSaber input to "
+                                "make sure you do not lose any music/data.")
+                    input_path = gr.Textbox(label='InfernoSaber Input Folder', interactive=False, value=paths.dir_path)
+                    image_browse_btn = gr.Button('Browse', min_width=1)
+                    path_status = gr.Textbox(label='Folder Status', value='not set', interactive=False)
+                    image_browse_btn.click(on_browse_input_path, inputs=[], outputs=[input_path, path_status])
 
-                # Optional BS Link
-                gr.Markdown("**Optional: BeatSaber Link**")
-                gr.Markdown("Select your BeatSaber folder to automatically export generated songs.")
-                bs_path = gr.Textbox(label='BeatSaber Folder', interactive=False, value=paths.bs_song_path)
-                image_browse_btn_2 = gr.Button('Browse', min_width=1)
-                bs_path_status = gr.Textbox(label='Folder Status', placeholder='(optional)', interactive=False)
-                image_browse_btn_2.click(on_browse_bs_path, inputs=[], outputs=[bs_path, bs_path_status])
+                    # Optional BS Link
+                    gr.Markdown("**Optional: BeatSaber Link**")
+                    gr.Markdown("Select your BeatSaber folder to automatically export generated songs.")
+                    bs_path = gr.Textbox(label='BeatSaber Folder', interactive=False, value=paths.bs_song_path)
+                    image_browse_btn_2 = gr.Button('Browse', min_width=1)
+                    bs_path_status = gr.Textbox(label='Folder Status', placeholder='(optional)', interactive=False)
+                    image_browse_btn_2.click(on_browse_bs_path, inputs=[], outputs=[bs_path, bs_path_status])
 
-            # Right Column
-            with gr.Column():
-                # Music Import
-                gr.Markdown("**Music Import: Currently only ogg/egg/mp3/m4a files supported!**")
-                # TODO: fix/test for wma, wav, etc.
-                music_loader = gr.File(
-                    label='Select Music Files',
-                    file_types=None,
-                    file_count='multiple'
-                )
-                file_status = gr.Textbox(label='File Import Status', placeholder='(optional)', interactive=False)
-                upload_button = gr.Button('Copy Files to Input Folder')
-                upload_button.click(upload_files, inputs=[music_loader], outputs=[file_status])
-
-                # Add button to open the folder
-                gr.Markdown("... Or copy your songs to this folder:")
-                open_folder_button = gr.Button('Open Input Folder')
-                open_folder_button.click(open_folder_music, inputs=[input_path], outputs=[])
-
-                # Show status text box of how many songs are in th folder
-                song_count = gr.Textbox(label='Song Count', interactive=False,
-                                        value=song_counting, every=3)
-                # upload_button.click(song_counting, inputs=[], outputs=[song_count])
-
-                # YT download
-                gr.Markdown("**Music download (YT_DLP)**")
-                gr.Markdown("Add one or more YouTube URLs to download music files. Using [yt-dlp](https://github.com/yt-dlp/yt-dlp), use at your own risk!")
-                url_input = gr.Textbox(label='URL(s)', lines=3, placeholder='https://...')
-                url_status = gr.Textbox(label='URL Import Status', interactive=False)
-                url_import_btn = gr.Button('Start import')
-                url_import_btn.click(
-                    fn=import_urls,
-                    inputs=[url_input],
-                    outputs=[url_status]
-                )
-
-    ################################
-    # TAB 2: Parameters
-    ################################
-
-    # Second Tab for "Specify Parameters"
-    with gr.Tab("Specify Parameters"):
-        gr.Markdown("## Specify Parameters")
-        gr.Markdown("All changes are automatically applied and saved for the next runs. There is no save button.")
-        with gr.Row():
-            with gr.Column():
-                # Dropdown Menu for Model Selection
-                gr.Markdown("### Model Selection")
-                model_selector = gr.Dropdown(
-                    choices=["fav_15", "pp3_15", "easy_15", "expert_15"],
-                    label="Select Model", value=config.use_mapper_selection, interactive=True,
-                    info="Select the model to be used for song generation. "
-                         "The model will be downloaded from [HuggingFace](https://huggingface.co/BierHerr/InfernoSaber)"
-                         " if required at runtime."
-                )
-
-            with gr.Column():
-                # Dropdown Menu for Version Selection
-                gr.Markdown("Select Beat Saber mapping verison: v3-default, v2-without arcs")
-                version_selector = gr.Dropdown(
-                    choices=["v3", "v2"],
-                    label="Select BS Mapping Output Version", value=config.bs_mapping_version, interactive=True,
-                    info="Both currently produce the same notes. v3 includes arcs, v2 does not."
-                )
-                version_selector.input(set_version_selector, inputs=[version_selector], outputs=[])
-
-        # Difficulty Selection
-        gr.Markdown("### Difficulty Selection")
-        gr.Markdown("""Specify the difficulties you want to use for the song generation.
-            You can input **up to 5** difficulties. Set any unused difficulties to **0** to reduce computation time.\n
-            Each difficulty value must be between 0.01 and 1000 (or 0 to deactivate).
-            The value is leaned on the notes-per-second / star rating (~1 Easy to ~6 Expert+)."""
+                # Right Column
+                with gr.Column():
+                    # Music Import
+                    gr.Markdown("**Music Import: Currently only ogg/egg/mp3/m4a files supported!**")
+                    # TODO: fix/test for wma, wav, etc.
+                    music_loader = gr.File(
+                        label='Select Music Files',
+                        file_types=None,
+                        file_count='multiple'
                     )
-        # Inputs for difficulties
-        with gr.Row():
-            difficulty_1 = gr.Number(
-                label="Difficulty 1",
-                value=config.difficulty_1, precision=2, interactive=True,
-                step=0.25, minimum=0, maximum=1000,
-                info="First difficulty setting. Must be set above 0."
-            )
-            difficulty_1.input(set_difficulty_1, inputs=[difficulty_1], outputs=[])
+                    file_status = gr.Textbox(label='File Import Status', placeholder='(optional)', interactive=False)
+                    upload_button = gr.Button('Copy Files to Input Folder')
+                    upload_button.click(upload_files, inputs=[music_loader], outputs=[file_status])
 
-            difficulty_2 = gr.Number(
-                label="Difficulty 2 (optional)",
-                value=config.difficulty_2, precision=2, interactive=True,
-                step=0.25, minimum=0, maximum=1000,
-            )
-            difficulty_2.input(set_difficulty_2, inputs=[difficulty_2], outputs=[])
+                    # Add button to open the folder
+                    gr.Markdown("... Or copy your songs to this folder:")
+                    open_folder_button = gr.Button('Open Input Folder')
+                    open_folder_button.click(open_folder_music, inputs=[input_path], outputs=[])
 
-            difficulty_3 = gr.Number(
-                label="Difficulty 3 (optional)",
-                value=config.difficulty_3, precision=2, interactive=True,
-                step=0.25, minimum=0, maximum=1000,
-            )
-            difficulty_3.input(set_difficulty_3, inputs=[difficulty_3], outputs=[])
+                    # Show status text box of how many songs are in th folder
+                    song_count = gr.Textbox(label='Song Count', interactive=False,
+                                            value=song_counting, every=3)
+                    # upload_button.click(song_counting, inputs=[], outputs=[song_count])
 
-            difficulty_4 = gr.Number(
-                label="Difficulty 4 (optional)",
-                value=config.difficulty_4, precision=2, interactive=True,
-                step=0.25, minimum=0, maximum=1000,
-            )
-            difficulty_4.input(set_difficulty_4, inputs=[difficulty_4], outputs=[])
+                    # YT download
+                    gr.Markdown("**Music download (YT_DLP)**")
+                    gr.Markdown("Add one or more YouTube URLs to download music files. Using [yt-dlp](https://github.com/yt-dlp/yt-dlp), use at your own risk!")
+                    url_input = gr.Textbox(label='URL(s)', lines=3, placeholder='https://...')
+                    url_status = gr.Textbox(label='URL Import Status', interactive=False)
+                    url_import_btn = gr.Button('Start import')
+                    url_import_btn.click(
+                        fn=import_urls,
+                        inputs=[url_input],
+                        outputs=[url_status]
+                    )
 
-            difficulty_5 = gr.Number(
-                label="Difficulty 5 (optional)",
-                value=config.difficulty_5, precision=2, interactive=True,
-                step=0.25, minimum=0, maximum=1000,
-            )
-            difficulty_5.input(set_difficulty_5, inputs=[difficulty_5], outputs=[])
+        ################################
+        # TAB 2: Parameters
+        ################################
 
-        with gr.Row():
-            gr.Markdown("""### Further
-                        ### Modifications""")
-            # set gimme_more_notes_prob
-            more_notes_prob = gr.Number(label="Left/Right Notes Filling (%)", value=config.gimme_more_notes_prob * 100,
-                                        precision=0, interactive=True, step=5, minimum=0, maximum=100,
-                                        info="Increase to always have notes on both sides.")
-            more_notes_prob.input(set_more_notes_prob, inputs=[more_notes_prob], outputs=[])
-            # emphasize beats on/off
-            emphasize_beats = gr.Checkbox(label="Emphasize Beats", value=config.emphasize_beats_flag,
-                                          info="Emphasize beats with double/triple notes.")
-            emphasize_beats.input(set_emphasize_mode, inputs=[emphasize_beats], outputs=[])
-            # single mode on/off
-            single_mode = gr.Checkbox(label="Single Mode", value=config.single_notes_only_flag,
-                                      info="Generate maximum one note per beat.")
-            single_mode.input(set_single_mode, inputs=[single_mode], outputs=[emphasize_beats])
-            # dot notes on/off
-            dot_notes = gr.Checkbox(label="Allow Dot Notes", value=config.allow_dot_notes,
-                                    info="Allow (rare) notes without arrow direction.")
-            dot_notes.input(set_dot_notes, inputs=[dot_notes], outputs=[])
-            # add obstacles on/off
-            add_obstacles = gr.Checkbox(label="Add Obstacles", value=config.add_obstacle_flag,
-                                        info="Add obstacles on the left/right with little movement.")
-            add_obstacles.input(set_add_obstacles, inputs=[add_obstacles], outputs=[])
-        with gr.Row():
-            # add sporty obstacles on/off
-            add_sporty_obstacles = gr.Checkbox(label="Add Sporty Obstacles", value=config.sporty_obstacles,
-                                               info="Add obstacles with movement and squats.")
-            add_sporty_obstacles.input(set_add_obstacles_sporty, inputs=[add_sporty_obstacles], outputs=[])
-            # set js offset
-            js_offset = gr.Number(label="Jump Speed Offset", value=config.jump_speed_offset, precision=1,
-                                  interactive=True, step=0.5, minimum=-5, maximum=5,
-                                  info="In-/decrease the (jump) speed of the notes.")
-            js_offset.input(set_js_offset, inputs=[js_offset], outputs=[])
-            # set intensity
-            intensity = gr.Number(label="Beat Intensity (%)", value=config.add_beat_intensity, precision=0,
-                                  interactive=True, step=5, minimum=70, maximum=125,
-                                  info="Acts as multiplier to the difficulty target. "
-                                       "High values will enforce more notes in calm sections.")
-            intensity.input(set_intensity, inputs=[intensity], outputs=[])
-            # set silence threshold
-            silence_threshold = gr.Number(label="Silence Threshold (%)", value=config.silence_threshold_percentage,
-                                          precision=2, interactive=True, step=10, minimum=50, maximum=400,
-                                          info="In-/decrease the silence threshold. "
-                                               "High values will enforce less notes in calm sections.")
-            silence_threshold.input(set_silence_threshold, inputs=[silence_threshold], outputs=[])
-            # # set quick start value
-            # quick_start = gr.Number(label="Quick Start", value=config.quick_start, precision=1,
-            #                         interactive=True, step=0.5, minimum=0, maximum=3)
-            # quick_start.input(set_quick_start, inputs=[quick_start], outputs=[])
-            # set random behaviour value
-            random_behaviour = gr.Number(label="Random Behaviour", value=config.random_note_map_factor, precision=1,
-                                         interactive=True, step=0.05, minimum=0, maximum=0.6,
-                                         info="Increase to produce different outcomes on each iteration. "
-                                              "0 deactivates the feature.")
-            random_behaviour.input(set_random_behaviour, inputs=[random_behaviour], outputs=[])
+        # Second Tab for "Specify Parameters"
+        with gr.Tab("Specify Parameters"):
+            gr.Markdown("## Specify Parameters")
+            gr.Markdown("All changes are automatically applied and saved for the next runs. There is no save button.")
+            with gr.Row():
+                with gr.Column():
+                    # Dropdown Menu for Model Selection
+                    gr.Markdown("### Model Selection")
+                    model_selector = gr.Dropdown(
+                        choices=["v2_expert"],
+                        label="Model", value="v2_expert", interactive=False,
+                        info="Local v2 inference bundle. Configure v2_model_bundle_path in config.py."
+                    )
 
-        with gr.Row():
-            # Set arc stats
-            gr.Markdown("""### Arc Modifications
-                        ### (v3 only)""")
+                with gr.Column():
+                    # Dropdown Menu for Version Selection
+                    gr.Markdown("Select Beat Saber mapping verison: v3-default, v2-without arcs")
+                    version_selector = gr.Dropdown(
+                        choices=["v3", "v2"],
+                        label="Select BS Mapping Output Version", value=config.bs_mapping_version, interactive=True,
+                        info="v3 includes arcs and native chains; legacy v2 keeps chain heads and reports unsupported objects."
+                    )
+                    version_selector.input(set_version_selector, inputs=[version_selector], outputs=[])
 
-            # add Arcs (v3 only) on/off
-            add_arcs = gr.Checkbox(label="Add Arcs (v3 only)", value=config.add_slider_flag,
-                                   info="Enable or disable arcs between notes.")
-            add_arcs.input(set_add_arcs, inputs=[add_arcs], outputs=[])
-            # slider_start_time
-            arc_start_time = gr.Number(label="Arc Start Time", value=config.slider_time_gap[0], precision=1,
-                                       interactive=True, step=0.1, minimum=0, maximum=2,
-                                       info="Minimum time in seconds to activate arcs.")
-            # arc_start_time.input(set_arc_time, inputs=[arc_start_time, arc_end_time], outputs=[])
-            # slider_end_time
-            arc_end_time = gr.Number(label="Arc End Time", value=config.slider_time_gap[1], precision=1,
-                                     interactive=True, step=0.1, minimum=0, maximum=20,
-                                     info="Maximum time in seconds to activate arcs.")
-            arc_start_time.input(set_arc_time, inputs=[arc_start_time, arc_end_time], outputs=[])
-            arc_end_time.input(set_arc_time, inputs=[arc_start_time, arc_end_time], outputs=[])
-            # slider_probability
-            arc_probability = gr.Number(label="Arc Probability (%)", value=config.slider_probability * 100, precision=0,
-                                        interactive=True, step=10, minimum=10, maximum=100,
-                                        info="Probability to add arcs, if other conditions are met.")
-            arc_probability.input(set_arc_probability, inputs=[arc_probability], outputs=[])
-            # slider_movement_min
-            arc_movement_min = gr.Number(label="Arc Movement Min", value=config.slider_movement_minimum, precision=1,
-                                         interactive=True, step=0.5, minimum=0, maximum=5,
-                                         info="Note distance required to allow arcs.")
-            arc_movement_min.input(set_arc_movement_min, inputs=[arc_movement_min], outputs=[])
-            # add bpm overwrite
-            bpm_overwrite = gr.Checkbox(label="BPM Overwrite", value=config.use_fixed_bpm > 0,
-                                        info="Default False (uses real song bpm instead of fixed value). "
-                                             "Activate only in case of note jump speed bugs in BS at high difficulties.")
-            bpm_overwrite.input(set_bpm_overwrite, inputs=[bpm_overwrite], outputs=[])
-
-    ################################
-    # TAB 3: Runtime
-    ################################
-
-    # Third Tab for "Run"
-    with gr.Tab("Run"):
-        gr.Markdown("## Run")
-
-        with gr.Row():
-            with gr.Column():
-                # Empty Textbox
-                gr.Markdown("### Summary")
-                log_output = gr.Textbox(
-                    label="Information",
-                    lines=3,
-                    interactive=False,
-                    value=get_summary,
-                    inputs=[difficulty_1, difficulty_2, difficulty_3, difficulty_4, difficulty_5],
-                    every=4,
+            # Difficulty Selection
+            gr.Markdown("### Difficulty Selection")
+            gr.Markdown("""Specify the difficulties you want to use for the song generation.
+                You can input **up to 5** difficulties. Set any unused difficulties to **0** to reduce computation time.\n
+                Each difficulty value must be between 0.01 and 1000 (or 0 to deactivate).
+                The value requests retained colored notes per second; 5 means 5 NPS before postprocessing."""
+                        )
+            # Inputs for difficulties
+            with gr.Row():
+                difficulty_1 = gr.Number(
+                    label="Difficulty 1",
+                    value=config.difficulty_1, precision=2, interactive=True,
+                    step=0.25, minimum=0, maximum=1000,
+                    info="First difficulty setting. Must be set above 0."
                 )
+                difficulty_1.input(set_difficulty_1, inputs=[difficulty_1], outputs=[])
 
-                # CPU Workers Selection and RAM Requirement Display
-                gr.Markdown("### CPU Workers")
-                num_workers = gr.Slider(
-                    label="Number of CPU Workers",
-                    minimum=1,
-                    maximum=16,
-                    step=1,
-                    value=config.num_workers,
-                    interactive=True,
-                    info="Memory estimation depends on the model. Start low and check your Task Manager."
+                difficulty_2 = gr.Number(
+                    label="Difficulty 2 (optional)",
+                    value=config.difficulty_2, precision=2, interactive=True,
+                    step=0.25, minimum=0, maximum=1000,
                 )
-                ram_required = gr.Textbox(
-                    label="Estimated RAM Requirement",
-                    value=f"{config.num_workers * 2} GB free RAM, {config.num_workers} physical CPU cores",
-                    interactive=False,
+                difficulty_2.input(set_difficulty_2, inputs=[difficulty_2], outputs=[])
+
+                difficulty_3 = gr.Number(
+                    label="Difficulty 3 (optional)",
+                    value=config.difficulty_3, precision=2, interactive=True,
+                    step=0.25, minimum=0, maximum=1000,
                 )
+                difficulty_3.input(set_difficulty_3, inputs=[difficulty_3], outputs=[])
 
-                # Update RAM display when number of workers changes
-                num_workers.change(update_ram, inputs=[num_workers], outputs=[ram_required])
-                num_workers.change(update_num_workers, inputs=[num_workers], outputs=[])
+                difficulty_4 = gr.Number(
+                    label="Difficulty 4 (optional)",
+                    value=config.difficulty_4, precision=2, interactive=True,
+                    step=0.25, minimum=0, maximum=1000,
+                )
+                difficulty_4.input(set_difficulty_4, inputs=[difficulty_4], outputs=[])
 
-            with gr.Column():
-                # Checkbox to select automatic cut to "done" folder
-                gr.Markdown("### Move finished songs")
-                auto_cut_done = gr.Checkbox(label="Automatically move songs to 'y_done' folder",
-                                            value=config.auto_move_song_afterwards,
-                                            info="Songs in 'y_done' will not be processed again, "
-                                                 "until moved back to the input folder.")
-                auto_cut_done.input(update_auto_cut_done, inputs=[auto_cut_done], outputs=[])
+                difficulty_5 = gr.Number(
+                    label="Difficulty 5 (optional)",
+                    value=config.difficulty_5, precision=2, interactive=True,
+                    step=0.25, minimum=0, maximum=1000,
+                )
+                difficulty_5.input(set_difficulty_5, inputs=[difficulty_5], outputs=[])
 
-        # Run Button
-        gr.Markdown("### Start Processing")
-        run_button = gr.Button("Run")
+            with gr.Row():
+                gr.Markdown("""### Further
+                            ### Modifications""")
+                # set gimme_more_notes_prob
+                more_notes_prob = gr.Number(label="Left/Right Notes Filling (%)", value=config.gimme_more_notes_prob * 100,
+                                            precision=0, interactive=True, step=5, minimum=0, maximum=100,
+                                            info="Increase to always have notes on both sides.")
+                more_notes_prob.input(set_more_notes_prob, inputs=[more_notes_prob], outputs=[])
+                # emphasize beats on/off
+                emphasize_beats = gr.Checkbox(label="Emphasize Beats", value=config.emphasize_beats_flag,
+                                              info="Emphasize beats with double/triple notes.")
+                emphasize_beats.input(set_emphasize_mode, inputs=[emphasize_beats], outputs=[])
+                # single mode on/off
+                single_mode = gr.Checkbox(label="Single Mode", value=config.single_notes_only_flag,
+                                          info="Generate maximum one note per beat.")
+                single_mode.input(set_single_mode, inputs=[single_mode], outputs=[emphasize_beats])
+                # dot notes on/off
+                dot_notes = gr.Checkbox(label="Allow Dot Notes", value=config.allow_dot_notes,
+                                        info="Allow (rare) notes without arrow direction.")
+                dot_notes.input(set_dot_notes, inputs=[dot_notes], outputs=[])
+                # add obstacles on/off
+                add_obstacles = gr.Checkbox(label="Add Obstacles", value=config.add_obstacle_flag,
+                                            info="Add obstacles on the left/right with little movement.")
+                add_obstacles.input(set_add_obstacles, inputs=[add_obstacles], outputs=[])
+            with gr.Row():
+                # add sporty obstacles on/off
+                add_sporty_obstacles = gr.Checkbox(label="Add Sporty Obstacles", value=config.sporty_obstacles,
+                                                   info="Add obstacles with movement and squats.")
+                add_sporty_obstacles.input(set_add_obstacles_sporty, inputs=[add_sporty_obstacles], outputs=[])
+                # set js offset
+                js_offset = gr.Number(label="Jump Speed Offset", value=config.jump_speed_offset, precision=1,
+                                      interactive=True, step=0.5, minimum=-5, maximum=5,
+                                      info="In-/decrease the (jump) speed of the notes.")
+                js_offset.input(set_js_offset, inputs=[js_offset], outputs=[])
+                # set intensity
+                intensity = gr.Number(label="Beat Intensity (%)", value=config.add_beat_intensity, precision=0,
+                                      interactive=True, step=5, minimum=70, maximum=125,
+                                      info="Acts as multiplier to the difficulty target. "
+                                           "High values will enforce more notes in calm sections.")
+                intensity.input(set_intensity, inputs=[intensity], outputs=[])
+                # set silence threshold
+                silence_threshold = gr.Number(label="Silence Threshold (%)", value=config.silence_threshold_percentage,
+                                              precision=2, interactive=True, step=10, minimum=50, maximum=400,
+                                              info="In-/decrease the silence threshold. "
+                                                   "High values will enforce less notes in calm sections.")
+                silence_threshold.input(set_silence_threshold, inputs=[silence_threshold], outputs=[])
+                # # set quick start value
+                # quick_start = gr.Number(label="Quick Start", value=config.quick_start, precision=1,
+                #                         interactive=True, step=0.5, minimum=0, maximum=3)
+                # quick_start.input(set_quick_start, inputs=[quick_start], outputs=[])
+                # set random behaviour value
+                random_behaviour = gr.Number(label="Random Behaviour", value=config.random_note_map_factor, precision=1,
+                                             interactive=True, step=0.05, minimum=0, maximum=0.6,
+                                             info="Increase to produce different outcomes on each iteration. "
+                                                  "0 deactivates the feature.")
+                random_behaviour.input(set_random_behaviour, inputs=[random_behaviour], outputs=[])
 
-        # Textbox for Progress/ETA
-        progress_eta = gr.Textbox(
-            label="Progress: After run plus max. 1 minute, it should display an ETA. "
-                  "Else check the server logs and try another song",
-            placeholder="""Processing progress or ETA will appear here.
-            After latest 1 minute, it should display an ETA like that:
-            Loading AI Model: fav_15
-            Model Found
-            Starting multi map generator with 10 workers.
-            Checking and Normalizing Song Files...
-            Found 3 songs. Iterating...
-            ### ETA: 0.3 minutes. Time per song: 9 s ###
-            ### ETA: 0.2 minutes. Time per song: 10 s ###
-            ### ETA: 0.0 minutes. Time per song: 10 s ###
-            Process finished!
-            """,
-            lines=5,
-            interactive=False,
-        )
+            with gr.Row():
+                # Set arc stats
+                gr.Markdown("""### Arc Modifications
+                            ### (v3 only)""")
 
-        # Link Run button to the process function
-        run_button.click(
-            run_process,
-            inputs=[num_workers, model_selector, difficulty_1, difficulty_2, difficulty_3, difficulty_4,
-                    difficulty_5],
-            outputs=[progress_eta],
-            queue=True,
-        )
+                # add Arcs (v3 only) on/off
+                add_arcs = gr.Checkbox(label="Add Arcs (v3 only)", value=config.add_slider_flag,
+                                       info="Enable or disable arcs between notes.")
+                add_arcs.input(set_add_arcs, inputs=[add_arcs], outputs=[])
+                # slider_start_time
+                arc_start_time = gr.Number(label="Arc Start Time", value=config.slider_time_gap[0], precision=1,
+                                           interactive=True, step=0.1, minimum=0, maximum=2,
+                                           info="Minimum time in seconds to activate arcs.")
+                # arc_start_time.input(set_arc_time, inputs=[arc_start_time, arc_end_time], outputs=[])
+                # slider_end_time
+                arc_end_time = gr.Number(label="Arc End Time", value=config.slider_time_gap[1], precision=1,
+                                         interactive=True, step=0.1, minimum=0, maximum=20,
+                                         info="Maximum time in seconds to activate arcs.")
+                arc_start_time.input(set_arc_time, inputs=[arc_start_time, arc_end_time], outputs=[])
+                arc_end_time.input(set_arc_time, inputs=[arc_start_time, arc_end_time], outputs=[])
+                # slider_probability
+                arc_probability = gr.Number(label="Arc Probability (%)", value=config.slider_probability * 100, precision=0,
+                                            interactive=True, step=10, minimum=10, maximum=100,
+                                            info="Probability to add arcs, if other conditions are met.")
+                arc_probability.input(set_arc_probability, inputs=[arc_probability], outputs=[])
+                # slider_movement_min
+                arc_movement_min = gr.Number(label="Arc Movement Min", value=config.slider_movement_minimum, precision=1,
+                                             interactive=True, step=0.5, minimum=0, maximum=5,
+                                             info="Note distance required to allow arcs.")
+                arc_movement_min.input(set_arc_movement_min, inputs=[arc_movement_min], outputs=[])
+                # add bpm overwrite
+                bpm_overwrite = gr.Checkbox(label="BPM Overwrite", value=config.use_fixed_bpm > 0,
+                                            info="Default False (uses real song bpm instead of fixed value). "
+                                                 "Activate only in case of note jump speed bugs in BS at high difficulties.")
+                bpm_overwrite.input(set_bpm_overwrite, inputs=[bpm_overwrite], outputs=[])
 
-        # Add button to open the folder
-        with gr.Row():
-            with gr.Column():
-                gr.Markdown("... Maps will be generated here:")
-                open_folder_button2 = gr.Button('Open Output Folder')
-                open_folder_button2.click(open_folder_maps, inputs=[input_path], outputs=[])
-            with gr.Column():
-                gr.Markdown("... or view the maps here:")
-                gr.Markdown("[ArcViewer](https://allpoland.github.io/ArcViewer/)")
+        ################################
+        # TAB 3: Runtime
+        ################################
+
+        # Third Tab for "Run"
+        with gr.Tab("Run"):
+            gr.Markdown("## Run")
+
+            with gr.Row():
+                with gr.Column():
+                    # Empty Textbox
+                    gr.Markdown("### Summary")
+                    log_output = gr.Textbox(
+                        label="Information",
+                        lines=3,
+                        interactive=False,
+                        value=get_summary,
+                        inputs=[difficulty_1, difficulty_2, difficulty_3, difficulty_4, difficulty_5],
+                        every=4,
+                    )
+
+                    # CPU Workers Selection and RAM Requirement Display
+                    gr.Markdown("### CPU Workers")
+                    num_workers = gr.Slider(
+                        label="Number of CPU Workers",
+                        minimum=1,
+                        maximum=16,
+                        step=1,
+                        value=config.num_workers,
+                        interactive=True,
+                        info="Memory estimation depends on the model. Start low and check your Task Manager."
+                    )
+                    ram_required = gr.Textbox(
+                        label="Estimated RAM Requirement",
+                        value=f"{config.num_workers * 2} GB free RAM, {config.num_workers} physical CPU cores",
+                        interactive=False,
+                    )
+
+                    # Update RAM display when number of workers changes
+                    num_workers.change(update_ram, inputs=[num_workers], outputs=[ram_required])
+                    num_workers.change(update_num_workers, inputs=[num_workers], outputs=[])
+
+                with gr.Column():
+                    # Checkbox to select automatic cut to "done" folder
+                    gr.Markdown("### Move finished songs")
+                    auto_cut_done = gr.Checkbox(label="Automatically move songs to 'y_done' folder",
+                                                value=config.auto_move_song_afterwards,
+                                                info="Songs in 'y_done' will not be processed again, "
+                                                     "until moved back to the input folder.")
+                    auto_cut_done.input(update_auto_cut_done, inputs=[auto_cut_done], outputs=[])
+
+            # Run Button
+            gr.Markdown("### Start Processing")
+            run_button = gr.Button("Run")
+
+            # Textbox for Progress/ETA
+            progress_eta = gr.Textbox(
+                label="Progress: After run plus max. 1 minute, it should display an ETA. "
+                      "Else check the server logs and try another song",
+                placeholder="""Processing progress or ETA will appear here.
+                After latest 1 minute, it should display an ETA like that:
+                Loading AI Model: fav_15
+                Model Found
+                Starting multi map generator with 10 workers.
+                Checking and Normalizing Song Files...
+                Found 3 songs. Iterating...
+                ### ETA: 0.3 minutes. Time per song: 9 s ###
+                ### ETA: 0.2 minutes. Time per song: 10 s ###
+                ### ETA: 0.0 minutes. Time per song: 10 s ###
+                Process finished!
+                """,
+                lines=5,
+                interactive=False,
+            )
+
+            # Link Run button to the process function
+            run_button.click(
+                run_process,
+                inputs=[num_workers, model_selector, difficulty_1, difficulty_2, difficulty_3, difficulty_4,
+                        difficulty_5],
+                outputs=[progress_eta],
+                queue=True,
+            )
+
+            # Add button to open the folder
+            with gr.Row():
+                with gr.Column():
+                    gr.Markdown("... Maps will be generated here:")
+                    open_folder_button2 = gr.Button('Open Output Folder')
+                    open_folder_button2.click(open_folder_maps, inputs=[input_path], outputs=[])
+                with gr.Column():
+                    gr.Markdown("... or view the maps here:")
+                    gr.Markdown("[ArcViewer](https://allpoland.github.io/ArcViewer/)")
+
+    return demo
+
 
 # Launch the app
 if __name__ == "__main__":
-    demo.launch()
+    import multiprocessing
+    multiprocessing.freeze_support()
+    build_app().launch()

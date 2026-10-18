@@ -28,7 +28,13 @@ bs_mapping_version = "v3"  # allows to generate advanced features like arcs
 # use_mapper_selection = "easy_15"
 # use_mapper_selection = "hard_15"
 # use_mapper_selection = "expert_15"
-use_mapper_selection = "fav_15"
+use_mapper_selection = "v2_expert"
+
+# V2 generation bundle is independent of prediction/library folder settings.
+v2_model_bundle_path = "../Data/model/v2_expert"
+v2_inference_threads = 2
+v2_timing_batch_size = 8
+v2_compile_inference = True
 
 # select song metadata search mode
 enable_auto_metadata = True  # if True, tries to get song metadata from song name
