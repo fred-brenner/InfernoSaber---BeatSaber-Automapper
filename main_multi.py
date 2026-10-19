@@ -14,7 +14,7 @@ from tools.config import config, paths
 from bs_shift.export_map import check_music_files
 from map_creation.v2_generation import (apply_snapshot, configure_inference, generate_song,
                                        save_report, scoped_settings, settings_snapshot)
-from map_creation.v2_runtime import validate_bundle
+from map_creation.v2_runtime import validate_production_bundle
 from map_creation.v2_export import combine_packages
 
 
@@ -139,7 +139,7 @@ def _run(n_workers, diff_list, export_results_to_bs, logger_callback, parallel):
     snapshot = settings_snapshot()
     # Invalid bootstrap settings must fail here, not cause endless Pool respawns.
     configure_inference()
-    validate_bundle(snapshot["config"]["v2_model_bundle_path"])
+    validate_production_bundle(snapshot["config"]["v2_model_bundle_path"])
     _emit("Checking and normalizing song files...", logger_callback)
     input_path = snapshot["paths"]["songs_pred"]
     songs = check_music_files(sorted(os.listdir(input_path)), input_path)
@@ -209,7 +209,7 @@ def main_multi(diff_list: list, export_results_to_bs=True):
 
 if __name__ == "__main__":
     mp.freeze_support()
-    diff_list = json.loads(os.environ.get("diff_list", "[1]"))
+    diff_list = json.loads(os.environ.get("diff_list", "[6, 8, 10]"))
     n_workers = 7 if paths.main_path.startswith("/mnt/") else 3
     result = main_multi_par(n_workers, diff_list, export_results_to_bs=True)
     raise SystemExit(1 if result["failures"] else 0)

@@ -45,6 +45,12 @@ class Timing:
         return {"counts": values}
 
 
+def lighting(times, encoder):
+    """Injected retained-lighting boundary; decoder parity has dedicated tests."""
+    return ([{"time": float(time), "type": 0, "value": 2000000804} for time in times],
+            {"backend": "v1", "queries": len(times)})
+
+
 def processors():
     def timing(song, beats, audio_path, logger=None):
         return [{"time": float(time), "count": int(beats["counts"][frame])}
@@ -83,6 +89,7 @@ def test_production_pipeline_uses_only_audio_and_keeps_all_output_families(monke
     predictors = dummy_predictors(vocab)
     predictors["timing"] = Timing()
     calls = []
+    predictors["lighting"] = lambda inputs: pytest.fail("Production must use v1 lighting")
 
     def encoder(times):
         calls.append(np.asarray(times).copy())
@@ -92,9 +99,12 @@ def test_production_pipeline_uses_only_audio_and_keeps_all_output_families(monke
     settings.pop("stage_policies", None)  # Exercise the retained legacy decoder.
     settings["schedule"]["arc_max_gap_seconds"] = 6.
     result = generate(song, 4., predictors, encoder, settings, vocab,
-                      postprocessors=processors(), random_factor=0, logger=lambda message: None)
+                      lighting_generator=lighting, postprocessors=processors(), random_factor=0, logger=lambda message: None)
     assert result.status == "dummy"
     assert result.diagnostics["export_ready"]
+    assert result.stages["lighting"]["backend"] == "v1"
+    np.testing.assert_array_equal([event["time"] for event in result.state["lighting"]],
+                                  result.state["event_times"])
     assert set(result.stages) == {"intensity", "timing", "positions", "arrows", "multiplier", "hazards", "arcs", "lighting"}
     assert all(result.state[family] for family in ("notes", "walls", "bombs", "arcs", "lighting"))
     assert result.stages["multiplier"]["added_notes"] > 0
@@ -130,7 +140,7 @@ def test_single_mode_cannot_be_undone_by_multiplier(monkeypatch):
     predictors = dummy_predictors(vocab)
     predictors["timing"] = Timing()
     result = generate(song, 4., predictors, lambda times: np.zeros((len(times), 16), np.float32),
-                      preparation_settings(), vocab, postprocessors=processors(), random_factor=0,
+                      preparation_settings(), vocab, lighting_generator=lighting, postprocessors=processors(), random_factor=0,
                       logger=lambda message: None)
     assert not result.state["chains"]
     assert not any(note["kind"] == "copy" for note in result.state["notes"])
@@ -161,7 +171,7 @@ def test_multiplier_histories_record_rejected_outputs_as_none(monkeypatch):
 
     hooks.validate_expansions = reject
     result = generate(song, 4., predictors, lambda times: np.zeros((len(times), 16), np.float32),
-                      preparation_settings(), vocab, postprocessors=hooks, random_factor=0,
+                      preparation_settings(), vocab, lighting_generator=lighting, postprocessors=hooks, random_factor=0,
                       logger=lambda message: None)
     assert len(seen) == 3
     assert (seen[1][-1] == [0, 0]).all()
@@ -193,7 +203,7 @@ def test_raw_hazard_and_arc_choices_survive_clearance_rejection_in_diagnostics(m
 
     hooks.validate_hazards, hooks.validate_arcs = reject_hazards, reject_arcs
     result = generate(song, 4., predictors, lambda times: np.zeros((len(times), 16), np.float32),
-                      settings, vocab, postprocessors=hooks, random_factor=0, logger=lambda message: None)
+                      settings, vocab, lighting_generator=lighting, postprocessors=hooks, random_factor=0, logger=lambda message: None)
     raw, final = result.diagnostics["raw_decisions"], result.diagnostics["final_counts"]
     assert raw["wall_proposals"] > 0 and raw["bomb_proposals"] > 0 and raw["arc_attachments"] > 0
     assert final["walls"] == final["bombs"] == final["arcs"] == 0
@@ -205,4 +215,4 @@ def test_raw_hazard_and_arc_choices_survive_clearance_rejection_in_diagnostics(m
 @pytest.mark.parametrize("nps", [-1., float("nan"), True])
 def test_invalid_density_is_rejected(nps):
     with pytest.raises(ValueError, match="NPS"):
-        generate(audio_song(), nps, {}, None, preparation_settings(), vocabulary(), postprocessors=processors())
+        generate(audio_song(), nps, {}, None, preparation_settings(), vocabulary(), lighting_generator=lighting, postprocessors=processors())

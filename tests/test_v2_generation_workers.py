@@ -18,6 +18,7 @@ def _observed_worker_settings(_):
     from tools.config import config, paths
     import os, sys
     return (config.v2_inference_threads, config.slider_time_gap.tolist(), paths.songs_pred,
+            config.v1_lighting_model_path, config.v1_lighting_vocabulary_path,
             os.environ['CUDA_VISIBLE_DEVICES'], 'tensorflow' in sys.modules)
 
 
@@ -26,10 +27,13 @@ def test_spawn_transfers_settings_before_tensorflow():
     snapshot['config']['v2_inference_threads'] = 1
     snapshot['config']['slider_time_gap'] = np.array([.17, .39])
     snapshot['paths']['songs_pred'] = '/disposable/v2-input/'
+    snapshot['config']['v1_lighting_model_path'] = '/retained/v1.h5'
+    snapshot['config']['v1_lighting_vocabulary_path'] = '/retained/v1-events.pkl'
     context = mp.get_context('spawn')
     with context.Pool(1, initializer=main_multi._worker_init, initargs=(snapshot,)) as pool:
         result = pool.map(_observed_worker_settings, [0, 1])
-    assert result == [(1, [.17, .39], '/disposable/v2-input/', '-1', False)] * 2
+    assert result == [(1, [.17, .39], '/disposable/v2-input/', '/retained/v1.h5',
+                       '/retained/v1-events.pkl', '-1', False)] * 2
 
 
 def test_groups_prefer_song_cache_but_use_idle_workers():
@@ -119,7 +123,7 @@ assert callable(main_app.build_app)
 def test_main_repeated_calls_restore_offsets_and_accept_legacy_model_argument(tmp_path, monkeypatch):
     import main
     monkeypatch.setattr(paths, 'songs_pred', str(tmp_path) + '/')
-    monkeypatch.setattr(main, 'validate_bundle', lambda: {})
+    monkeypatch.setattr(main, 'validate_production_bundle', lambda: {})
     monkeypatch.setattr(main, 'check_music_files', lambda files, directory: ['song.egg'])
     calls = []
     def generate(name, logger):
@@ -138,7 +142,7 @@ def test_main_repeated_calls_restore_offsets_and_accept_legacy_model_argument(tm
 def test_app_surfaces_worker_failures(monkeypatch):
     import main_app
     monkeypatch.setattr(main_app, 'get_summary', lambda *args: 'Ready')
-    monkeypatch.setattr(main_app, 'validate_bundle', lambda: {})
+    monkeypatch.setattr(main_app, 'validate_production_bundle', lambda: {})
     monkeypatch.setattr(main_app, 'main_multi_par', lambda *args: {'failures': [{'error': 'broken'}]})
     result = list(main_app.run_process(2, 'fav_15', 3, 5, 0, 0, 0))
     assert result[-1].endswith('Process failed: 1 failed variants/packages')

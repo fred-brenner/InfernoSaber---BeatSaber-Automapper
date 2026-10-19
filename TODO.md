@@ -8,8 +8,10 @@
 - [ ] V2: Legacy Timing-/Noten-Nachverarbeitung anhand kontrollierter Vergleiche schrittweise reduzieren; Rohmodell-Ausgabe, heuristische Ergänzungen und Multiplier getrennt bewerten.
 - [ ] V2: Nach Profiling Modellfusion und TensorFlow-native Vorverarbeitung untersuchen. Aktuell bleiben neun Netze pro CPU-Worker geladen; Timing/Encoder sind gebatcht und Aufrufe kompiliert.
 - [ ] V2: Slider-Turbo-Start neu prüfen. Er bleibt deaktiviert, weil er einen nicht vorhandenen Noten-Endpunkt erfindet; Arcs dürfen nur bestehende gleichhändige Noten verbinden.
-- [ ] V2: Reparierte Hazards-/Lighting-/Arc-Verträge trainieren, validieren und erst nach positiven Vergleichsergebnissen als neues Bundle übernehmen; siehe docs/sparse-stage-repair.md. Keine versteckten prozeduralen Fallbacks hinzufügen.
-- [ ] V2: Custom-/Chroma-Lighting als eigene unterstützte Repräsentation untersuchen; der reparierte portable Basis-Modus bewahrt und meldet ausgeschlossene Kommandos.
+- [ ] V2: Repariertes Hazards-Modell trainieren, validieren und erst nach positiven Vergleichsergebnissen übernehmen; siehe docs/sparse-stage-repair.md. Keine versteckten prozeduralen Fallbacks hinzufügen.
+- [ ] V2: Arc-Modell kann ohne vorherige positive Referenz-Arcs keine passenden Sequenzen beginnen. Am 2026-10-19 auf ausdrücklichen Wunsch mit Schwelle 0.18 installiert, trotz 0/358 Validation- und 0/66 Benchmark-Treffern im autoregressiven Test. History-Abhängigkeit untersuchen und vor weiterem Training einen Lösungsplan abstimmen; vorheriges Bundle bleibt als Backup erhalten. Siehe docs/baseline.md.
+- [ ] Optional / zurückgestellt: Eigenständiges V2-Lighting ist noch nicht für Produktion implementiert (not yet implemented for production — optional/deferred). Experimentelle Verträge, Trainer und Artefakte bleiben erhalten; Produktion verwendet ausschließlich V1-`fav_15`-Lighting. Eine spätere Übernahme braucht explizite Qualitätsprüfung; siehe docs/sparse-stage-repair.md.
+- [ ] Optional / zurückgestellt: Custom-/Chroma-Lighting als eigene unterstützte Repräsentation untersuchen; der experimentelle reparierte portable Basis-Modus bewahrt und meldet ausgeschlossene Kommandos.
 - [ ] V2: Unbekannte Aufnahmen mit positiven Arcs für eine saubere End-to-End-Evaluation sammeln. Der Arc-Train/Validation-Overlay enthält vorheriges Upstream-Training; TEST hat nur eine positive Aufnahmegruppe.
 - [ ] V2: Arc-Clearance für native Kurven-Handles geometrisch prüfen; aktuell wird die Verbindung zwischen den vorhandenen Endpunkten abgetastet. In-Game-Prüfung bleibt separat.
 

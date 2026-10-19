@@ -13,13 +13,16 @@ environment, with system site packages disabled. CPU verification uses the
 `TF_USE_LEGACY_KERAS=1` where specified by that profile. The framework does not
 change installed packages or application paths.
 
-For the new positions, arrows, multiplier, hazards, lighting and arcs stages,
-use [the v2 concept framework](pipeline-v2.md). That composition reuses the
+For positions, arrows, multiplier, hazards and arcs, plus the optional experimental
+v2 lighting stage, use [the v2 concept framework](pipeline-v2.md). That composition
+reuses the
 trained intensity/timing pair and retained encoder; it does not use this
 framework's joint `notes` checkpoint. Existing commands and artifacts below
 remain supported. The shared [development launcher](pipeline-v2.md#small-development-launcher)
 also accepts `python main_training.py --models intensity timing` and can queue
-all eight v2 stages with `--models all`.
+all seven production v2 stages with `--models all`. Independent v2 lighting is
+not yet implemented for production — optional/deferred; the normal launcher
+omits it. Its explicit experimental trainer remains documented in that guide.
 
 ## Targets and timing
 

@@ -12,7 +12,8 @@ used `fav_15` at BPS difficulty setting 5 with Beat Saber library export disable
 See [the baseline](baseline.md) for evidence and remaining verification limits.
 This establishes execution, not a map-quality benchmark.
 
-For the current pipeline, see [model architecture](model-beat-architecture.md).
+For the current production pipeline, see [model architecture](model-architecture.md)
+and [generation lifecycle](generation-v2.md).
 For BPS terminology, see [CONTEXT.md](../CONTEXT.md): the BPS difficulty setting
 is an approximate control, distinct from measured output density.
 
@@ -43,10 +44,12 @@ Improve the quality and variety of generated gameplay, including obstacles,
 arcs, and other mapping options. Replace or extend the existing simple
 algorithms with AI models where learned behavior produces better results.
 
-The selected [v2 architecture](model-architecture.md) now has a
-[train-ready concept framework](pipeline-v2.md) for positions, arrows,
-multiplier, hazards, independent lighting and arcs. Adapting playability checks
-to each stage's ownership remains explicit review work before package export.
+The selected [v2 architecture](model-architecture.md) now has an
+[implemented framework](pipeline-v2.md) for positions, arrows, multiplier, hazards
+and arcs. The seven production v2 stages reuse the retained encoder and original
+v1 `fav_15` lighting model. Independent v2 lighting is not yet implemented for
+production — optional/deferred; see [optional work](../TODO.md). Production
+package export is implemented; in-game playability remains a separate check.
 
 ## 3. Fix the causes of postprocessing corrections
 
@@ -71,14 +74,15 @@ per saber in a synchronized event. A red/blue pair counts as two retained notes;
 its timing remains one onset. See [the new framework](beat-model-training.md)
 for the data contract and later training workflow.
 
-The current milestone ends at tested intermediate predictions and train-ready
-model definitions. Training, a full generation rebuild, and quality evaluation
-follow separately. Model size or successful untrained inference does not
-establish improved gameplay.
+The models have completed training and production composition/package export is
+implemented. Recorded evaluations expose sparse positive-case limitations;
+training completion and successful package generation do not establish improved
+gameplay. See [recorded results](baseline.md).
 
 The v2 multiplier now has train-ready targets from original/reduced relationships
-and explicit chains; the combined hazards model owns bombs and walls. These new
-models remain untrained. The existing seven-song CPU benchmark remains a
+and explicit chains; the combined hazards model owns bombs and walls. Repaired
+hazards/arcs contracts still require replacement training and positive-case
+evaluation before promotion. The existing seven-song CPU benchmark remains a
 regression reference rather than a sufficient training or generalization set.
 
 ## Human-map timing benchmark

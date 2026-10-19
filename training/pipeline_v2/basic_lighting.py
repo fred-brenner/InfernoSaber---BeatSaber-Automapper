@@ -1,4 +1,6 @@
-"""Versioned, basic-only lighting supervision and inference projection.
+"""Experimental v2 lighting: not yet implemented for production (optional/deferred).
+
+Versioned, basic-only lighting supervision and inference projection.
 
 Source objects are never rewritten. All times here are elapsed seconds; the
 selected grid's unit is recorded explicitly in its frozen stage policy.

@@ -26,6 +26,7 @@ _REPOSITORY = Path(__file__).resolve().parents[1]
 _CACHE = None
 _CACHE_HITS = 0
 _CACHE_LOCK = threading.Lock()
+PRODUCTION_STAGES = tuple(stage for stage in STAGES if stage != "lighting")
 
 
 def _bundle_path(path):
@@ -42,17 +43,56 @@ def _local(root, name):
     return path
 
 
-def validate_bundle(bundle_path=None):
-    """Check all required assets and frozen contracts without importing TensorFlow."""
+def _relative(root, name):
+    """Resolve a bundle reference without requiring an experimental asset to exist."""
+    if not isinstance(name, str) or not name or Path(name).is_absolute():
+        raise ValueError("Bundle paths must be relative")
+    path = (root / name).resolve()
+    if path == root or not path.is_relative_to(root):
+        raise ValueError(f"Invalid v2 bundle path: {name}")
+    return path
+
+
+def _production_exclusions(root, bundle, required):
+    stages = bundle["model_stages"]
+    directories = [_relative(root, stages[stage]) for stage in required]
+    lighting = _relative(root, stages.get("lighting", "lighting"))
+    calibrations = bundle.get("calibrations", {})
+    for stage in calibrations:
+        if stage not in ("hazards", "lighting", "arcs"):
+            raise ValueError(f"Unsupported calibrated stage: {stage}")
+    sidecar = _relative(root, calibrations["lighting"]) if "lighting" in calibrations else None
+    encoder = _relative(root, bundle.get("encoder"))
+    protected = [(root / "normalization.json").resolve(), (root / "vocabularies.json").resolve(), encoder,
+                 (encoder.parent / "manifest.json").resolve(),
+                 *(_relative(root, filename) for stage, filename in calibrations.items() if stage != "lighting")]
+    sidecar_overlap = sidecar is not None and (
+        sidecar in protected or any(sidecar.is_relative_to(path) for path in directories))
+    if (any(lighting.is_relative_to(path) or path.is_relative_to(lighting) for path in directories)
+            or any(path.is_relative_to(lighting) for path in protected)
+            or sidecar_overlap):
+        raise ValueError("Experimental lighting paths overlap required production assets")
+    return lighting, sidecar
+
+
+def _validate_bundle(bundle_path=None, *, production=False):
     root = _bundle_path(bundle_path)
     bundle = read_json(root / "bundle.json")
     if bundle.get("kind") != "infernosaber_v2_inference_bundle" or bundle.get("schema_version") != 1:
         raise ValueError("Unsupported v2 inference bundle")
-    required = {"intensity", "timing", *STAGES}
+    required = {"intensity", "timing", *(PRODUCTION_STAGES if production else STAGES)}
     stages = bundle.get("model_stages", {})
-    if set(stages) != required:
+    if production:
+        if not required <= set(stages) or set(stages) - required - {"lighting"}:
+            raise ValueError("Production bundle requires seven separate trained v2 stages")
+        lighting, sidecar = _production_exclusions(root, bundle, required)
+    elif set(stages) != required:
         raise ValueError("V2 bundle must contain the eight separate trained stages")
     for name, record in bundle.get("files", {}).items():
+        if production:
+            path = _relative(root, name)
+            if path.is_relative_to(lighting) or path == sidecar:
+                continue
         path = _local(root, name)
         if file_hash(path) != record.get("sha256"):
             raise ValueError(f"V2 bundle checksum mismatch: {name}")
@@ -63,8 +103,11 @@ def validate_bundle(bundle_path=None):
     vocabularies = read_json(_local(root, "vocabularies.json"))
     if statistics_hash(vocabularies) != bundle.get("vocabularies_sha256"):
         raise ValueError("V2 bundle vocabulary fingerprint mismatch")
-    if any(not vocabularies.get(key) for key in ("multiplier", "walls", "lighting")):
-        raise ValueError("V2 bundle requires frozen multiplier, wall and lighting vocabularies")
+    vocabulary_keys = ("multiplier", "walls") if production else ("multiplier", "walls", "lighting")
+    if any(not vocabularies.get(key) for key in vocabulary_keys):
+        message = ("Production bundle requires frozen multiplier and wall vocabularies" if production else
+                   "V2 bundle requires frozen multiplier, wall and lighting vocabularies")
+        raise ValueError(message)
     encoder_path = _local(root, bundle.get("encoder"))
     encoder_manifest = read_json(encoder_path.parent / "manifest.json")
     identity = encoder_manifest.get("encoder_identity", {})
@@ -98,10 +141,25 @@ def validate_bundle(bundle_path=None):
     for stage, filename in bundle.get("calibrations", {}).items():
         if stage not in ("hazards", "lighting", "arcs"):
             raise ValueError(f"Unsupported calibrated stage: {stage}")
+        if production and stage == "lighting":
+            continue
         calibrations[stage] = load_calibration(_local(root, filename), stage, manifests[stage])
     return {"root": root, "bundle": bundle, "normalization": statistics,
             "vocabularies": vocabularies, "encoder_identity": identity, "manifests": manifests,
             "calibrations": calibrations}
+
+
+def validate_bundle(bundle_path=None):
+    """Strictly validate all eight experimental bundle stages without TensorFlow."""
+    return _validate_bundle(bundle_path)
+
+
+def validate_production_bundle(bundle_path=None):
+    """Validate seven v2 stages and retained v1 lighting without TensorFlow."""
+    from lighting_prediction.v1_lighting import validate_assets
+    validated = _validate_bundle(bundle_path, production=True)
+    validated["lighting_assets"] = validate_assets()
+    return validated
 
 
 @dataclass
@@ -135,16 +193,16 @@ def _validate_audio_song(song):
 
 
 class V2Runtime:
-    """Load one complete bundle once, retaining one song's feature/latent cache."""
+    """Cache seven v2 stages, retained v1 lighting, encoder and one recording."""
 
     def __init__(self, bundle_path=None):
         started = perf_counter()
-        validated = validate_bundle(bundle_path)
+        validated = validate_production_bundle(bundle_path)
         self.root, self.bundle = validated["root"], validated["bundle"]
         self.statistics, self.vocabularies = validated["normalization"], validated["vocabularies"]
         self.settings = deepcopy(self.bundle["data_settings"])
         for stage, record in validated["calibrations"].items():
-            key = {"hazards": "bomb_threshold", "lighting": "lighting_threshold", "arcs": "arc_threshold"}[stage]
+            key = {"hazards": "bomb_threshold", "arcs": "arc_threshold"}[stage]
             self.settings[key] = record["threshold"]
         import tensorflow as tf
         threads = getattr(config, "v2_inference_threads", 2)
@@ -162,6 +220,7 @@ class V2Runtime:
             # Existing application imports may already have initialized CPU TF.
             pass
         from evaluation.beat_pair import BeatPair, _graph_signature
+        from lighting_prediction.v1_lighting import load_lighting
         from training.pipeline_v2.runner import load_stage_artifact
         paths = self.bundle["model_stages"]
         self.models = {}
@@ -190,7 +249,7 @@ class V2Runtime:
         self.pair = BeatPair(self.root / paths["intensity"], self.root / paths["timing"], model_loader=beat_loader)
         self.predictors = dict(self.pair.predictors)
         with tf.device("/CPU:0"):
-            for stage in STAGES:
+            for stage in PRODUCTION_STAGES:
                 model, _ = load_stage_artifact(self.root / paths[stage], stage)
                 self.models[stage] = model
                 self.predictors[stage] = predictor(model)
@@ -198,6 +257,8 @@ class V2Runtime:
             if tuple(self.encoder_model.input_shape[1:]) != (24, 20, 1) or tuple(self.encoder_model.output_shape[1:]) != (16,):
                 raise ValueError("The retained encoder must accept [24,20,1] and return [16]")
             self._encode = predictor(self.encoder_model)
+            self.lighting = load_lighting(validated["lighting_assets"], predictor)
+            self.models["lighting"] = self.lighting.model
         self.encoder_fingerprint = validated["encoder_identity"]["checkpoint_fingerprint"]
         self._prepared = None
         self._prepared_key = None
@@ -255,7 +316,7 @@ class V2Runtime:
             reused_intensity = prepared.intensity is not None
             result = generate(prepared.song, requested_nps, self.predictors, prepared.encoder,
                               self.settings, self.vocabularies, audio_path=prepared.audio_path,
-                              intensity=prepared.intensity, logger=logger)
+                              intensity=prepared.intensity, logger=logger, lighting_generator=self.lighting)
             prepared.intensity = result.state["intensity"].copy()
             result.diagnostics["bundle_path"] = str(self.root)
             self._cache_metrics["generation_calls"] += 1
@@ -269,8 +330,9 @@ class V2Runtime:
 
 def get_runtime(bundle_path=None):
     """Keep one bundle per process, rebuilding after a fork or explicit selection."""
+    from lighting_prediction.v1_lighting import lighting_paths
     global _CACHE, _CACHE_HITS
-    key = os.getpid(), _bundle_path(bundle_path)
+    key = os.getpid(), _bundle_path(bundle_path), *lighting_paths()
     with _CACHE_LOCK:
         if _CACHE is None or _CACHE[0] != key:
             _CACHE = key, V2Runtime(key[1])

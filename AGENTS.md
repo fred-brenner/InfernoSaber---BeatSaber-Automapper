@@ -3,7 +3,8 @@
 ## Direction
 
 Revive the existing Beat Saber automapper incrementally. App startup and legacy model generation were verified on CPU and GPU.
-V2 application generation uses CPU; GPU remains the training runtime.
+V2 application generation uses CPU, with seven v2 stages, the retained encoder,
+and exclusive v1 `fav_15` lighting; GPU remains the training runtime.
 WSL/Linux is the primary development environment; preserve Windows app
 compatibility. Complete the requested task, including small supporting 
 refactors when they simplify the change. Keep unrelated cleanup separate. 
@@ -24,7 +25,7 @@ platforms before implementing them unless the task already authorizes them.
   and the evaluated `v2_expert` inference bundle. Completed training does not
   establish positive-case or gameplay quality; read the recorded limitations.
   Corpus comparisons require an explicit request.
-- For repaired hazards/lighting/arcs datasets, masks, arc split overlays,
+- For repaired hazards/arcs and experimental v2 lighting datasets, masks, arc split overlays,
   calibration, or mixed legacy/replacement bundles, read
   [docs/sparse-stage-repair.md](docs/sparse-stage-repair.md). New preparation uses
   versioned sparse-stage policies. Preserve existing datasets and inference
@@ -49,7 +50,7 @@ platforms before implementing them unless the task already authorizes them.
 - For the new intensity/timing/note framework, training commands, data contracts,
   and verification limits, read [docs/beat-model-training.md](docs/beat-model-training.md).
   It also documents intensity/timing input caching and grouped Keras execution;
-  these have separate settings from the six downstream trainers.
+  these have separate settings from the downstream trainers.
   Its training-framework acceptance stops at intermediate predictions; production
   composition and package export are documented separately in generation-v2.md.
 - For legacy training work, consult
@@ -72,12 +73,16 @@ labels require verification before becoming current requirements.
   API in that environment and break the existing TCN loading path.
 - Main-script imports are inert: `main_app.build_app()` explicitly builds the UI
   and checks for updates; its guarded launch is spawn-safe. Generation loads the
-  validated local `v2_expert` bundle once per CPU worker and caches one recording.
+  validated seven-stage projection of local `v2_expert`, retained encoder and
+  configured v1 lighting assets once per CPU worker, and caches one recording.
+  V2 lighting is experimental: not yet implemented for production — optional/deferred.
+  Preserve the bundle and experimental strict eight-stage validation/tools.
   Preserve explicit current-run completion records when combining packages; never
   infer success from output-folder existence. `main_training.py` is inert on import; running
-  it selects from all eight v2 training stages, sequentially by default or with
+  it selects the seven production v2 stages, sequentially by default or with
   bounded parallelism via `--parallel N`, routing intensity/timing and downstream
-  models to their respective datasets/trainers.
+  models to their respective datasets/trainers. Menu numbers remain 1–6 and 8
+  (arcs); lighting/7 directs callers to the explicit experimental pipeline trainer.
 
 ## Validation
 

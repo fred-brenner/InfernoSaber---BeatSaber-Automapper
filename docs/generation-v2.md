@@ -1,13 +1,26 @@
 # V2 map generation
 
-The application uses the evaluated local `../Data/model/v2_expert` bundle,
-including its retained encoder. `tools/config/config.py:v2_model_bundle_path`
-can select another compatible bundle; a relative value is relative to the
-repository. Prediction and optional Beat Saber library paths stay separately
-configured in `tools/config/paths.py`. No training datasets or historical source
-paths are required. Missing files, changed hashes, incompatible architecture,
-normalization, encoder identity, or vocabulary fail explicitly. Generation does
-not download models or train them.
+The application uses seven v2 stages from the evaluated local
+`../Data/model/v2_expert` bundle: intensity, timing, positions, arrows, multiplier,
+hazards and arcs, plus its retained encoder. Lighting comes exclusively from
+the original v1 `fav_15` model and event vocabulary. Independent v2 lighting is
+**not yet implemented for production — optional/deferred**; its experimental
+code and artifacts remain available. Existing bundle contents are unchanged.
+
+Settings in `tools/config/config.py` accept repository-relative or absolute paths:
+
+- `v2_model_bundle_path`: `../Data/model/v2_expert`
+- `v1_lighting_model_path`: `../Data/model/fav_15/tf_event_gen_2_12_5_5__22_18.h5`
+- `v1_lighting_vocabulary_path`: `../Data/model/fav_15/onehot_encoder_events.pkl`
+
+Application preflights validate the seven-stage production projection and require
+the v1 lighting assets; they do not require the experimental v2 lighting stage.
+Strict eight-stage bundle validation and experimental tools remain available.
+Prediction and optional Beat Saber library paths stay separately configured in
+`tools/config/paths.py`. No training datasets or historical source paths are
+required. Missing assets or incompatible selected production contracts fail
+explicitly; v2 bundle hashes, normalization, encoder identity and vocabularies
+remain validated. Generation does not download models or train them.
 
 ## Existing commands
 
@@ -47,7 +60,9 @@ result = main_multi_par(2, [3, 5], export_results_to_bs=False)
 
 Call multiprocessing from a guarded `if __name__ == '__main__':` entry point.
 The app, `main_multi`, and `main_multi_par` signatures remain available;
-`main_training.py` continues to select/train all eight v2 stages independently.
+`main_training.py` selects the seven production v2 stages. Explicit experimental
+lighting training uses `python -m training.pipeline_v2 train --stage lighting`;
+see [training selection](pipeline-v2.md#small-development-launcher).
 
 The app displays only `v2_expert`. Importing any main script does not build the
 UI, check for updates, or load TensorFlow. Explicit `main_app.build_app()` builds
@@ -56,9 +71,10 @@ the UI; `build_app(check_updates=False)` also skips the startup update check.
 ## Runtime and workers
 
 Each spawned CPU worker receives a serializable settings/path snapshot before
-TensorFlow loads. It loads each of the eight networks and encoder once, retains
-one recording's decoded features, detected BPM, intensity and encoder latents,
-and replaces that song cache when the recording changes. Timing windows and
+TensorFlow loads. It loads the seven v2 networks, retained encoder and v1 lighting
+model/vocabulary once per worker, retains one recording's decoded features,
+detected BPM, intensity and encoder latents, and replaces that song cache when
+the recording changes. Timing windows and
 encoder queries are batched; chronological stages retain bounded preceding
 history and indexed note lookups. Model calls use reusable TensorFlow graphs.
 
@@ -78,8 +94,15 @@ reports failures instead of displaying unconditional success.
 ## Production stages and controls
 
 The order is audio/BPM → intensity/timing → timing cleanup → positions/arrows →
-legacy note cleanup → multiplier → hazards → arcs → package. Lighting predicts
-its own timeline, including simultaneous commands and partial final blocks.
+legacy note cleanup → multiplier → hazards → arcs → package. V1 lighting uses
+the cleaned gameplay timing sequence, with audio latents from the current
+`FixedEncoder`. It preserves the legacy 16-step block convention and pairs
+decoded events with the timestamp prefix. For `N` cleaned gameplay timestamps,
+there are `max(floor(N/16) - 1, 0)` calls and 16 times that many events; incomplete
+tails and the final complete block are omitted. Songs with fewer than 32 timings
+therefore have no lighting events. Each block uses argmax type/value classes and
+one-hot history, with the existing random score weighting. This is separate from
+the experimental v2 independent schedule and multi-label decoder.
 
 Beat features use the trained 16 kHz contract. The encoder independently uses
 its trained 14,800 Hz preprocessing and fixed song normalization. Neither input
@@ -92,7 +115,9 @@ merges use `min_time_diff`, keep the largest count, and cap it at two. Added eve
 use the nearest timing frame's stronger one/two-note probability. Zero density
 remains empty. Mirroring, single-note mode, flow/movement, breaks, emphasis,
 waveform changes and dot controls run before learned expansion. `random_factor`
-adds bounded normalized variation only to position/arrow probabilities.
+adds bounded normalized variation to v2 position/arrow probabilities. The same
+control also feeds the separate original v1 lighting score weighting through
+`config.random_note_map_factor`.
 
 After cleanup, training reduction selects one representative per hand; heuristic
 extra notes remain separate. Stable note IDs anchor expansions and arc endpoints.
@@ -101,12 +126,20 @@ Single-note mode suppresses emphasis/mirroring conflicts and multiplier expansio
 V2 supplies all bombs, walls and arcs, filtered by applicable legacy options and
 clearance against final notes and chain occupancy. Arcs require existing same-hand
 endpoints. The old synthetic slider turbo start is disabled. Current learned
-thresholds remain unchanged for legacy bundles; sparse lighting or absent arcs
-are reported, with no procedural fallback. Repaired replacement artifacts select
-versioned hazard, lighting and arc policies. A candidate bundle may include
-checkpoint-bound validation calibration sidecars; runtime verifies their hashes
+thresholds remain unchanged for legacy bundles; absent arcs are reported, with no
+procedural fallback. Repaired production replacement artifacts select versioned
+hazard and arc policies. Experimental v2 lighting policies do not affect
+production. A candidate bundle may include checkpoint-bound validation
+calibration sidecars; runtime verifies their hashes
 and contracts before applying thresholds. Stage-specific compatibility keeps
 unchanged upstream checkpoints usable. See [repair workflow](sparse-stage-repair.md). These conservative checks do not prove gameplay safety.
+
+The 2026-10-19 arc-only update uses the repaired contract and a calibrated **0.18**
+attachment threshold. It was installed at the user's request despite failing
+autoregressive positive-case evaluation: **0/358 validation** and **0/66 curated**
+arcs recovered. The disposable Insane packages also contain no arcs. Other stage
+assets are unchanged, and the previous bundle remains available for rollback.
+See the [evaluation and backup paths](baseline.md#arc-only-deployment-and-failed-positive-case-evaluation-2026-10-19).
 
 ## Packages and diagnostics
 

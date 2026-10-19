@@ -2,10 +2,15 @@
 
 Target design, agreed **2026-10-17**, implemented for training and application generation.
 As of **2026-10-18**, all eight model stages have completed training runs; the
-audio encoder is retained. Completed training is separate from positive-case
+audio encoder is retained. As of **2026-10-19**, production uses seven v2 stages
+plus that encoder and exclusively the original v1 `fav_15` lighting model and
+event vocabulary. Independent v2 lighting is **not yet implemented for production
+— optional/deferred**; experimental code and the existing eight-stage bundle
+remain intact. Completed training is separate from positive-case
 quality and playable generation. See [v2 commands and review boundaries](pipeline-v2.md)
 and the [completed-run evaluation](baseline.md#v2-completed-runs-and-inference-bundle-2026-10-18).
-The drawing's amber colors describe the original implementation milestone.
+The drawing shows the current production lighting path; the experimental v2
+lighting contract is retained separately below.
 The trained joint position/direction model is documented in
 [the implemented beat framework](model-beat-architecture.md); v2 separates it
 into **positions → arrows**. The production generator connects these stages through
@@ -25,7 +30,7 @@ retained legacy cleanup; the concept command retains its isolated review boundar
   `K_mult` and `K_wall` are bounded template counts, including NONE;
   vocabularies are fitted on training recordings only and frozen for later stages.
 - Features/probabilities are float32; categories are integers; padding masks are
-  boolean. All times and gaps are **elapsed seconds**. Each stage uses aligned
+  boolean. All times and gaps are **elapsed seconds**. Each v2 stage uses aligned
   current audio, upstream outputs, and strictly preceding own-stage history.
 - Requested density `D` means **retained colored notes/second**, before expansion.
   A red/blue pair counts as two. BPM is a separate input. Multiplier output can
@@ -71,9 +76,10 @@ Frame argmax yields timestamps; final BPM alignment/grid snapping is separate.
 **I/O:** centered two-second spectrogram `[B,24,20,1]` → latent `[B,16]`.
 Keep the checkpoint's 14,800 Hz decoding and resized log-spectrum. The approved
 normalization adaptation fits one min/max scale on a fixed half-second grid per
-song and reuses it for every stage. Cache latents at gameplay, hazard, arc and
-independent lighting query locations. The adapter pads edge patches while
-retaining timestamps; the encoder weights remain unchanged.
+song and reuses it for every stage. Cache latents at gameplay, hazard and arc
+query locations; production v1 lighting reuses latents at cleaned gameplay times.
+The adapter pads edge patches while retaining timestamps; the encoder weights
+remain unchanged.
 Every model **4–9** receives its own snippet's **`Z [B,16]`** directly from this
 standalone encoder, alongside its other inputs.
 
@@ -159,7 +165,27 @@ bomb masks and canonical cleared-section history preserve local supervision.
 Existing legacy artifacts retain their original gap/source-query policy.
 The repaired contracts need separately trained replacement checkpoints.
 
-## 8. Lighting events — retained topology, independent scheduling implemented
+## 8. Lighting events — retained v1 production model
+
+Production loads the original `fav_15` lighting checkpoint and
+`onehot_encoder_events.pkl` once per CPU worker. The unchanged retained encoder
+uses the current `FixedEncoder` preprocessing at cleaned gameplay timestamps.
+The checkpoint consumes latent blocks `[B,16,16,1]`, gaps `[B,16,1]` and previous
+one-hot classes `[B,16,1904]`; argmax decodes one type/value class per emitted row.
+Its network has **38,264,640 parameters**.
+
+The legacy16 convention keeps `max(floor(N/16) - 1, 0)` calls for `N` cleaned
+gameplay timestamps, dropping the incomplete tail and last complete block.
+Decoded events pair with the timestamp prefix rather than shifting timestamps
+to the next block. Fewer than 32 timestamps produce no events. Existing random
+score weighting and one-hot feedback remain. Assets are configured separately
+from the unchanged v2 bundle; see [production settings](generation-v2.md).
+
+### Independent v2 lighting — optional/deferred experiment
+
+**Not yet implemented for production — optional/deferred.** The following
+training/concept contract, checkpoints and repair tools remain experimental;
+the application does not load their lighting model, schedule or decoder.
 
 **I/O:** audio **`Z [B,16]` per lighting query**, stacked into `[B,L,16,1]`,
 gaps `[B,L,1]`, lighting history `[B,L,C_light]`
@@ -212,14 +238,16 @@ positive-sensitive checkpoint selection and validation-only calibration.
 
 ## Composition boundary
 
-**Intensity → timing → positions → arrows → multiplier → hazards → arcs**;
-lighting runs on its independent timeline. The shared encoder supplies downstream
-audio. Each stage owns its output objects/attributes and passes upstream data on.
+**Intensity → timing → positions → arrows → multiplier → hazards → arcs**.
+Production adds v1 lighting on cleaned gameplay timings; the independent v2
+lighting timeline is an optional/deferred experiment. The shared encoder supplies
+downstream audio. Each stage owns its output objects/attributes and passes
+upstream data on.
 The production order is **intensity/timing → timing cleanup → positions/arrows →
-legacy note cleanup → multiplier → hazards → arcs → export**. Lighting keeps its
-own timeline. Legacy movement/direction changes finish before stable note IDs and
-learned expansions. Training reduction chooses one representative per hand;
-heuristic extra notes remain separate. Downstream clearance rejects additions
+legacy note cleanup → multiplier → hazards → arcs → export**. V1 lighting uses
+its legacy16 prefix pairing. Legacy movement/direction changes finish before
+stable note IDs and learned expansions. Training reduction chooses one
+representative per hand; heuristic extra notes remain separate. Downstream clearance rejects additions
 without moving those anchors. Export converts seconds to beats once, writing
 3.2.0 by default or the existing 2.0.0 legacy option. Native chains belong to the
 multiplier; v2 export keeps their colored heads and reports omitted bodies/arcs.

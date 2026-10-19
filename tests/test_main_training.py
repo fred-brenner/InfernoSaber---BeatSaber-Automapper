@@ -14,8 +14,8 @@ import main_training
     ("positions arrows", ("positions", "arrows")),
     ("1, 2 3 8", ("intensity", "timing", "positions", "arcs")),
     ("ARCS, positions 3 arcs", ("positions", "arcs")),
-    ("all", main_training.STAGES),
-    ("alle", main_training.STAGES),
+    ("all", ("intensity", "timing", "positions", "arrows", "multiplier", "hazards", "arcs")),
+    ("alle", ("intensity", "timing", "positions", "arrows", "multiplier", "hazards", "arcs")),
     ("   ", ()),
 ])
 def test_menu_selection(selection, expected):
@@ -26,6 +26,33 @@ def test_menu_selection(selection, expected):
 def test_menu_rejects_unknown_models(selection):
     with pytest.raises(ValueError, match="Unknown model"):
         main_training.selected_models(selection)
+
+
+@pytest.mark.parametrize("selection", ["7", "07", "LIGHTING", "all lighting", "8 7"])
+def test_menu_explains_deferred_lighting(selection):
+    with pytest.raises(ValueError, match="not yet implemented for production") as error:
+        main_training.selected_models(selection)
+    assert "experimental" in str(error.value)
+    assert "python -m training.pipeline_v2 train --stage lighting" in str(error.value)
+
+
+@pytest.mark.parametrize("selection", ["7", "lighting", "all lighting"])
+@pytest.mark.parametrize("interactive", [False, True])
+def test_deferred_lighting_fails_before_creating_outputs(tmp_path, monkeypatch, capsys, selection, interactive):
+    root = tmp_path / "queue"
+    monkeypatch.setattr("builtins.input", lambda _: selection)
+    monkeypatch.setattr(main_training.subprocess, "run", lambda *_, **__: pytest.fail("No training expected"))
+    monkeypatch.setattr(main_training.subprocess, "Popen", lambda *_, **__: pytest.fail("No training expected"))
+    args = ["--dataset", str(tmp_path / "missing"), "--run-dir", str(root)]
+    if not interactive:
+        args += ["--models", *selection.split()]
+    with pytest.raises(SystemExit) as error:
+        main_training.main(args)
+    assert error.value.code == 2
+    stderr = capsys.readouterr().err
+    assert "not yet implemented for production" in stderr
+    assert "python -m training.pipeline_v2 train --stage lighting" in stderr
+    assert not root.exists()
 
 
 @pytest.fixture
@@ -40,7 +67,7 @@ def queue_paths(tmp_path):
 
 
 @pytest.mark.parametrize("dry_run", [False, True])
-def test_all_eight_commands_are_sequential_and_use_the_active_python(queue_paths, monkeypatch, dry_run):
+def test_all_seven_commands_are_sequential_and_use_the_active_python(queue_paths, monkeypatch, dry_run):
     dataset, beat_dataset, root = queue_paths
     calls = []
 
@@ -58,7 +85,7 @@ def test_all_eight_commands_are_sequential_and_use_the_active_python(queue_paths
     if dry_run:
         args.append("--dry-run")
     assert main_training.main(args) == 0
-    assert len(calls) == 8
+    assert len(calls) == 7
     for stage, (command, cwd) in zip(main_training.STAGES, calls):
         beat = stage in ("intensity", "timing")
         module = "training.beat_models" if beat else "training.pipeline_v2"
@@ -80,8 +107,9 @@ def test_interactive_menu_and_cli_share_canonical_order(queue_paths, monkeypatch
     assert main_training.main(["--dataset", str(dataset), "--run-dir", str(root)]) == 0
     assert [command[5] for command in calls] == ["positions", "arcs"]
     output = capsys.readouterr().out
-    for number, stage in enumerate(main_training.STAGES, 1):
+    for number, stage in zip((1, 2, 3, 4, 5, 6, 8), main_training.STAGES):
         assert f"{number}. {stage}" in output
+    assert "7. lighting" not in output
     assert "[1/2] positions" in output
     assert "[2/2] arcs" in output
 

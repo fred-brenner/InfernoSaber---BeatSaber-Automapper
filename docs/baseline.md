@@ -1413,3 +1413,114 @@ Replacement training, validation calibration, reference-conditioned and
 autoregressive model comparisons, and candidate-bundle playtests remain later
 user-run work. Promotion requires positive-case improvement over empty/frequency
 baselines and valid exported objects. There is no procedural fallback.
+
+
+## Production lighting status (2026-10-19)
+
+Production now uses seven v2 stages (intensity, timing, positions, arrows,
+multiplier, hazards and arcs), the unchanged retained encoder and exclusively
+the original v1 `fav_15` lighting model/event vocabulary. Independent v2 lighting
+is **not yet implemented for production — optional/deferred**. Its experimental
+training, repaired contracts, strict eight-stage tools and existing bundle assets
+remain available; the dated evaluations and sparse-lighting results above record
+the earlier production composition.
+
+Application preflights select the seven-stage projection and require the
+configured v1 lighting assets. Workers cache those assets and use cleaned
+gameplay timings with the current `FixedEncoder` and legacy16 prefix pairing,
+including `max(floor(N/16) - 1, 0)` complete-block calls. The normal training menu
+and `--models all` select seven v2 stages, retaining arcs as menu item 8. Explicit
+experimental lighting training uses `python -m training.pipeline_v2 train --stage lighting`.
+See [generation details](generation-v2.md) and [training selection](pipeline-v2.md#small-development-launcher).
+
+No training or corpus comparisons were run for this production-lighting change.
+It does not establish improved map quality or in-game playability.
+
+A full-song WSL CPU check generated Bad Hatter at requested 5 NPS with
+`main(diff=20, export_results_to_bs=False, random_factor=0)` in 31.6 seconds.
+The worker loaded exactly the seven production v2 predictors and the original
+v1 lighting assets. Its 803 cleaned timing queries produced 49 complete blocks
+and **784 lighting events**, matching the legacy16 contract. Final gameplay
+contains **645 colored notes** (629 retained and 16 heuristic), with no learned
+copies, chains, walls, bombs or arcs from the existing bundle/options. Source
+assets were unchanged and Beat Saber library export was disabled.
+
+The disposable package and ZIP are under
+`/tmp/infernosaber-v1-lighting-sample-n69ph946/output/`;
+`/tmp/infernosaber-v1-lighting-sample-n69ph946/acceptance.json` records package
+inspection, active stage names, counts and SHA-256 identities for both v1 assets.
+GPU inference, native Windows execution and in-game playability were not checked.
+
+## Arc-only deployment and failed positive-case evaluation (2026-10-19)
+
+The user requested evaluation, calibration and installation of the replacement
+arc run in `Data/training/pipeline_v2/runs/sparse-repair-20261018/arcs`.
+Only arcs existed in that run root. Training completed technically: **23 epochs**,
+with **epoch 13** selected by validation attachment PR-AUC **0.1553**. This score
+uses reference history; validation positive prevalence is **0.00554**. The selected
+checkpoint's validation loss is **0.01758**; the lower loss recorded at epoch 2
+does not identify the selected checkpoint. All positive TRAIN/validation anchor
+labels are class 0, so reported anchor accuracy does not establish mode diversity.
+
+Validation-only calibration ranked thresholds .01–.99 using the real decoder
+and replayed the best three (.18, .11, .13) autoregressively. All three had zero
+true positives. The prescribed tie break selected **0.18**. At that threshold:
+
+| Evaluation context | TP | FP | FN | F1 |
+|---|---:|---:|---:|---:|
+| Validation, reference arc history | 82 | 106 | 276 | 0.3004 |
+| Validation, predicted arc history | 0 | 77 | 358 | 0 |
+| Seven curated songs, reference arc history | 3 | 4 | 63 | 0.0822 |
+| Seven curated songs, predicted arc history | 0 | 4 | 66 | 0 |
+
+All seven curated packages prepared successfully; no favorites data was used.
+Their 66 eligible source arcs all belong to Insane. The four autoregressive false
+positives belong to Lost In The Echo. The replacement does **not** improve positive
+F1 over empty/frequency baselines. TEST and curated examples were not used to tune
+thresholds. Arc validation's two positive groups were previously exposed to
+upstream models; TEST contains only one arc-positive recording group.
+
+Reconstructed calibration inputs matched preparation bit-for-bit for all **4,891
+queries** in six arc-positive validation maps, including history masks, elapsed
+times and equal-time exclusion. Zeroing only history values reduced detections
+on the 358 positive rows from **82 to 0** at threshold .18. All 82 detections need
+preceding reference-positive history. The evidence supports a model that cannot
+initiate useful arc sequences on its own, rather than a history assembly mismatch.
+
+Despite the failed positive-case gate, the arc-only replacement was installed
+at the user's explicit request. `Data/model/v2_expert` now contains checkpoint
+SHA-256 `7d4e5a2b894d8e9bcda9531ddc0fa09afdfeefffb67215a6fb8ea12a99d113ea`,
+its versioned arc contract and checkpoint-bound .18 calibration sidecar. Bundle
+metadata explicitly records failed autoregressive quality. All other model,
+encoder, normalization and vocabulary assets remain byte-identical. The complete
+previous bundle is retained at `Data/model/v2_expert_before_arcs-20261019-191457`.
+Training artifacts and curated source files remain unchanged.
+
+CPU verification used the pinned Python 3.10 / TensorFlow/tf.keras 2.15 environment:
+
+- **86 focused tests passed** for arc policy, bundle compatibility, calibration
+  and sparse production integration. The full CPU suite was not rerun for this
+  artifact review.
+- A disposable full-generation check produced Insane at requested **3/5 NPS**,
+  with **247/529 colored notes** and **272/528 lighting commands**. Both maps have
+  zero raw arc attachment proposals and zero final arcs; clearance/export did not
+  remove positive proposals. JSON, asset references, bounds, endpoint checks and
+  ZIP inspection passed. Library export was disabled.
+- No training, optimizer updates or GPU execution occurred during the review.
+  Technical loading/export success does not establish gameplay quality.
+
+Reports and sample (outside source control):
+
+- [Evaluation summary](../../Data/training/pipeline_v2/sparse-repair-20261018-r2/arc-review-20261019-191457/summary.md)
+- [Calibration](../../Data/training/pipeline_v2/sparse-repair-20261018-r2/arc-review-20261019-191457/calibration/arcs/calibration.json)
+- [Seven-song comparison](../../Data/training/pipeline_v2/sparse-repair-20261018-r2/arc-review-20261019-191457/comparison/arcs/report.json)
+- [Installation and preservation checks](../../Data/training/pipeline_v2/sparse-repair-20261018-r2/arc-review-20261019-191457/promotion.json)
+- [Insane sample ZIP](../../Data/training/pipeline_v2/sparse-repair-20261018-r2/arc-review-20261019-191457/package-check/new_map/12345_Insane.zip)
+
+Detailed logs and source hashes are under
+`/home/frede/.local/share/infernosaber-baseline/diagnostics/arc-promotion-20261019-191457`.
+
+The complete CPU framework suite, `python -m pytest -q -m 'not comparison'`,
+passed: **1,005 passed, 10 deselected, 1,246 warnings in 179.07 seconds**.
+The log is `/tmp/infernosaber-v1-lighting-pytest.log`. Comparison tests were
+excluded; no training or corpus comparison was started.

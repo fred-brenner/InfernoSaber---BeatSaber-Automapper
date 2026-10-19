@@ -14,7 +14,7 @@ from training.beat_models.contracts import CORE, FRAME_SECONDS, frame_conditions
 from training.pipeline_v2.contracts import build_inputs, expansion_occupancy_notes, index_state
 from training.pipeline_v2.pipeline import (PipelineResult, _decode_positions, _distribution,
                                            _expand, _multilabel, _output, _predict)
-from training.pipeline_v2.scheduling import hazard_candidates, lighting_candidates
+from training.pipeline_v2.scheduling import hazard_candidates
 from training.pipeline_v2.arc_policy import arc_candidates, history_value
 from training.pipeline_v2.policies import repaired
 
@@ -186,9 +186,9 @@ def _validate_state(state, duration):
 
 
 def generate(song, requested_nps, predictors, encoder, settings, vocabularies, *,
-             audio_path=None, logger=None, postprocessors=None, random_factor=None,
+             lighting_generator, audio_path=None, logger=None, postprocessors=None, random_factor=None,
              intensity=None, rng=None):
-    """Compose all trained stages and application validators into exportable state."""
+    """Compose seven v2 stages, retained v1 lighting, and application validators."""
     if isinstance(requested_nps, bool) or not np.isfinite(requested_nps) or requested_nps < 0:
         raise ValueError("Requested retained NPS must be finite and nonnegative")
     if postprocessors is None:
@@ -202,7 +202,8 @@ def generate(song, requested_nps, predictors, encoder, settings, vocabularies, *
     options = deepcopy(settings)
     options["vocabularies"] = vocabularies
     schedule = options["schedule"]
-    status = "dummy" if all(getattr(predictor, "status", "trained") == "dummy" for predictor in predictors.values()) else "trained"
+    status = "dummy" if all(getattr(predictor, "status", "trained") == "dummy"
+                            for stage, predictor in predictors.items() if stage != "lighting") else "trained"
     result = PipelineResult(status, {key: [] for key in ("notes", "chains", "walls", "bombs", "arcs", "lighting")},
                             diagnostics={"requested_retained_nps": float(requested_nps),
                                          "duration_seconds": duration, "bpm": bpm,
@@ -218,7 +219,7 @@ def generate(song, requested_nps, predictors, encoder, settings, vocabularies, *
                        getattr(config, "v2_timing_batch_size", 8), intensity=intensity)
     beat_seconds = beats.pop("_stage_seconds")
     state.update(beats, requested_nps=float(requested_nps),
-                 light_classes=len(vocabularies["lighting"]), multiplier_classes=len(vocabularies["multiplier"]))
+                 multiplier_classes=len(vocabularies["multiplier"]))
     cleanup_started = perf_counter()
     candidates, diagnostics = postprocessors.postprocess_timing(song, beats, audio_path, logger=logger)
     candidates = _candidates(song, candidates)
@@ -388,30 +389,10 @@ def generate(song, requested_nps, predictors, encoder, settings, vocabularies, *
     result.diagnostics["arc_clearance"].update(arc_rejections)
     result.stages["arcs"] = {"queries": len(queries), "arcs": len(state["arcs"]), "elapsed_seconds": perf_counter() - started}
     started = perf_counter()
-    if repaired(options, "lighting"):
-        from training.pipeline_v2.basic_lighting import candidates as light_candidates, decode
-        queries = light_candidates(song, options)
-    else:
-        queries = lighting_candidates(song, duration, bpm, schedule)
-    encoder(np.asarray([query["time"] for query in queries], np.float64))
-    history, block = [], options["lighting_block_length"]
-    _log(logger, "V2 lighting")
-    for start in range(0, len(queries), block):
-        selected = queries[start:start + block]
-        candidate = {"time": selected[0]["time"], "times": [query["time"] for query in selected],
-                     "mask": [True] * len(selected) + [False] * (block - len(selected))}
-        output = _predict(predictors["lighting"], _inputs("lighting", song, state, candidate, history, encoder, options))
-        values = _multilabel(_output(output, "events"), (1, block, len(vocabularies["lighting"])), "lighting")[0]
-        for index, query in enumerate(selected):
-            labels = (decode(values[index], vocabularies, options["lighting_threshold"]) if repaired(options, "lighting")
-                      else values[index] >= options["lighting_threshold"])
-            raw["lighting_commands"] += int(labels.sum())
-            state["lighting"].extend({"time": query["time"], **deepcopy(vocabularies["lighting"][int(category)])}
-                                     for category in np.flatnonzero(labels))
-            _history(history, {"time": query["time"], "value": labels.astype(np.float32).tolist()}, block)
-        _progress(logger, "lighting blocks", start // block, (len(queries) + block - 1) // block)
-    result.stages["lighting"] = {"queries": len(queries), "events": len(state["lighting"]),
-                                 "blocks": (len(queries) + block - 1) // block, "tail_queries": len(queries) % block,
+    _log(logger, "V1 lighting")
+    state["lighting"], lighting_report = lighting_generator(state["event_times"], encoder)
+    raw["lighting_commands"] = len(state["lighting"])
+    result.stages["lighting"] = {**lighting_report, "events": len(state["lighting"]),
                                  "elapsed_seconds": perf_counter() - started}
     if [note for note in state["notes"] if note.get("kind") == "retained"] != retained:
         raise ValueError("A downstream stage changed retained notes")

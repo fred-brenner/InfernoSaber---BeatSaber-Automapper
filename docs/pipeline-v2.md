@@ -3,8 +3,11 @@
 The concept pipeline implements the stage contracts in
 [model-architecture.md](model-architecture.md). It connects the retained
 intensity/timing pair and audio encoder to **positions → arrows → multiplier →
-hazards → arcs**, with lighting on its own timeline. The former joint `notes`
-checkpoint is not used by this composition.
+hazards → arcs**. Production lighting uses only the v1 `fav_15` model and event
+vocabulary. Independent v2 lighting is **not yet implemented for production —
+optional/deferred**; the concept pipeline and strict eight-stage tools retain
+its experimental implementation. The former joint `notes` checkpoint is not
+used by this composition.
 
 Application generation now uses the production path in `map_creation/v2_runtime.py`,
 `v2_pipeline.py`, `v2_postprocessing.py` and `v2_export.py`. It connects the trained
@@ -21,7 +24,9 @@ best checkpoints, original manifests and reports are copied into
 `encoder/encoder.h5`. The former joint `notes` model is excluded. `bundle.json`
 records explicit source runs, hashes, compatibility and CPU loading checks;
 `evaluation.json` records model-quality limitations. Normalization statistics
-and frozen vocabularies are included, without training datasets.
+and frozen vocabularies are included, without training datasets. This historical
+eight-stage bundle remains intact. Production selects seven stages plus its
+encoder and separately configured v1 lighting assets; it ignores v2 lighting.
 
 Use `v2_expert` as `--beat-run`, its stage directories as the corresponding
 `--<stage>-artifact`, and `encoder/encoder.h5` as `--encoder-checkpoint` in the
@@ -70,7 +75,7 @@ lighting defaults to blocks of 16. Every effective configuration is recorded.
 | Multiplier | Red/blue bounded template categories, including NONE | Directed retained notes, neighboring retained notes, preceding expansions, latent and conditions |
 | Hazards | Wall-template softmax plus 12 independent bomb probabilities; categorical/BCE losses | Expanded-note/chain occupancy, candidate interval, preceding hazards, latent and conditions |
 | Arcs | Attachment softmax, two bounded handle controls, three anchor modes | Existing same-hand endpoints, preceding arcs, latent and conditions; control losses masked unless attached |
-| Lighting | Independent type/value probabilities; masked BCE | Current latent/time block and a separate strictly preceding history block |
+| Lighting (experimental, optional/deferred) | Independent type/value probabilities; masked BCE | Current latent/time block and a separate strictly preceding history block |
 
 Five new event models follow Dense64/Embedding16/GRU64/Dense128 designs. Lighting
 retains the documented Conv2D/LSTM/Dense1024 topology; its class count comes from
@@ -101,7 +106,7 @@ with the real training vocabulary. These are untrained model sizes.
   the anchor's hand and direction; conflicting/dot groups and unsupported
   templates are preserved and masked. Timing offsets are bounded template data,
   quantized separately from the synchronization threshold. Anchors never move.
-- **Lighting:** simultaneous type/value commands form multi-label targets;
+- **Experimental v2 lighting:** simultaneous type/value commands form multi-label targets;
   an all-zero vector means no command. Current audio/time blocks predict their
   own targets, including partial tails. Unsupported brightness/custom events are
   retained in diagnostics rather than squeezed into type/value labels.
@@ -174,8 +179,16 @@ python -m training.pipeline_v2 train --stage positions --dataset ../Data/trainin
 python -m training.pipeline_v2 train --stage arrows --dataset ../Data/training/pipeline_v2/full/dataset --run-dir ../Data/training/pipeline_v2/runs/arrows
 python -m training.pipeline_v2 train --stage multiplier --dataset ../Data/training/pipeline_v2/full/dataset --run-dir ../Data/training/pipeline_v2/runs/multiplier
 python -m training.pipeline_v2 train --stage hazards --dataset ../Data/training/pipeline_v2/full/dataset --run-dir ../Data/training/pipeline_v2/runs/hazards
-python -m training.pipeline_v2 train --stage lighting --dataset ../Data/training/pipeline_v2/full/dataset --run-dir ../Data/training/pipeline_v2/runs/lighting
 python -m training.pipeline_v2 train --stage arcs --dataset ../Data/training/pipeline_v2/full/dataset --run-dir ../Data/training/pipeline_v2/runs/arcs
+```
+
+V2 lighting training is separate, experimental and optional/deferred. Run it only
+when explicitly pursuing that future work; it does not change production lighting:
+
+```bash
+python -m training.pipeline_v2 train --stage lighting \
+  --dataset ../Data/training/pipeline_v2/full/dataset \
+  --run-dir ../Data/training/pipeline_v2/runs/lighting-experimental
 ```
 
 The new stages use fixed upstream reference inputs and strictly preceding
@@ -197,12 +210,13 @@ python main_training.py
 ```
 
 Select models by number or name, separated by spaces or commas; `all`/`alle`
-selects all eight and an empty answer cancels. The menu order is intensity,
-timing, positions, arrows, multiplier, hazards, lighting and arcs. The selected
-models start in that order, using the activated Python. By default they run one
-child process at a time; `--parallel N` allows up to N simultaneous models.
+selects the seven production stages and an empty answer cancels. Existing menu
+numbers stay stable: 1 intensity, 2 timing, 3 positions, 4 arrows, 5 multiplier,
+6 hazards and 8 arcs. Selecting `lighting` or `7` fails with the explicit
+experimental trainer command above. The selected models start in pipeline order,
+using the activated Python. By default they run one child process at a time; `--parallel N` allows up to N simultaneous models.
 Intensity/timing use their existing `training.beat_models` trainer and default
-dataset `../Data/training/beat_models_v2/full-2026-10-17/dataset`; the other six use
+dataset `../Data/training/beat_models_v2/full-2026-10-17/dataset`; the other five use
 `training.pipeline_v2` and `../Data/training/pipeline_v2/full/dataset`. Both
 trainers retain their settings from `config.py`, including timing conditioning.
 A new timestamped parent run directory contains one child directory per stage.
@@ -220,7 +234,7 @@ python main_training.py --models positions
 For the stages after positions, with two models running at a time:
 
 ```bash
-python main_training.py --models arrows multiplier hazards lighting arcs --parallel 2
+python main_training.py --models arrows multiplier hazards arcs --parallel 2
 ```
 
 Omit `--parallel` or use `--parallel 1` for sequential execution. It also works
@@ -238,7 +252,8 @@ the script or requesting `--help` neither prompts nor starts model work.
 
 ### Training throughput
 
-The six downstream stages perform one integrity, provenance, stage-validation and split-count
+The five production downstream stages and optional experimental lighting trainer
+perform one integrity, provenance, stage-validation and split-count
 scan at startup, with progress every 25 songs. It then reuses those checks.
 Only the chosen stage is retained: `pipeline_v2_training_ram_cache_mib = 1024`
 allows an automatic 1 GiB RAM cache. Larger stages stream one song at a time;
@@ -287,6 +302,8 @@ traversal with all unresolved reviews recorded. Dummy smoke uses a dummy-only
 contract mode to exercise the entire sequence. Keras smoke builds untrained
 networks, differentiates losses and checks serialization; it makes no optimizer.
 
+The concept command remains an experimental strict eight-stage tool, including
+v2 lighting; it does not select the production v1 lighting path.
 With trained artifacts, `concept --backend keras` requires `--beat-run` selecting
 the retained intensity/timing run, `--encoder-checkpoint`, and each of
 `--positions-artifact`, `--arrows-artifact`, `--multiplier-artifact`,
@@ -324,8 +341,8 @@ python -m evaluation.evaluate_pipeline_v2 --stage positions \
   --output ../Data/training/evaluate_beats/results/v2-positions
 ```
 
-Select `arrows`, `multiplier`, `hazards`, `lighting`, `arcs` or `encoder` for the
-other independent comparisons. An encoder comparison additionally needs an
+Select `arrows`, `multiplier`, `hazards`, `arcs` or `encoder` for the other
+independent comparisons; `lighting` selects the optional experimental v2 stage. An encoder comparison additionally needs an
 explicit curated `--audio` and its retained checkpoint; `--autoencoder-artifact`
 is optional. Only explicit `--execute` performs a comparison. Favorites and
 unrelated recordings are rejected. Hazards expose augmented-reference,

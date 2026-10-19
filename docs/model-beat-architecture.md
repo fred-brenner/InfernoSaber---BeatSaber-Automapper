@@ -11,8 +11,10 @@ grid snapping, map export, lighting, obstacles/bombs, and a future multiplier
 are outside this architecture milestone.
 
 The subsequent [v2 concept framework](pipeline-v2.md) now implements separate
-positions, arrows, multiplier, hazards, lighting and arcs stages with explicit
-review stops. It reuses this trained intensity/timing pair; the joint `notes`
+positions, arrows, multiplier, hazards and arcs stages with explicit review stops.
+Independent v2 lighting remains experimental: not yet implemented for production
+— optional/deferred. The application instead uses the original v1 lighting model
+and event vocabulary; see [production generation](generation-v2.md). It reuses this trained intensity/timing pair; the joint `notes`
 checkpoint described here remains a separate earlier model.
 
 The previous generator, autoencoder, H5 checkpoints, learned pattern

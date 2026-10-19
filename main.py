@@ -8,7 +8,7 @@ import time
 from tools.config import paths, config
 from map_creation.v2_generation import generate_song, scoped_settings
 from map_creation.v2_export import write_zip
-from map_creation.v2_runtime import validate_bundle
+from map_creation.v2_runtime import validate_production_bundle
 from bs_shift.export_map import check_music_files, shutil_copy_maps
 
 
@@ -71,9 +71,9 @@ def main(use_model=None, diff=None, export_results_to_bs=True,
                 config.bs_mapping_version = 'v2'
             else:
                 config.bs_mapping_version = 'v3'
-        validate_bundle()
+        validate_production_bundle()
         if logger_callback:
-            logger_callback("V2 model bundle verified")
+            logger_callback("Production models verified")
         results, failures = [], []
         song_list = os.listdir(paths.songs_pred)
         song_list = check_music_files(song_list, paths.songs_pred)

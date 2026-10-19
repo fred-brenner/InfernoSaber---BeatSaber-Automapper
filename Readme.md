@@ -40,14 +40,17 @@ https://discord.com/invite/cdV6HhpufY
 ### Built With
 
 Generation uses the local `v2_expert` bundle: intensity, timing, positions,
-arrows, multiplier, hazards, arcs, and independent lighting, plus the retained
-audio encoder. Legacy timing and note cleanup remain between the learned stages.
+arrows, multiplier, hazards and arcs, plus the retained audio encoder. Lighting
+uses only the original v1 `fav_15` model and event vocabulary. Independent v2
+lighting is not yet implemented for production — optional/deferred. Legacy timing
+and note cleanup remain between the learned stages.
 
 Existing `main.py`, `main_multi.py`, and `main_app.py` commands and map folders
 remain available. Difficulty 5 requests 5 retained colored notes per second;
 postprocessing and expansion can change the final density. Legacy model arguments
 are still accepted and select v2. Configure `v2_model_bundle_path` in
-`tools/config/config.py`; generation never downloads a replacement model.
+`tools/config/config.py`, together with `v1_lighting_model_path` and
+`v1_lighting_vocabulary_path`; generation never downloads a replacement model.
 
 See [generation commands](docs/generation-v2.md),
 [model architecture](docs/model-architecture.md), and
@@ -69,9 +72,9 @@ Current pinokio version from: https://github.com/pinokiocomputer/pinokio/release
 
 ## Usage
 
-The inference usage is simplified with the included app in branch 'main_app'. The AI models will be automatically downloaded during runtime from [Hugging Face](https://huggingface.co/BierHerr/InfernoSaber), if not yet available.
+The included app in branch 'main_app' uses the configured local v2 bundle and v1 lighting assets. Missing models fail explicitly; install the assets before generation. See [generation setup](docs/generation-v2.md).
 
-You can also train your own models on your favorite maps and difficulty. This can only be done locally with cloning the repo and using GPU (one better consumer GPU is enough) A guide to train the 4 models is included in the repo: 'How_to_Train_InfernoSaber.docx'
+You can train the seven production v2 stages locally in the GPU environment. See [current training commands](docs/pipeline-v2.md); independent v2 lighting remains an optional experiment. The older four-model guide describes legacy training.
 
 Extract maps from Beatsaber/Bsaber to feed them into AI models. Map versions with custom modded data (values out of normal boundaries) are excluded, so that the data is as smooth as possible.
 

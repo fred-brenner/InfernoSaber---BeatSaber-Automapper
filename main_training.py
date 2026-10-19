@@ -9,21 +9,26 @@ import time
 
 
 BEAT_STAGES = ("intensity", "timing")
-STAGES = (*BEAT_STAGES, "positions", "arrows", "multiplier", "hazards", "lighting", "arcs")
+MENU_STAGES = {1: "intensity", 2: "timing", 3: "positions", 4: "arrows",
+               5: "multiplier", 6: "hazards", 8: "arcs"}
+STAGES = tuple(MENU_STAGES.values())
 
 
 def selected_models(value):
     """Accept menu numbers/names and return unique models in pipeline order."""
     selected = set()
     for token in value.lower().replace(",", " ").split():
+        if token == "lighting" or (token.isdigit() and int(token) == 7):
+            raise ValueError("V2 lighting is not yet implemented for production and is deferred from this selector. "
+                             "For experimental training, use: python -m training.pipeline_v2 train --stage lighting")
         if token in ("all", "alle"):
             selected.update(STAGES)
         elif token in STAGES:
             selected.add(token)
-        elif token.isdigit() and 1 <= int(token) <= len(STAGES):
-            selected.add(STAGES[int(token) - 1])
+        elif token.isdigit() and int(token) in MENU_STAGES:
+            selected.add(MENU_STAGES[int(token)])
         else:
-            raise ValueError(f"Unknown model: {token}. Choose 1-{len(STAGES)}, model names, or all.")
+            raise ValueError(f"Unknown model: {token}. Choose 1-6 or 8, model names, or all.")
     return tuple(stage for stage in STAGES if stage in selected)
 
 
@@ -37,7 +42,7 @@ def parser():
     command.add_argument("--run-dir", type=Path,
                          help="New queue output directory (default: ../Data/training/pipeline_v2/runs/<timestamp>)")
     command.add_argument("--models", nargs="+", metavar="MODEL",
-                         help="Model names or menu numbers; all selects all eight and skips the menu")
+                         help="Model names or menu numbers; all selects all seven supported v2 stages and skips the menu")
     command.add_argument("--parallel", type=int, default=1, metavar="N",
                          help="Maximum simultaneous model processes (default: 1, sequential)")
     command.add_argument("--dry-run", action="store_true", help="Pass --dry-run to each stage training command")
@@ -89,7 +94,7 @@ def main(argv=None):
     try:
         if args.models is None:
             print("Choose v2 models to train (spaces/commas; all/alle selects all; blank cancels):")
-            for number, stage in enumerate(STAGES, 1):
+            for number, stage in MENU_STAGES.items():
                 print(f"  {number}. {stage}")
             selection = input("Models: ")
         else:

@@ -17,6 +17,7 @@ from map_creation.class_helpers import get_class_size, update_out_class, add_fav
 # from tools.utils import numpy_shorts
 
 from training.helpers import *
+from lighting_prediction.v1_lighting import apply_random_mapper
 
 
 def decode_class_string(y_class_num):
@@ -115,42 +116,6 @@ def generate(l_in_song, time_ar, save_model_name, lstm_len, encoder_file):
         # print("Finished mapping generator")
         pass
     return y_class_num
-
-
-def apply_random_mapper(y_class, rd_distribution, rd_counter):
-    # Warning: Prediction is not stable enough
-    # May lead to random resampling of ml output
-
-    # initiate random map center
-    c_window = 60
-    c_val = config.random_note_map_factor
-    if c_val == 0:
-        return y_class, rd_distribution, rd_counter
-
-    # scale batch to [0, 1]
-    y_class_sc = y_class / np.max(y_class)
-
-    if rd_counter <= 0:
-        # initialization
-        rd_distribution = np.random.rand(y_class.shape[0], y_class.shape[1], y_class.shape[2]) * c_val
-        center = int(np.random.rand(1)[0] * y_class.shape[2])
-        # check center is in bounds
-        if center < c_window:
-            center = c_window
-        elif center > y_class.shape[2] - c_window - 1:
-            center = y_class.shape[2] - c_window - 1
-        center_start = center - c_window
-        center_end = center + c_window
-        # shift emphasis towards center
-        rd_distribution[:, :, center_start:center_end] += c_val
-        rd_distribution += 1
-        rd_counter = config.random_note_map_change
-
-    rd_counter -= 1
-
-    y_class = y_class_sc * rd_distribution
-
-    return y_class, rd_distribution, rd_counter
 
 
 if __name__ == '__main__':

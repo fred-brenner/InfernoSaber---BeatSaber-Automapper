@@ -63,9 +63,7 @@ def _predictors(vocab):
         "red": np.eye(13, dtype=np.float32)[[6]], "blue": np.eye(13, dtype=np.float32)[[11]]})
     predictors["arrows"] = _Predictor(lambda inputs: {
         "red": np.eye(9, dtype=np.float32)[[8]], "blue": np.eye(9, dtype=np.float32)[[8]]})
-    predictors["lighting"] = _Predictor(lambda inputs: {
-        "events": np.broadcast_to(np.array([.8, .9, .7], np.float32),
-                                   (len(inputs["audio"]), inputs["audio"].shape[1], 3)).copy()})
+    predictors["lighting"] = _Predictor(lambda inputs: pytest.fail("V2 lighting is experimental only"))
     return predictors
 
 
@@ -88,10 +86,16 @@ def _settings():
     return options
 
 
+def _lighting(times, encoder):
+    events = [{"time": float(time), "type": index % 2, "value": 3 if index % 2 == 0 else 2}
+              for index, time in enumerate(times)]
+    return events, {"backend": "v1", "queries": len(times)}
+
+
 def _generate(song, options):
     vocab = _vocab()
     return generate(song, 4., _predictors(vocab), lambda times: np.zeros((len(times), 16), np.float32),
-                    options, vocab, postprocessors=_processors(), random_factor=0)
+                    options, vocab, lighting_generator=_lighting, postprocessors=_processors(), random_factor=0)
 
 
 def test_repaired_production_all_sparse_families_serialize_and_preserve_audio_source(monkeypatch):
@@ -107,6 +111,7 @@ def test_repaired_production_all_sparse_families_serialize_and_preserve_audio_so
     assert [(item["time"], item["end_time"]) for item in result.state["walls"]] == [(0., 1.6)]
     assert len(result.state["arcs"]) == 4  # .25s gaps, below the former .5s gate
     assert result.stages["hazards"]["wall_section_proposals"] > result.stages["hazards"]["walls"]
+    assert result.stages["lighting"]["backend"] == "v1"
     lighting = result.state["lighting"]
     assert {(event["type"], event["value"]) for event in lighting} == {(0, 3), (1, 2)}
     assert len({(event["time"], event["type"]) for event in lighting}) == len(lighting)
@@ -143,7 +148,7 @@ def test_repaired_production_keeps_native_chains_with_all_other_object_families(
     processors.validate_expansions = validate_expansions
     result = generate(_song(), 4., _predictors(vocab),
                       lambda times: np.zeros((len(times), 16), np.float32),
-                      _settings(), vocab, postprocessors=processors, random_factor=0)
+                      _settings(), vocab, lighting_generator=_lighting, postprocessors=processors, random_factor=0)
     assert all(result.state[family] for family in ("notes", "chains", "walls", "bombs", "arcs", "lighting"))
     assert len(result.state["chains"]) == 3
     # A chain owns each red swing; only the clear blue attachments survive.

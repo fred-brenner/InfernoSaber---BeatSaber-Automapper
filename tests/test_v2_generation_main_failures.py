@@ -13,7 +13,7 @@ from tools.config import config, paths
 def inputs(tmp_path, monkeypatch):
     monkeypatch.setattr(paths, "songs_pred", str(tmp_path) + "/")
     monkeypatch.setattr(paths, "new_map_path", str(tmp_path) + "/")
-    monkeypatch.setattr(main, "validate_bundle", lambda: {})
+    monkeypatch.setattr(main, "validate_production_bundle", lambda: {})
     monkeypatch.setattr(main, "check_music_files", lambda files, directory: ["first.egg", "second.egg"])
     generated = []
 
@@ -64,7 +64,7 @@ def test_cli_exit_status_matches_generation_failures(tmp_path, monkeypatch, fail
 
     monkeypatch.setattr(paths, "songs_pred", str(tmp_path) + "/")
     monkeypatch.setattr(paths, "new_map_path", str(tmp_path) + "/")
-    monkeypatch.setattr(v2_runtime, "validate_bundle", lambda: {})
+    monkeypatch.setattr(v2_runtime, "validate_production_bundle", lambda: {})
     monkeypatch.setattr(export_map, "check_music_files", lambda files, directory: ["song.egg"])
 
     def generate(name, logger):
@@ -139,7 +139,7 @@ def test_run_freezes_preparation_paths_bundle_and_report_destination(tmp_path, m
     monkeypatch.setattr(config, "general_diff", "ExpertPlus")
     monkeypatch.setattr(main_multi, "configure_inference", lambda: None)
     bundles, prepared, captured, reports = [], [], [], []
-    monkeypatch.setattr(main_multi, "validate_bundle", lambda path: bundles.append(path))
+    monkeypatch.setattr(main_multi, "validate_production_bundle", lambda path: bundles.append(path))
 
     def prepare(files, input_path):
         prepared.append(input_path)

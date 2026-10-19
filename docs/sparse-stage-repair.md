@@ -2,9 +2,18 @@
 
 The repaired contracts are preparation/inference policies, not new network
 designs. Lighting's output width follows its new effective vocabulary. Existing
-datasets, runs and `Data/model/v2_expert` remain unchanged. The current bundle
-still uses its recorded legacy schedules and thresholds. These repairs require
-new hazards, lighting and arcs runs before they can improve generated maps.
+datasets and training runs remain unchanged. On 2026-10-19, the repaired arc
+checkpoint was installed in `Data/model/v2_expert` at the user's explicit request,
+with validation-calibrated threshold **0.18**. It failed autoregressive positive
+evaluation: **0/358 validation arcs** and **0/66 curated arcs** recovered. Calibration
+completed, but did not establish a useful model; see the [dated baseline review](baseline.md#arc-only-deployment-and-failed-positive-case-evaluation-2026-10-19).
+The previous bundle is preserved as `Data/model/v2_expert_before_arcs-20261019-191457`.
+Hazards still use their recorded legacy schedule and thresholds. Production
+lighting now uses only the original v1 `fav_15` checkpoint and vocabulary.
+Independent v2 lighting is **not yet implemented for production — optional/deferred**;
+its contracts and tools below remain experimental. Hazard replacement training
+and useful autoregressive arc recovery remain pending. Experimental
+v2 lighting training or bundle replacement does not change the production path.
 Wall vocabulary fitting and ordering remain unchanged: this corpus retains the
 17-category wall head and 19-row history embedding. Unsupported geometries stay
 masked or rejected; eligibility filtering does not resize the hazard network.
@@ -28,7 +37,7 @@ Unrecoverable geometry/intervals use conservative supervision masks and remain
 visible in the audit. Source-wall reporting distinguishes fully and partially
 represented objects.
 
-**Lighting:** the `default_basic_v1` profile supports types 0–4/values 0–12,
+**Experimental v2 lighting:** the `default_basic_v1` profile supports types 0–4/values 0–12,
 ring types 8/9 canonicalized to value 0, and speed types 12/13/values 0–15.
 Brightness remains fixed at 1. Custom dependencies, Chroma colors, unsupported
 brightness and other families remain preserved and excluded with reasons.
@@ -67,8 +76,9 @@ recording group.
 ## Learning and reporting
 
 Network widths, learning rates, batch sizes and accelerated stage-only loading
-remain. These three trainers shuffle recordings and examples. Wall occupancy
-and arc attachment use inverse binary-group frequency; lighting/bombs use
+remain. The hazards/arcs trainers and optional experimental v2 lighting trainer
+shuffle recordings and examples. Wall occupancy and arc attachment use inverse
+binary-group frequency; lighting/bombs use
 per-class positive BCE weights capped at 100. Statistics come only from effective
 TRAIN. Masks remain supervision, not balancing factors. Shape/anchor losses are
 positive-only. Missing positive or negative TRAIN/validation supervision fails
@@ -107,7 +117,7 @@ python -m training.pipeline_v2 prepare \
   --output ../Data/training/pipeline_v2/sparse-repair-next/dataset
 python -m training.pipeline_v2 validate \
   --dataset ../Data/training/pipeline_v2/sparse-repair-next/dataset
-python main_training.py --models hazards lighting arcs --dry-run \
+python main_training.py --models hazards arcs --dry-run \
   --dataset ../Data/training/pipeline_v2/sparse-repair-next/dataset \
   --run-dir ../Data/training/pipeline_v2/sparse-repair-next/dry-run
 ```
@@ -128,7 +138,7 @@ Use your chosen replacement path instead if you repeat preparation.
 
 ```bash
 source /home/frede/.local/share/infernosaber-baseline/gpu/env.sh
-python main_training.py --models hazards lighting arcs \
+python main_training.py --models hazards arcs \
   --dataset ../Data/training/pipeline_v2/sparse-repair-20261018-r2/dataset \
   --run-dir ../Data/training/pipeline_v2/runs/sparse-repair-20261018
 ```
@@ -137,7 +147,7 @@ After those runs, return to CPU for explicit calibration:
 
 ```bash
 source /home/frede/.local/share/infernosaber-baseline/env.sh
-for stage in hazards lighting arcs; do
+for stage in hazards arcs; do
   python -m training.pipeline_v2 calibrate \
     --dataset ../Data/training/pipeline_v2/sparse-repair-20261018-r2/dataset \
     --stage "$stage" \
@@ -155,7 +165,7 @@ python -m training.pipeline_v2 prepare --evaluation-only \
   --training-dataset ../Data/training/pipeline_v2/sparse-repair-20261018-r2/dataset \
   --encoder-checkpoint ../Data/model/v2_expert/encoder/encoder.h5 \
   --output ../Data/training/pipeline_v2/sparse-repair-20261018-r2/curated
-for stage in hazards lighting arcs; do
+for stage in hazards arcs; do
   threshold=$(python -c 'import json,sys; print(json.load(open(sys.argv[1]))["threshold"])' \
     "../Data/training/pipeline_v2/sparse-repair-20261018-r2/calibration/$stage/calibration.json")
   python -m evaluation.evaluate_pipeline_v2 --execute --stage "$stage" \
@@ -177,7 +187,7 @@ Assemble a separate candidate bundle after reviewing calibration/evaluation:
 python - <<'PY'
 from pathlib import Path
 from training.pipeline_v2.bundle import assemble_bundle
-stages = ('hazards', 'lighting', 'arcs')
+stages = ('hazards', 'arcs')
 run = Path('../Data/training/pipeline_v2/runs/sparse-repair-20261018')
 cal = Path('../Data/training/pipeline_v2/sparse-repair-20261018-r2/calibration')
 assemble_bundle(
@@ -188,8 +198,39 @@ assemble_bundle(
 PY
 ```
 
-This does not replace `v2_expert` or change configuration. The existing generation
-commands can use the candidate by explicitly setting `v2_model_bundle_path`.
+This does not replace `v2_expert` or change configuration. The strict experimental
+eight-stage assembly tool retains the original v2 lighting artifact; production
+ignores that artifact and continues to use the configured v1 lighting assets.
+The existing generation commands can use the hazards/arcs candidate by explicitly
+setting `v2_model_bundle_path`.
 Use disposable input/output directories and disable Beat Saber library export
 for package checks. Keep custom lighting and clean unseen arc-positive evaluation
-recordings as separate follow-ups.
+recordings as separate follow-ups. These commands are later opt-in work; no
+training or corpus comparison was performed for the v1-lighting integration.
+
+## Optional experimental v2 lighting
+
+Independent v2 lighting is not yet implemented for production — optional/deferred.
+The normal `main_training.py` menu and `--models all` omit it; selecting
+`lighting` or `7` reports the explicit experimental trainer command. To pursue
+this separate experiment, use a new output directory and the frozen repaired
+dataset above:
+
+```bash
+# CPU contract check without optimizer updates.
+source /home/frede/.local/share/infernosaber-baseline/env.sh
+python -m training.pipeline_v2 train --stage lighting --dry-run \
+  --dataset ../Data/training/pipeline_v2/sparse-repair-20261018-r2/dataset \
+  --run-dir ../Data/training/pipeline_v2/runs/lighting-experimental-dry-run
+
+# Optional later GPU training; explicitly experimental.
+source /home/frede/.local/share/infernosaber-baseline/gpu/env.sh
+python -m training.pipeline_v2 train --stage lighting \
+  --dataset ../Data/training/pipeline_v2/sparse-repair-20261018-r2/dataset \
+  --run-dir ../Data/training/pipeline_v2/runs/lighting-experimental
+```
+
+Experimental calibration and independent comparisons retain `--stage lighting`
+and require the resulting artifact. Run comparisons only on explicit request.
+Those results cannot establish production lighting quality because production
+uses the separate v1 model and legacy16 semantics.

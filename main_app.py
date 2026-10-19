@@ -18,7 +18,7 @@ from app_helper.update_dir_path import update_dir_path
 # from main import main
 from main_multi import main_multi_par
 from tools.config import paths, config
-from map_creation.v2_runtime import validate_bundle
+from map_creation.v2_runtime import validate_production_bundle
 
 data_folder_name = 'Data'
 bs_folder_name = "Beat Saber_Data/CustomLevels"
@@ -299,15 +299,15 @@ def run_process(num_workers, use_model, diff1, diff2, diff3, diff4, diff5):
         return
 
     config.use_mapper_selection = "v2_expert"
-    progress_log = ["Checking local v2_expert bundle"]
+    progress_log = ["Checking local v2_expert bundle and retained v1 lighting"]
     log_queue = queue.Queue()
     yield "\n".join(progress_log)
     try:
-        validate_bundle()
+        validate_production_bundle()
     except Exception as error:
         yield f"Error: {type(error).__name__}: {error}"
         return
-    progress_log.append("V2 model bundle verified")
+    progress_log.append("Production models verified")
 
     def logger_callback(message):
         log_queue.put(message)
