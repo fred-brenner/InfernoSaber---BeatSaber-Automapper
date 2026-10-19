@@ -197,7 +197,8 @@ def build_inputs(stage, song, state, candidate, own_history, encoder=None, setti
         shares = base.arrays.get("intensity", np.zeros_like(base.arrays["bin_durations"]))
     if not np.sum(shares):
         shares = base.arrays["bin_durations"] / base.metadata["duration"]
-    density = float(state.get("requested_nps", base.metadata.get("difficulty_nps", 0.)))
+    density = float(state.get("conditioning_nps",
+                              state.get("requested_nps", base.metadata.get("difficulty_nps", 0.))))
     frame = min(int(np.floor(now / FRAME_SECONDS + .5)), len(base.arrays["frame_times"]) - 1)
     bin_index = min(int(base.arrays["frame_times"][frame]), len(shares) - 1)
     relative = float(shares[bin_index]) * base.metadata["duration"] / float(base.arrays["bin_durations"][bin_index])

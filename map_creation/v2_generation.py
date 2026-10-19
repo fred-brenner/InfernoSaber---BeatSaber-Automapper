@@ -110,8 +110,8 @@ def save_predictions(state):
     root = Path(paths.temp_path) / "v2-generation"
     root.mkdir(parents=True, exist_ok=True)
     destination = root / f"{datetime.now():%Y%m%d-%H%M%S-%f}-{os.getpid()}-predictions.npz"
-    keys = ("intensity", "frame_probabilities", "raw_event_frames", "raw_event_times", "raw_counts",
-            "event_frames", "event_times", "counts", "raw_model_notes")
+    keys = ("raw_intensity", "intensity", "conditioning_nps", "frame_probabilities", "raw_event_frames",
+            "raw_event_times", "raw_counts", "event_frames", "event_times", "counts", "raw_model_notes")
     arrays = {key: np.asarray(state[key]) for key in keys if key in state}
     arrays["final_notes"] = np.asarray([[note[key] for key in ("id", "time", "hand", "x", "y", "d")]
                                        for note in state["notes"]], dtype=np.float64).reshape(-1, 6)

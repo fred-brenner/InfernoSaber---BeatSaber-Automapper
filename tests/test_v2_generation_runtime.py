@@ -300,6 +300,10 @@ def test_runtime_cache_is_per_pid_and_explicit_bundle(monkeypatch, tmp_path):
 
 
 def test_prepare_audio_caches_song_and_intensity_between_difficulties(monkeypatch, tmp_path):
+    from training.beat_models.contracts import CORE
+
+    for key, setting in {"low_boost": .1, "high_reduction": .1, "scale": 1., "adjustment_strength": .8}.items():
+        monkeypatch.setattr(config, f"v2_intensity_{key}", setting)
     value = runtime.V2Runtime.__new__(runtime.V2Runtime)
     value.statistics, value.settings = statistics(), preparation_settings()
     value.vocabularies, value.predictors = {}, {}
@@ -312,21 +316,27 @@ def test_prepare_audio_caches_song_and_intensity_between_difficulties(monkeypatc
     path = tmp_path / "song.ogg"
     path.write_bytes(b"not decoded by this injected test")
     calls = []
-    arrays = {"features": np.zeros((6, 82), np.float32), "coarse_features": np.zeros((1, 82), np.float32),
-              "frame_times": np.arange(6, dtype=np.float64) / 100,
-              "bin_durations": np.array([.06], np.float32)}
-    monkeypatch.setattr(runtime, "decode_audio", lambda path: calls.append(path) or np.zeros(960, np.float32))
-    monkeypatch.setattr(runtime, "decode_encoder_audio", lambda path: np.zeros(888, np.float32))
-    monkeypatch.setattr(runtime, "extract_features", lambda samples: (deepcopy(arrays), {"duration": .06}))
+    arrays = {"features": np.zeros((150, 82), np.float32), "coarse_features": np.zeros((2, 82), np.float32),
+              "frame_times": np.arange(150, dtype=np.float64) / 100,
+              "bin_durations": np.array([1., .5], np.float32)}
+    monkeypatch.setattr(runtime, "decode_audio", lambda path: calls.append(path) or np.zeros(24000, np.float32))
+    monkeypatch.setattr(runtime, "decode_encoder_audio", lambda path: np.zeros(22200, np.float32))
+    monkeypatch.setattr(runtime, "extract_features", lambda samples: (deepcopy(arrays), {"duration": 1.5}))
     from map_creation import v2_pipeline
+
+    predictions = []
+    raw = np.array([.2, .8], np.float32)
+    value.predictors = {"intensity": lambda inputs: predictions.append(True) or raw[None],
+                        "timing": lambda inputs: np.tile([1., 0., 0.], (len(inputs["audio"]), CORE, 1))}
 
     def generate(song, nps, *args, intensity=None, lighting_generator, **kwargs):
         assert lighting_generator is value.lighting
         if nps == 2:
             assert intensity is None
         else:
-            np.testing.assert_array_equal(intensity, [1.])
-        return PipelineResult("dummy", {"intensity": np.array([1.], np.float32)}, diagnostics={"export_ready": True})
+            np.testing.assert_array_equal(intensity, raw)
+        beats = v2_pipeline.infer_beats(song, nps, value.predictors, intensity=intensity)
+        return PipelineResult("dummy", beats, diagnostics={"export_ready": True})
 
     monkeypatch.setattr(v2_pipeline, "generate", generate)
     prepared = value.prepare_audio(path, bpm=120)
@@ -334,8 +344,18 @@ def test_prepare_audio_caches_song_and_intensity_between_difficulties(monkeypatc
     assert len(calls) == 1
     assert set(prepared.song.arrays) == set(arrays)
     assert prepared.encoder.metadata["silence_scale_fallback"]
-    value.generate(prepared, 2)
-    value.generate(prepared, 4)
+    first = value.generate(prepared, 2)
+    second = value.generate(prepared, 4)
+    np.testing.assert_array_equal(first.state["intensity"], second.state["intensity"])
+    assert not np.allclose(first.state["intensity"], raw)
+    monkeypatch.setattr(config, "v2_intensity_low_boost", 1.)
+    monkeypatch.setattr(config, "v2_intensity_high_reduction", 1.)
+    monkeypatch.setattr(config, "v2_intensity_adjustment_strength", 1.)
+    third = value.generate(prepared, 6)
+    np.testing.assert_allclose(third.state["intensity"], [2 / 3, 1 / 3])
+    np.testing.assert_array_equal(prepared.intensity, raw)
+    assert len(predictions) == 1
+    assert len(calls) == 1
     assert prepared.song.metadata["bpm"] == 120
 
 

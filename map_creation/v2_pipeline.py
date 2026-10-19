@@ -5,6 +5,7 @@ its independent review stops; this path uses concrete application postprocessors
 """
 
 from copy import deepcopy
+from numbers import Real
 from time import perf_counter
 
 import numpy as np
@@ -31,6 +32,33 @@ def _progress(logger, stage, index, total):
         _log(logger, f"V2 {stage}: {index + 1}/{total}")
 
 
+def _postprocess_intensity(song, shares, requested_nps):
+    """Shape normalized shares and separate their overall conditioning gain."""
+    options = {}
+    for key in ("low_boost", "high_reduction", "scale", "adjustment_strength"):
+        name = f"v2_intensity_{key}"
+        value = getattr(config, name)
+        if (isinstance(value, (bool, np.bool_)) or not isinstance(value, Real)
+                or not np.isfinite(value) or value < 0 or (key != "scale" and value > 1)):
+            bounds = "nonnegative" if key == "scale" else "within [0, 1]"
+            raise ValueError(f"{name} must be a finite numeric value {bounds}")
+        options[key] = float(value)
+    strength = options["adjustment_strength"]
+    adjusted, density = shares.copy(), float(requested_nps)
+    if strength:
+        uniform = np.asarray(song.arrays["bin_durations"], np.float64) / song.metadata["duration"]
+        target = (shares + options["low_boost"] * np.maximum(uniform - shares, 0)
+                  - options["high_reduction"] * np.maximum(shares - uniform, 0))
+        target /= target.sum()
+        mass = (1 - strength) * shares + strength * options["scale"] * target
+        total = float(mass.sum())
+        adjusted = (mass / total).astype(np.float32) if total else shares.copy()
+        density *= total
+        if not np.isfinite(density):
+            raise ValueError("V2 intensity adjustment produced non-finite conditioning NPS")
+    return adjusted, density, {**options, "requested_nps": float(requested_nps), "conditioning_nps": density}
+
+
 def infer_beats(song, requested_nps, predictors, batch_size=8, intensity=None):
     """Batch independent timing windows without reading any target arrays."""
     if isinstance(batch_size, bool) or not isinstance(batch_size, int) or batch_size < 1:
@@ -39,13 +67,14 @@ def infer_beats(song, requested_nps, predictors, batch_size=8, intensity=None):
     started = perf_counter()
     if intensity is None:
         intensity = _output(_predict(predictors["intensity"], intensity_inputs(song)), "shares")
-    shares = _distribution(np.asarray(intensity).reshape(1, bins), (1, bins), "intensity")[0]
+    raw_shares = _distribution(np.asarray(intensity).reshape(1, bins), (1, bins), "intensity")[0]
+    shares, conditioning_nps, adjustment = _postprocess_intensity(song, raw_shares, requested_nps)
     intensity_seconds = perf_counter() - started
     started = perf_counter()
-    conditions = frame_conditions(song, shares, requested_nps)
+    conditions = frame_conditions(song, shares, conditioning_nps)
     probabilities = np.zeros((frames, 3), np.float32)
     probabilities[:, 0] = 1
-    if requested_nps > 0:
+    if conditioning_nps > 0:
         starts = list(range(0, frames, CORE))
         for offset in range(0, len(starts), batch_size):
             selected = starts[offset:offset + batch_size]
@@ -58,9 +87,11 @@ def infer_beats(song, requested_nps, predictors, batch_size=8, intensity=None):
                 probabilities[start:start + valid] = output[row, :valid]
     counts = probabilities.argmax(axis=-1).astype(np.int32)
     event_frames = np.flatnonzero(counts)
-    return {"intensity": shares, "conditions": conditions, "frame_probabilities": probabilities,
+    return {"raw_intensity": raw_shares.copy(), "intensity": shares, "conditioning_nps": conditioning_nps,
+            "conditions": conditions, "frame_probabilities": probabilities,
             "counts": counts, "event_frames": event_frames,
             "event_times": song.arrays["frame_times"][event_frames].copy(),
+            "_intensity_postprocessing": adjustment,
             "_stage_seconds": {"intensity": intensity_seconds, "timing": perf_counter() - started}}
 
 
@@ -218,6 +249,7 @@ def generate(song, requested_nps, predictors, encoder, settings, vocabularies, *
     beats = infer_beats(song, requested_nps, predictors,
                        getattr(config, "v2_timing_batch_size", 8), intensity=intensity)
     beat_seconds = beats.pop("_stage_seconds")
+    result.diagnostics["intensity_postprocessing"] = beats.pop("_intensity_postprocessing")
     state.update(beats, requested_nps=float(requested_nps),
                  multiplier_classes=len(vocabularies["multiplier"]))
     cleanup_started = perf_counter()

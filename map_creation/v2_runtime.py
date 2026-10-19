@@ -168,7 +168,7 @@ class PreparedAudio:
     encoder: object
     audio_path: Path
     raw_features: dict = field(default_factory=dict)
-    intensity: object = None
+    intensity: object = None  # Raw model shares; generation adjustments are never cached.
     diagnostics: dict = field(default_factory=dict)
 
 
@@ -317,7 +317,7 @@ class V2Runtime:
             result = generate(prepared.song, requested_nps, self.predictors, prepared.encoder,
                               self.settings, self.vocabularies, audio_path=prepared.audio_path,
                               intensity=prepared.intensity, logger=logger, lighting_generator=self.lighting)
-            prepared.intensity = result.state["intensity"].copy()
+            prepared.intensity = result.state["raw_intensity"].copy()
             result.diagnostics["bundle_path"] = str(self.root)
             self._cache_metrics["generation_calls"] += 1
             result.diagnostics["runtime"] = {**self._cache_metrics, **prepared.diagnostics,

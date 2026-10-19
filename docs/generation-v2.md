@@ -141,6 +141,52 @@ arcs recovered. The disposable Insane packages also contain no arcs. Other stage
 assets are unchanged, and the previous bundle remains available for rollback.
 See the [evaluation and backup paths](baseline.md#arc-only-deployment-and-failed-positive-case-evaluation-2026-10-19).
 
+## Intensity postprocessing
+
+Generation adjusts the intensity profile before timing inference. The four
+`config.py` controls apply only during production generation:
+
+| Setting | Default | Meaning |
+| --- | --- | --- |
+| `v2_intensity_low_boost` | `0.1` | Fraction of the deficit below uniform density to lift. |
+| `v2_intensity_high_reduction` | `0.1` | Fraction of the excess above uniform density to trim. |
+| `v2_intensity_scale` | `1.0` | Overall target gain; one preserves average conditioning NPS. |
+| `v2_intensity_adjustment_strength` | `0.8` | Fraction of the change toward the configured target to apply. |
+
+Boost, reduction and strength must be finite numeric values in `[0, 1]`; scale
+must be finite and nonnegative. Invalid settings raise an explicit error.
+Uniform shares are each bin's actual duration divided by decoded song duration,
+so a partial final bin receives proportionately less mass. For raw shares `s`
+and uniform shares `u`, generation computes:
+
+```text
+target = s + low_boost * max(u - s, 0) - high_reduction * max(s - u, 0)
+target = target / sum(target)
+mass = (1 - strength) * s + strength * scale * target
+conditioning_nps = requested_nps * sum(mass)
+adjusted_shares = mass / sum(mass)
+```
+
+Timing and the downstream stages receive the adjusted normalized shares and
+effective conditioning NPS. The original requested NPS still controls package
+identity and legacy gameplay settings. Zero mass retains the raw normalized
+profile with zero conditioning NPS and skips timing prediction. Zero requested
+NPS stays empty. Strength zero preserves the original conditioning exactly.
+
+The defaults gently flatten the profile while preserving its average density:
+relative intensities `0.5 / 1.5` become `0.54 / 1.46`. With both shaping controls
+set to one, the same inputs become `0.9 / 1.1` at strength `0.8`. Scale `1.25`
+with strength `0.8` raises average conditioning NPS by 20%. These changes affect
+conditioning; the timing decoder, gameplay cleanup and note expansion still
+determine the actual emitted and exported NPS.
+
+Workers cache the raw model shares and reapply the current controls for every
+generation call, including cached difficulties. Adjustments never accumulate
+between calls. Reports record the controls and requested/effective NPS under
+`intensity_postprocessing`; prediction NPZ files save `raw_intensity`, adjusted
+`intensity`, and scalar `conditioning_nps`. Training, prepared targets and model
+artifacts retain their original contracts.
+
 ## Packages and diagnostics
 
 Default output remains Beat Saber **3.2.0**: notes, bombs, walls, basic lighting,
@@ -158,8 +204,9 @@ pass. Packages and ZIPs publish through temporary destinations only after succes
 Reports live outside packages under `paths.temp_path/v2-generation/`. They include
 raw/cleaned counts, heuristic changes, learned expansions, rejected objects,
 legacy omissions, per-stage durations and cache metrics. Companion numeric NPZ
-files contain intensity shares, raw timing probabilities/counts, processed events,
-pre-cleanup model notes and final notes; they load with `allow_pickle=False`. The historical v1 runner
+files contain raw/adjusted intensity shares, effective conditioning NPS, raw timing
+probabilities/counts, processed events, pre-cleanup model notes and final notes;
+they load with `allow_pickle=False`. The historical v1 runner
 now lives in `evaluation/legacy_generator.py` for explicitly requested benchmarks;
 it is not an application model-selection option.
 

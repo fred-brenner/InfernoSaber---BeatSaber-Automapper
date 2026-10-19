@@ -19,6 +19,8 @@ def _observed_worker_settings(_):
     import os, sys
     return (config.v2_inference_threads, config.slider_time_gap.tolist(), paths.songs_pred,
             config.v1_lighting_model_path, config.v1_lighting_vocabulary_path,
+            (config.v2_intensity_low_boost, config.v2_intensity_high_reduction,
+             config.v2_intensity_scale, config.v2_intensity_adjustment_strength),
             os.environ['CUDA_VISIBLE_DEVICES'], 'tensorflow' in sys.modules)
 
 
@@ -29,11 +31,13 @@ def test_spawn_transfers_settings_before_tensorflow():
     snapshot['paths']['songs_pred'] = '/disposable/v2-input/'
     snapshot['config']['v1_lighting_model_path'] = '/retained/v1.h5'
     snapshot['config']['v1_lighting_vocabulary_path'] = '/retained/v1-events.pkl'
+    snapshot['config'].update(v2_intensity_low_boost=.2, v2_intensity_high_reduction=.3,
+                              v2_intensity_scale=1.25, v2_intensity_adjustment_strength=.6)
     context = mp.get_context('spawn')
     with context.Pool(1, initializer=main_multi._worker_init, initargs=(snapshot,)) as pool:
         result = pool.map(_observed_worker_settings, [0, 1])
     assert result == [(1, [.17, .39], '/disposable/v2-input/', '/retained/v1.h5',
-                       '/retained/v1-events.pkl', '-1', False)] * 2
+                       '/retained/v1-events.pkl', (.2, .3, 1.25, .6), '-1', False)] * 2
 
 
 def test_groups_prefer_song_cache_but_use_idle_workers():
@@ -177,12 +181,15 @@ def test_single_multi_difficulty_keeps_automatic_expert(tmp_path, monkeypatch):
 
 def test_prediction_evidence_is_numeric_and_outside_package(tmp_path, monkeypatch):
     monkeypatch.setattr(paths, 'temp_path', str(tmp_path))
-    path = v2_generation.save_predictions({'intensity': np.array([.25, .75], np.float32),
+    path = v2_generation.save_predictions({'raw_intensity': np.array([.25, .75], np.float32),
+                                          'intensity': np.array([.27, .73], np.float32), 'conditioning_nps': 5.6,
                                           'raw_model_notes': np.zeros((0, 6)), 'notes': []})
     assert Path(path).parent == tmp_path / 'v2-generation'
     with np.load(path, allow_pickle=False) as archive:
         assert archive['final_notes'].shape == (0, 6)
-        np.testing.assert_array_equal(archive['intensity'], [.25, .75])
+        np.testing.assert_array_equal(archive['raw_intensity'], [.25, .75])
+        np.testing.assert_allclose(archive['intensity'], [.27, .73])
+        assert archive['conditioning_nps'] == 5.6
         assert all(not archive[name].dtype.hasobject for name in archive.files)
 
 

@@ -39,6 +39,12 @@ v2_inference_threads = 2
 v2_timing_batch_size = 8
 v2_compile_inference = True
 
+# V2 intensity postprocessing (generation only; training shares stay unchanged).
+v2_intensity_low_boost = 0.1  # fraction of the deficit below uniform density [0, 1]
+v2_intensity_high_reduction = 0.1  # fraction of the excess above uniform density [0, 1]
+v2_intensity_scale = 1.0  # overall target gain; nonnegative, 1 preserves average NPS
+v2_intensity_adjustment_strength = 0.8  # fraction of the target change applied [0, 1]
+
 # select song metadata search mode
 enable_auto_metadata = True  # if True, tries to get song metadata from song name
 # allowed patterns for metadata: artist, title

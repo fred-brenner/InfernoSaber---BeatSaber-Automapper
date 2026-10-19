@@ -32,8 +32,9 @@ platforms before implementing them unless the task already authorizes them.
   bundles; repair implementation alone does not establish replacement quality.
 - For implemented intensity/timing/note contracts and training status, read
   [docs/model-beat-architecture.md](docs/model-beat-architecture.md).
-- For production v2 generation, model caching, worker settings, package formats,
-  and unchanged external commands, read [docs/generation-v2.md](docs/generation-v2.md).
+- For production v2 generation, intensity postprocessing, model caching, worker
+  settings, package formats, and unchanged external commands, read
+  [docs/generation-v2.md](docs/generation-v2.md).
 - For legacy generation calls, checkpoints, and preprocessing, read
   [docs/model-architecture_old.md](docs/model-architecture_old.md).
 - For feature priorities or planning model and pipeline improvements, read
@@ -75,6 +76,8 @@ labels require verification before becoming current requirements.
   and checks for updates; its guarded launch is spawn-safe. Generation loads the
   validated seven-stage projection of local `v2_expert`, retained encoder and
   configured v1 lighting assets once per CPU worker, and caches one recording.
+  Reapply intensity postprocessing from cached raw shares for each generation;
+  keep user-requested NPS separate from effective model conditioning NPS.
   V2 lighting is experimental: not yet implemented for production — optional/deferred.
   Preserve the bundle and experimental strict eight-stage validation/tools.
   Preserve explicit current-run completion records when combining packages; never

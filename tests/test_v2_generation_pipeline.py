@@ -8,7 +8,7 @@ import pytest
 
 from map_creation.v2_pipeline import _atomic_expand, generate, infer_beats
 from tools.config import config
-from training.beat_models.contracts import CORE, Song, timing_window
+from training.beat_models.contracts import CORE, FRAME_SECONDS, Song, frame_conditions, timing_window
 from training.pipeline_v2.pipeline import dummy_predictors
 from training.pipeline_v2.settings import preparation_settings
 
@@ -121,6 +121,57 @@ def test_production_pipeline_uses_only_audio_and_keeps_all_output_families(monke
     assert final["colored_notes"] == 9 and final["unique_onsets"] == 6
     assert result.state["raw_model_notes"].shape == (6, 6)
     assert not result.state["raw_model_notes"].dtype.hasobject
+
+
+@pytest.mark.parametrize("repaired_contract", [False, True])
+def test_intensity_adjustment_conditions_timing_and_all_downstream_stages(monkeypatch, repaired_contract):
+    from map_creation import v2_pipeline
+    from training.pipeline_v2 import contracts
+
+    monkeypatch.setattr(config, "v2_intensity_scale", 1.5)
+    monkeypatch.setattr(config, "v2_intensity_adjustment_strength", .8)
+    base, vocab = audio_song(), vocabulary()
+    predictors, timing = dummy_predictors(vocab), Timing()
+    shares = np.arange(1, len(base.arrays["bin_durations"]) + 1, dtype=np.float32)
+    shares /= shares.sum()
+    predictors["intensity"] = lambda inputs: {"shares": shares[None]}
+    windows, stages = [], set()
+
+    def predict_timing(inputs):
+        windows.append(inputs["conditions"].copy())
+        return timing(inputs)
+
+    original = v2_pipeline.build_inputs
+
+    def build(stage, song, state, candidate, *args, **kwargs):
+        inputs = original(stage, song, state, candidate, *args, **kwargs)
+        frame = min(int(np.floor(candidate["time"] / FRAME_SECONDS + .5)), len(state["conditions"]) - 1)
+        np.testing.assert_allclose(inputs["conditions"][0, 2:], state["conditions"][frame], rtol=1e-6)
+        assert state["requested_nps"] == 4.
+        assert state["conditioning_nps"] == pytest.approx(5.6)
+        stages.add(stage)
+        return inputs
+
+    predictors["timing"] = predict_timing
+    monkeypatch.setattr(v2_pipeline, "build_inputs", build)
+    monkeypatch.setattr(contracts, "build_inputs", build)
+    settings = preparation_settings()
+    settings["schedule"]["arc_max_gap_seconds"] = 6.
+    if repaired_contract:
+        settings["stage_policies"]["arcs"]["max_gap_seconds"] = 6.
+    else:
+        settings.pop("stage_policies", None)
+    result = generate(base, 4., predictors, lambda times: np.zeros((len(times), 16), np.float32),
+                      settings, vocab, lighting_generator=lighting, postprocessors=processors(),
+                      random_factor=0, logger=lambda message: None)
+    assert stages == {"positions", "arrows", "multiplier", "hazards", "arcs"}
+    np.testing.assert_array_equal(result.state["raw_intensity"], shares)
+    expected = frame_conditions(base, result.state["intensity"], 5.6)
+    np.testing.assert_allclose(result.state["conditions"], expected, rtol=1e-6)
+    np.testing.assert_allclose(windows[0], np.concatenate([timing_window(base, expected, start)[0]["conditions"]
+                                                        for start in range(0, 1100, CORE)]), rtol=1e-6)
+    assert result.diagnostics["intensity_postprocessing"]["scale"] == 1.5
+    assert result.diagnostics["requested_retained_nps"] == 4.
 
 
 def test_rejected_expansion_is_atomic_and_does_not_mutate_anchor():
