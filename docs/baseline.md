@@ -1524,3 +1524,94 @@ The complete CPU framework suite, `python -m pytest -q -m 'not comparison'`,
 passed: **1,005 passed, 10 deselected, 1,246 warnings in 179.07 seconds**.
 The log is `/tmp/infernosaber-v1-lighting-pytest.log`. Comparison tests were
 excluded; no training or corpus comparison was started.
+
+## Hazard-only deployment and CPU validation (2026-10-20)
+
+The completed run at
+`Data/training/pipeline_v2/runs/sparse-repair-20261019/hazards` was evaluated,
+calibrated and installed at the user's request. The run stopped after **29/80
+epochs**, selecting **epoch 19** by mean validation PR-AUC **0.47648** (wall
+presence **0.83244**, bombs **0.12052**). It contains **52,237 parameters**.
+Selected-checkpoint validation loss is **0.290696**; the reported minimum
+**0.089874** belongs to epoch 1. Training losses are weighted and validation
+losses unweighted; both vary substantially over the run. Technical completion
+does not establish useful generated hazards.
+
+Checkpoint SHA-256, graph, encoder, normalization, vocabulary, repaired policy,
+training split and recorded source hashes matched. Hazard recording groups are
+disjoint: **219 TRAIN / 28 validation / 28 TEST**. Validation has positive wall
+sections in **19 groups** and bomb cells in **18 groups**. Two bomb cells have
+only 22/24 TRAIN positives; all twelve bomb positive-loss weights reach cap 100.
+
+Calibration evaluated all **99 thresholds (.01–.99)** on the **92 validation
+maps / 394,432 queries**, then replayed the best three (.99, .98, .97) with
+predicted own-stage history. Six single-thread CPU workers parallelized maps
+using the unchanged project decoder and integer-count aggregation. An independent
+audit confirmed protocol equivalence. **0.97** selected the highest decoded bomb
+F1; walls retain categorical argmax including NONE. No TEST or curated examples
+selected thresholds. At the selected threshold:
+
+| Context | Head and unit | TP | FP | FN | F1 |
+|---|---|---:|---:|---:|---:|
+| Validation, reference history | Wall sections, exact geometry | 10,754 | 6,165 | 1,754 | 0.730893 |
+| Validation, predicted history | Wall sections, exact geometry | 526 | 22,600 | 11,982 | 0.029522 |
+| Validation, reference history | Bomb cells | 974 | 8,330 | 1,028 | 0.172298 |
+| Validation, predicted history | Bomb cells | 31 | 22,640 | 1,971 | 0.002513 |
+| Seven curated, reference history | Wall sections, exact geometry | 185 | 235 | 24 | 0.588235 |
+| Seven curated, predicted history | Wall sections, exact geometry | 0 | 517 | 209 | 0 |
+| Seven curated, reference history | Bomb cells | 41 | 161 | 11 | 0.322835 |
+| Seven curated, predicted history | Bomb cells | 0 | 1,118 | 52 | 0 |
+
+All seven curated packages evaluated with zero skips and no favorites input.
+The replacement **fails positive-case improvement over empty/TRAIN-frequency
+baselines**. Source representability remains separate: 156 original walls yield
+10 fully and 12 partially supported objects, with 134 unrepresented. Original
+bomb counts and unique supervised grid cells are also reported separately.
+Every excluded source record remains identified in the comparison diagnostics.
+
+Reference-history reconstruction matched prepared histories, masks, ages and
+conditions exactly for **5,090 queries** on Shera and Beat it. Zeroing only
+history values reduced positive wall presence/exact-geometry detections from
+**26/22 of 32** and **117/117 of 141** to zero, retaining all other inputs.
+Bomb matches on these maps were **4/10 → 0/10** and **0/42 → 0/42** at each tested
+threshold (.5/.97/.98/.99). Both maps' first positive walls lacked preceding
+positive history and predicted NONE. This bounded evidence supports dependence
+on preceding reference hazards and difficulty initiating useful outputs, rather
+than a saved/replayed history-input mismatch.
+
+Despite the failed quality screen, the requested hazard-only replacement is
+active in `Data/model/v2_expert`, using checkpoint
+`e029308d634fbc0f8d15c64bd0ba78e0f07d3468ed326a8237f981b1ce73a30b`
+and its checkpoint-bound **0.97** bomb calibration. All other model files,
+including arcs and its .18 sidecar, encoder, normalization and vocabulary remain
+byte-identical. Production lighting remains v1 `fav_15`. The complete previous
+bundle is `Data/model/v2_expert_before_hazards-20261020-161736`. Source training
+artifacts and all **21 curated source files** verified unchanged.
+
+Pinned WSL CPU Python 3.10 / TensorFlow/tf.keras 2.15 verification:
+
+- **79 focused tests passed** for hazard sections, calibration, bundle compatibility
+  and sparse production integration.
+- `python -m pytest -q -m 'not comparison'`: **1,051 passed, 10 deselected**,
+  in **197.65 seconds**. No training or optimizer updates occurred during review.
+- Two CPU workers generated Insane and Sweet Nothing at requested **3/5 NPS**
+  in **67.89 seconds**, reusing a worker for each song's difficulties. Insane
+  contains **263/561 notes, 7/1 walls, 272/528 lighting commands**; Sweet Nothing
+  contains **359/739 notes, 1/1 wall, 496/992 lighting commands**. All four maps
+  have zero raw bomb proposals and zero final bombs; filtering/export did not
+  remove bomb predictions. They also contain no arcs or chains.
+- JSON, referenced assets, timestamps/geometry, endpoints, ZIP integrity and
+  reconstructed serialized-wall clearance passed. Library export was disabled.
+  GPU inference, native Windows and in-game playability were not evaluated.
+
+Artifacts outside source control:
+
+- [Evaluation summary](../../Data/training/pipeline_v2/sparse-repair-20261018-r2/hazard-review-20261020-161736/summary.md)
+- [Calibration](../../Data/training/pipeline_v2/sparse-repair-20261018-r2/hazard-review-20261020-161736/calibration/hazards/calibration.json)
+- [Seven-song comparison and exclusions](../../Data/training/pipeline_v2/sparse-repair-20261018-r2/hazard-review-20261020-161736/comparison/hazards/report.json)
+- [Installation and preservation checks](../../Data/training/pipeline_v2/sparse-repair-20261018-r2/hazard-review-20261020-161736/promotion.json)
+- [Insane ZIP](../../Data/training/pipeline_v2/sparse-repair-20261018-r2/hazard-review-20261020-161736/package-check/new_map/12345_Insane.zip)
+- [Sweet Nothing ZIP](../../Data/training/pipeline_v2/sparse-repair-20261018-r2/hazard-review-20261020-161736/package-check/new_map/12345_Sweet%20Nothing.zip)
+
+Detailed logs, source hashes and reproducible diagnostic scripts are under
+`/home/frede/.local/share/infernosaber-baseline/diagnostics/hazard-promotion-20261020-161736`.

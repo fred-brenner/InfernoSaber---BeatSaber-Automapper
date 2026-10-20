@@ -141,6 +141,14 @@ arcs recovered. The disposable Insane packages also contain no arcs. Other stage
 assets are unchanged, and the previous bundle remains available for rollback.
 See the [evaluation and backup paths](baseline.md#arc-only-deployment-and-failed-positive-case-evaluation-2026-10-19).
 
+The 2026-10-20 hazard-only update also selects the repaired quarter-beat policy.
+Its checkpoint-bound bomb threshold is **0.97**; wall geometry remains categorical.
+It was installed as requested despite failing the seven-song positive-case screen:
+**0/209 supported wall sections** and **0/52 bomb cells** matched. Full CPU sample
+packages do contain valid cleared walls, but reference agreement and own-history
+robustness remain poor. Other stage assets, including arcs and v1 lighting, are
+unchanged. See the [hazard report and rollback backup](baseline.md#hazard-only-deployment-and-cpu-validation-2026-10-20).
+
 ## Intensity postprocessing
 
 Generation adjusts the intensity profile before timing inference. The four

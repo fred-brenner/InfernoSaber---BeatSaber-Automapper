@@ -8,11 +8,18 @@ with validation-calibrated threshold **0.18**. It failed autoregressive positive
 evaluation: **0/358 validation arcs** and **0/66 curated arcs** recovered. Calibration
 completed, but did not establish a useful model; see the [dated baseline review](baseline.md#arc-only-deployment-and-failed-positive-case-evaluation-2026-10-19).
 The previous bundle is preserved as `Data/model/v2_expert_before_arcs-20261019-191457`.
-Hazards still use their recorded legacy schedule and thresholds. Production
-lighting now uses only the original v1 `fav_15` checkpoint and vocabulary.
+On 2026-10-20, the repaired hazard checkpoint from
+`runs/sparse-repair-20261019/hazards` was also installed at the user's request,
+with validation-calibrated bomb threshold **0.97** and categorical wall selection.
+Predicted-history validation F1 is only **0.02952 for walls / 0.002513 for bombs**;
+the seven curated songs recover **0/209 supported wall sections / 0/52 bomb cells**.
+The failed quality screen and backup
+`Data/model/v2_expert_before_hazards-20261020-161736` are recorded in the
+[hazard deployment review](baseline.md#hazard-only-deployment-and-cpu-validation-2026-10-20).
+Production lighting uses only the original v1 `fav_15` checkpoint and vocabulary.
 Independent v2 lighting is **not yet implemented for production — optional/deferred**;
-its contracts and tools below remain experimental. Hazard replacement training
-and useful autoregressive arc recovery remain pending. Experimental
+its contracts and tools below remain experimental. Useful autoregressive
+hazard and arc recovery remain unresolved. Experimental
 v2 lighting training or bundle replacement does not change the production path.
 Wall vocabulary fitting and ordering remain unchanged: this corpus retains the
 17-category wall head and 19-row history embedding. Unsupported geometries stay
