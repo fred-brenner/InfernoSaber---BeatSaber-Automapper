@@ -42,19 +42,42 @@ def _objects(data: dict, key: str) -> list:
     return values
 
 
-def _check_timing(data) -> None:
-    """Reject tempo/offset metadata wherever standard or custom JSON stores it."""
+def _tempo_value(entry):
+    """Return a change entry's declared tempo, or None when unreadable."""
+    if not isinstance(entry, dict):
+        return None
+    for key, value in entry.items():
+        if key.lstrip("_").lower() in {"bpm", "m"}:
+            try:
+                return _number(value, key)
+            except ValueError:
+                return None
+    return None
+
+
+def _check_timing(data, bpm=None) -> None:
+    """Reject tempo/offset metadata wherever standard or custom JSON stores it.
+
+    With ``bpm`` set, constant restatements are accepted: every declared change
+    entry must carry a readable tempo equal to the base BPM. Real tempo changes
+    and nonzero offsets/shuffle still fail explicitly.
+    """
     if isinstance(data, dict):
         for key, value in data.items():
             normalized = key.lstrip("_").lower()
             if normalized in {"bpmchanges", "bpmevents"} and value:
-                raise ValueError(f"Unsupported tempo changes in {key}")
+                if bpm is None or not isinstance(value, list):
+                    raise ValueError(f"Unsupported tempo changes in {key}")
+                tempos = [_tempo_value(entry) for entry in value]
+                if any(tempo is None or not math.isclose(tempo, bpm, rel_tol=0, abs_tol=1e-3)
+                       for tempo in tempos):
+                    raise ValueError(f"Unsupported tempo changes in {key}")
             if normalized in {"songtimeoffset", "shuffle"} and _number(value, key) != 0:
                 raise ValueError(f"Unsupported nonzero {key}")
-            _check_timing(value)
+            _check_timing(value, bpm)
     elif isinstance(data, list):
         for value in data:
-            _check_timing(value)
+            _check_timing(value, bpm)
 
 
 def _package_file(package: Path, filename) -> Path:
@@ -84,10 +107,10 @@ def load_reference(package: Path, difficulty="ExpertPlus", characteristic="Stand
     info_path = info_files[0]
     info = _read_json(info_path)
     _version(info, ("2",), "Info.dat")
-    _check_timing(info)
     bpm = _number(info.get("_beatsPerMinute"), "BPM")
     if bpm <= 0:
         raise ValueError("BPM must be positive")
+    _check_timing(info, bpm)
 
     matches = [beatmap for group in _objects(info, "_difficultyBeatmapSets")
                if group.get("_beatmapCharacteristicName") == characteristic
@@ -99,7 +122,7 @@ def load_reference(package: Path, difficulty="ExpertPlus", characteristic="Stand
     audio_path = _package_file(package, info.get("_songFilename"))
     beatmap = _read_json(beatmap_path)
     version = _version(beatmap, ("2", "3"), "beatmap")
-    _check_timing(beatmap)
+    _check_timing(beatmap, bpm)
     notes_key, time_key, color_key = ("_notes", "_time", "_type") if version == "2" else ("colorNotes", "b", "c")
     times = set()
     for note in _objects(beatmap, notes_key):

@@ -22,7 +22,11 @@ def _policy_settings(settings, identity):
         raise ValueError("Bundle replacements require a repaired sparse-stage policy")
     settings.setdefault("stage_policies", {})[stage] = deepcopy(data["policy"])
     for key, value in data.items():
-        schedule_key = {"occupancy_clearance_seconds": "clearance_seconds", "lighting_onset_threshold": "lighting_onset_threshold"}.get(key)
+        schedule_key = {"occupancy_clearance_seconds": "clearance_seconds",
+                        "lighting_onset_threshold": "lighting_onset_threshold",
+                        "hazard_context_seconds": "hazard_context_seconds",
+                        "hazard_context_back_seconds": "hazard_context_back_seconds",
+                        "hazard_context_bins": "hazard_context_bins"}.get(key)
         if schedule_key is not None:
             settings.setdefault("schedule", {})[schedule_key] = deepcopy(value)
         elif key not in ("policy", "policy_version", "schedule"):
@@ -53,17 +57,22 @@ def _copy(source, root, relative):
 def assemble_bundle(base_bundle, replacements, calibrations, output):
     """Copy a validated base into a fresh bundle with explicit stage replacements.
 
-    Only hazards, arcs and lighting may be replaced. Each replacement requires
-    its matching validation calibration. The five upstream models, retained
-    encoder and normalization remain byte-for-byte copies of the base assets.
-    No TensorFlow model is loaded, and no configured/current bundle is changed.
+    Sparse stages (hazards, arcs, lighting) and the categorical note stages
+    (positions, arrows, multiplier) may be replaced. Sparse-stage replacements
+    each require their matching validation calibration; note-stage
+    replacements carry no calibration or sparse-policy sidecars. The five
+    upstream models, retained encoder and normalization remain byte-for-byte
+    copies of the base assets. No TensorFlow model is loaded, and no
+    configured/current bundle is changed.
     """
     from map_creation.v2_runtime import _local, validate_bundle
 
-    if not isinstance(replacements, dict) or not replacements or set(replacements) - set(SPARSE_STAGES):
-        raise ValueError("Select explicit hazards, arcs or lighting bundle replacements")
-    if not isinstance(calibrations, dict) or set(calibrations) != set(replacements):
-        raise ValueError("Each repaired bundle replacement requires its validation calibration")
+    note_stages = ("positions", "arrows", "multiplier")
+    if (not isinstance(replacements, dict) or not replacements
+            or set(replacements) - set(SPARSE_STAGES) - set(note_stages)):
+        raise ValueError("Select explicit hazards, arcs, lighting or note-stage bundle replacements")
+    if not isinstance(calibrations, dict) or set(calibrations) != set(replacements) & set(SPARSE_STAGES):
+        raise ValueError("Each repaired sparse-stage replacement requires its validation calibration")
     supplied = Path(base_bundle)
     base = validate_bundle(supplied.parent if supplied.is_file() and supplied.name == "bundle.json" else supplied)
     base_root = base["root"]
@@ -77,9 +86,10 @@ def assemble_bundle(base_bundle, replacements, calibrations, output):
         root, manifest = load_checkpoint_manifest(path, stage)
         if manifest.get("status") != "trained" or manifest.get("training", {}).get("status", "trained") != "trained":
             raise ValueError("Bundle replacements must be explicitly trained artifacts")
-        _policy_settings(options, manifest["compatibility"])
-        _merge_vocabulary(vocabularies, manifest)
-        sidecars[stage] = load_calibration(calibrations[stage], stage, manifest)
+        if stage in SPARSE_STAGES:
+            _policy_settings(options, manifest["compatibility"])
+            _merge_vocabulary(vocabularies, manifest)
+            sidecars[stage] = load_calibration(calibrations[stage], stage, manifest)
         selected[stage] = root, manifest
     context = {"beat_representation": base["manifests"]["timing"]["representation"],
                "normalization_sha256": base["bundle"]["normalization_sha256"],
@@ -117,7 +127,8 @@ def assemble_bundle(base_bundle, replacements, calibrations, output):
                     created_at=datetime.now(timezone.utc).isoformat(),
                     assembly={"base_bundle_sha256": file_hash(base_root / "bundle.json"),
                               "replacements": {stage: {"checkpoint_sha256": manifest["checkpoint_sha256"],
-                                                       "calibration_fingerprint": sidecars[stage]["fingerprint"]}
+                                                       **({"calibration_fingerprint": sidecars[stage]["fingerprint"]}
+                                                          if stage in sidecars else {})}
                                                for stage, (_, manifest) in selected.items()},
                               "optimizer_steps": 0, "promotion": "explicit_new_directory_only"},
                     files={path.relative_to(root).as_posix(): {"sha256": file_hash(path)}

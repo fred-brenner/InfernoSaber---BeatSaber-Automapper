@@ -51,8 +51,8 @@ def read_objects(base):
     """Return normalized object records and untouched per-object source JSON."""
     raw, complete = _source(base)
     version = _version(raw, ("2", "3"), "beatmap")
-    _check_timing(raw)
     bpm, duration = base.metadata["bpm"], base.metadata["duration"]
+    _check_timing(raw, bpm)
     factor = 60 / bpm
     objects = {key: [] for key in ("notes", "bombs", "walls", "arcs", "chains", "lighting", "ignored")}
     indices = base.arrays["original_notes"][:, 0].astype(int)

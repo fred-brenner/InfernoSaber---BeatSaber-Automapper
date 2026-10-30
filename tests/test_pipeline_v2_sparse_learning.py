@@ -19,6 +19,29 @@ def test_balance_uses_train_only_and_does_not_change_supervision_masks():
     assert before == counts
 
 
+def test_negative_supervision_weight_scales_classification_negatives_only():
+    counts = {"train": {"wall": {"positive": 2., "negative": 8.},
+                        "bombs": {"positive": [1., 0.], "negative": [500., 10.]}},
+              "validation": {"wall": {"positive": 999., "negative": 1.}}}
+    result = class_balance(counts, "hazards", cap=100., negative_weight=.1)
+    assert result["wall"]["positive"] == 2.5
+    assert result["wall"]["negative"] == pytest.approx(.0625)
+    assert result["bombs"]["negative"] == pytest.approx(.1)
+    full = class_balance(counts, "hazards", cap=100.)
+    assert full["wall"]["negative"] == .625
+
+
+def test_negative_supervision_weight_leaves_events_and_is_validated():
+    counts = {"train": {"events": {"positive": [1.], "negative": [9.]}}, "validation": {}}
+    result = class_balance(counts, "lighting", cap=100., negative_weight=.1)
+    assert result["events"]["negative"] == 1.
+    hazards = {"train": {"wall": {"positive": 2., "negative": 8.}}, "validation": {}}
+    assert class_balance(hazards, "hazards", cap=100., negative_weight=0.)["wall"]["negative"] == 0.
+    for bad in (1.5, -0.1, float("nan"), True):
+        with pytest.raises(ValueError, match="between zero and one"):
+            class_balance(counts, "lighting", negative_weight=bad)
+
+
 def test_zero_positive_validation_is_rejected_before_training():
     counts = {split: {"attach": {"positive": positive, "negative": 10.}}
               for split, positive in (("train", 3.), ("validation", 0.))}

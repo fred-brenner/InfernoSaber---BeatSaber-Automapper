@@ -22,17 +22,27 @@ platforms before implementing them unless the task already authorizes them.
 - For v2 dataset preparation, individual stage training, concept composition,
   review stops and opt-in model comparisons, read [docs/pipeline-v2.md](docs/pipeline-v2.md).
   It also covers training throughput, the `main_training.py` selection script,
-  and the evaluated `v2_expert` inference bundle. Completed training does not
-  establish positive-case or gameplay quality; read the recorded limitations.
+  and the evaluated `v2_expert` inference bundle — the history-repair arm B
+  install was evaluated live and rolled back (kept at
+  `v2_expert_armB-history-repair`); the October bundle is active again.
+  Completed training does not establish positive-case or gameplay quality;
+  read the recorded limitations.
   Corpus comparisons require an explicit request.
 - For repaired hazards/arcs and experimental v2 lighting datasets, masks, arc split overlays,
   calibration, or mixed legacy/replacement bundles, read
-  [docs/sparse-stage-repair.md](docs/sparse-stage-repair.md). New preparation uses
+  [docs/sparse-stage-repair.md](docs/sparse-stage-repair.md). It also covers the
+  optional `*_enabled_song_supervision`, `*_history_corrupt_*` and
+  `*_negative_supervision_weight` training levers for sparse-stage history
+  dependence and positive-unlabeled semantics, plus window-tolerant replay
+  metrics (`tolerance_seconds`, default `.25`), the gated hazards `context`
+  note-space input (`pipeline_v2_hazard_context_*`), and the gated hazards
+  feasibility-mask inputs (`pipeline_v2_hazard_feasibility_input`). New preparation uses
   versioned sparse-stage policies. Preserve existing datasets and inference
   bundles; repair implementation alone does not establish replacement quality.
 - For implemented intensity/timing/note contracts and training status, read
   [docs/model-beat-architecture.md](docs/model-beat-architecture.md).
-- For production v2 generation, intensity postprocessing, model caching, worker
+- For production v2 generation, intensity postprocessing, note-decoding
+  temperature sampling (`v2_note_sample_temperature`), model caching, worker
   settings, package formats, and unchanged external commands, read
   [docs/generation-v2.md](docs/generation-v2.md).
 - For legacy generation calls, checkpoints, and preprocessing, read
@@ -47,6 +57,8 @@ platforms before implementing them unless the task already authorizes them.
   [docs/development.md](docs/development.md#human-map-beat-benchmark).
   Use only the curated `evaluate_beats/bs_map_input` packages for comparisons;
   exclude `favorites_bs_input` and report skipped packages individually.
+  Favorites remain valid *training* input: `--source-root` can be repeated to
+  ingest several package folders, with automatic beatmap+audio deduplication.
 - For the existing user workflow, read [Readme.md](Readme.md).
 - For the new intensity/timing/note framework, training commands, data contracts,
   and verification limits, read [docs/beat-model-training.md](docs/beat-model-training.md).

@@ -1,8 +1,15 @@
 """Legacy timing/flow adapters and conservative clearance for v2 objects.
 
 All timestamps remain elapsed seconds. Legacy note mutators run once, before
-stable note IDs and expansion relationships are assigned. Clearance only drops
-added objects; it never moves an upstream colored note.
+stable note IDs and expansion relationships are assigned. Clearance resolves
+same-time same-cell and swing-path conflicts; it prefers mutating heuristic or
+copied notes and only touches retained model notes when nothing else resolves
+the conflict.
+
+Cut-direction convention: ``get_cut_dir_xy`` yields the approach vector — the
+hand enters from ``pos + step`` and exits through ``pos - step``. Both adjacent
+cells along the arrow axis belong to the swing volume and must stay free of
+simultaneous other-hand notes (same occupancy model as ``calc_note_pos``).
 """
 
 import math
@@ -12,11 +19,10 @@ from collections import Counter
 import numpy as np
 
 from tools.config import config
-from map_creation.artificial_mod import gimme_more_notes
 from map_creation.bpm_optimizer import align_beats_on_bpm
 from map_creation.note_postprocessing import remove_double_notes
 from map_creation.sanity_check import (calc_note_pos, calc_note_speed,
-                                       fill_map_times_scale, remove_silent_times,
+                                       fill_map_times_scale, get_cut_dir_xy, remove_silent_times,
                                        sanity_check_notes, sanity_check_timing2)
 
 
@@ -198,6 +204,484 @@ def postprocess_timing(song, beats, audio_path, logger=None):
     return candidates, diagnostics
 
 
+# Exact reversals keep consecutive same-hand swings alternating; dots are
+# directionless and never need a recut.
+_REVERSE_DIRECTION = {0: 1, 1: 0, 2: 3, 3: 2, 4: 7, 5: 6, 6: 5, 7: 4}
+# Direction index → 45°-step angle (right=0, counterclockwise).
+_DIRECTION_ANGLE = {3: 0, 5: 1, 0: 2, 4: 3, 2: 4, 6: 5, 1: 6, 7: 7}
+# Direction index → axis group; recuts prefer staying inside the original's
+# group so the fix does not reshape the model's direction marginals.
+_DIRECTION_GROUP = {0: 0, 1: 0, 2: 1, 3: 1, 4: 2, 5: 2, 6: 2, 7: 2, 8: 3}
+# Direction index → one-cell (dx, dy) offset. ``get_cut_dir_xy`` yields the
+# approach vector: the hand enters from ``pos + step`` and exits through
+# ``pos - step``, so both adjacent cells along the axis belong to the swing
+# volume (same occupancy model as ``calc_note_pos``).
+_DIRECTION_STEP = {direction: get_cut_dir_xy(direction) for direction in range(8)}
+_STEP_DIRECTION = {step: direction for direction, step in _DIRECTION_STEP.items()}
+
+
+def _swept_cells(x, y, direction):
+    """In-grid cells the saber passes through on this cut: approach and exit."""
+    step = _DIRECTION_STEP.get(direction)
+    if step is None:
+        return ()
+    return tuple((x + sign * step[0], y + sign * step[1]) for sign in (1, -1)
+                 if 0 <= x + sign * step[0] < 4 and 0 <= y + sign * step[1] < 3)
+
+
+def _dot_virtual_direction(previous_d, px, py, x, y):
+    """Implied direction of a dot note from geometry.
+
+    After the previous cut the hand rests near its exit cell ``pos - step``;
+    the dot is then hit by whatever motion reaches it from there. A dot on the
+    exit cell continues the same stroke; a dot in the return zone inherits the
+    pendulum reversal. ``None`` when there is no previous direction."""
+    if previous_d is None or previous_d == 8:
+        return None
+    dx, dy = _DIRECTION_STEP[previous_d]
+    mx, my = x - px + dx, y - py + dy
+    if mx == 0 and my == 0:
+        return _REVERSE_DIRECTION[previous_d]
+    return _STEP_DIRECTION[(-int(np.sign(mx)), -int(np.sign(my)))]
+
+
+def _v2_mirroring(values):
+    """``gimme_more_notes`` variant that also mirrors the cut direction.
+
+    The legacy pass only mirrors lane and hand, so a copied inward cut became
+    an unmotivated outward/inward mismatch for the other hand. Mirroring the
+    horizontal step (dy preserved) keeps doubled sections symmetric like human
+    maps. v1 keeps using the untouched legacy function."""
+    probability = config.gimme_more_notes_prob
+    if probability <= 0:
+        return values
+    extra = config.max_speed / 4 - 5
+    if extra > 0:
+        probability += 0.1 * 0.1 * extra
+    for index, section in enumerate(values):
+        if probability < random.random() or len(section) < 4 or len(set(section[2::4])) != 1:
+            continue
+        mirrored = []
+        for offset in range(0, len(section), 4):
+            x, y, hand, direction = map(int, section[offset:offset + 4])
+            mirror_hand = 1 - hand if hand in (0, 1) else hand
+            if direction == 8:
+                mirror_direction = 8
+            else:
+                dx, dy = _DIRECTION_STEP[direction]
+                mirror_direction = _STEP_DIRECTION[(-dx, dy)]
+            mirrored.extend([3 - x, y, mirror_hand, mirror_direction])
+        values[index] = section + mirrored
+    return values
+
+
+def _step_distance(a, b):
+    """Smallest angle between two cut directions in 45° steps (0–4); dots count as free."""
+    if a == 8 or b == 8:
+        return 4
+    pa, pb = _DIRECTION_ANGLE[a], _DIRECTION_ANGLE[b]
+    return min((pa - pb) % 8, (pb - pa) % 8)
+
+
+def _swing_clear(origin, forbidden, direction):
+    """No swept cell of ``direction`` from ``origin`` sits in ``forbidden``."""
+    return (origin is None or not forbidden
+            or not (set(_swept_cells(origin[0], origin[1], direction)) & forbidden))
+
+
+def _rank_flow_candidates(original, candidates, others):
+    """Reversal-preferring order over pre-filtered directions; 8 = give up."""
+    if not candidates:
+        return 8
+    same_group = [d for d in candidates if _DIRECTION_GROUP[d] == _DIRECTION_GROUP[original]]
+    pool = same_group or candidates
+    return min(pool, key=lambda d: (-min((_step_distance(d, other) for other in others), default=8),
+                                    _step_distance(d, original), d))
+
+
+def _flow_legal(direction, previous, x, y, time, same_stroke_gap):
+    """Relaxed >90° rule against a (time, x, y, effective direction) predecessor.
+
+    Near-simultaneous pairs share one stroke and are exempt; a 90° change is
+    allowed when the hand physically travels at least two cells."""
+    if previous is None:
+        return True
+    ptime, px, py, pdirection = previous
+    if pdirection is None or time - ptime <= same_stroke_gap:
+        return True
+    steps = _step_distance(direction, pdirection)
+    if steps <= 1:
+        return False
+    return steps >= 3 or abs(x - px) + abs(y - py) >= 2
+
+
+def _flow_direction(original, previous_direction, blocked=(), swing_from=None, forbidden_cells=None):
+    """Nearest reversal of ``original`` that keeps >90° from ``previous_direction``.
+
+    Human flow resolves repeats with a swing back (~180°), so the candidate
+    furthest from ``previous_direction`` wins; ties fall back to the smallest
+    rotation away from ``original``. This keeps the forced fix inside the
+    reversal vocabulary instead of manufacturing side cuts the model never
+    asked for. ``blocked`` lists further directions the replacement must stay
+    >90° away from (used when recutting the earlier note of a pair). With
+    ``swing_from``/``forbidden_cells`` a candidate is rejected when one of its
+    swept cells is occupied by a simultaneous other-hand note."""
+    others = (previous_direction, *blocked)
+    candidates = [d for d in range(8)
+                  if all(_step_distance(d, other) >= 3 for other in others)
+                  and _swing_clear(swing_from, forbidden_cells, d)]
+    return _rank_flow_candidates(original, candidates, others)
+
+
+def _recut_same_direction_repeats(flattened, times, same_stroke_gap, flipped=None):
+    """Rotate a note that repeats its predecessor's cut within ±45°.
+
+    Consecutive same-hand notes *farther* than ``same_stroke_gap`` seconds need
+    a >90° direction change, or ≥90° when the hand travels at least two cells
+    (the travel gives the swing room). Near-simultaneous pairs share one
+    stroke and are exempt; dots never need a recut themselves but pass their
+    geometry-implied direction on to the next note's check.
+    ``flipped``, when given, is incremented per rewritten note.
+    """
+    avoid_swept = bool(getattr(config, "v2_cleanup_swing_clash", True))
+    last = {}
+    for time, group in zip(times, flattened):
+        for offset in range(0, len(group), 4):
+            x, y, hand, direction = map(int, group[offset:offset + 4])
+            previous = last.get(hand)
+            if previous is not None:
+                ptime, px, py, pdirection = previous
+                if direction != 8 and not _flow_legal(direction, previous, x, y, time, same_stroke_gap):
+                    forbidden = ({(int(group[o]), int(group[o + 1])) for o in range(0, len(group), 4)
+                                  if int(group[o + 2]) != hand} if avoid_swept else None)
+                    direction = _flow_direction(direction, pdirection,
+                                                swing_from=(x, y), forbidden_cells=forbidden)
+                    group[offset + 3] = direction
+                    if flipped is not None:
+                        flipped["n"] += 1
+            # dots get their implied direction from geometry, alternating the pendulum
+            last[hand] = (time, x, y, direction if direction != 8 else
+                          (_dot_virtual_direction(pdirection, px, py, x, y) if previous else None))
+    return flattened
+
+
+def recut_same_direction_notes(notes, chains=None, protect_retained=True):
+    """Flip any note repeating its same-hand predecessor's cut direction.
+
+    Covers heuristic additions, dedup survivors, and multiplier copies that
+    the stream-level pass cannot see. With ``protect_retained`` a retained
+    model note (contract-fixed downstream) is never flipped; a repeat against
+    a non-retained predecessor is then resolved by recutting that earlier
+    note against both neighbors instead. Chain heads keep their swing
+    consistent with a flipped anchor. Returns the number of flipped notes.
+    """
+    anchors, flipped, last = {note["id"]: note for note in notes}, 0, {}
+    ordered = sorted(notes, key=lambda item: (item["time"], item["id"]))
+    same_stroke_gap = float(getattr(config, "v2_cleanup_same_dir_gap", 0.1) or 0.)
+    if getattr(config, "v2_cleanup_swing_clash", True):
+        eps = float(getattr(config, "min_time_diff", .02))
+        window = max(eps, float(getattr(config, "v2_cleanup_swing_window", .15) or 0.))
+        other_cells = _other_hand_cells(ordered, eps, window)
+    else:
+        other_cells = {}
+    for note in ordered:
+        history = last.setdefault(note["hand"], [None, None])
+        previous = history[1]
+        prior = ((previous["time"], previous["x"], previous["y"], previous["d"])
+                 if previous is not None else None)
+        if note["d"] != 8 and not _flow_legal(note["d"], prior, note["x"], note["y"], note["time"], same_stroke_gap):
+            # prefer recutting a heuristic predecessor over a retained model
+            # note: dedup/mirroring artifacts created most violating pairs
+            if previous.get("kind") != "retained" and not previous.get("_virtual") \
+                    and note.get("kind") == "retained":
+                before = history[0]
+                blocked = (before["d"],) if before is not None and before["d"] != 8 else ()
+                previous["d"] = _flow_direction(previous["d"], note["d"], blocked,
+                                                swing_from=(previous["x"], previous["y"]),
+                                                forbidden_cells=other_cells.get(previous["id"]))
+                flipped += 1
+            elif not protect_retained or note.get("kind") != "retained":
+                note["d"] = _flow_direction(note["d"], previous["d"], swing_from=(note["x"], note["y"]),
+                                            forbidden_cells=other_cells.get(note["id"]))
+                flipped += 1
+        # dots get their implied direction from geometry for the next pair;
+        # the wrapper is virtual-only and must never become a recut target
+        effective = note
+        if note["d"] == 8 and previous is not None:
+            virtual = _dot_virtual_direction(previous["d"], previous["x"], previous["y"],
+                                             note["x"], note["y"])
+            effective = {**note, "d": virtual if virtual is not None else 8, "_virtual": True}
+        history[:] = [previous, effective]
+    for chain in chains or []:
+        anchor = anchors.get(chain.get("anchor_id"))
+        if anchor is not None:
+            chain["d"] = anchor["d"]
+    return flipped
+
+
+def _simultaneous_pairs(ordered, window):
+    """All ordered note pairs at most ``window`` seconds apart, regardless of hand."""
+    for index, note in enumerate(ordered):
+        for other in ordered[index + 1:]:
+            if other["time"] - note["time"] > window:
+                break
+            yield note, other
+
+
+def _other_hand_cells(ordered, eps, window):
+    """Note id → cells of other-hand notes standing during its swing.
+
+    A swing at ``t`` clips an uncut other-hand block whose own hit time lies
+    inside ``[t - eps, t + window]``: simultaneous-or-earlier notes inside the
+    ``eps`` grace count both ways, later notes are still standing (forward
+    horizon only — a note struck before the swing is already cleared)."""
+    cells = {note["id"]: set() for note in ordered}
+    for first, second in _simultaneous_pairs(ordered, window):
+        if first["hand"] != second["hand"]:
+            cells[first["id"]].add((second["x"], second["y"]))
+            if second["time"] - first["time"] <= eps:
+                cells[second["id"]].add((first["x"], first["y"]))
+    return cells
+
+
+def _history_context(ordered, eps):
+    """Per note: same-hand predecessor (time, x, y, virtual direction through
+    dots) strictly before its simultaneous group, plus for each dot its implied
+    direction derived from the predecessor's exit geometry."""
+    pred, incoming = {}, {}
+    last_eff = {}
+    start = 0
+    for note in ordered:
+        while ordered[start]["time"] < note["time"] - eps:
+            earlier = ordered[start]
+            before = last_eff.get(earlier["hand"])
+            if earlier["d"] != 8:
+                effective = earlier["d"]
+            elif before is not None and before[3] is not None:
+                effective = _dot_virtual_direction(before[3], before[1], before[2],
+                                                   earlier["x"], earlier["y"])
+            else:
+                effective = None
+            last_eff[earlier["hand"]] = (earlier["time"], earlier["x"], earlier["y"], effective)
+            start += 1
+        pred[note["id"]] = last_eff.get(note["hand"])
+        before = pred[note["id"]]
+        incoming[note["id"]] = note["d"] if note["d"] != 8 else (
+            _dot_virtual_direction(before[3], before[1], before[2], note["x"], note["y"])
+            if before is not None and before[3] is not None else None)
+    return pred, incoming
+
+
+def _off_side(note):
+    """The note sits on the opposite hand's half of the grid."""
+    return (note["x"] >= 2) == (note["hand"] == 0)
+
+
+def _relocation_cells(note, ordered, eps, window, incoming, dropped):
+    """Free cells for ``note``: unoccupied at its own time, outside every
+    earlier-or-simultaneous other-hand swing volume, and not swinging into a
+    later-standing other-hand note itself."""
+    occupied, swung, later = set(), set(), set()
+    for other in ordered:
+        if other["id"] == note["id"] or other["id"] in dropped:
+            continue
+        dt = other["time"] - note["time"]
+        if abs(dt) <= eps:
+            occupied.add((other["x"], other["y"]))
+        if other["hand"] != note["hand"]:
+            direction = other["d"] if other["d"] != 8 else incoming.get(other["id"])
+            if -window <= dt <= eps and direction is not None and direction != 8:
+                swung.update(_swept_cells(other["x"], other["y"], direction))
+                swung.add((other["x"], other["y"]))
+            if -eps <= dt <= window:
+                later.add((other["x"], other["y"]))
+    cells = []
+    for x in range(4):
+        for y in range(3):
+            if (x, y) in occupied or (x, y) in swung:
+                continue
+            direction = note["d"] if note["d"] != 8 else incoming.get(note["id"])
+            own = {(x, y)} | set(_swept_cells(x, y, direction)) \
+                if direction is not None and direction != 8 else {(x, y)}
+            if own & later:
+                continue
+            cells.append((x, y))
+    cells.sort(key=lambda cell: ((cell[0] >= 2) != (note["hand"] == 1),
+                                 abs(cell[0] - note["x"]) + abs(cell[1] - note["y"]), cell[0], cell[1]))
+    return cells
+
+
+def _resolve_clashes(notes, protect_retained, check_cells, check_swing, counters):
+    """One pass over simultaneous-position conflicts, mutating ``notes``.
+
+    Same-time same-cell notes are relocated to a clear cell (preferring the
+    off-side, non-retained one) or dropped when nothing is free; same-hand
+    duplicates are dropped. A note whose swing volume (approach cell, own
+    cell and exit cell) is occupied by an uncut other-hand note — struck at
+    the same instant or up to ``window`` seconds later — is resolved by
+    recutting the swinger, then relocating the target, then the swinger,
+    then dropping the target. Returns the number of changed notes."""
+    eps = float(getattr(config, "min_time_diff", .02))
+    window = max(eps, float(getattr(config, "v2_cleanup_swing_window", .15) or 0.))
+    gap = float(getattr(config, "v2_cleanup_same_dir_gap", .1) or 0.)
+    ordered = sorted(notes, key=lambda item: (item["time"], item["id"]))
+    pred, incoming = _history_context(ordered, eps)
+    other_cells = _other_hand_cells(ordered, eps, window)
+    dropped, changed = set(), 0
+    alive = lambda note: note["id"] not in dropped
+    movable = lambda note: not (protect_retained and note.get("kind") == "retained")
+
+    def drop(note):
+        nonlocal changed
+        dropped.add(note["id"])
+        counters["dropped"] += 1
+        changed += 1
+
+    if check_cells:
+        for first, second in _simultaneous_pairs(ordered, eps):
+            if not alive(first) or not alive(second) or (first["x"], first["y"]) != (second["x"], second["y"]):
+                continue
+            if first["hand"] == second["hand"]:
+                drop(first if movable(first) and not movable(second) else second)
+                counters["cell_dropped"] += 1
+                continue
+            movers = sorted((first, second), key=lambda note: (not movable(note), not _off_side(note), note["id"]))
+            for mover in movers:
+                cells = _relocation_cells(mover, ordered, eps, window, incoming, dropped)
+                if cells:
+                    mover["x"], mover["y"] = cells[0]
+                    counters["cell_relocated"] += 1
+                    changed += 1
+                    break
+            else:
+                drop(movers[0])
+                counters["cell_dropped"] += 1
+    if check_swing:
+        partners = {note["id"]: [] for note in ordered}
+        for first, second in _simultaneous_pairs(ordered, window):
+            if first["hand"] != second["hand"]:
+                partners[first["id"]].append(second)
+                if second["time"] - first["time"] <= eps:
+                    partners[second["id"]].append(first)
+        for swinger in ordered:
+            if not alive(swinger):
+                continue
+            direction = swinger["d"] if swinger["d"] != 8 else incoming.get(swinger["id"])
+            swept = set(_swept_cells(swinger["x"], swinger["y"], direction)) \
+                if direction is not None and direction != 8 else set()
+            for target in partners[swinger["id"]]:
+                if not alive(target):
+                    continue
+                position = (target["x"], target["y"])
+                on_cell = position == (swinger["x"], swinger["y"])
+                if position not in swept and not (on_cell and target["time"] - swinger["time"] > eps):
+                    continue
+                resolved = False
+                previous = pred.get(swinger["id"])
+                if swinger["d"] != 8 and movable(swinger) and not on_cell:
+                    others = (() if previous is None or previous[3] is None
+                              or swinger["time"] - previous[0] <= gap else (previous[3],))
+                    candidates = [d for d in range(8)
+                                  if _flow_legal(d, previous, swinger["x"], swinger["y"], swinger["time"], gap)
+                                  and _swing_clear((swinger["x"], swinger["y"]),
+                                                   other_cells.get(swinger["id"]), d)]
+                    new = _rank_flow_candidates(swinger["d"], candidates, others)
+                    if new != 8:
+                        swinger["d"] = new
+                        counters["swing_recut"] += 1
+                        changed += 1
+                        resolved = True
+                if not resolved:
+                    for mover in (target, swinger):
+                        if not movable(mover):
+                            continue
+                        cells = _relocation_cells(mover, ordered, eps, window, incoming, dropped)
+                        if cells:
+                            mover["x"], mover["y"] = cells[0]
+                            counters["swing_relocated"] += 1
+                            changed += 1
+                            resolved = True
+                            break
+                if not resolved:
+                    drop(min((swinger, target), key=lambda n: (not movable(n), n is swinger)))
+                    counters["swing_dropped"] += 1
+                break
+    if dropped:
+        notes[:] = [note for note in notes if note["id"] not in dropped]
+    return changed
+
+
+def clearance_violations(notes):
+    """Pure count of remaining hard-rule violations: same-cell pairs, swing-into
+    pairs and same-hand flow repeats."""
+    eps = float(getattr(config, "min_time_diff", .02))
+    window = max(eps, float(getattr(config, "v2_cleanup_swing_window", .15) or 0.))
+    gap = float(getattr(config, "v2_cleanup_same_dir_gap", .1) or 0.)
+    ordered = sorted(notes, key=lambda item: (item["time"], item["id"]))
+    pred, incoming = _history_context(ordered, eps)
+    same_cell = sum(1 for first, second in _simultaneous_pairs(ordered, eps)
+                    if (first["x"], first["y"]) == (second["x"], second["y"]))
+    partners = {note["id"]: [] for note in ordered}
+    for first, second in _simultaneous_pairs(ordered, window):
+        if first["hand"] != second["hand"]:
+            partners[first["id"]].append(second)
+            if second["time"] - first["time"] <= eps:
+                partners[second["id"]].append(first)
+    swing_into = 0
+    for swinger in ordered:
+        direction = swinger["d"] if swinger["d"] != 8 else incoming.get(swinger["id"])
+        swept = set(_swept_cells(swinger["x"], swinger["y"], direction)) \
+            if direction is not None and direction != 8 else set()
+        for target in partners[swinger["id"]]:
+            position = (target["x"], target["y"])
+            swing_into += int(position in swept
+                              or (position == (swinger["x"], swinger["y"])
+                                  and target["time"] - swinger["time"] > eps))
+    repeats = sum(1 for note in ordered
+                  if note["d"] != 8 and not _flow_legal(note["d"], pred.get(note["id"]),
+                                                      note["x"], note["y"], note["time"], gap))
+    return {"same_cell_pairs": same_cell, "swing_into_pairs": swing_into, "flow_repeats": repeats}
+
+
+def enforce_note_flow_and_clearance(notes, chains=None, protect_retained=True):
+    """Fixpoint of the >90° recut and swing-clearance.
+
+    A swing at ``t`` sweeps ``pos + step → pos → pos - step``; an other-hand
+    note standing on any of those cells at that instant — same time, or
+    struck up to ``v2_cleanup_swing_window`` seconds later — is a clash.
+    Both passes can feed back into each other (a flow recut may point at an
+    occupied swept cell; a relocation changes travel distances), so they repeat
+    until stable, bounded at eight rounds. Retained notes are never touched
+    while any alternative fix exists when ``protect_retained`` is set.
+    Returns a stats dict including residual violation counts."""
+    stats = {"flow_recuts": 0, "cell_relocated": 0, "cell_dropped": 0,
+             "swing_recut": 0, "swing_relocated": 0, "swing_dropped": 0}
+    flow = float(getattr(config, "v2_cleanup_same_dir_recut", 0.) or 0.) > 0
+    check_cells = bool(getattr(config, "v2_cleanup_cell_clash", True))
+    check_swing = bool(getattr(config, "v2_cleanup_swing_clash", True))
+    for _ in range(8):
+        changed = 0
+        if flow:
+            flips = recut_same_direction_notes(notes, chains, protect_retained)
+            stats["flow_recuts"] += flips
+            changed += flips
+        if check_cells or check_swing:
+            counters = {"dropped": 0, "cell_dropped": 0, "cell_relocated": 0,
+                        "swing_recut": 0, "swing_relocated": 0, "swing_dropped": 0}
+            changed += _resolve_clashes(notes, protect_retained, check_cells, check_swing, counters)
+            for key in ("cell_dropped", "cell_relocated", "swing_recut", "swing_relocated", "swing_dropped"):
+                stats[key] += counters[key]
+        if not changed:
+            break
+    anchors = {note["id"]: note for note in notes}
+    for chain in chains or []:
+        anchor = anchors.get(chain.get("anchor_id"))
+        if anchor is not None:
+            chain["x"], chain["y"], chain["d"] = anchor["x"], anchor["y"], anchor["d"]
+    stats["residual"] = clearance_violations(notes)
+    return stats
+
+
 def postprocess_notes(notes, event_times, logger=None):
     """Run the shared legacy flow pass, then establish stable retained anchors."""
     from training.beat_models.data import reduce_notes
@@ -246,24 +730,75 @@ def postprocess_notes(notes, event_times, logger=None):
         record_operation(stage, previous, grouped_counts(flattened))
 
     if config.gimme_more_notes_flag:
-        apply_operation("mirroring", gimme_more_notes)
+        apply_operation("mirroring", _v2_mirroring)
     if config.single_notes_only_flag:
         apply_operation("initial_single_note_filter", remove_double_notes)
-    apply_operation("legacy_note_flow", lambda values: sanity_check_notes(values, times))
+    def relaxed_flow(values):
+        # Sampled v2 model output already carries human-like variety; the
+        # legacy homogenizers are relaxed only for this call, leaving the v1
+        # generator's cleanup behavior unchanged.
+        overrides = {"allow_dot_notes": getattr(config, "v2_cleanup_allow_dots", config.allow_dot_notes),
+                     "flow_model_flag": getattr(config, "v2_cleanup_flow_recut", config.flow_model_flag),
+                     "shift_blocks_left_right_flag": getattr(config, "v2_cleanup_lane_shift",
+                                                           config.shift_blocks_left_right_flag),
+                     "sanity_direction_recut_flag": getattr(config, "v2_cleanup_sanity_recut",
+                                                          config.sanity_direction_recut_flag),
+                     "add_dot_notes": getattr(config, "v2_cleanup_add_dots", config.add_dot_notes),
+                     "shift_blocks_middle_flag": getattr(config, "v2_cleanup_middle_shift",
+                                                         config.shift_blocks_middle_flag),
+                     "shift_blocks_up_down_flag": getattr(config, "v2_cleanup_updown_shift",
+                                                          config.shift_blocks_up_down_flag),
+                     "correct_notes_all_flag": getattr(config, "v2_cleanup_cross_hand_adjust",
+                                                       config.correct_notes_all_flag)}
+        previous = {key: getattr(config, key) for key in overrides}
+        try:
+            for key, value in overrides.items():
+                setattr(config, key, value)
+            return sanity_check_notes(values, times)
+        finally:
+            for key, value in previous.items():
+                setattr(config, key, value)
+
+    apply_operation("legacy_note_flow", relaxed_flow)
+    flat_flips = {"n": 0}
+    if float(getattr(config, "v2_cleanup_same_dir_recut", 0.) or 0.) > 0:
+        gap = float(getattr(config, "v2_cleanup_same_dir_gap", 0.1) or 0.)
+        apply_operation("same_direction_recut",
+                        lambda values: _recut_same_direction_repeats(values, times, gap, flat_flips))
     # Emphasis and mirroring must not undo the user's single-note selection.
     if config.single_notes_only_flag:
         apply_operation("final_single_note_filter", remove_double_notes)
     structured, source = [], []
-    seen = set()
+    last_kept, same_stroke_gap = {}, float(getattr(config, "v2_cleanup_same_dir_gap", .1) or 0.)
     for event, (time, values) in enumerate(zip(times, flattened)):
+        per_hand = {}
         for offset in range(0, len(values), 4):
             x, y, hand, direction = map(int, values[offset:offset + 4])
-            key = (time, x, y, hand)
-            if key in seen:
-                continue
-            seen.add(key)
             if not (0 <= x < 4 and 0 <= y < 3 and hand in (0, 1) and 0 <= direction <= 8):
                 raise ValueError("Legacy note cleanup produced invalid colored-note geometry")
+            per_hand.setdefault(hand, []).append((x, y, direction))
+        for hand in sorted(per_hand):
+            options = per_hand[hand]
+            previous = last_kept.get(hand)
+            # with same-hand candidates, keep the one that flows best against
+            # the predecessor instead of always the first surviving cleanup
+            if len(options) > 1 and previous is not None and previous[3] is not None \
+                    and time - previous[0] > same_stroke_gap:
+                def rank(option):
+                    od = option[2]
+                    if od == 8:
+                        return 0, 0
+                    steps = _step_distance(od, previous[3])
+                    illegal = steps <= 1 or (steps == 2 and abs(option[0] - previous[1])
+                                             + abs(option[1] - previous[2]) < 2)
+                    return illegal, -steps
+                x, y, direction = min(enumerate(options), key=lambda item: (*rank(item[1]), item[0]))[1]
+            else:
+                x, y, direction = options[0]
+            effective = direction if direction != 8 else (
+                _dot_virtual_direction(previous[3], previous[1], previous[2], x, y)
+                if previous is not None and previous[3] is not None else None)
+            last_kept[hand] = (time, x, y, effective)
             identity = len(structured)
             structured.append({"id": identity, "time": float(time), "hand": hand, "x": x, "y": y,
                                "d": direction, "kind": "heuristic"})
@@ -278,7 +813,11 @@ def postprocess_notes(notes, event_times, logger=None):
         for index in selected:
             structured[int(index)]["kind"] = "retained"
     retained = sum(note["kind"] == "retained" for note in structured)
+    clearance = enforce_note_flow_and_clearance(structured, protect_retained=False)
     diagnostics = {"input_notes": len(notes), "retained_notes": retained,
+                   "same_direction_recut_notes": clearance["flow_recuts"],
+                   "same_direction_recut_stream_notes": flat_flips["n"],
+                   "note_clearance": clearance,
                    "heuristic_notes": len(structured) - retained, "notes": len(structured),
                    "ids_assigned_after_cleanup": True, "times_changed": False,
                    "operations": operations, **differences(structured)}

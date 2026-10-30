@@ -114,10 +114,72 @@ with actual timestamps in seconds. Moving events retains their count; nearby
 merges use `min_time_diff`, keep the largest count, and cap it at two. Added events
 use the nearest timing frame's stronger one/two-note probability. Zero density
 remains empty. Mirroring, single-note mode, flow/movement, breaks, emphasis,
-waveform changes and dot controls run before learned expansion. `random_factor`
-adds bounded normalized variation to v2 position/arrow probabilities. The same
-control also feeds the separate original v1 lighting score weighting through
+waveform changes and dot controls run before learned expansion. Position and
+arrow categories are sampled from the model distributions at
+`config.v2_note_sample_temperature` (default `0.9`; `0` restores argmax). A
+one-note event samples jointly over the 24 hand/cell combinations weighted like
+the count-one argmax rule; a two-note event samples each hand independently.
+Sampling replaces the former `random_factor` noise mixture for note decoding,
+which produced degenerate near-uniform argmax patterns; the setting still feeds
+the separate original v1 lighting score weighting through
 `config.random_note_map_factor`.
+
+Arrows decoding optionally mixes in a second model: when
+`v2_arrows_variety` is above `0` the runtime also loads the arrows stage of
+`v2_arrows_reference_bundle` (currently the history-corrupted
+`v2_expert_noterepair-c50` candidate) and each note decodes with the reference
+model with probability `v2_arrows_variety`. Per-note model selection keeps each
+model's internal coherence — linear softmax blending flattened disagreeing
+regions and overshot side cuts — so the slider interpolates aggregate
+statistics directly (`0` = production model only, `1` = reference only).
+
+The shared legacy flow pass (`sanity_check_notes`) is relaxed only for v2 via
+`v2_cleanup_*` overrides: `allow_dots` keeps sampled dot notes, `flow_recut`
+and `sanity_recut` skip the movement-reversal direction rewrites (which
+collapsed the 135°/dot vocabulary), `lane_shift` and `middle_shift` control
+the positional block shifters, `updown_shift`/`cross_hand_adjust` gate the
+remaining position movers (`shift_blocks_up_down`, `correct_notes_all`), and
+`add_dots` skips invented extra dots. The new `shift_blocks_left_right_flag`,
+`shift_blocks_middle_flag`, `shift_blocks_up_down_flag`,
+`correct_notes_all_flag` and `sanity_direction_recut_flag` defaults preserve
+the v1 cleanup unchanged.
+
+Hard note invariants run as a bounded fixpoint
+(`enforce_note_flow_and_clearance`) both after dedup and once more after
+multiplier expansion, with retained-model notes contract-fixed whenever an
+alternative fix exists:
+
+- no two notes share `(time, hand)` — deduplication keeps the best-flowing
+  candidate, and same-hand same-cell duplicates are dropped;
+- consecutive same-hand notes separated by more than
+  `v2_cleanup_same_dir_gap` seconds must change cut direction by more than
+  90° (a 90° turn is allowed only when the hand travels at least two cells);
+  dots take an implied direction from geometry — the hand rests at the
+  previous cut's exit cell, so a dot on the exit ray continues the stroke
+  while a dot in the return zone inherits the pendulum reversal, and
+  consecutive dots keep alternating. The direction recut runs
+  on the flattened stream and on structured notes, preferring reversal-like
+  replacements inside the original axis group;
+- with `v2_cleanup_cell_clash` enabled no two simultaneous notes may share
+  one cell for any hand pair — clashes relocate the off-side, non-retained
+  note to the nearest clear cell or drop it as a last resort;
+- with `v2_cleanup_swing_clash` enabled none of a note's swing volume —
+  the approach cell, its own cell, and the exit cell one grid step along
+  the arrow axis (`get_cut_dir_xy` yields the approach vector; the saber
+  sweeps `pos + step → pos → pos - step`) — may hold an *uncut* other-hand
+  note at the swing instant: struck simultaneously or up to
+  `v2_cleanup_swing_window` seconds later (default `.15`; an earlier note
+  is already cleared by its own cut). Dots swing along their implied
+  direction; a later note stacked on the swinger's own cell can only be
+  relocated or dropped, never recut away. Resolution order: recut the
+  swinger under the flow rule, then relocate the target, then relocate the
+  swinger, then drop the target.
+
+Counts are reported under `note_clearance` (`flow_recuts`,
+`cell_relocated`/`cell_dropped`, `swing_recut`/`swing_relocated`/
+`swing_dropped`) plus a `residual` block that must read zero for
+`same_cell_pairs`, `swing_into_pairs` and `flow_repeats`. Chain heads stay
+synced to their anchor's direction and position.
 
 After cleanup, training reduction selects one representative per hand; heuristic
 extra notes remain separate. Stable note IDs anchor expansions and arc endpoints.

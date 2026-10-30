@@ -114,9 +114,11 @@ def test_training_first_cut_selects_anchor_after_heuristic_cleanup(monkeypatch):
     original = [note(4, y=0), note(9, y=2)]
     before = deepcopy(original)
     actual, report = post.postprocess_notes(original, [1.])
-    assert [item["id"] for item in actual] == [0, 1]
-    assert [item["kind"] for item in actual] == ["heuristic", "retained"]
-    assert report["heuristic_notes"] == 1
+    # same-hand notes at one timestep collapse before anchoring (never playable);
+    # the survivor is marked retained by the source-order reduce contract
+    assert [item["id"] for item in actual] == [0]
+    assert [item["kind"] for item in actual] == ["retained"]
+    assert report["heuristic_notes"] == 0 and report["retained_notes"] == 1
     assert original == before
 
 

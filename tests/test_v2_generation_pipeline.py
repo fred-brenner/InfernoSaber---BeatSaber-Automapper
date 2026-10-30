@@ -97,6 +97,7 @@ def test_production_pipeline_uses_only_audio_and_keeps_all_output_families(monke
 
     settings = preparation_settings()
     settings.pop("stage_policies", None)  # Exercise the retained legacy decoder.
+    settings["hazard_feasibility_input"] = False
     settings["schedule"]["arc_max_gap_seconds"] = 6.
     result = generate(song, 4., predictors, encoder, settings, vocab,
                       lighting_generator=lighting, postprocessors=processors(), random_factor=0, logger=lambda message: None)
@@ -161,6 +162,7 @@ def test_intensity_adjustment_conditions_timing_and_all_downstream_stages(monkey
         settings["stage_policies"]["arcs"]["max_gap_seconds"] = 6.
     else:
         settings.pop("stage_policies", None)
+        settings["hazard_feasibility_input"] = False
     result = generate(base, 4., predictors, lambda times: np.zeros((len(times), 16), np.float32),
                       settings, vocab, lighting_generator=lighting, postprocessors=processors(),
                       random_factor=0, logger=lambda message: None)
@@ -239,6 +241,7 @@ def test_raw_hazard_and_arc_choices_survive_clearance_rejection_in_diagnostics(m
     predictors["timing"] = Timing()
     settings = preparation_settings()
     settings.pop("stage_policies", None)  # Exercise the retained legacy decoder.
+    settings["hazard_feasibility_input"] = False
     settings["schedule"]["arc_max_gap_seconds"] = 6.
     hooks = processors()
 
@@ -267,3 +270,231 @@ def test_raw_hazard_and_arc_choices_survive_clearance_rejection_in_diagnostics(m
 def test_invalid_density_is_rejected(nps):
     with pytest.raises(ValueError, match="NPS"):
         generate(audio_song(), nps, {}, None, preparation_settings(), vocabulary(), lighting_generator=lighting, postprocessors=processors())
+
+
+def test_sampled_position_decode_preserves_count_and_cells():
+    from map_creation.v2_pipeline import _decode_positions_sampled
+    outputs = {"red": np.array([[.6, .05, .05, .05, .05, .05, .05, .05, .05, .0, .0, .0, .0]], np.float32),
+               "blue": np.array([[.4, .0, .0, .0, .0, .0, .0, .0, .0, .0, .0, .5, .1]], np.float32)}
+    rng = np.random.default_rng(5)
+    singles = [_decode_positions_sampled(outputs, 1, .9, rng) for _ in range(400)]
+    assert all((red == 0) != (blue == 0) for red, blue in singles)
+    assert all(1 <= max(red, blue) <= 12 for red, blue in singles)
+    assert len(set(singles)) > 2  # non-degenerate sampling explores the tail
+    doubles = [_decode_positions_sampled(outputs, 2, .9, rng) for _ in range(200)]
+    assert all(1 <= red <= 12 and 1 <= blue <= 12 for red, blue in doubles)
+    argmaxed = [_decode_positions_sampled(outputs, 1, 0, rng) for _ in range(10)]
+    assert len(set(argmaxed)) == 1  # zero temperature keeps the argmax contract
+
+
+def test_note_sampling_flows_through_generate():
+    song, vocab = audio_song(), vocabulary()
+    predictors = dummy_predictors(vocab)
+    predictors["timing"] = Timing()
+    predictors["lighting"] = lambda inputs: pytest.fail("Production must use v1 lighting")
+    settings = preparation_settings()
+    settings.pop("stage_policies", None)
+    settings["hazard_feasibility_input"] = False
+    settings["schedule"]["arc_max_gap_seconds"] = 6.
+    settings["note_sample_temperature"] = 0.9
+    counts = {}
+    for seed in range(6):
+        result = generate(song, 4., predictors, lambda times: np.zeros((len(times), 16), np.float32),
+                          settings, vocab, lighting_generator=lighting, postprocessors=processors(),
+                          random_factor=0, rng=np.random.default_rng(seed), logger=lambda message: None)
+        assert result.diagnostics["note_sample_temperature"] == 0.9
+        retained = [note for note in result.state["notes"] if note.get("kind") == "retained"]
+        assert len(retained) == result.diagnostics["raw_decisions"]["position_notes"]
+        for note in retained:
+            assert 0 <= note["x"] < 4 and 0 <= note["y"] < 3 and 0 <= note["d"] <= 8
+        counts[tuple((note["x"], note["y"]) for note in result.state["notes"])] = 1
+    assert result.status == "dummy"
+
+
+def _note(note_id, time, hand, direction, kind="heuristic"):
+    return {"id": note_id, "time": time, "hand": hand, "x": 1, "y": 1,
+            "d": direction, "kind": kind}
+
+
+def test_same_direction_recut_flips_repeat():
+    from map_creation.v2_postprocessing import recut_same_direction_notes, _step_distance
+    notes = [_note(0, 0., 0, 1), _note(1, .2, 0, 1), _note(2, .4, 0, 1),
+             _note(3, .2, 1, 0), _note(4, .4, 1, 0)]
+    flipped = recut_same_direction_notes(notes)
+    assert flipped == 2
+    assert _step_distance(notes[0]["d"], notes[1]["d"]) >= 3
+    assert _step_distance(notes[1]["d"], notes[2]["d"]) >= 3
+    assert _step_distance(notes[3]["d"], notes[4]["d"]) >= 3
+
+
+def test_same_direction_recut_handles_near_repeats_and_exemptions():
+    from map_creation.v2_postprocessing import recut_same_direction_notes, _step_distance
+    # 45° neighbour repeats violate the ≥90° rule for far-apart notes
+    notes = [_note(0, 0., 0, 1), _note(1, .5, 0, 6)]
+    assert recut_same_direction_notes(notes) == 1
+    assert _step_distance(notes[0]["d"], notes[1]["d"]) >= 3
+    # 90° changes are still too hectic for separated notes at one cell
+    notes = [_note(0, 0., 0, 1), _note(1, .5, 0, 2)]
+    assert recut_same_direction_notes(notes) == 1
+    assert _step_distance(notes[0]["d"], notes[1]["d"]) >= 3
+    # 90° is allowed when the hand travels at least two cells
+    notes = [_note(0, 0., 0, 1), _note(1, .5, 0, 2)]
+    notes[1]["x"], notes[1]["y"] = 3, 1
+    assert recut_same_direction_notes(notes) == 0
+    # 135° changes are fine as-is
+    notes = [_note(0, 0., 0, 1), _note(1, .5, 0, 4)]
+    assert recut_same_direction_notes(notes) == 0
+    # near-simultaneous notes share one stroke and keep the direction
+    notes = [_note(0, 0., 0, 1), _note(1, .05, 0, 1)]
+    assert recut_same_direction_notes(notes) == 0
+    # dots may repeat freely
+    notes = [_note(0, 0., 0, 8), _note(1, .5, 0, 8)]
+    assert recut_same_direction_notes(notes) == 0
+    # a same-cell dot is hit by the return swing: down → dot → down is legal
+    notes = [_note(0, 0., 0, 1), _note(1, .2, 0, 8), _note(2, .4, 0, 1)]
+    assert recut_same_direction_notes(notes) == 0
+    assert notes[1]["d"] == 8
+    # a dot in the continuation zone continues the stroke: down → dot → down repeats
+    notes = [_note(0, 0., 0, 1), _note(1, .2, 0, 8), _note(2, .4, 0, 1)]
+    notes[0]["y"], notes[1]["y"] = 2, 0
+    assert recut_same_direction_notes(notes) == 1
+    assert notes[1]["d"] == 8 and _step_distance(notes[0]["d"], notes[2]["d"]) >= 3
+
+
+def test_same_direction_recut_protects_retained():
+    from map_creation.v2_postprocessing import recut_same_direction_notes, _step_distance
+    # retained note preceded by same-direction copy: recut the earlier note
+    notes = [_note(0, 0., 0, 4, kind="copy"), _note(1, .2, 0, 4, kind="retained")]
+    assert recut_same_direction_notes(notes) == 1
+    assert notes[1]["d"] == 4 and _step_distance(notes[0]["d"], 4) >= 3
+    # retained/retained pairs are contract-fixed and left alone
+    notes = [_note(0, 0., 0, 1, kind="retained"), _note(1, .2, 0, 1, kind="retained")]
+    assert recut_same_direction_notes(notes) == 0
+    assert notes[1]["d"] == 1
+    # unprotected mode recuts the later note unconditionally
+    assert recut_same_direction_notes(notes, protect_retained=False) == 1
+    assert _step_distance(notes[0]["d"], notes[1]["d"]) >= 3
+
+
+def test_same_direction_recut_syncs_chain_heads():
+    from map_creation.v2_postprocessing import recut_same_direction_notes
+    notes = [_note(0, 0., 0, 2, kind="copy"), _note(1, .2, 0, 2, kind="copy")]
+    chain = {"anchor_id": 1, "d": 2}
+    assert recut_same_direction_notes(notes, chains=[chain]) == 1
+    assert notes[1]["d"] == chain["d"] and notes[1]["d"] != 2
+
+
+def test_simultaneous_same_cell_is_resolved():
+    from map_creation.v2_postprocessing import clearance_violations, enforce_note_flow_and_clearance
+    # different-hand notes on one cell at one timestep are physically impossible
+    notes = [_note(0, .5, 0, 1), _note(1, .5, 1, 0)]
+    stats = enforce_note_flow_and_clearance(notes)
+    assert clearance_violations(notes)["same_cell_pairs"] == 0
+    assert len(notes) == 2 and stats["cell_relocated"] == 1
+    # the same-hand duplicate is dropped outright
+    notes = [_note(0, .5, 0, 1), _note(1, .5, 0, 0)]
+    stats = enforce_note_flow_and_clearance(notes)
+    assert len(notes) == 1 and stats["cell_dropped"] == 1
+
+
+def test_swing_into_other_hand_is_resolved():
+    from map_creation.v2_postprocessing import clearance_violations, enforce_note_flow_and_clearance
+    # left cuts into the simultaneous right note's approach cell: recut or relocate
+    notes = [_note(0, .5, 0, 2), _note(1, .5, 1, 0)]
+    notes[1]["x"], notes[1]["y"] = 2, 1
+    stats = enforce_note_flow_and_clearance(notes)
+    assert clearance_violations(notes)["swing_into_pairs"] == 0
+    assert stats["swing_recut"] + stats["swing_relocated"] >= 1
+    # the exported-map violation: right note (2,0) arrow-left exits through the
+    # simultaneous left note at (1,0)
+    notes = [_note(0, .5, 1, 2), _note(1, .5, 0, 0)]
+    notes[0]["x"], notes[0]["y"], notes[1]["x"], notes[1]["y"] = 2, 0, 1, 0
+    stats = enforce_note_flow_and_clearance(notes)
+    assert clearance_violations(notes) == {"same_cell_pairs": 0, "swing_into_pairs": 0, "flow_repeats": 0}
+    assert stats["swing_recut"] + stats["swing_relocated"] + stats["swing_dropped"] >= 1
+    # a retained swinger cannot be recut, so the target moves instead
+    notes = [_note(0, .5, 0, 2, kind="retained"), _note(1, .5, 1, 0)]
+    notes[1]["x"], notes[1]["y"] = 2, 1
+    stats = enforce_note_flow_and_clearance(notes)
+    assert notes[0]["d"] == 2 and stats["swing_relocated"] == 1
+    assert (notes[1]["x"], notes[1]["y"]) != (2, 1)
+    assert clearance_violations(notes)["swing_into_pairs"] == 0
+
+
+def test_swing_into_later_note_is_resolved():
+    from map_creation.v2_postprocessing import clearance_violations, enforce_note_flow_and_clearance
+    # a later other-hand note still stands in the swept cell when the blade
+    # passes through: right (2,0) arrow-left exits where the left note lands .08s later
+    notes = [_note(0, .5, 1, 2), _note(1, .58, 0, 0)]
+    notes[0]["x"], notes[0]["y"], notes[1]["x"], notes[1]["y"] = 2, 0, 1, 0
+    stats = enforce_note_flow_and_clearance(notes)
+    assert clearance_violations(notes) == {"same_cell_pairs": 0, "swing_into_pairs": 0, "flow_repeats": 0}
+    assert stats["swing_recut"] + stats["swing_relocated"] + stats["swing_dropped"] >= 1
+    # a later note standing on the swinger's own cell is a real clash too and
+    # can only be relocated/dropped, never recut away
+    notes = [_note(0, .5, 1, 1), _note(1, .58, 0, 0)]
+    notes[0]["x"], notes[0]["y"], notes[1]["x"], notes[1]["y"] = 2, 0, 2, 0
+    stats = enforce_note_flow_and_clearance(notes)
+    assert clearance_violations(notes)["swing_into_pairs"] == 0
+    assert stats["swing_recut"] == 0
+    # notes struck before the swing are already gone: .08s before the exit cell
+    # is not a clash
+    notes = [_note(0, .42, 0, 0), _note(1, .5, 1, 2)]
+    notes[0]["x"], notes[0]["y"], notes[1]["x"], notes[1]["y"] = 1, 0, 2, 0
+    stats = enforce_note_flow_and_clearance(notes)
+    assert clearance_violations(notes)["swing_into_pairs"] == 0
+    assert stats["swing_recut"] + stats["swing_relocated"] + stats["swing_dropped"] == 0
+
+
+def test_swing_recut_respects_same_hand_flow():
+    from map_creation.v2_postprocessing import (clearance_violations, _step_distance,
+                                                enforce_note_flow_and_clearance)
+    # swinger is flow-legal against its predecessor (90° with 2-cell travel),
+    # so the clash fix - not the flow pass - must supply the new direction;
+    # any horizontal recut still sweeps the blocked cell, so it must leave the
+    # original axis entirely
+    notes = [_note(0, 0., 0, 0), _note(1, .5, 0, 2), _note(2, .5, 1, 0)]
+    notes[0]["x"], notes[0]["y"] = 0, 0
+    notes[2]["x"], notes[2]["y"] = 2, 1
+    stats = enforce_note_flow_and_clearance(notes)
+    assert stats["flow_recuts"] == 0 and stats["swing_recut"] == 1
+    assert notes[1]["d"] == 1  # vertical reversal is the furthest legal family
+    assert clearance_violations(notes) == {"same_cell_pairs": 0, "swing_into_pairs": 0, "flow_repeats": 0}
+    assert _step_distance(notes[0]["d"], notes[1]["d"]) >= 2
+
+
+def test_v2_mirroring_also_mirrors_cut_direction(monkeypatch):
+    from map_creation.v2_postprocessing import _v2_mirroring
+    monkeypatch.setattr(config, "gimme_more_notes_prob", 1.)
+    monkeypatch.setattr(config, "max_speed", 4.)
+    # single-hand section: mirrored copy must flip lane, hand and horizontal cut
+    assert _v2_mirroring([[1, 1, 0, 2]]) == [[1, 1, 0, 2, 2, 1, 1, 3]]
+    # vertical cuts and dots survive the mirror unchanged
+    assert _v2_mirroring([[0, 0, 0, 1]]) == [[0, 0, 0, 1, 3, 0, 1, 1]]
+    assert _v2_mirroring([[2, 2, 0, 8]]) == [[2, 2, 0, 8, 1, 2, 1, 8]]
+    # mixed-hand sections are not doubled
+    assert _v2_mirroring([[1, 1, 0, 2, 2, 1, 1, 3]]) == [[1, 1, 0, 2, 2, 1, 1, 3]]
+
+
+def test_dot_bridges_flow_with_implied_direction():
+    from map_creation.v2_postprocessing import clearance_violations, enforce_note_flow_and_clearance
+    # reported violation: up-right, dot in the return zone, down-left again -
+    # the dot already carries the down-left pendulum motion, so the third note
+    # repeats it and must be recut back to the up-right family
+    notes = [_note(0, 0., 1, 5), _note(1, .25, 1, 8), _note(2, .5, 1, 6)]
+    notes[0]["x"], notes[0]["y"] = 2, 0
+    notes[1]["x"], notes[1]["y"] = 1, 0
+    notes[2]["x"], notes[2]["y"] = 3, 0
+    enforce_note_flow_and_clearance(notes)
+    assert notes[1]["d"] == 8
+    assert notes[2]["d"] == 5
+    assert clearance_violations(notes)["flow_repeats"] == 0
+    # consecutive dots alternate the implied direction through the run
+    notes = [_note(0, 0., 1, 5), _note(1, .25, 1, 8), _note(2, .5, 1, 8), _note(3, .75, 1, 0)]
+    notes[0]["x"], notes[0]["y"] = 2, 0
+    notes[1]["x"], notes[1]["y"] = 1, 0
+    notes[2]["x"], notes[2]["y"] = 0, 0
+    notes[3]["x"], notes[3]["y"] = 3, 0
+    enforce_note_flow_and_clearance(notes)
+    assert notes[3]["d"] == 1
+    assert clearance_violations(notes)["flow_repeats"] == 0

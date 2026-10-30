@@ -103,7 +103,7 @@ def test_performance_settings_are_execution_only(monkeypatch):
     from tools.config import config
 
     assert performance_settings() == {
-        "ram_cache_mib": 1024, "prefetch_batches": 2,
+        "ram_cache_mib": 16384, "prefetch_batches": 8,
         "compile_steps": True, "log_every_batches": 100}
     monkeypatch.setattr(config, "pipeline_v2_training_prefetch_batches", -1)
     with pytest.raises(ValueError, match="prefetch_batches"):

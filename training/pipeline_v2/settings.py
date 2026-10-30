@@ -68,6 +68,17 @@ def training_settings(stage):
         raise ValueError("Invalid training monitor or shuffle setting")
     if result["verbose"] > 2:
         raise ValueError("Verbose must be 0, 1 or 2")
+    enabled = getattr(config, f"{stage}_enabled_song_supervision", False)
+    if not isinstance(enabled, bool):
+        raise ValueError(f"{stage}_enabled_song_supervision must be boolean")
+    result["enabled_song_supervision"] = enabled
+    if stage == "hazards":
+        result["bomb_presence"] = bool(getattr(config, "hazards_bomb_presence", False))
+    for key, default in (("history_corrupt_rate", 0.), ("history_corrupt_drop", 1.),
+                         ("negative_supervision_weight", 1.)):
+        result[key] = _positive(getattr(config, f"{stage}_{key}", default), key, zero=True)
+        if result[key] > 1:
+            raise ValueError(f"{stage}_{key} must not exceed one")
     return result
 
 
@@ -94,12 +105,13 @@ def preparation_settings():
               "bomb_threshold", "lighting_threshold")
     result = {key: getattr(config, f"pipeline_v2_{key}") for key in fields}
     result.update(history_length=config.positions_history_length, lighting_block_length=config.lighting_block_length,
-                  arc_shape_bounds=list(config.arcs_shape_bounds), schedule=schedule_settings())
+                  arc_shape_bounds=list(config.arcs_shape_bounds), schedule=schedule_settings(),
+                  hazard_feasibility_input=bool(getattr(config, "pipeline_v2_hazard_feasibility_input", False)))
     histories = {getattr(config, f"{stage}_history_length") for stage in STAGES if stage != "lighting"}
     if len(histories) != 1:
         raise ValueError("V2 stages currently share a history length; set all stage history lengths together")
     for key, value in result.items():
-        if key in ("schedule", "arc_shape_bounds"):
+        if key in ("schedule", "arc_shape_bounds", "hazard_feasibility_input"):
             continue
         integer = key.startswith("max_") and key != "max_chain_span_seconds"
         integer = integer or key in ("encoder_batch_size", "history_length", "lighting_block_length")

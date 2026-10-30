@@ -23,6 +23,10 @@ SCHEDULE_DEFAULTS = {
     "lighting_onset_threshold": 1.,
     "arc_min_gap_seconds": .15,
     "arc_max_gap_seconds": .8,
+    "tolerance_seconds": .25,
+    "hazard_context_seconds": 2.,
+    "hazard_context_back_seconds": .5,
+    "hazard_context_bins": 10,
     "max_candidates": 10000,
 }
 

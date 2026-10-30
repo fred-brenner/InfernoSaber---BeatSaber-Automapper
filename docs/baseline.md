@@ -1615,3 +1615,219 @@ Artifacts outside source control:
 
 Detailed logs, source hashes and reproducible diagnostic scripts are under
 `/home/frede/.local/share/infernosaber-baseline/diagnostics/hazard-promotion-20261020-161736`.
+
+## Sparse-stage history-dependence repair attempt (2026-10-24)
+
+Diagnosis: ~90 % of positive supervision are continuations of existing positive
+history, and maps that never use a feature (96 % of songs for arcs, ~24–54 %
+for hazard heads) read as "never fire". Two config-gated levers were trained
+and evaluated: `*_enabled_song_supervision` masks a head's weights in
+feature-free songs (per-head; unsupported positives count as disabled), and
+`*_history_corrupt_rate/drop` empties sampled positive history records to NONE
+rows on TRAIN inputs only. Calibration/evaluation reports now split scores by
+history regime (`start` vs `continuation`) and `enabled_only`/`enabled_songs`.
+
+Two GPU arms on `sparse-repair-20261018-r2` (same dataset, no re-preparation):
+`runs/history-repair-20261024-c0` (masking only) and
+`runs/history-repair-20261024-c50` (masking + corruption 0.5/drop 1.0).
+Autoregressive validation/curated outcomes:
+
+| Stage | Installed | Arm A (mask) | Arm B (+corrupt) |
+|---|---|---|---|
+| walls, validation F1 | 0.0295 | 0.062 | 0.064 |
+| walls, curated TP/FP | 0/209, n/a | 26/209, 5 520 FP | **48/209**, 2 880 FP |
+| bombs, curated TP/FP | 0/52, n/a | 6/52, 27 793 FP | 0/52, 0 FP |
+| arcs, validation | 0/358 | 0/358 | 0/358 |
+| arcs, curated | 0/66 | 0/66 (0 FP) | 0/66 (0 FP) |
+
+Outcome: masking alone broke the absorbing state (first real autoregressive
+recoveries), corruption cut bomb FPs by ~96 % and wall FPs by ~half on curated.
+Precision remains unusable (~1.6 % walls) and the `start` regime still shows
+no cold-start discrimination — the models fire, but not where hazards begin.
+Arcs did not recover at all; only ~30 train songs / 6 validation songs are
+arc-enabled, so a data-poverty ceiling likely binds in addition to exposure
+bias. Remaining lever directions: history corruption did not teach
+localization — the next fix is representation-side (richer per-query hazard
+context, or decoding that scores candidates jointly rather than per-query
+autoregression).
+
+**Installed and rolled back (2026-10-24):** arm B replaced hazards and arcs in
+`Data/model/v2_expert` at user request for a live evaluation (thresholds
+0.98/0.87; production and CPU-runtime load validation passed). A `main_multi`
+run over 8 songs emitted ~13 walls total across 24 difficulties (0 bombs,
+0 arcs) — not the FP flood seen in validation, but the user judged the few
+placements random. The October bundle was restored to `Data/model/v2_expert`;
+arm B remains at `Data/model/v2_expert_armB-history-repair` and the backup
+`v2_expert_before_history-repair-20261024-231200` was consumed by the rollback.
+Evidence record:
+`../Data/training/pipeline_v2/sparse-repair-20261018-r2/history-repair-review-20261024-c50/promotion.json`.
+Key feedback: mapper walls/bombs are rare, nondeterministic choices — many
+"negatives" are equally valid placements, so supervision is positive-unlabeled
+rather than positive/negative, and strict cell-F1 is a miscalibrated gate.
+
+**Arm C (2026-10-25/26, dataset `full-2026-10-25`, `runs/negweight-20261025-w10`):**
+masking on, corruption off, `*_negative_supervision_weight = 0.1` — the new
+positive-unlabeled lever scaling classification-head negative class factors.
+The dataset adds arc/chain supervision (216 arc-supervised songs, 93 with
+chains, vs ~30 arc songs before; AI-generated `12345_*`/`1234_*` packages
+excluded). Teacher-forced validation improved sharply (wall F1 0.464,
+PR-AUC 0.744; attach F1 0.254), but autoregressive calibration collapsed
+(wall strict F1 0.038 at thr 0.98, **tolerant F1 0.0** — 767 decoded walls,
+none near a reference; bombs strict 0.004; attach strict 0.045 with ~9×
+over-prediction). Live `main_multi` over 8 songs: walls 5–21 per map
+(plausible counts), but **288–1,965 bombs and 0–827 arcs per map** — unplayable
+spam. Verdict: weight 0.1 removes too much negative signal; the lever works
+as a fire/suppress dial and the usable point sits higher (~0.3–0.5, with
+history corruption for anchoring). Candidate bundle `v2_expert_negweight-w10`
+was assembled for the live test; production `v2_expert` restored unchanged.
+Tolerant replay metrics (`tolerance_seconds` 0.25) now complement strict F1
+in calibration sidecars.
+
+**Arm D (2026-10-26, dataset `full-2026-10-26-context`, `runs/context-20261026-w50-c50`):**
+new gated hazard `context` input (10 bins x 2 hands x 12 cells of note/chain
+occupancy over `[now-0.5s, now+2.0s)`, presence only — no direction), masking on,
+`*_negative_supervision_weight = 0.5`, `*_history_corrupt_rate = 0.5` / drop 1.0.
+Hazards best epoch 1 (stopped at 6, patience 5); arcs best epoch 9.
+Autoregressive calibration: hazards thr 0.96 — wall strict F1 0.043, tolerant
+F1 0.003 (38 near-matches vs Arm C's 0), bombs strict 0.0096; arcs thr 0.85 —
+attach strict F1 0.051, enabled-only 0.094, predicted 3.4k vs 1.7k reference
+(~2x, down from Arm C's ~9x). Regime split is decisive: continuation wall F1
+0.116 vs **start F1 0.003** — ~95% of spurious wall/bomb fires happen with
+empty history at cold start; context did not fix the anchoring gap there.
+Live `main_multi` over the same 8-song BWB spot-check set: **zero bombs on all
+maps**, walls 0–4, arcs 1–32 (Expert only; ~0 on the denser ExpertPlus), chains
+0. Verdict: Arm D eliminated the Arm C spam signature (maps are playable, not
+flooded) but overcorrected hazards back toward suppression — the dial is
+confirmed at both ends (1.0 suppress, 0.5+corrupt suppress, 0.1 flood) and
+cold-start history dependence remains the dominant autoregressive failure.
+Candidate bundle `v2_expert_context-w50-c50` kept; production `v2_expert`
+restored unchanged. Also fixed: `stage_data` now only records
+`hazard_context_*` keys when the emission gate is on, so legacy manifests keep
+matching (base bundle validation regression caught by live assembly).
+
+**Feasibility-gated hazard decode (2026-10-26, on Arm D artifacts):**
+the frozen `ClearanceIndex`/`SectionDecoder` checks (note+swing occupancy,
+geometry modes, wall-count limits) now also exist as pre-decision masks:
+`SectionDecoder.wall_feasible`/`feasible_wall_classes`/`eligible_bomb_cells`,
+gated by `options["hazard_feasibility_decode"]` (config flag
+`v2_hazard_feasibility_decode`), with optional temperature sampling
+(`options["hazard_sample_temperature"]`, config `v2_hazard_sample_temperature`;
+walls sample the masked class softmax incl. NONE, bombs draw temperature-scaled
+Bernoulli per eligible cell). Findings on 8 validation songs at thr 0.96:
+- **Pure veto is a provable no-op** — `step` already rejected infeasible
+  placements post-decision, so masking produced byte-identical metrics. Legality
+  was never the deficit; Arm D outputs were already legal.
+- ~10% of wall argmaxes and ~20% of above-threshold bomb cells target
+  **impossible** placements (324/325 masked of ~6.7k queries) — wasted capacity
+  evidence for masking *inside* training heads later.
+- **Substitution is harmful**: masked argmax redirected to the next feasible
+  class raised start-regime wall fp 3636→5188 and added legal-but-unwanted
+  walls. Veto semantics kept.
+- **History latch confirmed**: the redirect variant's bomb fp fell 1583→221
+  purely as a downstream-state effect — own-decision history amplifies whatever
+  passes the gate.
+- Masked sampling at T=1.0 live (8 BWB songs): walls 0–10, bombs 0, all legal,
+  per-map variance — preference shape is too weak for sampling to add quality
+  yet; it needs the masked-choice retraining (model scores *within* feasible
+  space + density head) before the sampler has signal worth drawing from.
+Outputs: `gpu/Data/prediction/new_map/_armD-sample` (T=1.0); the earlier
+redirect-variant outputs were overwritten in place.
+
+**Arm E (2026-10-29, dataset `full-2026-10-27-feasible`, `runs/feasible-20261027-w50-c50`):**
+masked-choice training — `feasible_wall` (per-class) and `feasible_bombs`
+(12-cell) boolean inputs computed per hazard query from `SectionDecoder` state
+(reference decisions at preparation, model decisions at rollout), consumed as
+features and applied in-graph via the serializable `MaskLogits` layer (masked
+wall softmax; sigmoid x mask for bombs), so infeasible classes carry no
+probability mass, no gradient and no pseudo-negatives. History corruption now
+keeps the most recent positive record; Arm E uses corrupt rate 0.5 / drop 0.5
+(partial amnesia instead of Arm D's full-window emptying). The whole contract
+is gated by `hazard_feasibility_input` / `pipeline_v2_hazard_feasibility_input`;
+legacy datasets and bundles are unchanged (production `v2_expert` re-validated).
+Measured on the prepared data: only ~6% of wall classes are legal per query
+(~4 of 64 incl. NONE), ~67% of bomb cells — the unmasked model spent most of
+its probability mass on impossible wall templates.
+Training: hazards best epoch **6** (vs Arm D's 1 — the masked action space
+keeps improving past epoch 1), val PR-AUC 0.459 (Arm D: 0.428); arcs best
+epoch 11, PR-AUC 0.378 (0.369), shape MAE 0.040 (0.068).
+Autoregressive calibration: hazards thr 0.98, arcs thr 0.77. Arm E vs Arm D:
+
+- **enabled wall F1 0.633** (was 0.060), continuation wall F1 0.737 (0.116),
+  wall tp 15473/21068 ref vs 2210 — the wall head now reproduces human wall
+  structure rather than noise;
+- start-regime wall fp 7064 (was 64324) — the masked head also suppressed the
+  empty-history wall flood;
+- bombs: enabled F1 0.010 (was 0.019) — unchanged at essentially zero; masked
+  sigmoid fixed legality but the head still never learned *when* to fire;
+- arcs: enabled attach F1 0.160 (was 0.094), recall 0.213 (0.078) — the
+  keep-guard/partial corruption tripled recall, still sparse.
+
+Live `main_multi` over the BWB set (ExpertPlus, 5/8 songs before a manual
+timeout): **walls 5–14/map, every proposal legal** — and wall decisions
+coalesce into structured runs (e.g. 544 accepted section proposals → 12 final
+walls), i.e. plausible wall phrases rather than scattered singles. Bombs 0,
+arcs 0 — the rate bottleneck is now *density*, not legality. Verdict: masked
+heads turned the categorical (wall) stage from calibrated spam into learned
+placement; bombs/arcs remain bottlenecked on when-to-fire and need a density-
+style supervision signal next. Candidate bundle `v2_expert_feasible-w50-c50`
+assembled (new directory; production `v2_expert` untouched) with both
+checkpoint-bound calibration sidecars.
+
+**Density/rate decode attempt for bombs (2026-10-30, evaluated, not adopted):**
+
+Since Arm E's bomb head ranks reference-positive eligible cells well (mean rank
+percentile 0.797, positive mean score 0.31 vs negative 0.023) but is badly
+miscalibrated absolutely, a gated rate-matching decoder was implemented
+(`v2_hazard_bomb_rate_decode`, `_BombRateWindow` in `hazard_sections.py`,
+reused by `calibration._hazard_replay` so sweeps and production share
+semantics): fire top-ranked eligible cells while the trailing-window placed
+count lags the model's expected mass scaled by `bomb_rate_factor`.
+
+Autoregressive replay on 4 bomb-dense validation songs showed it cannot rescue
+the head:
+
+- rate-matching at factor 0.05–0.9 placed 302–9822 bombs vs 585 reference —
+  always off by an order of magnitude in one direction or the other;
+  cell precision stayed 0.015–0.040 (F1 ≤ 0.034 vs 0.010 threshold baseline);
+- per-query max-score gating (top-1 eligible argmax ≥ 0.4) is well separated
+  under teacher forcing (71% positive-query recall at 3.9% negative-query rate)
+  but under autoregressive replay still places ~3900 bombs vs 585 reference;
+- per-song AR counts [308, 2146, 1428, 0] vs per-song reference ~130–190 —
+  the head is inconsistent *per map*: floods on two songs, silent on a third.
+
+Verdict: the masked-sigmoid head learned legality, not density; its scores do
+not localize per query under autoregressive conditions, so no decode-side rate
+control can calibrate them. The mechanism stays gated off (default), test-
+covered, and reusable if a retrained head ever produces rankable per-query
+scores. The proven path for the bomb head mirrors the wall fix: a masked
+categorical head (NONE + 12 cells) so cell scores compete against an explicit
+NONE logit — Arm F candidate.
+
+**Arm F — factorized bomb head (2026-10-30, training launched):**
+
+The pure 13-way categorical was rejected after finding 43.2% of positive bomb
+queries carry ≥2 cells — argmax cannot represent them. Instead the hazards
+model gained a gated scalar `bomb_presence` sigmoid (the "when" query-level
+signal, strongly separated under teacher forcing) factorized against the
+existing masked 12-cell "where" scores: decode fires
+`p_presence × p_cell ≥ threshold` per eligible cell, preserving multi-bomb
+queries. Presence supervision is derived in `loss_components` from existing
+cell targets (no re-preparation); the flag rides
+`manifest["training"]["bomb_presence"]` for artifact rebuild. Levers as Arm E
+(`full-2026-10-27-feasible`, enabled-song supervision, corrupt .5/.5, negative
+weight .5) plus `hazards_bomb_presence = True`. Run:
+`runs/armf-presence-hazards`. Calibration and evaluation pending.
+
+Artifacts outside source control:
+
+- [Arm A hazards calibration](../../Data/training/pipeline_v2/sparse-repair-20261018-r2/history-repair-review-20261024-c0/calibration/hazards/calibration.json)
+- [Arm A curated comparison](../../Data/training/pipeline_v2/sparse-repair-20261018-r2/history-repair-review-20261024-c0/comparison/hazards/report.json)
+- [Arm B hazards calibration](../../Data/training/pipeline_v2/sparse-repair-20261018-r2/history-repair-review-20261024-c50/calibration/hazards/calibration.json)
+- [Arm B curated comparison](../../Data/training/pipeline_v2/sparse-repair-20261018-r2/history-repair-review-20261024-c50/comparison/hazards/report.json)
+- Run artifacts: `../Data/training/pipeline_v2/runs/history-repair-20261024-c0` and `...-c50`
+- Arm C run + calibrations: `../Data/training/pipeline_v2/runs/negweight-20261025-w10`
+- Arm D run + calibrations: `../Data/training/pipeline_v2/runs/context-20261026-w50-c50`
+- Arm E run + calibrations: `../Data/training/pipeline_v2/runs/feasible-20261027-w50-c50`
+- Arm E dataset: `../Data/training/pipeline_v2/full-2026-10-27-feasible/dataset`
+- Arm E candidate bundle: `../Data/model/v2_expert_feasible-w50-c50`
+- Live spot-check outputs: `gpu/Data/prediction/new_map/{_armB,_armC,_armD}`

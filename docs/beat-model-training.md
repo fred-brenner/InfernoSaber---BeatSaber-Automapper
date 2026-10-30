@@ -302,6 +302,17 @@ python -m training.beat_models prepare --source-root /path/to/training-packages 
 python -m training.beat_models validate --dataset "$beat_data/training"
 ```
 
+`--source-root` may be repeated to combine several input folders (for example
+`custom_bs_input` plus `favorites_bs_input`); identical beatmap+audio payloads
+are deduplicated and recorded in `preparation.duplicates`. Adding inputs
+reshuffles split assignment, so pass `--splits-from <existing dataset>` to pin
+previous recording splits and distribute only the new groups; omitting it is
+fine when no comparison with earlier runs is planned. The 2026-10-17 full
+dataset skipped 307 beatmaps; constant `_BPMChanges`/`bpmEvents` restatements
+of the base tempo are now accepted while real tempo changes still skip.
+`favorites_bs_input` remains excluded from benchmark comparisons, but it is
+valid training input.
+
 Use `--difficulty ExpertPlus` to select that Standard difficulty; otherwise all
 Standard difficulties are considered. The separate `--prepared-root` adapter
 expects `maps/name.dat`, `maps/name_info.dat`, and `songs_egg/name.egg` (or those

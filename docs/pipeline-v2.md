@@ -151,6 +151,9 @@ python -m training.pipeline_v2 validate \
 Preparation runs only the frozen encoder to cache inputs. For intact raw
 packages, replace `--beat-dataset` with `--source-root /path/to/packages` and
 provide `--reserved-root ../Data/training/evaluate_beats/bs_map_input`.
+`--source-root` may be repeated for several input folders; identical
+beatmap+audio payloads are deduplicated, and `--splits-from` pins an earlier
+dataset's recording splits when extending it.
 Use `--normalization-from` with the existing beat training dataset if retaining
 the trained intensity/timing pair. `--prepared-root` explicitly selects the
 existing beatmap/Info/audio triple adapter. It is never selected implicitly.

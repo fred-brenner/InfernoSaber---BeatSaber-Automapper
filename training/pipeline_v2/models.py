@@ -68,6 +68,15 @@ class EndpointIdentity(keras.layers.Layer):
         return tf.identity(features)
 
 
+@keras.utils.register_keras_serializable(package="InfernoSaberV2")
+class MaskLogits(keras.layers.Layer):
+    """Shift infeasible logits out of reach so softmax mass stays on legal options."""
+
+    def call(self, inputs):
+        logits, feasible = inputs
+        return logits - 1e4 * (1. - tf.cast(feasible, logits.dtype))
+
+
 def _embedding(values, classes, width, name, history=False, length=None):
     values = keras.layers.Embedding(classes, width, name=f"{name}_embedding")(values)
     if history:
@@ -162,7 +171,7 @@ def build_multiplier_model(vocabularies):
     return keras.Model(inputs, _hands(joined, len(vocabularies["multiplier"])), name="multiplier")
 
 
-def build_hazards_model(vocabularies):
+def build_hazards_model(vocabularies, input_shapes=None, bomb_presence=False):
     settings = architecture_settings("hazards")
     inputs = _common("hazards", settings, 13, "float32")
     inputs.update(occupancy=keras.Input((2, 2, 12), name="occupancy"),
@@ -170,9 +179,28 @@ def build_hazards_model(vocabularies):
     occupancy = keras.layers.Flatten(name="occupancy_flatten")(inputs["occupancy"])
     occupancy = keras.layers.Dense(settings["audio_dense_units"], activation=settings["activation"],
                                    name="occupancy_features")(occupancy)
-    joined = _shared("hazards", inputs, settings, vocabularies, [occupancy, inputs["interval"]])
-    outputs = {"wall": keras.layers.Dense(len(vocabularies["walls"]), activation="softmax", name="wall")(joined),
-               "bombs": keras.layers.Dense(12, activation="sigmoid", name="bombs")(joined)}
+    context = [occupancy, inputs["interval"]]
+    if input_shapes and "context" in input_shapes:
+        inputs["context"] = keras.Input(tuple(input_shapes["context"][1:]), name="context")
+        context.append(keras.layers.Dense(settings["audio_dense_units"], activation=settings["activation"],
+                                          name="context_features")(
+            keras.layers.Flatten(name="context_flatten")(inputs["context"])))
+    if input_shapes and "feasible_wall" in input_shapes:
+        inputs["feasible_wall"] = keras.Input(tuple(input_shapes["feasible_wall"][1:]), name="feasible_wall")
+        inputs["feasible_bombs"] = keras.Input(tuple(input_shapes["feasible_bombs"][1:]), name="feasible_bombs")
+        context.extend((inputs["feasible_wall"], inputs["feasible_bombs"]))
+    joined = _shared("hazards", inputs, settings, vocabularies, context)
+    if "feasible_wall" in inputs:
+        wall = keras.layers.Softmax(name="wall")(MaskLogits(name="mask_wall_logits")(
+            [keras.layers.Dense(len(vocabularies["walls"]), name="wall_scores")(joined), inputs["feasible_wall"]]))
+        bombs = keras.layers.Multiply(name="bombs")(
+            [keras.layers.Dense(12, activation="sigmoid", name="bomb_scores")(joined), inputs["feasible_bombs"]])
+        outputs = {"wall": wall, "bombs": bombs}
+    else:
+        outputs = {"wall": keras.layers.Dense(len(vocabularies["walls"]), activation="softmax", name="wall")(joined),
+                   "bombs": keras.layers.Dense(12, activation="sigmoid", name="bombs")(joined)}
+    if bomb_presence:
+        outputs["bomb_presence"] = keras.layers.Dense(1, activation="sigmoid", name="bomb_presence")(joined)
     return keras.Model(inputs, outputs, name="hazards")
 
 
@@ -233,13 +261,17 @@ BUILDERS = {"positions": build_positions_model, "arrows": build_arrows_model,
             "arcs": build_arcs_model, "lighting": build_lighting_model}
 
 
-def build_model(stage, vocabularies=None):
+def build_model(stage, vocabularies=None, input_shapes=None, bomb_presence=False):
     if stage not in BUILDERS:
         raise ValueError(f"Unknown v2 model stage: {stage}")
     vocabularies = vocabularies or {}
     required = {"multiplier": "multiplier", "hazards": "walls", "lighting": "lighting"}.get(stage)
     if required and not vocabularies.get(required):
         raise ValueError(f"{stage} requires an explicit frozen {required} vocabulary")
+    if stage == "hazards":
+        return build_hazards_model(vocabularies, input_shapes=input_shapes, bomb_presence=bomb_presence)
+    if bomb_presence:
+        raise ValueError("bomb_presence applies to the hazards model only")
     return BUILDERS[stage](vocabularies)
 
 
@@ -253,24 +285,36 @@ def _weighted_terms(values, weights):
 
 
 def loss_components(stage, targets, predicted, weights, balance=None):
-    """Return per-head sums/counts so validation is invariant to batch partition."""
-    if stage not in STAGES or set(targets) != set(predicted) or set(targets) != set(weights):
+    """Return per-head sums/counts so validation is invariant to batch partition.
+
+    ``bomb_presence`` is model-only: its supervision is derived per query from
+    the supervised bomb cells, so prepared targets stay untouched.
+    """
+    required = set(predicted) - ({"bomb_presence"} if stage == "hazards" else set())
+    if stage not in STAGES or required != set(targets) or set(targets) != set(weights):
         raise ValueError("Stage loss requires matching target, prediction, and weight heads")
     components = {}
     for head, output in predicted.items():
-        target = tf.cast(targets[head], output.dtype)
-        weight = tf.convert_to_tensor(weights[head])
-        if (stage, head) in (("hazards", "bombs"), ("lighting", "events")):
-            # Multi-label targets allow simultaneous light instructions/bombs.
+        if head == "bomb_presence":
+            supervised = tf.cast(tf.convert_to_tensor(weights["bombs"]) > 0, output.dtype)
+            target = tf.cast(tf.reduce_max(tf.cast(targets["bombs"], output.dtype) * supervised,
+                                           axis=-1), output.dtype)[..., None]
+            weight = tf.reduce_max(supervised, axis=-1)[..., None]
             values = keras.backend.binary_crossentropy(target, output)
-        elif stage == "arcs" and head == "shape":
-            difference = target - output
-            absolute = tf.abs(difference)
-            values = tf.where(absolute <= 1., .5 * tf.square(difference), absolute - .5)
         else:
-            target = tf.cast(target, tf.int32)
-            target = tf.where(weight > 0, target, tf.zeros_like(target))
-            values = keras.losses.sparse_categorical_crossentropy(target, output)
+            target = tf.cast(targets[head], output.dtype)
+            weight = tf.convert_to_tensor(weights[head])
+            if (stage, head) in (("hazards", "bombs"), ("lighting", "events")):
+                # Multi-label targets allow simultaneous light instructions/bombs.
+                values = keras.backend.binary_crossentropy(target, output)
+            elif stage == "arcs" and head == "shape":
+                difference = target - output
+                absolute = tf.abs(difference)
+                values = tf.where(absolute <= 1., .5 * tf.square(difference), absolute - .5)
+            else:
+                target = tf.cast(target, tf.int32)
+                target = tf.where(weight > 0, target, tf.zeros_like(target))
+                values = keras.losses.sparse_categorical_crossentropy(target, output)
         if balance and head in balance:
             factors = balance[head]
             factor = tf.where(target > 0, tf.cast(factors["positive"], values.dtype),
@@ -282,12 +326,12 @@ def loss_components(stage, targets, predicted, weights, balance=None):
 
 def combine_loss_components(stage, components):
     settings = architecture_settings(stage)
-    if set(components) != set(settings["loss_weights"]):
+    if not set(components) <= set(settings["loss_weights"]) | {"bomb_presence"}:
         raise ValueError("Configured loss weights must identify every stage output head")
     terms, active = [], []
     for head, pair in components.items():
         numerator, denominator = (tf.cast(value, tf.float32) for value in pair)
-        weight = tf.cast(settings["loss_weights"][head], tf.float32)
+        weight = tf.cast(settings["loss_weights"].get(head, 1.), tf.float32)
         terms.append(weight * tf.math.divide_no_nan(numerator, denominator))
         active.append(weight * tf.cast(denominator > 0, tf.float32))
     return tf.math.divide_no_nan(tf.add_n(terms), tf.add_n(active))

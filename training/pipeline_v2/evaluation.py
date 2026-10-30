@@ -430,6 +430,10 @@ def _evaluate_sparse(dataset, stage, predictors, fitted, *, split, threshold, ba
     options = dataset.manifest["data_settings"]
     raw_totals, positives = {name: {} for name in predictors}, {name: {} for name in predictors}
     decoded = {conditioning: {name: {} for name in predictors} for conditioning in ("teacher_forced", "autoregressive")}
+    decoded_regimes = {conditioning: {name: {"start": {}, "continuation": {}} for name in predictors}
+                       for conditioning in ("teacher_forced", "autoregressive")}
+    decoded_enabled = {conditioning: {name: {} for name in predictors}
+                       for conditioning in ("teacher_forced", "autoregressive")}
     training_hashes = {digest for recording in fitted["training_recordings"] for digest in recording["source_sha256"] if digest}
     training_decoded = {recording["decoded_audio_sha256"] for recording in fitted["training_recordings"] if recording["decoded_audio_sha256"]}
     overlay = dataset.manifest.get("stage_splits", {}).get(stage, {})
@@ -468,8 +472,15 @@ def _evaluate_sparse(dataset, stage, predictors, fitted, *, split, threshold, ba
                                       conditioning=conditioning, outputs=outputs if conditioning == "teacher_forced" else None,
                                       retain_objects=False)
                 _add_positive(decoded[conditioning][name], replay["heads"])
+                for regime, heads in replay["regimes"].items():
+                    _add_positive(decoded_regimes[conditioning][name][regime], heads)
+                _add_positive(decoded_enabled[conditioning][name],
+                              {head: values for head, values in replay["heads"].items()
+                               if replay["enabled"].get(head)})
                 item["decoded_scores"][name][conditioning] = {
-                    "heads": _summarize_positive(replay["heads"]), "diagnostics": replay["diagnostics"]}
+                    "heads": _summarize_positive(replay["heads"]),
+                    "regimes": {regime: _summarize_positive(heads) for regime, heads in replay["regimes"].items()},
+                    "enabled": replay["enabled"], "diagnostics": replay["diagnostics"]}
             del outputs
     if not examples_count:
         raise ValueError(f"No {stage} examples in the requested {split} split")
@@ -481,6 +492,9 @@ def _evaluate_sparse(dataset, stage, predictors, fitted, *, split, threshold, ba
             summarized = _summarize_positive(heads)
             decoded_scores[conditioning][name] = {
                 "heads": summarized, "objective_head": OBJECTIVE_HEAD[stage], "objective": summarized[OBJECTIVE_HEAD[stage]],
+                "regimes": {regime: _summarize_positive(decoded_regimes[conditioning][name][regime])
+                            for regime in ("start", "continuation")},
+                "enabled_only": _summarize_positive(decoded_enabled[conditioning][name]),
                 "positive_case_status": _positive_status(summarized),
                 "all_empty_failure": any(values["all_empty_failure"] for values in summarized.values())}
     source_total = sum(song["source_coverage"]["reference_objects"] for song in selected_songs)

@@ -40,20 +40,24 @@ def sanity_check_notes(notes: list, timings: list):
         notes_l, notes_r = apply_waveform_pattern(notes_l, notes_r)
 
     # shift notes in cut direction
-    notes_l = shift_blocks_up_down(notes_l, time_diffs)
-    notes_r = shift_blocks_up_down(notes_r, time_diffs)
+    if config.shift_blocks_up_down_flag:
+        notes_l = shift_blocks_up_down(notes_l, time_diffs)
+        notes_r = shift_blocks_up_down(notes_r, time_diffs)
     # shift notes left and right for better flow
-    notes_l, notes_r = shift_blocks_left_right(notes_l, notes_r, time_diffs)
+    if config.shift_blocks_left_right_flag:
+        notes_l, notes_r = shift_blocks_left_right(notes_l, notes_r, time_diffs)
 
     if config.add_waveform_pattern_flag > 1:
         # shift consecutive blocks into waveform
         notes_l, notes_r = apply_waveform_pattern(notes_l, notes_r)
 
     # check static position for next and last note for left and right together
-    notes_r, notes_l, notes_b = correct_notes_all(notes_r, notes_l, notes_b, time_diffs)
+    if config.correct_notes_all_flag:
+        notes_r, notes_l, notes_b = correct_notes_all(notes_r, notes_l, notes_b, time_diffs)
 
     # shift notes away from the middle
-    notes_r, notes_l, notes_b = shift_blocks_middle(notes_r, notes_l, notes_b)
+    if config.shift_blocks_middle_flag:
+        notes_r, notes_l, notes_b = shift_blocks_middle(notes_r, notes_l, notes_b)
 
     # # (TODO: add bombs for long pause to focus on next note direction)
     # notes_b, timings_b = add_pause_bombs(notes_r, notes_l, notes_b, timings, pitch_algo, pitch_times)
@@ -917,7 +921,7 @@ def turn_notes_single(notes_single):
             else:
                 notes_single[idx] = []
                 continue  # do not update old notes
-        elif df_score >= 2:
+        elif df_score >= 2 and config.sanity_direction_recut_flag:
             # only ones
             if len(notes) == 4:
                 if abs(cd_old_x) == abs(cd_new_x) == abs(cd_old_y) == abs(cd_new_y) == 1:
@@ -969,7 +973,8 @@ def correct_notes(notes, timings):
         # elif len(notes[idx]) == 4:
         elif len(notes[idx]) >= 4:
             # check cut direction movement (of first element in each time step)
-            notes[idx] = check_note_movement(nl_last, notes[idx])
+            if config.sanity_direction_recut_flag:
+                notes[idx] = check_note_movement(nl_last, notes[idx])
 
             # # notes[idx] = optimize_note_movement(nl_last, notes[idx])
             # notes[idx] = check_border_notes(notes, timings, idx)
@@ -1003,7 +1008,7 @@ def correct_notes(notes, timings):
                 cut_dir = notes[idx][3]
                 for n in range(int(len(notes[idx]) / 4) - 1):
                     # check if cut direction is same
-                    if notes[idx][(n + 1) * 4 + 3] != cut_dir:
+                    if config.sanity_direction_recut_flag and notes[idx][(n + 1) * 4 + 3] != cut_dir:
                         notes[idx][(n + 1) * 4 + 3] = 8
                     n *= 4
                     speed1 = calc_note_speed(notes[idx][n:n + 4],

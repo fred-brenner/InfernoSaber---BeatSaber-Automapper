@@ -98,12 +98,33 @@ def test_rejects_unsupported_info_timing(tmp_path, changes):
     {"bpmEvents": [{"b": 4, "m": 150}]}, {"_BPMChanges": [{"_time": 4, "_BPM": 150}]},
     {"customData": {"bpmChanges": [{"b": 4, "m": 150}]}},
     {"_customData": {"_BPMChanges": [{"_time": 4, "_BPM": 150}]}},
+    {"_customData": {"_BPMChanges": [{"_time": 4}]}},
+    {"bpmEvents": [{"b": 4}]},
 ])
 def test_rejects_standard_and_custom_beatmap_tempo_changes(tmp_path, changes):
     beatmap = {"version": "3.2.0", "colorNotes": []}
     beatmap.update(changes)
     with pytest.raises(ValueError, match="tempo changes"):
         load_reference(write_package(tmp_path, beatmap=beatmap))
+
+
+@pytest.mark.parametrize("changes", [
+    {"bpmEvents": [{"b": 4, "m": 120}, {"b": 8, "m": 120.0}]},
+    {"_customData": {"_BPMChanges": [{"_time": 4, "_BPM": 120, "_beatsPerBar": 4, "_metronomeOffset": 4}]}},
+    {"customData": {"bpmChanges": [{"b": 4, "bpm": 120}]}},
+    {"_BPMChanges": [{"_time": 0, "_BPM": 120}]},
+])
+def test_accepts_constant_tempo_restatements(tmp_path, changes):
+    beatmap = {"version": "3.2.0", "colorNotes": [{"b": 2, "c": 0}]}
+    beatmap.update(changes)
+    reference = load_reference(write_package(tmp_path, beatmap=beatmap))
+    assert reference["times"] == [1.0]
+
+
+def test_accepts_constant_info_restatement(tmp_path):
+    info_changes = {"_customData": {"_BPMChanges": [{"_time": 0, "_BPM": 120}]}}
+    reference = load_reference(write_package(tmp_path, info_changes=info_changes))
+    assert reference["bpm"] == 120
 
 
 @pytest.mark.parametrize("filename", ["INFO.DAT", "ExpertPlus.dat", "song.ogg"])

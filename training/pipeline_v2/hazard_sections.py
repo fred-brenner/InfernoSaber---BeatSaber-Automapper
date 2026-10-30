@@ -6,7 +6,7 @@ decisions; the duration limit applies only after consecutive walls are merged.
 """
 
 from bisect import bisect_left, bisect_right
-from collections import Counter
+from collections import Counter, deque
 from copy import deepcopy
 import math
 
@@ -262,6 +262,28 @@ class SectionDecoder:
                 cells[cell] = False
         return cells
 
+    def wall_feasible(self, candidate, wall):
+        """Whether one nonzero wall class passes the frozen clearance rules."""
+        item = {**self.vocab[wall], "time": float(candidate["time"]),
+                "end_time": float(candidate["end_time"])}
+        previous = self._nearby_walls(item["time"], max(self.clearance["obstacle_time_gap"]))
+        continuation = bool(self.walls and _geometry(self.walls[-1]) == _geometry(item)
+                            and abs(self.walls[-1]["end_time"] - item["time"]) <= 1e-10)
+        return self.index.wall_reason(item, previous[:-1] if continuation else previous) is None
+
+    def feasible_wall_classes(self, candidate):
+        """Boolean mask over wall vocabulary classes for this query.
+
+        Uses the same frozen clearance rules as ``step``; class 0 (NONE) is
+        always feasible. Infeasible classes can be zeroed before argmax so a
+        proposal that ``step`` would reject is never presented as a decision.
+        """
+        mask = np.zeros(len(self.vocab), bool)
+        mask[0] = True
+        for index in range(1, len(self.vocab)):
+            mask[index] = self.wall_feasible(candidate, index)
+        return mask
+
     def step(self, candidate, wall=0, bombs=None):
         kind, time = candidate["kind"], float(candidate["time"])
         order = (time, 0 if kind == "wall" else 1)
@@ -336,14 +358,76 @@ class SectionDecoder:
                                 "section_rejections": dict(self.rejections), "final_rejections": dict(reasons)}}
 
 
-def rollout(song, state, vocab, options, predict, encoder=None, progress=None):
+def _sample_probs(probs, temperature, rng):
+    """Temperature-scaled categorical sample; degenerate to argmax at T<=0."""
+    if temperature <= 0:
+        return int(np.asarray(probs).argmax())
+    scaled = np.power(np.clip(probs, 1e-12, None), 1. / temperature)
+    scaled /= scaled.sum()
+    return int(rng.choice(len(scaled), p=scaled))
+
+
+def _sample_cells(probs, temperature, rng):
+    """Independent per-cell Bernoulli draws at temperature-scaled sigmoids."""
+    if temperature <= 0:
+        return np.zeros(len(probs), bool)
+    clipped = np.clip(probs, 1e-9, 1. - 1e-9)
+    scaled = 1. / (1. + np.exp(-np.log(clipped / (1. - clipped)) / temperature))
+    return rng.random(len(probs)) < scaled
+
+
+class _BombRateWindow:
+    """Trailing-window density matcher for bomb decisions.
+
+    The summed cell probabilities are the model's expected bomb count per
+    query. While the placed count inside the trailing ``hazard_bomb_rate_seconds``
+    window lags that expectation scaled by ``bomb_rate_factor``, fire the
+    top-ranked eligible cells (score >= ``bomb_score_floor``, at most
+    ``bomb_rate_max_per_query``). Placement follows the model's local rate
+    profile instead of an absolute score threshold.
+    """
+
+    def __init__(self, options):
+        self.seconds = float(options.get("hazard_bomb_rate_seconds", 2.0))
+        self.factor = float(options.get("bomb_rate_factor", options.get("bomb_threshold", 1.)))
+        self.floor = float(options.get("bomb_score_floor", .05))
+        self.max_per_query = int(options.get("bomb_rate_max_per_query", 2))
+        if self.seconds <= 0 or not 0 <= self.factor <= 1 or not 0 <= self.floor <= 1 or self.max_per_query < 1:
+            raise ValueError("Invalid bomb rate-matching settings")
+        self._mass, self._placed = deque(), deque()
+
+    def fires(self, time, scores, eligible):
+        """Ranked cells to place while the window deficit exceeds one bomb."""
+        scores = np.clip(np.asarray(scores, np.float64), 0., 1.)
+        eligible = np.asarray(eligible, bool)
+        cutoff = time - self.seconds
+        self._mass.append((time, float(scores[eligible].sum())))
+        while self._mass and self._mass[0][0] < cutoff:
+            self._mass.popleft()
+        while self._placed and self._placed[0] < cutoff:
+            self._placed.popleft()
+        deficit = self.factor * sum(mass for _, mass in self._mass) - len(self._placed)
+        ranked = np.argsort(-np.where(eligible, scores, -1.))
+        cells = np.zeros(12, bool)
+        for cell in ranked[:max(0, min(int(round(deficit)), self.max_per_query))]:
+            if scores[cell] < self.floor:
+                break
+            cells[cell] = True
+        return cells
+
+    def placed(self, time, accepted):
+        """Record decoder-accepted bombs so realized rate is what steps through."""
+        self._placed.extend([time] * int(np.asarray(accepted).sum()))
+
+
+def rollout(song, state, vocab, options, predict, encoder=None, progress=None, rng=None):
     """Run a predictor with the shared decoder, updating only walls and bombs.
 
     ``predict(inputs)`` returns wall probabilities [1,C] and bomb probabilities
     [1,12]. ``progress(index,total)`` is optional. Returned diagnostics separate
     section proposals, accepted decisions, merged runs and final object counts.
     """
-    from .contracts import build_inputs
+    from .contracts import build_inputs, preparation_defaults
 
     base = getattr(song, "base", song)
     queries = candidates(base.metadata["duration"], base.metadata["bpm"], options)
@@ -351,21 +435,60 @@ def rollout(song, state, vocab, options, predict, encoder=None, progress=None):
     threshold = float(options.get("bomb_threshold", .5))
     if not 0 <= threshold <= 1:
         raise ValueError("Bomb threshold must be between zero and one")
+    masked = bool(options.get("hazard_feasibility_decode"))
+    temperature = float(options.get("hazard_sample_temperature", 0.) or 0.)
+    sampling = masked and temperature > 0
+    rate = _BombRateWindow(options) if options.get("hazard_bomb_rate_decode") else None
+    rng = np.random.default_rng() if rng is None else rng
+    mask_redirects, cells_masked = 0, 0
+    feasibility_inputs = bool(preparation_defaults(options).get("hazard_feasibility_input"))
     for index, query in enumerate(queries):
-        output = predict(build_inputs("hazards", song, state, query, decoder.history, encoder, options))
-        wall, bombs = np.asarray(output["wall"]), np.asarray(output["bombs"])
+        candidate = query
+        if feasibility_inputs:
+            candidate = dict(query)
+            candidate["_feasible_wall"] = (decoder.feasible_wall_classes(query) if query["kind"] == "wall"
+                                           else np.r_[True, np.zeros(len(vocab["walls"]) - 1, bool)])
+            candidate["_feasible_bombs"] = decoder.eligible_bomb_cells(float(query["time"]))
+        output = predict(build_inputs("hazards", song, state, candidate, decoder.history, encoder, options))
+        wall, bombs = np.asarray(output["wall"]).copy(), np.asarray(output["bombs"]).copy()
         if (wall.shape != (1, len(vocab["walls"])) or bombs.shape != (1, 12)
                 or not np.isfinite(wall).all() or not np.isfinite(bombs).all()
                 or np.any((wall < 0) | (wall > 1)) or np.any((bombs < 0) | (bombs > 1))
                 or not np.allclose(wall.sum(axis=-1), 1., atol=1e-4)):
             raise ValueError("Invalid hazard predictor probabilities")
-        decoder.step(query, int(wall[0].argmax()), bombs[0] >= threshold)
+        presence = output.get("bomb_presence")
+        if presence is not None:
+            bombs[0] *= float(np.asarray(presence).reshape(-1)[0])
+        choice, fires = int(wall[0].argmax()), bombs[0] >= threshold
+        if query["kind"] == "wall":
+            if masked:
+                feasible = decoder.feasible_wall_classes(query)
+                if sampling:
+                    allowed = np.flatnonzero(feasible)
+                    choice = int(allowed[_sample_probs(wall[0][feasible], temperature, rng)])
+                elif choice and not feasible[choice]:
+                    mask_redirects += 1
+                    choice = 0
+        else:
+            eligible = decoder.eligible_bomb_cells(float(query["time"])) if (masked or rate is not None) else None
+            if rate is not None:
+                fires = rate.fires(float(query["time"]), bombs[0], eligible)
+                cells_masked += int((~eligible & fires).sum())
+            elif masked:
+                cells_masked += int((~eligible & fires).sum())
+                fires = (fires if not sampling else _sample_cells(bombs[0], temperature, rng)) & eligible
+        accepted = decoder.step(query, choice, fires)
+        if rate is not None and query["kind"] == "bomb":
+            rate.placed(float(query["time"]), accepted["bombs"])
         if progress:
             progress(index, len(queries))
     final = decoder.finish()
     state.update(walls=final["walls"], bombs=final["bombs"])
     return {**final["diagnostics"], "queries": len(queries), "wall_queries": len(queries) // 2,
-            "bomb_queries": len(queries) // 2}
+            "bomb_queries": len(queries) // 2, "feasibility_masked": masked,
+            "wall_mask_redirects": mask_redirects, "bomb_cells_masked": cells_masked,
+            "bomb_rate_matching": rate is not None,
+            **({"bomb_rate_seconds": rate.seconds, "bomb_rate_factor": rate.factor} if rate else {})}
 
 
 def _overlapping_sections(boundaries, record, bpm=None):
@@ -402,7 +525,7 @@ def build_examples(song, state, vocab, options, encoder=None):
     affected section/cell, so unsupported positives never become NONE negatives.
     Raw-source coverage and final supported-reference output are separate counts.
     """
-    from .contracts import build_inputs
+    from .contracts import build_inputs, preparation_defaults
     from .targets import _stack
 
     duration, bpm = song.base.metadata["duration"], song.base.metadata["bpm"]
@@ -477,9 +600,16 @@ def build_examples(song, state, vocab, options, encoder=None):
             exclude(record, source_family(record), "ignored_source_object")
     inputs, walls, bombs, ww, bw = [], [], [], [], []
     supported_wall_sections, supported_bombs = {}, set()
+    feasibility_inputs = bool(preparation_defaults(options).get("hazard_feasibility_input"))
     for query in queries:
         index = query["section_index"]
-        inputs.append(build_inputs("hazards", song, state, query, decoder.history, encoder, options))
+        candidate = query
+        if feasibility_inputs:
+            candidate = dict(query)
+            candidate["_feasible_wall"] = (decoder.feasible_wall_classes(query) if query["kind"] == "wall"
+                                           else np.r_[True, np.zeros(len(vocab["walls"]) - 1, bool)])
+            candidate["_feasible_bombs"] = decoder.eligible_bomb_cells(query["time"])
+        inputs.append(build_inputs("hazards", song, state, candidate, decoder.history, encoder, options))
         wall, cells, wall_weight, bomb_weight = 0, np.zeros(12, np.float32), 0., np.zeros(12, np.float32)
         if query["kind"] == "wall":
             wall_weight = wall_masks[index]

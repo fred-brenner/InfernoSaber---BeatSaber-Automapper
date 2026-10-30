@@ -39,11 +39,92 @@ def _merge(examples):
                          np.concatenate([item.times for item in examples]))
 
 
-def batches(dataset, stage, split=None, batch_size=128, shuffle=False, rng=None):
+def _corruption_classes(dataset, stage):
+    """Class count for a stage's categorical history, or None when uncorruptible."""
+    if stage == "positions":
+        return 13
+    if stage == "arrows":
+        return 10
+    if stage == "multiplier":
+        vocab = getattr(dataset, "vocabularies", None) or {}
+        if len(vocab.get("multiplier", ())):
+            return len(vocab["multiplier"])
+        raise ValueError("Multiplier history corruption needs the multiplier vocabulary")
+    return None
+
+
+def _corrupt_history(examples, stage, rng, rate, drop, classes=None):
+    """Empty sampled positive history records, simulating missed decisions.
+
+    Records stay occupied: a missed object is a NONE row at inference too.
+    Categorical note stages instead substitute wrong classes, simulating
+    misdecoded own-decisions (wrong cell/direction or an absent/extra hand).
+    Only history input values change; masks, ages, targets and weights do not.
+    """
+    history, mask = examples.inputs.get("history"), examples.inputs.get("history_mask")
+    if history is None or mask is None or not len(examples.times) or rate <= 0:
+        return examples
+    if not 0 <= rate <= 1 or not 0 <= drop <= 1:
+        raise ValueError("History corruption probabilities must lie in [0, 1]")
+    selected = (rng.random(len(examples.times)) < rate)[:, None] & mask
+    if not selected.any():
+        return examples
+    corrupted = np.array(history, copy=True)
+    if stage in ("positions", "arrows", "multiplier"):
+        if not isinstance(classes, int) or classes < 2:
+            raise ValueError(f"History corruption needs a class count for {stage}")
+        # Sentinels (start = classes, pad = classes + 1) are never touched; only
+        # real class values in occupied slots get substituted.
+        replace = selected[..., None] & (corrupted < classes) & (rng.random(corrupted.shape) < drop)
+        noise = rng.integers(classes, size=corrupted.shape)
+        noise = np.where(noise == corrupted, (noise + 1) % classes, noise)
+        corrupted[replace] = noise[replace]
+        # A history event always has at least one occupied hand; restore one
+        # channel where substitution left an impossible all-absent row.
+        emptied = replace.any(axis=-1) & (corrupted == 0).all(axis=-1)
+        for row, slot in np.argwhere(emptied):
+            hands = np.flatnonzero(replace[row, slot])
+            hand = next((int(hand) for hand in reversed(hands)
+                         if history[row, slot, hand] != 0), int(hands[-1]))
+            corrupted[row, slot, hand] = history[row, slot, hand]
+        inputs = dict(examples.inputs)
+        inputs["history"] = corrupted
+        return StageExamples(inputs, examples.targets, examples.weights, examples.times)
+    if stage == "hazards":
+        before = (history[..., 0] > 0) | (history[..., 1:] > 0).any(axis=-1)
+        wall, bombs = corrupted[..., 0] > 0, corrupted[..., 1:] > 0
+        corrupted[..., 0][selected & wall & (rng.random(wall.shape) < drop)] = 0
+        corrupted[..., 1:][selected[..., None] & bombs & (rng.random(bombs.shape) < drop)] = 0
+        after = (corrupted[..., 0] > 0) | (corrupted[..., 1:] > 0).any(axis=-1)
+    elif stage == "arcs":
+        before = history[..., 0] > 0
+        attach = corrupted[..., 0] > 0
+        corrupted[selected & attach & (rng.random(attach.shape) < drop)] = 0
+        after = corrupted[..., 0] > 0
+    elif stage == "lighting":
+        before = (history > 0).any(axis=-1)
+        events = corrupted > 0
+        corrupted[selected[..., None] & events & (rng.random(events.shape) < drop)] = 0
+        after = (corrupted > 0).any(axis=-1)
+    else:
+        raise ValueError(f"History corruption is undefined for {stage}")
+    # A fully emptied window teaches "fire under all-NONE history" — the poisoned
+    # cold-start conditional. Restore the most recent positive record instead.
+    for row in np.flatnonzero((before & mask).any(axis=1) & ~after.any(axis=1)):
+        slots = np.flatnonzero(before[row] & mask[row])
+        corrupted[row, slots[-1]] = history[row, slots[-1]]
+    inputs = dict(examples.inputs)
+    inputs["history"] = corrupted
+    return StageExamples(inputs, examples.targets, examples.weights, examples.times)
+
+
+def batches(dataset, stage, split=None, batch_size=128, shuffle=False, rng=None,
+            corruption=None, corruption_rng=None):
     """Stream one stage at a time, retaining at most one song and one batch.
 
     A lazy, reiterable ``dataset.songs`` is supported. Shuffle permutes examples
     within each song; complete recording groups keep their prepared split.
+    ``corruption`` optionally degrades own-stage history on training inputs.
     """
     _check_stage(stage)
     rng = np.random.default_rng(3) if rng is None else rng
@@ -57,8 +138,14 @@ def batches(dataset, stage, split=None, batch_size=128, shuffle=False, rng=None)
     else:
         examples_source = iter_stage_examples(dataset, stage, split)
     rng = np.random.default_rng(3) if rng is None else rng
+    corruption_rng = rng if corruption_rng is None else corruption_rng
     pending, size = [], 0
     for examples in examples_source:
+        if corruption:
+            classes = _corruption_classes(dataset, stage) if corruption["rate"] > 0 else None
+            examples = _corrupt_history(examples, stage, corruption_rng,
+                                        corruption["rate"], corruption["drop"],
+                                        classes=classes)
         order = np.arange(len(examples.times))
         if shuffle:
             rng.shuffle(order)
@@ -147,6 +234,15 @@ def _checkpoint_signature(document):
     return _graph_signature(stable(document))
 
 
+def _saved_input_shapes(document):
+    """Name → batch_input_shape for every InputLayer in a saved model config."""
+    config = document.get("config", document)
+    return {layer["config"]["name"]: shape for layer in config.get("layers", [])
+            if layer.get("class_name") == "InputLayer"
+            for shape in [layer.get("config", {}).get("batch_input_shape") or layer.get("config", {}).get("batch_shape")]
+            if shape}
+
+
 def load_stage_artifact(path, stage, dataset=None):
     """Load only an explicitly selected stage/encoder/vocabulary-compatible artifact."""
     from . import models
@@ -158,7 +254,10 @@ def load_stage_artifact(path, stage, dataset=None):
     # only an identical graph before restoring weights across tf.keras versions.
     with zipfile.ZipFile(checkpoint) as archive:
         saved = json.loads(archive.read("config.json"))
-    model = models.build_model(stage, manifest["vocabularies"])
+    model = models.build_model(stage, manifest["vocabularies"],
+                               input_shapes=(manifest.get("training") or {}).get("input_shapes")
+                               or _saved_input_shapes(saved),
+                               bomb_presence=bool((manifest.get("training") or {}).get("bomb_presence")))
     if _checkpoint_signature(saved) != _checkpoint_signature(json.loads(model.to_json())):
         raise ValueError(f"Unsupported {stage} checkpoint graph; the current model does not match")
     model.load_weights(checkpoint)
@@ -192,7 +291,8 @@ def smoke_models(dataset, output, stages=None, max_examples=8):
             if examples is None:
                 raise ValueError(f"No {stage} smoke examples")
             models.keras.utils.set_random_seed(training_settings(stage)["seed"])
-            model = models.build_model(stage, dataset.vocabularies)
+            model = models.build_model(stage, dataset.vocabularies,
+                                       input_shapes={key: list(value.shape) for key, value in examples.inputs.items()})
             before = model.get_weights()
             check = gradient_check(stage, model, examples)
             expected = _outputs(model(examples.inputs, training=False))
@@ -201,7 +301,9 @@ def smoke_models(dataset, output, stages=None, max_examples=8):
             stage_dir = new_run_directory(root / stage)
             model.save(stage_dir / "model.keras")
             save_checkpoint_manifest(stage_dir, stage, dataset, "untrained", checkpoint="model.keras",
-                                     extra={"purpose": "smoke", "optimizer_steps": 0})
+                                     extra={"purpose": "smoke", "optimizer_steps": 0,
+                                            "input_shapes": {key: list(value.shape)
+                                                             for key, value in examples.inputs.items()}})
             restored, _ = load_stage_artifact(stage_dir, stage, dataset)
             actual = _outputs(restored(examples.inputs, training=False))
             error = max(float(np.max(np.abs(expected[key] - actual[key]))) for key in expected)
@@ -217,10 +319,11 @@ def smoke_models(dataset, output, stages=None, max_examples=8):
 
 
 def _epoch(dataset, stage, execution, batch_size, *, training=False, shuffle=False, rng=None,
-           prefetch=2, log_every=100, verbose=0, epoch=1):
+           prefetch=2, log_every=100, verbose=0, epoch=1, corruption=None, corruption_rng=None):
     split = "train" if training else "validation"
     total_batches = (dataset.counts[split]["examples"] + batch_size - 1) // batch_size
-    source = prefetch_batches(batches(dataset, stage, split, batch_size, shuffle, rng), prefetch)
+    source = prefetch_batches(batches(dataset, stage, split, batch_size, shuffle, rng,
+                                      corruption if training else None, corruption_rng), prefetch)
     execution.reset()
     start = perf_counter()
     examples_seen = batch_count = 0
@@ -276,7 +379,8 @@ def train_stage(dataset, stage, output, dry_run=True, epochs=None, batch_size=No
             raise ValueError(f"{name} must be a positive integer")
     preparation_started = perf_counter()
     data = TrainingData(dataset, stage, ram_cache_mib=performance["ram_cache_mib"],
-                        verbose=settings["verbose"], require_real=not dry_run)
+                        verbose=settings["verbose"], require_real=not dry_run,
+                        enabled_song_supervision=settings["enabled_song_supervision"])
     preparation_seconds = perf_counter() - preparation_started
     counts = data.counts
     if any(not counts[split]["supervised_values"] for split in ("train", "validation")):
@@ -290,11 +394,14 @@ def train_stage(dataset, stage, output, dry_run=True, epochs=None, batch_size=No
     if sparse:
         from tools.config import config
         from .supervision import class_balance
-        balance = class_balance(data.support, stage, config.pipeline_v2_positive_weight_cap)
+        balance = class_balance(data.support, stage, config.pipeline_v2_positive_weight_cap,
+                                settings["negative_supervision_weight"])
     from . import models
     models.keras.utils.set_random_seed(settings["seed"])
-    model = models.build_model(stage, dataset.vocabularies)
     preview = next(batches(data, stage, "train", batch_size))
+    model = models.build_model(stage, dataset.vocabularies,
+                               input_shapes={key: list(value.shape) for key, value in preview.inputs.items()},
+                               bomb_presence=bool(settings.get("bomb_presence")))
     before = model.get_weights()
     preview_loss = float(models.stage_loss(stage, preview.targets, model(preview.inputs, training=False), preview.weights))
     if not np.isfinite(preview_loss):
@@ -302,6 +409,8 @@ def train_stage(dataset, stage, output, dry_run=True, epochs=None, batch_size=No
     root = new_run_directory(output)
     report = {"kind": "v2_stage_training", "stage": stage, "status": "untrained", "dry_run": bool(dry_run),
               "optimizer_steps": 0, "conditioning": "reference", "history_conditioning": "strictly-preceding-teacher-forced",
+              "history_corruption": {"rate": settings["history_corrupt_rate"], "drop": settings["history_corrupt_drop"],
+                                     "scope": "train split inputs only; validation/test stay reference"},
               "compatibility": identity, "architecture": architecture_settings(stage), **settings,
               "epochs": epochs, "batch_size": batch_size, "splits": counts,
               "parameters": model.count_params(), "preview_loss": preview_loss,
@@ -323,6 +432,8 @@ def train_stage(dataset, stage, output, dry_run=True, epochs=None, batch_size=No
     execution = StageExecution(stage, model, preview, optimizer=optimizer, compiled=performance["compile_steps"],
                                balance=balance, vocabularies=dataset.vocabularies if sparse else None)
     rng = np.random.default_rng(settings["seed"])
+    corrupt_rng = np.random.default_rng(np.random.SeedSequence(settings["seed"]).spawn(1)[0])
+    corruption = {"rate": settings["history_corrupt_rate"], "drop": settings["history_corrupt_drop"]}
     history = {"loss": [], "val_loss": [], "val_pr_auc": []}
     epoch_performance = []
     mode = settings["monitor_mode"]
@@ -331,7 +442,8 @@ def train_stage(dataset, stage, output, dry_run=True, epochs=None, batch_size=No
     for epoch in range(epochs):
         train_loss, train_stats = _epoch(data, stage, execution, batch_size, training=True,
             shuffle=settings["shuffle"], rng=rng, prefetch=performance["prefetch_batches"],
-            log_every=performance["log_every_batches"], verbose=settings["verbose"], epoch=epoch + 1)
+            log_every=performance["log_every_batches"], verbose=settings["verbose"], epoch=epoch + 1,
+            corruption=corruption, corruption_rng=corrupt_rng)
         val_loss, val_stats = _epoch(data, stage, execution, batch_size,
             prefetch=performance["prefetch_batches"], log_every=performance["log_every_batches"],
             verbose=settings["verbose"], epoch=epoch + 1)

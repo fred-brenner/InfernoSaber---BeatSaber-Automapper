@@ -44,6 +44,61 @@ Unrecoverable geometry/intervals use conservative supervision masks and remain
 visible in the audit. Source-wall reporting distinguishes fully and partially
 represented objects.
 
+**Feasibility-masked decode (experimental):** `options["hazard_feasibility_decode"]`
+(config `v2_hazard_feasibility_decode`) evaluates the same frozen clearance rules
+*before* each decision — a wall argmax on an infeasible class is vetoed to NONE
+and infeasible bomb cells are zeroed. A veto is a no-op versus the decoder's
+built-in post-decision rejections; the flag exists for the masked-sampling path
+and diagnostics (`wall_mask_redirects`, `bomb_cells_masked`).
+`options["hazard_sample_temperature"]` (config `v2_hazard_sample_temperature`,
+0 disables) replaces argmax/threshold with masked sampling: walls draw from the
+temperature-scaled feasible-class softmax including NONE, bombs draw
+temperature-scaled Bernoulli per eligible cell. Replay seeds via
+`hazard_sample_seed`; live generation samples unseeded per map.
+
+**Feasibility inputs (gated training-time variant):** `hazard_feasibility_input`
+(config `pipeline_v2_hazard_feasibility_input`, default off) adds two per-query
+inputs to hazards: `feasible_wall` (one bool per wall class, NONE always legal)
+and `feasible_bombs` (12 bools), evaluated through the same frozen clearance
+rules under the evolving decoder state. Preparation attaches them under
+reference decisions; rollout attaches them under the model's own decisions, so
+train and decode semantics match. The hazard model consumes both as features and
+applies them inside the heads — a `MaskLogits` layer before the wall softmax and
+a multiply after the bomb sigmoid — so the heads are probability distributions
+over *legal* options only. Ordinary categorical/binary losses need no change:
+infeasible classes carry no probability mass and produce no gradient, so
+"impossible" options are neither negatives nor wasted model capacity. The flag
+is recorded in `stage_data` only when enabled, rides bundle assembly like other
+contract fields, and each checkpoint derives its input signature from its own
+`input_shapes` — legacy datasets and bundles stay byte-identical. The decode-side
+`hazard_feasibility_decode` flag remains useful for bundles without these inputs.
+
+**Factorized bomb head (Arm F, gated):** `hazards_bomb_presence` (default off)
+adds a scalar sigmoid `bomb_presence` output — "does any bomb belong at this
+query" — alongside the masked 12-cell `bombs` scores that answer "where". The
+masked-sigmoid cells alone learn legality but not firing rate: their rankings
+separated in aggregate yet carried no per-query calibration, which is why
+threshold decode stayed silent and rate-matching flooded. Supervision is
+*derived* inside `loss_components` from the existing cell targets/weights —
+presence target = any supervised positive cell, presence weight = any
+supervised cell — so no re-preparation or batch schema change is needed, and
+multi-bomb queries (≈43% of positives) keep all their cells. The presence
+component joins loss aggregation and per-head epoch metrics with default
+weight 1.0; configured `hazards_loss_weights` stay `wall`/`bombs` only. At
+decode (rollout and calibration replay alike) the firing score is
+`p_presence × p_cell` per eligible cell, so the swept threshold calibrates the
+product — the query-level "when" gate suppresses per-map floods and silences
+maps where presence never rises. `build_model`/`load_stage_artifact` read the
+flag from `manifest["training"]["bomb_presence"]` (recorded via training
+settings), so artifacts rebuild byte-exact and legacy checkpoints load
+unchanged; `bomb_presence=True` on a non-hazards stage raises.
+
+**History-corruption keep-guard:** corruption drops positive history records
+per-record at `rate`/`drop`, then restores the most recent positive record in
+any sample that would otherwise lose *all* of them. Fully-emptied windows taught
+"fire under all-NONE history" — the poisoned cold-start conditional behind
+start-regime spam — whereas partial amnesia is the realistic decode failure.
+
 **Experimental v2 lighting:** the `default_basic_v1` profile supports types 0–4/values 0–12,
 ring types 8/9 canonicalized to value 0, and speed types 12/13/values 0–15.
 Brightness remains fixed at 1. Custom dependencies, Chroma colors, unsupported
@@ -98,6 +153,52 @@ validation mean wall-presence/bomb PR-AUC, lighting command micro PR-AUC, or arc
 attachment PR-AUC. An empty prediction fails positive-case evaluation even if
 its loss is low. Approximate PR-AUC uses 512 logit-spaced thresholds.
 
+Two optional levers address the sparse-stage history/coverage failures without
+re-preparation or architecture changes, configured per stage:
+
+- `*_enabled_song_supervision` (default `True` for hazards/arcs) masks a head's
+  weights to zero for any song with no effective supervised positive for that
+  head. Wall and bomb supervision mask independently; unsupported positives
+  count as disabled. Masked queries remain inputs; supervision counts, class
+  balance and `supervised_values` reflect effective supervision. Training
+  reports record masked values and feature-disabled songs under
+  `training_data.enabled_song_supervision`.
+- `*_history_corrupt_rate` / `*_history_corrupt_drop` (defaults `0.0`/`1.0`,
+  disabled) corrupt the own-stage `history` input on TRAIN batches only:
+  each selected example's positive history records are emptied to NONE rows
+  with probability `drop`, simulating missed autoregressive decisions. Masks,
+  ages, targets and weights are untouched; validation/test stay
+  teacher-forced. Corruption uses a dedicated seed-derived stream, so runs
+  stay reproducible. Reports record `history_corruption`.
+  For the categorical note stages (`positions`, `arrows`, `multiplier`)
+  corruption instead substitutes each occupied history slot's `(red, blue)`
+  class with a uniform random different class at probability `drop`,
+  simulating misdecoded own-decisions (wrong cell/direction or an
+  absent/extra hand). Sentinels and padding are never touched and an
+  impossible all-absent `(0, 0)` row restores one channel. The multiplier
+  vocabulary supplies its class count, so its corruption needs a
+  `TrainingData` source (the training path always provides one).
+- `*_negative_supervision_weight` (`hazards_negative_supervision_weight`,
+  `arcs_negative_supervision_weight`; default `1.0`, range `0–1`) scales the
+  negative-class factor inside `class_balance` for the stage's classification
+  heads (`wall`, `bombs`, `attach`, `anchor`). Downweighting implements
+  positive-unlabeled semantics: a reference map's non-placement of a stylistic
+  object is treated as weak negative evidence, while positive cells keep full
+  weight. Regression heads (`shape`) and `events` are unaffected. `1.0`
+  reproduces prior behavior; reports record `negative_supervision_weight`.
+- `pipeline_v2_hazard_context_*` (`_seconds` `2.0`, `_back_seconds` `0.5`,
+  `_bins` `10`, schedule-recorded) adds a `context` input to hazards: a
+  `(bins, 2 hands, 12 cells)` binary occupancy grid of notes and chain slices
+  spanning `[now-back, now+forward)`. It answers "is this space free of notes"
+  — the structural gap behind random wall/bomb placements. Emission is gated
+  on the recorded schedule spec: datasets and bundles prepared before the
+  keys existed emit byte-identical legacy inputs, and each hazards model
+  declares the input iff its own checkpoint/input_shapes contain it
+  (`load_stage_artifact` derives the signature from the artifact, not current
+  config). The spec propagates to assembled bundles via `stage_data`; a
+  context-trained hazards model therefore requires re-prepared data and a
+  bundle carrying the spec.
+
 Calibration ranks `.01–.99` by validation F1 through the real decoder, then
 autoregressively replays the best three. F1 ties select the higher threshold.
 Wall geometry stays categorical. The sidecar binds thresholds to checkpoint
@@ -108,6 +209,22 @@ reference upstream context and predicted own-stage history, with no optimizer.
 Arc calibration requires sliders enabled and records movement/clearance controls;
 it disables the random acceptance filter for repeatability. Production controls
 remain adjustable. Neither calibration nor bundle assembly establishes gameplay quality.
+
+Per-song and aggregate calibration/evaluation reports split head scores by
+history regime (`start`: no positive decision in prepared history;
+`continuation`: a positive exists) — the cold-start regime is where the old
+models failed autoregressively. `enabled_only` restricts scores to songs where
+the feature was actually used, matching always-on generation semantics; the
+song counts are recorded under `enabled_songs`. These fields are additive;
+threshold selection still uses the existing objective.
+
+Replay reports additionally carry `tolerant` scores alongside strict F1:
+decoded predictions are matched one-to-one against reference positives within
+`tolerance_seconds` (default `.25`, a schedule option). Wall matches require
+overlapping onset/end within the window, bombs require matching grid cell,
+arcs require matching head/tail times and endpoint geometry. Strict metrics
+remain the calibration objective; tolerant metrics answer "right idea, nearby
+placement" separately from exact cell equality.
 
 ## Commands
 

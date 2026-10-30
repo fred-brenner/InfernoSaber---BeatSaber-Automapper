@@ -43,10 +43,13 @@ def _predict(predictor, inputs):
 
 
 def _validate_outputs(stage, outputs, examples, vocab, options):
-    if set(outputs) != set(examples.targets):
+    if set(outputs) - ({"bomb_presence"} if stage == "hazards" else set()) != set(examples.targets):
         raise ValueError("Calibration prediction heads disagree with prepared targets")
     for head, value in outputs.items():
-        target = examples.targets[head]
+        if head == "bomb_presence":
+            target = np.zeros((len(examples.times), 1), np.float32)
+        else:
+            target = examples.targets[head]
         classes = len(vocab["walls"]) if head == "wall" else 2 if head == "attach" else 3 if head == "anchor" else None
         expected = (*target.shape, classes) if classes is not None else target.shape
         if value.shape != expected or not np.isfinite(value).all():
@@ -149,6 +152,68 @@ def _statistics(tp, fp, fn):
             "f1": 2 * tp / (2 * tp + fp + fn) if 2 * tp + fp + fn else 0.}
 
 
+_SPARSE_CATEGORICAL_HEADS = {"wall", "attach", "anchor"}
+
+
+def _tolerance_seconds(options):
+    return float((options.get("schedule") or {}).get("tolerance_seconds", .25))
+
+
+def _tolerant_match(reference, predicted, window, fuzzy=("time",), exact=()):
+    """Greedy nearest one-to-one match; fuzzy fields need |delta| <= window."""
+    remaining = list(range(len(reference)))
+    tp = 0
+    for pred in sorted(predicted, key=lambda item: item["time"]):
+        best = best_gap = None
+        for index in remaining:
+            ref = reference[index]
+            if any(abs(float(pred.get(key, 0.)) - float(ref.get(key, 0.))) > window for key in fuzzy):
+                continue
+            if any(pred.get(key) != ref.get(key) for key in exact):
+                continue
+            gap = abs(pred["time"] - ref["time"])
+            if best_gap is None or gap < best_gap:
+                best, best_gap = index, gap
+        if best is not None:
+            remaining.remove(best)
+            tp += 1
+    return _statistics(float(tp), float(len(predicted) - tp), float(len(reference) - tp))
+
+
+def _history_regime(stage, head, examples):
+    """Per-query flag: the prepared reference history already contains a positive."""
+    history, mask = examples.inputs["history"], examples.inputs["history_mask"]
+    if stage == "hazards":
+        channel = history[..., 0] > 0 if head == "wall" else (history[..., 1:] > 0).any(axis=-1)
+    elif stage == "arcs":
+        channel = history[..., 0] > 0
+    else:
+        channel = (history > 0).any(axis=-1)
+    return (channel & mask).any(axis=1)
+
+
+def _regime_report(stage, examples, predicted):
+    """Split head scores by own-history regime and flag feature-enabled songs.
+
+    ``start`` covers queries whose prepared history has no positive decision —
+    the cold-start regime that fails autoregressively. ``enabled`` marks songs
+    where the mapper used the feature at least once, matching always-on
+    generation semantics.
+    """
+    regimes, enabled = {"start": {}, "continuation": {}}, {}
+    for head, values in predicted.items():
+        target, weight = examples.targets[head], examples.weights[head]
+        categorical = head in _SPARSE_CATEGORICAL_HEADS
+        supervised = np.asarray(weight) > 0
+        truth = (np.asarray(target) != 0) if categorical else (np.asarray(target) > .5)
+        enabled[head] = bool((truth & supervised).any())
+        regime = _history_regime(stage, head, examples)
+        for name, selection in (("start", ~regime), ("continuation", regime)):
+            regimes[name][head] = _score(target[selection], values[selection],
+                                         weight[selection], categorical=categorical)
+    return {"regimes": regimes, "enabled": enabled}
+
+
 def _reference_state(song, vocab, options, *, hazards=False):
     from .targets import reference_expanded_state
 
@@ -201,14 +266,20 @@ def _arc_replay(song, predictor, vocab, options, threshold, fixed, upstream_stat
         decisions.append(int(accepted))
         history.append({"time": query["time"], "value": history_value({"attach": accepted, "shape": shape, "anchor": anchor})})
         del history[:-(options["history_length"] + 2)]
+    decisions = np.asarray(decisions)
     heads = {"attach": _score(examples.targets["attach"], decisions, examples.weights["attach"])}
-    return heads, {"arcs": state["arcs"]} if retain_objects else {}, {
+    regime = _regime_report("arcs", examples, {"attach": decisions})
+    window = _tolerance_seconds(options)
+    supervised = (np.asarray(examples.targets["attach"]) > 0) & (np.asarray(examples.weights["attach"]) > 0)
+    reference = [queries[index] for index in np.flatnonzero(supervised)]
+    tolerant = {"attach": _tolerant_match(reference, state["arcs"], window, ("time", "end_time"), ("hand",))}
+    return heads, regime, {"arcs": state["arcs"]} if retain_objects else {}, {
         "queries": len(queries), "clearance_rejections": rejected,
-        "slider_probability": 1., "probability_filter": "disabled for calibration"}
+        "slider_probability": 1., "probability_filter": "disabled for calibration"}, tolerant
 
 
 def _hazard_replay(song, predictor, vocab, options, threshold, fixed, upstream_state, retain_objects):
-    from .hazard_sections import SectionDecoder, candidates
+    from .hazard_sections import SectionDecoder, candidates, _sample_probs, _sample_cells, _BombRateWindow
 
     state = upstream_state if upstream_state is not None else _reference_state(song, vocab, options)
     examples = song.examples["hazards"]
@@ -216,10 +287,41 @@ def _hazard_replay(song, predictor, vocab, options, threshold, fixed, upstream_s
     if len(queries) != len(examples.times) or not np.allclose([query["time"] for query in queries], examples.times, atol=1e-8, rtol=0):
         raise ValueError("Hazard replay schedule disagrees with prepared examples")
     decoder = SectionDecoder(state, song.base.metadata["duration"], vocab, options)
+    masked = bool(options.get("hazard_feasibility_decode"))
+    temperature = float(options.get("hazard_sample_temperature", 0.) or 0.)
+    sampling = masked and temperature > 0
+    # With rate-matching on, the swept threshold acts as the bomb_rate_factor.
+    rate = _BombRateWindow({**options, "bomb_rate_factor": threshold}) if options.get("hazard_bomb_rate_decode") else None
+    rng = np.random.default_rng(int(options.get("hazard_sample_seed", 0)))
+    mask_redirects, cells_masked = 0, 0
     for index, query in enumerate(queries):
         output = _one_prediction(song, "hazards", index, predictor, vocab, options, decoder.history, fixed)
+        wall, bombs = np.asarray(output["wall"][0]).copy(), np.asarray(output["bombs"][0]).copy()
+        presence = output.get("bomb_presence")
+        if presence is not None:
+            bombs *= float(np.asarray(presence).reshape(-1)[0])
+        choice, fires = int(wall.argmax()), bombs >= threshold
+        if query["kind"] == "wall":
+            if masked:
+                feasible = decoder.feasible_wall_classes(query)
+                if sampling:
+                    allowed = np.flatnonzero(feasible)
+                    choice = int(allowed[_sample_probs(wall[feasible], temperature, rng)])
+                elif choice and not feasible[choice]:
+                    mask_redirects += 1
+                    choice = 0
+        else:
+            eligible = decoder.eligible_bomb_cells(float(query["time"])) if (masked or rate is not None) else None
+            if rate is not None:
+                fires = rate.fires(float(query["time"]), bombs, eligible)
+                cells_masked += int((~eligible & fires).sum())
+            elif masked:
+                cells_masked += int((~eligible & fires).sum())
+                fires = (fires if not sampling else _sample_cells(bombs, temperature, rng)) & eligible
         # Wall geometry remains categorical argmax, including NONE.
-        decoder.step(query, int(output["wall"][0].argmax()), output["bombs"][0] >= threshold)
+        accepted = decoder.step(query, choice, fires)
+        if rate is not None and query["kind"] == "bomb":
+            rate.placed(float(query["time"]), accepted["bombs"])
     final = decoder.finish()
     walls = np.zeros_like(examples.targets["wall"])
     bombs = np.zeros_like(examples.targets["bombs"])
@@ -239,7 +341,21 @@ def _hazard_replay(song, predictor, vocab, options, threshold, fixed, upstream_s
             bombs[index, bomb_cells.get(round(query["time"], 9), [])] = 1
     heads = {"wall": _score(examples.targets["wall"], walls, examples.weights["wall"], categorical=True),
              "bombs": _score(examples.targets["bombs"], bombs, examples.weights["bombs"])}
-    return heads, {key: final[key] for key in ("walls", "bombs")} if retain_objects else {}, final["diagnostics"]
+    regime = _regime_report("hazards", examples, {"wall": walls, "bombs": bombs})
+    window = _tolerance_seconds(options)
+    wall_supervised = (np.asarray(examples.targets["wall"]) > 0) & (np.asarray(examples.weights["wall"]) > 0)
+    reference_walls = [{"time": queries[i]["time"], "end_time": queries[i]["end_time"]}
+                       for i in np.flatnonzero(wall_supervised)]
+    bomb_positive = (np.asarray(examples.targets["bombs"]) > 0) & (np.asarray(examples.weights["bombs"]) > 0)
+    reference_bombs = [{"time": queries[i]["time"], "cell": c} for i, c in np.argwhere(bomb_positive)]
+    predicted_bombs = [{"time": b["time"], "cell": 4 * b["y"] + b["x"]} for b in final["bombs"]]
+    tolerant = {"wall": _tolerant_match(reference_walls, final["walls"], window, ("time", "end_time")),
+                "bombs": _tolerant_match(reference_bombs, predicted_bombs, window, ("time",), ("cell",))}
+    diagnostics = {**final["diagnostics"], "feasibility_masked": masked,
+                   "wall_mask_redirects": mask_redirects, "bomb_cells_masked": cells_masked,
+                   "bomb_rate_matching": rate is not None,
+                   **({"bomb_rate_seconds": rate.seconds, "bomb_rate_factor": rate.factor} if rate else {})}
+    return heads, regime, {key: final[key] for key in ("walls", "bombs")} if retain_objects else {}, diagnostics, tolerant
 
 
 def _lighting_replay(song, predictor, vocab, options, threshold, fixed, upstream_state, retain_objects):
@@ -250,7 +366,8 @@ def _lighting_replay(song, predictor, vocab, options, threshold, fixed, upstream
         decisions = decode(fixed["events"], vocab, threshold)
         decisions *= examples.inputs["mask"][..., None]
         heads = {"events": _score(examples.targets["events"], decisions, examples.weights["events"])}
-        return heads, {}, {"blocks": len(examples.times), "events": int(decisions.sum())}
+        regime = _regime_report("lighting", examples, {"events": decisions})
+        return heads, regime, {}, {"blocks": len(examples.times), "events": int(decisions.sum())}, {}
     history, events, event_count = [], [], 0
     decisions = np.zeros_like(examples.targets["events"])
     for index, timeline in enumerate(examples.times):
@@ -266,7 +383,8 @@ def _lighting_replay(song, predictor, vocab, options, threshold, fixed, upstream
                 events.extend({"time": float(when), **deepcopy(vocab["lighting"][category])} for category in np.flatnonzero(projected[offset]))
         del history[:-options["lighting_block_length"]]
     heads = {"events": _score(examples.targets["events"], decisions, examples.weights["events"])}
-    return heads, {"lighting": events} if retain_objects else {}, {"blocks": len(examples.times), "events": event_count}
+    regime = _regime_report("lighting", examples, {"events": decisions})
+    return heads, regime, {"lighting": events} if retain_objects else {}, {"blocks": len(examples.times), "events": event_count}, {}
 
 
 def replay_stage(song, stage, predictor, vocab, options, threshold=.5, *, conditioning="autoregressive", outputs=None,
@@ -294,9 +412,11 @@ def replay_stage(song, stage, predictor, vocab, options, threshold=.5, *, condit
             raise ValueError("Autoregressive replay cannot consume teacher-forced outputs")
         fixed = None
     replay = {"arcs": _arc_replay, "hazards": _hazard_replay, "lighting": _lighting_replay}[stage]
-    heads, objects, diagnostics = replay(song, predictor, vocab, options, threshold, fixed, upstream_state, retain_objects)
+    heads, regime, objects, diagnostics, tolerant = replay(song, predictor, vocab, options, threshold, fixed, upstream_state, retain_objects)
     return {"song_id": song.base.song_id, "group_id": song.base.metadata["group_id"], "stage": stage,
             "conditioning": conditioning, "threshold": float(threshold), "heads": heads,
+            "tolerant": tolerant, "tolerance_seconds": _tolerance_seconds(options) if tolerant else None,
+            "regimes": regime["regimes"], "enabled": regime["enabled"],
             "objective": heads[OBJECTIVE_HEAD[stage]], "objects": objects, "diagnostics": diagnostics}
 
 
@@ -329,15 +449,36 @@ def _validation_songs(dataset, stage):
 
 
 def _aggregate(reports, stage):
-    heads = {}
+    heads, enabled, enabled_songs, tolerant = {}, {}, {}, {}
+    regimes = {"start": {}, "continuation": {}}
     for report in reports:
         for head, values in report["heads"].items():
             total = heads.setdefault(head, [0., 0., 0.])
             for index, key in enumerate(("true_positive", "false_positive", "false_negative")):
                 total[index] += values[key]
+            if report.get("enabled", {}).get(head):
+                enabled_songs[head] = enabled_songs.get(head, 0) + 1
+                total = enabled.setdefault(head, [0., 0., 0.])
+                for index, key in enumerate(("true_positive", "false_positive", "false_negative")):
+                    total[index] += values[key]
+        for head, values in report.get("tolerant", {}).items():
+            total = tolerant.setdefault(head, [0., 0., 0.])
+            for index, key in enumerate(("true_positive", "false_positive", "false_negative")):
+                total[index] += values[key]
+        for name in ("start", "continuation"):
+            for head, values in report.get("regimes", {}).get(name, {}).items():
+                total = regimes[name].setdefault(head, [0., 0., 0.])
+                for index, key in enumerate(("true_positive", "false_positive", "false_negative")):
+                    total[index] += values[key]
     scores = {head: _statistics(*values) for head, values in heads.items()}
     objective = scores.get(OBJECTIVE_HEAD[stage], _statistics(0., 0., 0.))
     return {"heads": scores, "objective_head": OBJECTIVE_HEAD[stage], "objective": objective,
+            "tolerant": {head: _statistics(*values) for head, values in tolerant.items()},
+            "tolerance_seconds": next((report.get("tolerance_seconds") for report in reports if report.get("tolerant")), None),
+            "regimes": {name: {head: _statistics(*values) for head, values in heads.items()}
+                        for name, heads in regimes.items()},
+            "enabled_only": {head: _statistics(*values) for head, values in enabled.items()},
+            "enabled_songs": enabled_songs,
             "songs": [{key: value for key, value in report.items() if key != "objects"} for report in reports]}
 
 

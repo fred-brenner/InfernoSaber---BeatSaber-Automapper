@@ -226,8 +226,10 @@ source audio or use the legacy training-map importer.
 
 Reference loading currently supports v2 `Info.dat` with v2 or v3 beatmaps,
 constant positive BPM, zero song offset, and unshuffled timing. Beat times are
-converted to elapsed seconds using `beat * 60 / BPM`. Nonempty tempo-change
-metadata, nonzero offsets/shuffle, and unknown format versions fail explicitly.
+converted to elapsed seconds using `beat * 60 / BPM`. Tempo-change entries are
+accepted only when every declared tempo equals the base BPM (constant
+restatements); real tempo changes, nonzero offsets/shuffle, and unknown format
+versions fail explicitly.
 Reference onsets are unique timestamps of colored notes: simultaneous notes count
 once, bombs are excluded, and nearby distinct timestamps remain distinct. Arcs,
 obstacles, and lighting do not add reference onsets.

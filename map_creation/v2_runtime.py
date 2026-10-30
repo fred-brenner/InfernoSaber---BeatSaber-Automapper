@@ -204,6 +204,15 @@ class V2Runtime:
         for stage, record in validated["calibrations"].items():
             key = {"hazards": "bomb_threshold", "arcs": "arc_threshold"}[stage]
             self.settings[key] = record["threshold"]
+        self.settings["hazard_feasibility_decode"] = bool(getattr(config, "v2_hazard_feasibility_decode", False))
+        self.settings["hazard_sample_temperature"] = float(getattr(config, "v2_hazard_sample_temperature", 0.) or 0.)
+        self.settings["hazard_bomb_rate_decode"] = bool(getattr(config, "v2_hazard_bomb_rate_decode", False))
+        self.settings["hazard_bomb_rate_seconds"] = float(getattr(config, "v2_hazard_bomb_rate_seconds", 2.0) or 2.0)
+        self.settings["bomb_score_floor"] = float(getattr(config, "v2_hazard_bomb_score_floor", .05) or .05)
+        factor = float(getattr(config, "v2_hazard_bomb_rate_factor", 0.) or 0.)
+        if factor:
+            self.settings["bomb_rate_factor"] = factor
+        self.settings["note_sample_temperature"] = float(getattr(config, "v2_note_sample_temperature", 0.) or 0.)
         import tensorflow as tf
         threads = getattr(config, "v2_inference_threads", 2)
         if isinstance(threads, bool) or not isinstance(threads, int) or threads < 1:
@@ -253,6 +262,14 @@ class V2Runtime:
                 model, _ = load_stage_artifact(self.root / paths[stage], stage)
                 self.models[stage] = model
                 self.predictors[stage] = predictor(model)
+            # Optional second arrows opinion blended at decode by v2_arrows_variety.
+            if "arrows" in self.predictors and 0 < float(getattr(config, "v2_arrows_variety", 0.) or 0.):
+                reference = _validate_bundle(getattr(config, "v2_arrows_reference_bundle",
+                                                     "../Data/model/v2_expert"), production=True)
+                model, _ = load_stage_artifact(reference["root"] / reference["bundle"]["model_stages"]["arrows"],
+                                               "arrows")
+                self.models["arrows_reference"] = model
+                self.predictors["arrows_reference"] = predictor(model)
             self.encoder_model = tf.keras.models.load_model(str(self.root / self.bundle["encoder"]), compile=False)
             if tuple(self.encoder_model.input_shape[1:]) != (24, 20, 1) or tuple(self.encoder_model.output_shape[1:]) != (16,):
                 raise ValueError("The retained encoder must accept [24,20,1] and return [16]")

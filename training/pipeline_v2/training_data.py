@@ -9,11 +9,23 @@ from training.beat_models.artifacts import file_hash, read_json
 from .artifacts import _Songs, _local
 from .contracts import NEW_STAGES, StageExamples, validate_examples
 from .arc_policy import stage_split
-from .supervision import support, add_support, describe_support
+from .supervision import support, add_support, describe_support, enabled_song_mask
 from .policies import SPARSE_STAGES
 
 
 SPLITS = ("train", "validation", "test")
+
+
+def _enabled_song_supervision(stage, flag=None):
+    if flag is not None:
+        if not isinstance(flag, bool):
+            raise ValueError("enabled_song_supervision must be boolean")
+        return flag
+    from tools.config import config
+    value = getattr(config, f"{stage}_enabled_song_supervision", False)
+    if not isinstance(value, bool):
+        raise ValueError(f"{stage}_enabled_song_supervision must be boolean")
+    return value
 
 
 def _selection(stage, split=None):
@@ -128,7 +140,8 @@ def iter_stage_examples(dataset, stage, split=None):
 class TrainingData:
     """A stage reader; construction will scan once before epochs reuse its checks."""
 
-    def __init__(self, dataset, stage, ram_cache_mib=1024, verbose=0, require_real=False):
+    def __init__(self, dataset, stage, ram_cache_mib=1024, verbose=0, require_real=False,
+                 enabled_song_supervision=None):
         _selection(stage)
         from .arc_policy import validate_split_overlay
         validate_split_overlay(dataset.manifest)
@@ -141,6 +154,9 @@ class TrainingData:
                     or not encoder.get("checkpoint_fingerprint")):
                 raise ValueError("Training requires real prepared examples from the explicit retained encoder")
         self.stage = stage
+        self._enabled_only = _enabled_song_supervision(stage, enabled_song_supervision)
+        masked_support = {split: {} for split in SPLITS}
+        masked_songs = {split: 0 for split in SPLITS}
         self.support = {split: {} for split in SPLITS}
         effective_identities = {}
         self.counts = {split: {"songs": 0, "examples": 0, "supervised_values": 0} for split in SPLITS}
@@ -185,6 +201,12 @@ class TrainingData:
             if examples is not None:
                 split = stage_split(getattr(dataset, "manifest", {}), stage, {**metadata, "song_id": song_id})
                 _metadata({**metadata, "split": split}, song_id, effective_identities)
+                if self._enabled_only:
+                    examples, masked = enabled_song_mask(examples, stage)
+                    if masked:
+                        masked_songs[split] += 1
+                        for head, count in masked["masked_supervised_values"].items():
+                            masked_support[split][head] = masked_support[split].get(head, 0) + count
                 if stage in SPARSE_STAGES:
                     add_support(self.support[split], support(examples, stage), metadata["group_id"])
                 count = self.counts[split]
@@ -214,11 +236,19 @@ class TrainingData:
         if disk or caching:
             self._songs = None
         self.support = {split: describe_support(value) for split, value in self.support.items()}
-        self.report = {"supervision": self.support, "stage": stage, "mode": "ram" if caching else "stream",
+        self.report = {"enabled_song_supervision": {"active": self._enabled_only,
+                                                    "masked_supervised_values": masked_support,
+                                                    "feature_disabled_songs": masked_songs},
+                       "supervision": self.support, "stage": stage, "mode": "ram" if caching else "stream",
                        "source": "npz" if disk else "memory", "ram_cache_mib": float(ram_cache_mib),
                        "budget_bytes": budget, "retained_bytes": retained, "stage_bytes": stage_bytes,
                        "estimated_stage_bytes": estimated_bytes, "songs_scanned": scanned,
                        "integrity_passes": 1}
+
+    def _mask_enabled(self, examples):
+        if self._enabled_only and examples is not None:
+            return enabled_song_mask(examples, self.stage)[0]
+        return examples
 
     def examples(self, split=None, rng=None):
         """Yield original song order, reusing checks from construction."""
@@ -236,10 +266,10 @@ class TrainingData:
                 _unchanged(source, snapshot)
                 examples, _ = _stage_arrays(source[0], self.stage)
                 _unchanged(source, snapshot)
-                yield examples
+                yield self._mask_enabled(examples)
                 del examples
             else:
-                yield self._songs[source].examples[self.stage]
+                yield self._mask_enabled(self._songs[source].examples[self.stage])
 
 
 def _nbytes(examples):

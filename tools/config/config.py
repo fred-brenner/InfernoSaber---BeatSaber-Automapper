@@ -38,6 +38,19 @@ v1_lighting_vocabulary_path = "../Data/model/fav_15/onehot_encoder_events.pkl"
 v2_inference_threads = 2
 v2_timing_batch_size = 8
 v2_compile_inference = True
+# Experimental: mask hazard decisions to feasible placements before argmax/threshold.
+v2_hazard_feasibility_decode = False
+# With feasibility decode on: sample among legal options at this temperature (0 = argmax).
+v2_hazard_sample_temperature = 0.0
+# Experimental: rate-matching bomb decode — fire top-ranked eligible cells while the
+# trailing-window placed count lags the model's own expected bomb mass.
+v2_hazard_bomb_rate_decode = False
+v2_hazard_bomb_rate_seconds = 2.0   # trailing window for expected-vs-placed density
+v2_hazard_bomb_score_floor = 0.05   # minimum eligible-cell score to place at all
+v2_hazard_bomb_rate_factor = 0.0    # scales predicted mass; 0 = use calibrated threshold
+# Sample positions/arrows categories at this temperature (0 = argmax). Sampling
+# replaces the legacy random_note_map_factor mixture for note decoding.
+v2_note_sample_temperature = 0.9
 
 # V2 intensity postprocessing (generation only; training shares stay unchanged).
 v2_intensity_low_boost = 0.1  # fraction of the deficit below uniform density [0, 1]
@@ -116,6 +129,34 @@ allow_double_first_notes = False  # if False remove second note if necessary for
 # improve_timings_mcfactor = 2.5  # max change bandwidth (2 wide, 4+ narrow)
 # improve_timings_mcchange = 1.2   # max change time in seconds
 # improve_timings_act_time = 0.35  # min time gap to activate
+
+shift_blocks_left_right_flag = True  # shift notes off the previous note's column
+shift_blocks_middle_flag = True      # shift notes off the two center-middle cells
+shift_blocks_up_down_flag = True     # shift notes along the previous note's cut direction
+correct_notes_all_flag = True        # cross-hand static-position adjustment
+sanity_direction_recut_flag = True   # rewrite cut directions from movement reversal
+# V2 note cleanup relaxations applied only around the v2 legacy flow pass:
+# sampled model directions/positions are trusted more than the homogenizers.
+v2_cleanup_allow_dots = True       # effective allow_dot_notes during v2 cleanup
+v2_cleanup_flow_recut = False      # effective flow_model_flag during v2 cleanup
+v2_cleanup_lane_shift = False      # effective shift_blocks_left_right_flag during v2 cleanup
+v2_cleanup_sanity_recut = False    # effective sanity_direction_recut_flag during v2 cleanup
+v2_cleanup_add_dots = 0            # effective add_dot_notes percent during v2 cleanup
+v2_cleanup_middle_shift = True     # effective shift_blocks_middle_flag during v2 cleanup
+v2_cleanup_same_dir_recut = 0.5    # enforce >90° direction changes between separated same-hand
+                                   # notes (90° allowed with >=2-cell travel); 0 disables
+v2_cleanup_same_dir_gap = 0.1      # same-stroke exemption (s): closer notes may repeat a direction
+v2_cleanup_updown_shift = False    # effective shift_blocks_up_down_flag during v2 cleanup
+v2_cleanup_cross_hand_adjust = False  # effective correct_notes_all_flag during v2 cleanup
+v2_cleanup_edge_recut = False      # edge cuts are legal (swing may exit the grid); kept off
+v2_cleanup_cell_clash = True       # simultaneous notes must never share a cell (any hands)
+v2_cleanup_swing_clash = True      # no other-hand note in a cut's swept cells (approach+cut+exit)
+v2_cleanup_swing_window = .15      # forward horizon (s): a later-standing block still in reach
+v2_arrow_approach_prior = 0.6      # override arrow with deterministic approach direction when the
+                                   # hand approaches axis-aligned and model top prob is below this; 0 disables
+v2_arrows_variety = 0.5            # blend share of the reference bundle's arrows model at decode:
+                                   # 0 = production arrows only, 1 = reference arrows only
+v2_arrows_reference_bundle = "../Data/model/v2_expert_noterepair-c50"  # variety (history-corrupted) arrows
 
 add_waveform_pattern_flag = 0   # [0: off, 1: on, 2: double on]
 waveform_pattern = [
@@ -256,7 +297,7 @@ intensity_learning_rate = 5e-4
 intensity_n_epochs = 80
 intensity_batch_size = 1  # whole songs
 intensity_clipnorm = 1.0
-intensity_early_stopping_patience = 10
+intensity_early_stopping_patience = 5
 intensity_early_stopping_min_delta = 0.0
 intensity_monitor = 'val_loss'
 intensity_monitor_mode = 'min'  # min / max / auto
@@ -276,7 +317,7 @@ timing_learning_rate = 5e-4
 timing_n_epochs =80
 timing_batch_size = 8  # context windows
 timing_clipnorm = 1.0
-timing_early_stopping_patience = 10
+timing_early_stopping_patience = 5
 timing_early_stopping_min_delta = 0.0
 timing_monitor = 'val_loss'
 timing_monitor_mode = 'min'  # min / max / auto
@@ -302,7 +343,7 @@ notes_learning_rate = 5e-4
 notes_n_epochs = 80
 notes_batch_size = 128  # note events
 notes_clipnorm = 1.0
-notes_early_stopping_patience = 10
+notes_early_stopping_patience = 5
 notes_early_stopping_min_delta = 0.0
 notes_monitor = 'val_loss'
 notes_monitor_mode = 'min'  # min / max / auto
@@ -354,6 +395,14 @@ pipeline_v2_lighting_onset_threshold = 1.0
 pipeline_v2_arc_min_gap_seconds = 0.15
 pipeline_v2_arc_max_gap_seconds = 0.8
 pipeline_v2_max_candidates = 10000
+pipeline_v2_tolerance_seconds = 0.25  # sparse-stage window-matched evaluation
+pipeline_v2_hazard_context_seconds = 2.0  # note-space lookahead for hazard candidates
+pipeline_v2_hazard_context_back_seconds = 0.5  # note-space lookback for hazard candidates
+pipeline_v2_hazard_context_bins = 10  # equal bins spanning [now-back, now+forward)
+pipeline_v2_hazard_feasibility_input = True  # gated: legal wall/bomb masks as hazard model inputs
+# Experimental Arm F: factorized hazard bomb head — a query-level presence sigmoid
+# multiplied into cell scores at decode. Supervision is derived from cell targets.
+hazards_bomb_presence = True
 
 # Repaired sparse-stage targets; recorded in each new dataset, never applied to old artifacts.
 pipeline_v2_repair_sparse_stages = True
@@ -365,8 +414,8 @@ pipeline_v2_positive_weight_cap = 100.0
 pipeline_v2_metric_thresholds = 512
 
 # V2 training execution (does not alter model/data contracts)
-pipeline_v2_training_ram_cache_mib = 1024  # active stage only; zero streams every song
-pipeline_v2_training_prefetch_batches = 2  # bounded CPU producer; zero disables prefetch
+pipeline_v2_training_ram_cache_mib = 16384  # active stage only; zero streams every song
+pipeline_v2_training_prefetch_batches = 8  # bounded CPU producer; zero disables prefetch
 pipeline_v2_training_compile_steps = True
 pipeline_v2_training_log_every_batches = 100  # zero keeps epoch summaries only
 
@@ -376,7 +425,7 @@ positions_learning_rate = 0.001
 positions_n_epochs = 80
 positions_batch_size = 128
 positions_clipnorm = 1.0
-positions_early_stopping_patience = 10
+positions_early_stopping_patience = 5
 positions_early_stopping_min_delta = 0.0
 positions_monitor = 'val_loss'
 positions_monitor_mode = 'min'
@@ -391,6 +440,8 @@ positions_shared_dense_units = 128
 positions_activation = 'relu'
 positions_history_dropout = 0.1
 positions_loss_weights = {'red': 1.0, 'blue': 1.0}
+positions_history_corrupt_rate = 0.5
+positions_history_corrupt_drop = 0.5
 
 # V2 arrows: training and network parameters
 arrows_optimizer = 'Adam'
@@ -398,7 +449,7 @@ arrows_learning_rate = 0.0005
 arrows_n_epochs = 80
 arrows_batch_size = 128
 arrows_clipnorm = 1.0
-arrows_early_stopping_patience = 10
+arrows_early_stopping_patience = 5
 arrows_early_stopping_min_delta = 0.0
 arrows_monitor = 'val_loss'
 arrows_monitor_mode = 'min'
@@ -413,6 +464,8 @@ arrows_shared_dense_units = 128
 arrows_activation = 'relu'
 arrows_history_dropout = 0.1
 arrows_loss_weights = {'red': 1.0, 'blue': 1.0}
+arrows_history_corrupt_rate = 0.5
+arrows_history_corrupt_drop = 0.5
 
 # V2 multiplier: training and network parameters
 multiplier_optimizer = 'Adam'
@@ -420,7 +473,7 @@ multiplier_learning_rate = 0.0005
 multiplier_n_epochs = 80
 multiplier_batch_size = 128
 multiplier_clipnorm = 1.0
-multiplier_early_stopping_patience = 10
+multiplier_early_stopping_patience = 5
 multiplier_early_stopping_min_delta = 0.0
 multiplier_monitor = 'val_loss'
 multiplier_monitor_mode = 'min'
@@ -435,6 +488,8 @@ multiplier_shared_dense_units = 128
 multiplier_activation = 'relu'
 multiplier_history_dropout = 0.1
 multiplier_loss_weights = {'red': 1.0, 'blue': 1.0}
+multiplier_history_corrupt_rate = 0.0
+multiplier_history_corrupt_drop = 0.5
 
 # V2 hazards: training and network parameters
 hazards_optimizer = 'Adam'
@@ -442,7 +497,7 @@ hazards_learning_rate = 0.0005
 hazards_n_epochs = 80
 hazards_batch_size = 128
 hazards_clipnorm = 1.0
-hazards_early_stopping_patience = 10
+hazards_early_stopping_patience = 5
 hazards_early_stopping_min_delta = 0.0
 hazards_monitor = 'val_loss'
 hazards_monitor_mode = 'min'
@@ -457,6 +512,10 @@ hazards_shared_dense_units = 128
 hazards_activation = 'relu'
 hazards_history_dropout = 0.1
 hazards_loss_weights = {'wall': 1.0, 'bombs': 1.0}
+hazards_enabled_song_supervision = True
+hazards_history_corrupt_rate = 0.5
+hazards_history_corrupt_drop = 0.5
+hazards_negative_supervision_weight = 0.5
 
 # Experimental V2 lighting: not yet implemented for production (optional/deferred)
 lighting_optimizer = 'Adam'
@@ -464,7 +523,7 @@ lighting_learning_rate = 0.0005
 lighting_n_epochs = 80
 lighting_batch_size = 8
 lighting_clipnorm = 1.0
-lighting_early_stopping_patience = 10
+lighting_early_stopping_patience = 5
 lighting_early_stopping_min_delta = 0.0
 lighting_monitor = 'val_loss'
 lighting_monitor_mode = 'min'
@@ -486,7 +545,7 @@ arcs_learning_rate = 0.0005
 arcs_n_epochs = 80
 arcs_batch_size = 128
 arcs_clipnorm = 1.0
-arcs_early_stopping_patience = 10
+arcs_early_stopping_patience = 5
 arcs_early_stopping_min_delta = 0.0
 arcs_monitor = 'val_loss'
 arcs_monitor_mode = 'min'
@@ -502,6 +561,10 @@ arcs_activation = 'relu'
 arcs_history_dropout = 0.1
 arcs_loss_weights = {'attach': 1.0, 'shape': 1.0, 'anchor': 1.0}
 arcs_shape_bounds = (0.0, 2.0)  # mu/tmu; out-of-range source controls are masked and reported
+arcs_enabled_song_supervision = True
+arcs_history_corrupt_rate = 0.5
+arcs_history_corrupt_drop = 0.5
+arcs_negative_supervision_weight = 0.5
 
 # Event prediction model configuration
 event_learning_rate = 1e-3

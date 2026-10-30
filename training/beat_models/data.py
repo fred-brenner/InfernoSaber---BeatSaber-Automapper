@@ -31,10 +31,10 @@ def _objects(data, key, optional=False):
 def _info(path):
     info = _read_json(path)
     _version(info, ("2",), "Info.dat")
-    _check_timing(info)
     bpm = _number(info.get("_beatsPerMinute"), "BPM")
     if bpm <= 0:
         raise ValueError("BPM must be positive")
+    _check_timing(info, bpm)
     return info, bpm
 
 
@@ -42,7 +42,7 @@ def _note_records(path, bpm):
     """Read original colored records in source order; v3 scalars default to zero."""
     data = _read_json(Path(path))
     version = _version(data, ("2", "3"), "beatmap")
-    _check_timing(data)
+    _check_timing(data, bpm)
     for event in _objects(data, "_events" if version == "2" else "basicBeatmapEvents", True):
         if event.get("_type" if version == "2" else "et", 0) == 100:
             raise ValueError("Unsupported tempo change lighting event type 100")
@@ -307,7 +307,7 @@ def _tokens(song):
             *(source["path"] for source in song.metadata.get("sources", []) if source["role"] == "audio")}
 
 
-def assign_splits(songs, reserved=(), aliases=None, seed=SEED):
+def assign_splits(songs, reserved=(), aliases=None, seed=SEED, prior_splits=None):
     """Group byte/decoded duplicates and aliases before configured song splits.
 
     Alias groups are lists of source audio paths, hashes, or song IDs. A mapping
@@ -341,10 +341,15 @@ def assign_splits(songs, reserved=(), aliases=None, seed=SEED):
     identifiers = {group: hashlib.sha256("\n".join(sorted({token for song in members for token in
                    (song.metadata["audio_sha256"], song.metadata["decoded_sha256"])})).encode()).hexdigest()
                    for group, members in grouped.items()}
-    available = sorted((group for group in grouped if group not in reserved_groups), key=lambda group: identifiers[group])
+    prior_splits = prior_splits or {}
+    pinned = {group: prior_splits[identifiers[group]] for group in grouped
+              if group not in reserved_groups and prior_splits.get(identifiers[group]) in ("train", "validation", "test")}
+    fresh = sorted((group for group in grouped if group not in reserved_groups and group not in pinned),
+                   key=lambda group: identifiers[group])
     rng = np.random.default_rng(seed)
-    if available:
-        available = [available[index] for index in rng.permutation(len(available))]
+    if fresh:
+        fresh = [fresh[index] for index in rng.permutation(len(fresh))]
+    available = [*pinned, *fresh]
     count = len(available)
     _, validation_fraction, test_fraction = split_fractions()
     test_count = max(1, int(round(count * test_fraction))) if count >= 3 and test_fraction > 0 else 0
@@ -352,9 +357,12 @@ def assign_splits(songs, reserved=(), aliases=None, seed=SEED):
     # Rounding on small sets must still leave a training group.
     test_count = min(test_count, max(0, count - 1 - int(validation_count > 0)))
     validation_count = min(validation_count, max(0, count - test_count - 1))
-    splits = {}
-    for index, group in enumerate(available):
-        splits[group] = "test" if index < test_count else "validation" if index < test_count + validation_count else "train"
+    splits = dict(pinned)
+    need_test = max(0, test_count - sum(1 for split in pinned.values() if split == "test"))
+    need_validation = max(0, validation_count - sum(1 for split in pinned.values() if split == "validation"))
+    for index, group in enumerate(fresh):
+        splits[group] = ("test" if index < need_test else
+                         "validation" if index < need_test + need_validation else "train")
     for group, members in grouped.items():
         for song in members:
             song.metadata.update({"group_id": identifiers[group], "split": splits.get(group, "reserved")})
@@ -383,11 +391,27 @@ def _reserved_audio(root, report, audio_cache):
     return result
 
 
+def prior_splits_from_manifest(path):
+    """Read group_id -> split from an existing beat dataset manifest or directory."""
+    manifest = _read_json(Path(path) / "manifest.json" if Path(path).is_dir() else Path(path))
+    result = {}
+    for record in manifest.get("songs", []):
+        meta = record.get("metadata", {})
+        group = meta.get("group_id") or record.get("group_id")
+        split = meta.get("split") or record.get("split")
+        if group and split:
+            result[group] = split
+    for record in manifest.get("preparation", {}).get("songs", []):
+        if record.get("group_id") and record.get("split"):
+            result.setdefault(record["group_id"], record["split"])
+    return result
+
+
 def prepare_songs(source_root=None, prepared_root=None, dummy=False, reserved_root=None, aliases=None, seed=SEED,
-                  evaluation_only=False, difficulty=None):
+                  evaluation_only=False, difficulty=None, prior_splits=None):
     """Prepare raw packages or explicitly selected flattened sources, read-only."""
     report = {"schema_version": 1, "songs": [], "skipped": [], "reserved": [], "reserved_skipped": [],
-              "filename_fallbacks": [],
+              "filename_fallbacks": [], "duplicates": [],
               "warnings": [], "split_seed": seed, "split_ratio": list(split_fractions()),
               "overlap_policy": "audio_byte_hash_and_decoded_float32_hash_plus_explicit_aliases",
               "role": "evaluation" if evaluation_only else "training", "difficulty": difficulty}
@@ -399,24 +423,51 @@ def prepare_songs(source_root=None, prepared_root=None, dummy=False, reserved_ro
     else:
         if source_root is not None and prepared_root is not None:
             raise ValueError("Choose source_root or prepared_root")
-        if source_root is None and prepared_root is None:
-            from tools.config import paths
-            source_root = paths.bs_input_path or str(Path(paths.train_path) / "custom_bs_input")
-        root = Path(prepared_root if prepared_root is not None else source_root).expanduser().resolve()
-        if not root.is_dir():
-            raise ValueError(f"Input root does not exist: {root}")
-        report.update({"source_root": str(root), "adapter": "prepared" if prepared_root is not None else "raw"})
+        if prepared_root is not None:
+            roots = [Path(prepared_root).expanduser().resolve()]
+        else:
+            if source_root is None:
+                from tools.config import paths
+                source_root = paths.bs_input_path or str(Path(paths.train_path) / "custom_bs_input")
+            roots = [Path(root).expanduser().resolve()
+                     for root in (source_root if isinstance(source_root, (list, tuple)) else [source_root])]
+        for root in roots:
+            if not root.is_dir():
+                raise ValueError(f"Input root does not exist: {root}")
+        report.update({"source_roots": [str(root) for root in roots],
+                       "adapter": "prepared" if prepared_root is not None else "raw"})
+        if len(roots) == 1:
+            report["source_root"] = str(roots[0])
         audio_cache = {}
-        songs = (_prepared_songs(root, report, audio_cache) if prepared_root is not None else
-                 _raw_songs(root, report, audio_cache, difficulty))
+        songs = []
+        for root in roots:
+            songs.extend(_prepared_songs(root, report, audio_cache) if prepared_root is not None else
+                         _raw_songs(root, report, audio_cache, difficulty))
+        # Identical beatmap+audio payloads across roots repeat the same supervision.
+        seen, unique = {}, []
+        for song in songs:
+            beatmap = next((s for s in song.metadata["sources"] if s["role"] == "beatmap"), {})
+            audio = next((s for s in song.metadata["sources"] if s["role"] == "audio"), {})
+            digest = (beatmap.get("sha256"), audio.get("sha256"))
+            if all(digest) and digest in seen:
+                report["duplicates"].append({"song_id": song.song_id, "beatmap_sha256": digest[0],
+                                             "path": beatmap.get("path"), "kept_song_id": seen[digest]})
+                continue
+            if all(digest):
+                seen[digest] = song.song_id
+            unique.append(song)
+        songs = unique
         if reserved_root is None:
-            candidates = [root / "evaluate_beats" / "bs_map_input", root.parent / "evaluate_beats" / "bs_map_input"]
+            candidates = []
+            for root in roots:
+                candidates.extend([root / "evaluate_beats" / "bs_map_input",
+                                   root.parent / "evaluate_beats" / "bs_map_input"])
             from tools.config import paths
             candidates.extend([Path(paths.train_path) / "evaluate_beats" / "bs_map_input",
                                Path(__file__).resolve().parents[3] / "Data" / "training" / "evaluate_beats" / "bs_map_input"])
             reserved_root = next((candidate for candidate in candidates if candidate.is_dir()), None)
         reserved = _reserved_audio(Path(reserved_root).expanduser().resolve() if reserved_root is not None else None, report, audio_cache)
-        assign_splits(songs, reserved, aliases, seed)
+        assign_splits(songs, reserved, aliases, seed, prior_splits=prior_splits)
         kept = []
         for song in songs:
             if song.metadata["split"] == "reserved":
@@ -435,6 +486,7 @@ def prepare_songs(source_root=None, prepared_root=None, dummy=False, reserved_ro
                         "unique_onsets": song.metadata["unique_onset_count"]} for song in songs]
     report.update({"success_count": len(songs), "skip_count": len(report["skipped"]),
                    "reserved_count": len(report["reserved"]),
+                   "duplicate_count": len(report["duplicates"]),
                    "group_count": len({song.metadata["group_id"] for song in songs})})
     return songs, report
 

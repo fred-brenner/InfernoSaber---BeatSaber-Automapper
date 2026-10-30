@@ -171,6 +171,7 @@ def test_repaired_stage_selection_does_not_change_upstream_notes_or_contract_ide
     monkeypatch.setattr(config, "slider_movement_minimum", 0.)
     frozen, legacy = _settings(), _settings()
     legacy.pop("stage_policies")
+    legacy["hazard_feasibility_input"] = False
     repaired = _generate(_song(), frozen)
     old = _generate(_song(), legacy)
     assert repaired.state["notes"] == old.state["notes"]

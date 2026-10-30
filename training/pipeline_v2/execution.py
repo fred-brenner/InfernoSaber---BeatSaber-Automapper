@@ -33,13 +33,15 @@ class StageExecution:
         heads = architecture_settings(stage)["loss_weights"]
         if set(preview.targets) != set(heads) or set(preview.weights) != set(heads):
             raise ValueError("Stage execution requires every configured target and weight head")
+        emitted = set(models.loss_components(stage, preview.targets,
+                                             model(preview.inputs, training=False), preview.weights))
         variables = getattr(model, "trainable_variables", ())
         with tf.device(variables[0].device if variables else None):
             self._totals = {head: tf.Variable(tf.zeros(2, tf.float64), trainable=False,
                                               name=f"{stage}_{head}_loss_totals")
-                            for head in heads}
+                            for head in emitted}
         self._unweighted_totals = {head: tf.Variable(tf.zeros(2, tf.float64), trainable=False)
-                                   for head in heads} if balance is not None else self._totals
+                                   for head in emitted} if balance is not None else self._totals
         self._steps = 0
         self._compiled = compiled
         self.metrics = None

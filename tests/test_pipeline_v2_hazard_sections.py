@@ -185,6 +185,153 @@ def test_decoder_rejects_colliding_wall_and_bomb_without_suppressing_other_lane(
         decoder.step(queries[0])
 
 
+def test_feasible_wall_classes_and_masked_rollout_suppress_infeasible_argmax():
+    opts = {**options(obstacle_time_gap=[0., 0.]), "hazard_feasibility_decode": True}
+    state = {"notes": [{"time": .05, "x": 0, "y": 1, "hand": 0, "d": 8}], "chains": []}
+    decoder = SectionDecoder(state, .25, VOCAB, opts)
+    wall_query = next(query for query in candidates(.25, 120., opts) if query["kind"] == "wall")
+    assert decoder.feasible_wall_classes(wall_query).tolist() == [True, False, True]
+
+    def predict(inputs):
+        return {"wall": np.asarray([[0., 1., 0.]]), "bombs": np.asarray([np.ones(12)])}
+
+    result = rollout(song(), state, VOCAB, opts, predict)
+    assert result["wall_mask_redirects"] == 1 and result["final_walls"] == 1
+    assert [(item["time"], item["end_time"]) for item in state["walls"]] == [(.125, 2.)]
+    assert result["feasibility_masked"] and result["bomb_cells_masked"] > 0
+    assert all(bomb["time"] != .05 or (bomb["x"], bomb["y"]) != (0, 1) for bomb in state["bombs"])
+
+
+def test_feasibility_inputs_emitted_from_decoder_state_in_examples_and_rollout():
+    opts = {**options(obstacle_time_gap=[0., 0.]), "hazard_feasibility_input": True}
+    state = {"notes": [{"time": .05, "x": 0, "y": 1, "hand": 0, "d": 8}], "chains": []}
+    examples, _ = build_examples(song(), state, VOCAB, opts)
+    wall, bombs = examples.inputs["feasible_wall"], examples.inputs["feasible_bombs"]
+    assert wall.shape == (len(examples.times), len(VOCAB["walls"]))
+    assert bombs.shape == (len(examples.times), 12)
+    # First wall query collides at x=0; bomb query carries the trivial wall mask.
+    assert wall[0].tolist() == [1., 0., 1.]
+    assert wall[1].tolist() == [1., 0., 0.]
+    assert bombs[1, 4] == 0.  # cell under the note at x=0, y=1
+    legacy_opts = {**options(obstacle_time_gap=[0., 0.]), "hazard_feasibility_input": False}
+    legacy, _ = build_examples(song(), {"notes": state["notes"], "chains": []}, VOCAB, legacy_opts)
+    assert "feasible_wall" not in legacy.inputs
+
+    supplied = []
+    def predict(inputs):
+        supplied.append(inputs)
+        return {"wall": np.asarray([[0., 1., 0.]]), "bombs": np.asarray([np.ones(12)])}
+
+    rollout(song(), {"notes": [dict(state["notes"][0])], "chains": []}, VOCAB, opts, predict)
+    assert supplied[0]["feasible_wall"].tolist() == [[1., 0., 1.]]
+    assert supplied[0]["feasible_bombs"].shape == (1, 12)
+
+
+def test_bomb_rate_matching_fires_only_while_window_deficit_exists():
+    opts = {**options(obstacle_time_gap=[0., 0.]),
+            "hazard_bomb_rate_decode": True, "hazard_bomb_rate_seconds": .4,
+            "bomb_rate_factor": .5, "bomb_score_floor": .05, "bomb_rate_max_per_query": 2}
+    state = {"notes": [], "chains": []}
+
+    def predict(inputs):
+        # One hot cell (9) plus a modest cell (4); the rest ~zero.
+        probs = np.full(12, .01)
+        probs[9], probs[4] = .9, .4
+        return {"wall": np.asarray([[0., 1., 0.]]), "bombs": np.asarray([probs])}
+
+    result = rollout(song(duration=1.), state, VOCAB, opts, predict)
+    assert result["bomb_rate_matching"] and result["bomb_rate_factor"] == .5
+    placed = [(bomb["time"], 4 * bomb["y"] + bomb["x"]) for bomb in state["bombs"]]
+    # factor .5 x ~1.3 mass/query fires ~1 bomb every other query until caught up;
+    # the hot cell always wins the ranking inside its window.
+    assert placed and all(cell == 9 for _, cell in placed)
+    assert len(placed) < len([q for q in candidates(1., 120., opts) if q["kind"] == "bomb"])
+    # rate-matching off: the same scores under a .5 threshold flood every query.
+    legacy = rollout(song(duration=1.), {"notes": [], "chains": []}, VOCAB,
+                     {**opts, "hazard_bomb_rate_decode": False, "bomb_threshold": .5}, predict)
+    assert not legacy["bomb_rate_matching"]
+    assert legacy["bomb_proposals"] > result["bomb_proposals"]
+
+
+def test_bomb_rate_matching_respects_eligible_and_floor():
+    opts = {**options(obstacle_time_gap=[0., 0.]),
+            "hazard_bomb_rate_decode": True, "hazard_bomb_rate_seconds": .5,
+            "bomb_rate_factor": 1., "bomb_score_floor": .5}
+    # note at (0,1) makes that cell ineligible at t=0; hot cell (3,2)=11 stays clear.
+    state = {"notes": [{"time": .05, "x": 0, "y": 1, "hand": 0, "d": 8}], "chains": []}
+
+    def predict(inputs):
+        probs = np.zeros(12)
+        probs[4], probs[11] = .95, .9   # 4 is under the note -> ineligible; 11 clear
+        return {"wall": np.asarray([[0., 1., 0.]]), "bombs": np.asarray([probs])}
+
+    result = rollout(song(duration=.5), state, VOCAB, opts, predict)
+    placed = {4 * bomb["y"] + bomb["x"] for bomb in state["bombs"]}
+    assert 4 not in placed and (not placed or placed <= {11})
+    # Below-floor scores never fire even with a large deficit.
+    low = rollout(song(duration=.5), {"notes": [dict(state["notes"][0])], "chains": []}, VOCAB,
+                  {**opts, "bomb_score_floor": .99}, predict)
+    assert low["final_bombs"] == 0
+
+
+def test_bomb_presence_scales_cell_scores_at_decode():
+    opts = {**options(obstacle_time_gap=[0., 0.]), "bomb_threshold": .5}
+    state = {"notes": [], "chains": []}
+    probs = np.zeros(12)
+    probs[9] = .8
+
+    def predict_factory(presence):
+        def predict(inputs):
+            out = {"wall": np.asarray([[0., 1., 0.]]), "bombs": np.asarray([probs])}
+            if presence is not None:
+                out["bomb_presence"] = np.asarray([[presence]])
+            return out
+        return predict
+
+    full = rollout(song(duration=.5), {"notes": [], "chains": []}, VOCAB, opts, predict_factory(1.))
+    gated = rollout(song(duration=.5), {"notes": [], "chains": []}, VOCAB, opts, predict_factory(.4))
+    legacy = rollout(song(duration=.5), {"notes": [], "chains": []}, VOCAB, opts, predict_factory(None))
+    assert full["bomb_proposals"] > 0 and legacy["bomb_proposals"] == full["bomb_proposals"]
+    assert gated["bomb_proposals"] == 0  # .8 * .4 = .32 < .5
+
+
+def test_bomb_presence_head_emits_and_derives_loss():
+    from training.pipeline_v2 import models
+
+    shapes = {"audio": (1, 16), "history": (1, 32, 13), "history_age": (1, 32, 1), "history_mask": (1, 32),
+              "conditions": (1, 6), "occupancy": (1, 2, 2, 12), "interval": (1, 2),
+              "feasible_wall": (1, 3), "feasible_bombs": (1, 12)}
+    model = models.build_model("hazards", VOCAB, input_shapes=shapes, bomb_presence=True)
+    assert "bomb_presence" in model.output_names
+    batch = {key: np.zeros((2,) + value[1:], np.float32) for key, value in shapes.items()}
+    predicted = model(batch, training=False)
+    assert predicted["bomb_presence"].shape == (2, 1)
+
+    targets = {"wall": np.zeros(2, np.int32), "bombs": np.zeros((2, 12), np.float32)}
+    weights = {"wall": np.ones(2, np.float32), "bombs": np.ones((2, 12), np.float32)}
+    targets["bombs"][0, 3] = 1.
+    components = models.loss_components("hazards", targets, predicted, weights)
+    assert set(components) == {"wall", "bombs", "bomb_presence"}
+    assert np.isfinite(float(models.combine_loss_components("hazards", components)))
+    legacy = models.build_model("hazards", VOCAB, input_shapes=shapes)
+    assert "bomb_presence" not in legacy.output_names
+    with pytest.raises(ValueError, match="hazards model only"):
+        models.build_model("arcs", bomb_presence=True)
+
+
+def test_unmasked_rollout_keeps_legacy_reject_flow():
+    opts = options(obstacle_time_gap=[0., 0.])
+    state = {"notes": [{"time": .05, "x": 0, "y": 1, "hand": 0, "d": 8}], "chains": []}
+
+    def predict(inputs):
+        return {"wall": np.asarray([[0., 1., 0.]]), "bombs": np.asarray([np.ones(12)])}
+
+    result = rollout(song(), state, VOCAB, opts, predict)
+    assert not result["feasibility_masked"]
+    assert result["section_rejections"].get("note_or_chain_collision", 0) > 0
+    assert result["section_rejections"].get("bomb_clearance", 0) > 0
+
+
 def test_ignored_bomb_with_known_cell_masks_only_that_cell():
     source = song(ignored=[{"id": "bad", "family": "bombs", "time": .5, "x": 2, "y": 0}])
     examples, _ = build_examples(source, {}, VOCAB, options())

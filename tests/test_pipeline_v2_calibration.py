@@ -89,6 +89,18 @@ def test_class_masks_exclude_unknown_values_from_decoded_positive_metrics():
     assert report["diagnostics"]["events"] == 10
 
 
+def test_tolerant_match_pairs_within_window_and_exact_fields():
+    match = calibration._tolerant_match(
+        [{"time": 1., "end_time": 1.5}, {"time": 2., "end_time": 2.5}],
+        [{"time": 1.1, "end_time": 1.4}, {"time": 5., "end_time": 5.5}], .25, ("time", "end_time"))
+    assert (match["true_positive"], match["false_positive"], match["false_negative"]) == (1., 1., 1.)
+    match = calibration._tolerant_match([{"time": 1., "cell": 3}], [{"time": 1.01, "cell": 4}], .25, ("time",), ("cell",))
+    assert match["true_positive"] == 0. and match["false_negative"] == 1.
+    # Each reference matches at most one prediction.
+    match = calibration._tolerant_match([{"time": 1.}], [{"time": .9}, {"time": 1.1}], .25)
+    assert (match["true_positive"], match["false_positive"], match["false_negative"]) == (1., 1., 0.)
+
+
 def test_arc_replay_none_history_is_zero_and_equal_time_queries_are_causal(monkeypatch):
     notes = [{"id": 0, "time": 0., "hand": 0}, {"id": 1, "time": .3, "hand": 0},
              {"id": 2, "time": .6, "hand": 0}, {"id": 3, "time": 0., "hand": 1},
@@ -136,6 +148,32 @@ def test_arc_rejected_proposals_do_not_feed_unused_geometry_and_probability_is_d
     assert np.all(seen[1]["history"] == 0)
     assert report["diagnostics"]["clearance_rejections"] == 2
     assert report["diagnostics"]["slider_probability"] == 1.
+    assert report["tolerance_seconds"] == .25
+    assert report["tolerant"]["attach"]["reference_positives"] == 2
+    assert report["tolerant"]["attach"]["predicted_positives"] == 0
+
+
+def test_arc_replay_window_tolerant_attach_matches_nearby_predictions(monkeypatch):
+    notes = [{"id": 0, "time": 0., "hand": 0}, {"id": 1, "time": .3, "hand": 0}, {"id": 2, "time": .6, "hand": 0}]
+    timeline = np.asarray([0., .3])
+    inputs = {"audio": np.zeros((2, 16), np.float32), "history": np.zeros((2, 4, 4), np.float32),
+              "history_mask": np.zeros((2, 4), bool), "history_age": np.zeros((2, 4, 1), np.float32),
+              "conditions": np.zeros((2, 6), np.float32)}
+    examples = StageExamples(inputs, {"attach": np.asarray([1, 0], np.int32),
+                                      "shape": np.ones((2, 2), np.float32), "anchor": np.zeros(2, np.int32)},
+                             {"attach": np.ones(2), "shape": np.ones(2), "anchor": np.ones(2)}, timeline)
+    song = _song("arcs", examples)
+    monkeypatch.setattr(calibration, "_reference_state", lambda *args, **kwargs: {"notes": deepcopy(notes), "arcs": []})
+    monkeypatch.setattr(calibration, "_arc_validator", lambda *args, **kwargs: None)
+
+    def predictor(values):
+        return {"attach": np.asarray([[.1, .9]]), "shape": np.asarray([[1.7, 1.4]]), "anchor": np.asarray([[0., 0., 1.]])}
+
+    report = calibration.replay_stage(song, "arcs", predictor, VOCAB, _options(), .5)
+    tolerant = report["tolerant"]["attach"]
+    assert tolerant["reference_positives"] == 1
+    assert tolerant["predicted_positives"] == 2
+    assert (tolerant["true_positive"], tolerant["false_positive"], tolerant["false_negative"]) == (1., 1., 0.)
 
 
 def test_hazard_calibration_leaves_wall_argmax_and_scores_final_cleared_objects(monkeypatch):

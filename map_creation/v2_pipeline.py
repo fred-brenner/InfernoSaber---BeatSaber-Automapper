@@ -109,6 +109,35 @@ def _biased(outputs, classes, factor, rng):
     return result
 
 
+def _sample_category(probabilities, temperature, rng):
+    """Sample one index from a categorical distribution; nonpositive temperature argmaxes."""
+    probs = np.asarray(probabilities, np.float64)
+    if not np.isfinite(probs).all() or (probs < 0).any() or not probs.sum() > 0:
+        raise ValueError("Invalid note category probabilities")
+    if temperature <= 0:
+        return int(probs.argmax())
+    scaled = np.power(probs / probs.sum(), 1. / temperature)
+    scaled /= scaled.sum()
+    return int(rng.choice(len(scaled), p=scaled))
+
+
+def _decode_positions_sampled(outputs, count, temperature, rng):
+    """Sample position categories while preserving the required note count.
+
+    A single-note event samples jointly over the 24 hand/cell combinations,
+    weighted exactly like the count-one argmax rule; a two-note event samples
+    each hand's cell independently.
+    """
+    red = _distribution(outputs["red"], (1, 13), "red position")[0]
+    blue = _distribution(outputs["blue"], (1, 13), "blue position")[0]
+    if count == 2:
+        return (1 + _sample_category(red[1:], temperature, rng),
+                1 + _sample_category(blue[1:], temperature, rng))
+    weights = np.concatenate([red[1:] * blue[0], red[0] * blue[1:]])
+    choice = _sample_category(weights, temperature, rng)
+    return (choice + 1, 0) if choice < 12 else (0, choice - 11)
+
+
 def _inputs(stage, song, state, candidate, history, encoder, settings):
     length = max(settings["history_length"], settings["lighting_block_length"])
     prior = [record for record in history if record["time"] < candidate["time"]][-length:]
@@ -129,6 +158,26 @@ def _rejections(total, diagnostics):
             total[key] = total.get(key, 0) + value
 
 
+_DIRECTION_VECTORS = {0: (0, 1), 1: (0, -1), 2: (-1, 0), 3: (1, 0),
+                      4: (-1, 1), 5: (1, 1), 6: (-1, -1), 7: (1, -1), 8: (0, 0)}
+
+
+def _approach_snap(exit_state, note):
+    """Deterministic cut prior: the direction an axis-aligned hand approach implies."""
+    if exit_state is None:
+        return None
+    vx, vy, last_dir = exit_state
+    dx, dy = note["x"] - vx, note["y"] - vy
+    for _ in range(6):
+        if dx or dy:
+            break
+        vx, vy = vx + _DIRECTION_VECTORS[last_dir][0], vy + _DIRECTION_VECTORS[last_dir][1]
+        dx, dy = note["x"] - vx, note["y"] - vy
+    if dx == 0 and dy == 0 or (dx != 0 and dy != 0):
+        return None  # unresolved or diagonal approach — the model decides
+    return (0 if dy > 0 else 1) if dx == 0 else (3 if dx > 0 else 2)
+
+
 def _atomic_expand(state, anchor, template, duration, rejected):
     """Reject a whole invalid/duplicate expansion and preserve every anchor."""
     if template.get("kind", "none") == "none":
@@ -138,12 +187,18 @@ def _atomic_expand(state, anchor, template, duration, rejected):
     _expand(trial, anchor, template, duration, errors)
     added = trial["notes"][len(state["notes"]):]
     occupied = {(round(note["time"], 8), note["x"], note["y"]) for note in state["notes"]}
+    occupied_hands = {(round(note["time"], 8), note["hand"]) for note in state["notes"]}
     for note in added:
         key = (round(note["time"], 8), note["x"], note["y"])
+        hand_key = (round(note["time"], 8), note["hand"])
+        if hand_key in occupied_hands:
+            errors.append({"anchor_id": anchor["id"], "reason": "duplicate same-hand expansion"})
+            break
         if key in occupied:
             errors.append({"anchor_id": anchor["id"], "reason": "duplicate expansion occupancy"})
             break
         occupied.add(key)
+        occupied_hands.add(hand_key)
     for chain in trial["chains"][len(state["chains"]):]:
         if any(existing["anchor_id"] == chain["anchor_id"] for existing in state["chains"]):
             errors.append({"anchor_id": anchor["id"], "reason": "duplicate chain anchor"})
@@ -231,6 +286,10 @@ def generate(song, requested_nps, predictors, encoder, settings, vocabularies, *
     rng = np.random.default_rng() if rng is None else rng
     duration, bpm = float(song.metadata["duration"]), float(song.metadata["bpm"])
     options = deepcopy(settings)
+    temperature = float(options.get("note_sample_temperature", 0.) or 0.)
+    if not np.isfinite(temperature) or temperature < 0:
+        raise ValueError("Note sample temperature must be finite and nonnegative")
+    sampling = temperature > 0
     options["vocabularies"] = vocabularies
     schedule = options["schedule"]
     status = "dummy" if all(getattr(predictor, "status", "trained") == "dummy"
@@ -239,7 +298,8 @@ def generate(song, requested_nps, predictors, encoder, settings, vocabularies, *
                             diagnostics={"requested_retained_nps": float(requested_nps),
                                          "duration_seconds": duration, "bpm": bpm,
                                          "rejected_expansions": [], "export_ready": False,
-                                         "random_factor": factor, "scheduler": deepcopy(schedule)})
+                                         "random_factor": factor, "note_sample_temperature": temperature,
+                                         "scheduler": deepcopy(schedule)})
     state = result.state
     raw = result.diagnostics["raw_decisions"] = {
         "position_events": 0, "position_notes": 0, "arrow_notes": 0,
@@ -271,7 +331,10 @@ def generate(song, requested_nps, predictors, encoder, settings, vocabularies, *
     history, length = [], options["history_length"]
     for index, candidate in enumerate(candidates):
         output = _predict(predictors["positions"], _inputs("positions", song, state, candidate, history, encoder, options))
-        pair = _decode_positions(_biased(output, 13, factor, rng), candidate["count"])
+        if sampling:
+            pair = _decode_positions_sampled(_biased(output, 13, 0, rng), candidate["count"], temperature, rng)
+        else:
+            pair = _decode_positions(_biased(output, 13, factor, rng), candidate["count"])
         for hand, category in enumerate(pair):
             if category:
                 cell = category - 1
@@ -284,19 +347,42 @@ def generate(song, requested_nps, predictors, encoder, settings, vocabularies, *
     raw.update(position_events=len(candidates), position_notes=len(state["notes"]))
     started = perf_counter()
     index_state(state)
-    history = []
+    history, kinematics = [], {}
+    approach_prior = float(getattr(config, "v2_arrow_approach_prior", 0.) or 0.)
+    approach_overrides = 0
+    arrows_reference = predictors.get("arrows_reference")
+    arrows_variety = float(getattr(config, "v2_arrows_variety", 0.) or 0.) if arrows_reference is not None else 0.
+    variety_picks = 0
     for index, candidate in enumerate(candidates):
-        output = _biased(_predict(predictors["arrows"], _inputs("arrows", song, state, candidate, history, encoder, options)), 9, factor, rng)
+        inputs = _inputs("arrows", song, state, candidate, history, encoder, options)
+        # Per-event model pick interpolates the resulting statistics exactly;
+        # mixing softmaxes would flatten disagreement and overshoot the tails.
+        model = (arrows_reference if arrows_variety > 0 and rng.random() < arrows_variety
+                 else predictors["arrows"])
+        variety_picks += int(model is arrows_reference)
+        output = _biased(_predict(model, inputs), 9, 0 if sampling else factor, rng)
         pair = [9, 9]
         for hand in (0, 1):
             times, track = state["_tracks"][hand]
             location = int(np.searchsorted(times, candidate["time"]))
             if location < len(track) and track[location]["time"] == candidate["time"]:
-                direction = int(output[("red", "blue")[hand]][0].argmax())
-                track[location]["d"] = direction
+                probabilities = output[("red", "blue")[hand]][0]
+                direction = (_sample_category(probabilities, temperature, rng)
+                             if sampling else int(probabilities.argmax()))
+                prior = _approach_snap(kinematics.get(hand), track[location])
+                if prior is not None and float(probabilities.max()) < approach_prior:
+                    direction = prior
+                    approach_overrides += 1
+                note = track[location]
+                note["d"] = direction
                 pair[hand] = direction
+                vector = _DIRECTION_VECTORS[direction]
+                kinematics[hand] = (note["x"] + vector[0], note["y"] + vector[1],
+                                    direction if direction != 8 else (kinematics.get(hand) or (0, 0, 1))[2])
         _history(history, {"time": candidate["time"], "value": pair}, length)
         _progress(logger, "arrows", index, len(candidates))
+    raw["arrow_approach_overrides"] = approach_overrides
+    raw["arrow_variety"] = round(variety_picks / len(candidates), 4) if candidates else 0.
     result.stages["arrows"] = {"directed_notes": len(state["notes"])}
     raw["arrow_notes"] = len(state["notes"])
     state["raw_model_notes"] = np.asarray([[note[key] for key in ("id", "time", "hand", "x", "y", "d")]
@@ -345,6 +431,11 @@ def generate(song, requested_nps, predictors, encoder, settings, vocabularies, *
     _rejections(expansion_rejections, result.diagnostics["expansion_clearance"])
     result.diagnostics["expansion_clearance"].update(expansion_rejections)
     result.stages["multiplier"]["elapsed_seconds"] = perf_counter() - started
+    enforce_flow = getattr(postprocessors, "enforce_note_flow_and_clearance", None)
+    if enforce_flow is not None:
+        clearance = enforce_flow(state["notes"], state["chains"])
+        result.diagnostics["same_direction_notes_flipped"] = clearance["flow_recuts"]
+        result.diagnostics["note_clearance"] = clearance
     started = perf_counter()
     index_state(state)
     if repaired(options, "hazards"):

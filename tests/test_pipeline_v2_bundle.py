@@ -233,8 +233,10 @@ def test_new_directory_and_explicit_calibration_are_required(tmp_path):
             assemble_bundle(base, {"lighting": artifact}, {"lighting": sidecar}, output)
     with pytest.raises(ValueError, match="requires its validation calibration"):
         assemble_bundle(base, {"lighting": artifact}, {}, tmp_path / "no-calibration")
-    with pytest.raises(ValueError, match="explicit hazards, arcs or lighting"):
-        assemble_bundle(base, {"positions": artifact}, {"positions": sidecar}, tmp_path / "upstream-change")
+    with pytest.raises(ValueError, match="explicit hazards, arcs, lighting or note-stage"):
+        assemble_bundle(base, {"timing": artifact}, {"timing": sidecar}, tmp_path / "upstream-change")
+    with pytest.raises(ValueError, match="requires its validation calibration"):
+        assemble_bundle(base, {"positions": artifact}, {"positions": sidecar}, tmp_path / "note-calibration")
     assert _hashes(base) == before
 
 

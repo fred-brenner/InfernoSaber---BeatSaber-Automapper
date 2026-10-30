@@ -56,6 +56,12 @@ def stage_data(settings, stage):
         result["lighting_onset_threshold"] = settings.get("schedule", {}).get("lighting_onset_threshold", 1.)
     if stage == "hazards":
         result["occupancy_clearance_seconds"] = settings.get("schedule", {}).get("clearance_seconds", .1)
+        schedule = settings.get("schedule", {})
+        if float(schedule.get("hazard_context_seconds", 0.) or 0.) > 0 and int(schedule.get("hazard_context_bins", 0) or 0) > 0:
+            for key in ("hazard_context_seconds", "hazard_context_back_seconds", "hazard_context_bins"):
+                result[key] = schedule.get(key)
+        if settings.get("hazard_feasibility_input"):
+            result["hazard_feasibility_input"] = True
     if stage in SPARSE_STAGES:
         result["policy_version"] = 2 if repaired(settings, stage) else 1
         if repaired(settings, stage):

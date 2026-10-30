@@ -120,8 +120,10 @@ validity mask; its patch excludes the extra volume/onset channels.
 and ordinary v2/v3 colored notes, or an explicitly selected prepared-triple
 adapter. Prepared inputs record that original difficulty/characteristic
 provenance may be unverified. BPM must be positive and constant, with zero
-offset/shuffle. Unsupported versions, tempo changes, direction-angle offsets,
-geometry, missing files, and decoding failures are skipped individually.
+offset/shuffle; restatements that only repeat the base tempo are accepted,
+while real tempo changes still fail. Unsupported versions, tempo changes,
+direction-angle offsets, geometry, missing files, and decoding failures are
+skipped individually.
 The [training guide](beat-model-training.md) documents filename compatibility
 and the remaining import limits.
 

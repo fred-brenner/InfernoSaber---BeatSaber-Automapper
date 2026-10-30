@@ -16,7 +16,8 @@ def parser():
     prepare = sub.add_parser("prepare", help="Extract and normalize an independent dataset")
     source = prepare.add_mutually_exclusive_group()
     source.add_argument("--dummy", action="store_true")
-    source.add_argument("--source-root")
+    source.add_argument("--source-root", action="append",
+                        help="Raw package root; repeat to ingest several folders")
     source.add_argument("--prepared-root")
     prepare.add_argument("--output", required=True)
     prepare.add_argument("--reserved-root", help="Curated evaluation packages excluded from learning")
@@ -24,6 +25,8 @@ def parser():
     prepare.add_argument("--evaluation-only", action="store_true", help="Keep curated recordings as test-only examples; requires existing normalization")
     prepare.add_argument("--difficulty", help="Select a raw Standard difficulty, for example ExpertPlus")
     prepare.add_argument("--aliases", help="JSON recording alias groups or alias-to-canonical mapping")
+    prepare.add_argument("--splits-from", help="Existing beat dataset/manifest; pin its recording splits "
+                                               "and assign only new groups")
     prepare.add_argument("--seed", type=int, default=SEED)
     validate = sub.add_parser("validate", help="Check persisted arrays, hashes and representation")
     validate.add_argument("--dataset", required=True)
@@ -102,14 +105,18 @@ def main(argv=None):
     command = parser()
     args = command.parse_args(argv)
     if args.command == "prepare":
-        from .data import prepare_songs
+        from .data import prepare_songs, prior_splits_from_manifest
         from .features import fit_normalization, normalize_songs
         if args.evaluation_only and not args.normalization_from:
             command.error("--evaluation-only requires --normalization-from; evaluation songs cannot fit statistics")
         aliases = read_json(args.aliases) if args.aliases else None
+        prior_splits = prior_splits_from_manifest(args.splits_from) if args.splits_from else None
         songs, report = prepare_songs(source_root=args.source_root, prepared_root=args.prepared_root,
                                      dummy=args.dummy, reserved_root=args.reserved_root, seed=args.seed,
-                                     aliases=aliases, evaluation_only=args.evaluation_only, difficulty=args.difficulty)
+                                     aliases=aliases, evaluation_only=args.evaluation_only, difficulty=args.difficulty,
+                                     prior_splits=prior_splits)
+        if args.splits_from:
+            report["splits_from"] = args.splits_from
         for key in ("skipped", "reserved_skipped"):
             for skip in report.get(key, []):
                 print(f"Skipped: {skip}")

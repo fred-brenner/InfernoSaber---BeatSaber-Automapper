@@ -54,6 +54,10 @@ def preparation_defaults(settings=None):
         if settings is not None and "stage_policies" not in settings:
             defaults.pop("stage_policies", None)
         defaults.update(settings or {})
+        from .policies import repaired
+        if not repaired(defaults, "hazards") and "hazard_feasibility_input" not in (settings or {}):
+            # Config-inherited masks need the repaired policy's decoder; explicit flags stay.
+            defaults.pop("hazard_feasibility_input", None)
     for key in ("history_length", "lighting_block_length", "encoder_batch_size",
                 "max_multiplier_templates", "max_wall_templates", "max_light_classes",
                 "max_copies", "max_chain_slices"):
@@ -250,19 +254,36 @@ def build_inputs(stage, song, state, candidate, own_history, encoder=None, setti
         end = float(candidate.get("end_time", now))
         occupancy = np.zeros((1, 2, 2, 12), np.float32)
         radius = float(options["schedule"].get("clearance_seconds", .1))
+        forward = float(options["schedule"].get("hazard_context_seconds", 0.) or 0.)
+        back = float(options["schedule"].get("hazard_context_back_seconds", 0.) or 0.)
+        bins = int(options["schedule"].get("hazard_context_bins", 0) or 0)
+        context = np.zeros((1, bins, 2, 12), np.float32) if forward > 0 and bins > 0 else None
         if "_occupancy" in state:
             timestamps, occupancy_notes = state["_occupancy"]
-            lo, hi = np.searchsorted(timestamps, [now - radius, end + radius], side="left")
-            hi = int(np.searchsorted(timestamps, end + radius, side="right"))
-            occupancy_notes = occupancy_notes[int(lo):hi]
+            lo = int(np.searchsorted(timestamps, min(now, end) - max(radius, back), side="left"))
+            hi = int(np.searchsorted(timestamps, max(end + radius, now + forward), side="right"))
+            occupancy_notes = occupancy_notes[lo:hi]
         else:
             occupancy_notes = expansion_occupancy_notes(state)
         for item in occupancy_notes:
+            x, y = int(np.clip(round(item["x"]), 0, 3)), int(np.clip(round(item["y"]), 0, 2))
             if now - radius <= item["time"] <= end + radius:
                 side = 0 if item["time"] < now else 1
-                x, y = int(np.clip(round(item["x"]), 0, 3)), int(np.clip(round(item["y"]), 0, 2))
                 occupancy[0, side, int(item["hand"]), 4 * y + x] = 1.
+            if context is not None:
+                index = int((item["time"] - now + back) / ((forward + back) / bins))
+                if 0 <= index < bins:
+                    context[0, index, int(item["hand"]), 4 * y + x] = 1.
         out.update({"occupancy": occupancy, "interval": np.asarray([[now, end]], np.float32)})
+        if context is not None:
+            out["context"] = context
+        if options.get("hazard_feasibility_input"):
+            wall_mask = candidate.get("_feasible_wall")
+            bomb_mask = candidate.get("_feasible_bombs")
+            if wall_mask is None or bomb_mask is None:
+                raise ValueError("Hazard feasibility inputs require per-query masks")
+            out["feasible_wall"] = np.asarray(wall_mask, np.float32).reshape(1, -1)
+            out["feasible_bombs"] = np.asarray(bomb_mask, np.float32).reshape(1, 12)
     elif stage == "arcs":
         ids = candidate.get("endpoint_ids", candidate.get("note_ids", []))
         if len(ids) != 2:
@@ -320,6 +341,16 @@ def validate_examples(examples, stage):
         elif stage == "hazards":
             target_shapes = {"wall": (count,), "bombs": (count, 12)}
             shapes.update(occupancy=(count, 2, 2, 12), interval=(count, 2))
+            context = examples.inputs.get("context")
+            if context is not None:
+                if context.ndim != 4 or context.shape[0] != count or context.shape[2:] != (2, 12):
+                    raise ValueError("Hazard context requires [N,T,2,12]")
+                shapes["context"] = context.shape
+            feasible = examples.inputs.get("feasible_wall")
+            if feasible is not None:
+                if feasible.ndim != 2 or feasible.shape[0] != count or not feasible.shape[1]:
+                    raise ValueError("feasible_wall requires [N,C]")
+                shapes["feasible_wall"], shapes["feasible_bombs"] = feasible.shape, (count, 12)
         else:
             target_shapes = {"attach": (count,), "shape": (count, 2), "anchor": (count,)}
             shapes.update(endpoints=(count, 2), endpoint_features=(count, 2, 3), gap=(count, 1))
@@ -339,7 +370,8 @@ def validate_examples(examples, stage):
     for key, array in examples.inputs.items():
         if key in ("mask", "history_mask", "occupied") and array.dtype != np.bool_:
             raise ValueError(f"{stage}.{key} must be boolean")
-        if key in ("audio", "history_age", "conditions", "neighbors", "occupancy", "interval", "gap", "gaps", "endpoint_features") and array.dtype != np.float32:
+        if key in ("audio", "history_age", "conditions", "neighbors", "occupancy", "interval", "context",
+                   "feasible_wall", "feasible_bombs", "gap", "gaps", "endpoint_features") and array.dtype != np.float32:
             raise ValueError(f"{stage}.{key} must use float32")
     for key, target in examples.targets.items():
         categorical = key in ("red", "blue", "wall", "attach", "anchor")

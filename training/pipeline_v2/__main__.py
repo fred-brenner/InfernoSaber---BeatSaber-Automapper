@@ -13,13 +13,16 @@ def parser():
     source = prepare.add_mutually_exclusive_group(required=True)
     source.add_argument("--dummy", action="store_true")
     source.add_argument("--beat-dataset", help="Existing training.beat_models dataset; preserves splits/normalization")
-    source.add_argument("--source-root", help="Intact raw map packages")
+    source.add_argument("--source-root", action="append",
+                        help="Intact raw map package root; repeat to ingest several folders")
     source.add_argument("--prepared-root", help="Explicit existing beatmap/Info/audio triples adapter")
     prepare.add_argument("--encoder-checkpoint", help="Explicit retained 24x20-to-16 encoder checkpoint")
     prepare.add_argument("--structure-only", action="store_true", help="Zero audio latents; marked dummy and prohibited for training")
     prepare.add_argument("--normalization-from", help="Existing beat dataset/run used when reading raw inputs")
     prepare.add_argument("--reserved-root", help="Curated benchmark packages excluded from learning")
     prepare.add_argument("--aliases", help="Existing recording alias JSON for new raw preparation")
+    prepare.add_argument("--splits-from", help="Existing beat dataset/manifest; pin its recording splits "
+                                             "when reading raw inputs")
     prepare.add_argument("--evaluation-only", action="store_true", help="Prepare curated test-only packages using frozen training vocabularies/statistics")
     prepare.add_argument("--training-dataset", help="V2 training dataset supplying frozen evaluation contracts")
     prepare.add_argument("--output", required=True)
@@ -68,6 +71,8 @@ def _prepare(args, command):
     if args.evaluation_only:
         if not args.training_dataset or not args.source_root or args.dummy or args.prepared_root or args.beat_dataset:
             command.error("--evaluation-only requires --training-dataset and curated --source-root packages")
+        if len(args.source_root) != 1:
+            command.error("--evaluation-only requires a single --source-root")
         training = load_dataset(args.training_dataset)
         settings = training.manifest["data_settings"]
         frozen = training.vocabularies
@@ -79,7 +84,7 @@ def _prepare(args, command):
         from training.beat_models.artifacts import statistics_hash
         if statistics_hash(normalization) != training.manifest["normalization_sha256"]:
             command.error("Evaluation normalization differs from the selected training dataset")
-        source = Path(args.source_root).resolve()
+        source = Path(args.source_root[0]).resolve()
         if "favorites_bs_input" in source.parts or source.name != "bs_map_input" or source.parent.name != "evaluate_beats":
             command.error("Evaluation source must be the curated evaluate_beats/bs_map_input directory")
     elif args.training_dataset:
@@ -100,16 +105,17 @@ def _prepare(args, command):
                        "base_dataset": str(Path(args.beat_dataset).resolve()),
                        "base_manifest_sha256": file_hash(Path(args.beat_dataset) / "manifest.json")}
     else:
-        from training.beat_models.data import prepare_songs
+        from training.beat_models.data import prepare_songs, prior_splits_from_manifest
         from training.beat_models.features import fit_normalization, normalize_songs
         from tools.config import paths
-        reserved = (args.source_root if args.evaluation_only else args.reserved_root or
+        reserved = (args.source_root[0] if args.evaluation_only else args.reserved_root or
                     str(Path(paths.train_path) / "evaluate_beats/bs_map_input"))
         if not Path(reserved).is_dir():
             command.error("Curated reservation folder is unavailable; supply --reserved-root explicitly")
         songs, base_report = prepare_songs(source_root=args.source_root, prepared_root=args.prepared_root,
                                           reserved_root=reserved, aliases=read_json(args.aliases) if args.aliases else None,
-                                          evaluation_only=args.evaluation_only, difficulty="ExpertPlus" if args.evaluation_only else None)
+                                          evaluation_only=args.evaluation_only, difficulty="ExpertPlus" if args.evaluation_only else None,
+                                          prior_splits=prior_splits_from_manifest(args.splits_from) if args.splits_from else None)
         if not songs:
             command.error("No accepted base songs: " + str(base_report.get("skipped", [])))
         if normalization is None:

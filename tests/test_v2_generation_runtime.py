@@ -266,7 +266,10 @@ def test_runtime_loads_v1_lighting_once_and_never_loads_v2_lighting(tmp_path, mo
     monkeypatch.setattr(v1_lighting, "load_lighting", lambda assets, factory: lighting_loads.append(assets) or lighting)
     first = runtime.get_runtime(root)
     assert runtime.get_runtime(root) is first
-    assert stages == list(runtime.PRODUCTION_STAGES)
+    expected = list(runtime.PRODUCTION_STAGES)
+    if float(getattr(config, "v2_arrows_variety", 0.) or 0.) > 0:
+        expected.append("arrows")  # optional second arrows opinion for the variety blend
+    assert stages == expected
     assert len(encoders) == len(lighting_loads) == 1
     assert lighting_loads[0]["model_path"] == production_assets["model_path"]
     assert first.lighting is lighting and first.models["lighting"] is lighting.model

@@ -395,3 +395,69 @@ def test_evaluation_only_retains_curated_without_any_training_split(tmp_path):
     assert "requested difficulty" in missing_report["skipped"][0]["reason"]
     with pytest.raises(ValueError, match="unverified difficulty"):
         prepare_songs(prepared_root=tmp_path, difficulty="ExpertPlus")
+
+
+def test_constant_restatement_accepted_while_real_changes_skip(tmp_path):
+    constant = {"_version": "2.2.0", "_notes": [_v2_note()],
+                "_customData": {"_BPMChanges": [{"_time": 4, "_BPM": 120, "_beatsPerBar": 4,
+                                                 "_metronomeOffset": 4}]},
+                "_events": []}
+    variable = {"_version": "2.2.0", "_notes": [_v2_note()],
+                "_customData": {"_BPMChanges": [{"_time": 4, "_BPM": 150}]},
+                "_events": []}
+    v3 = {"version": "3.2.0", "colorNotes": [{"b": .2, "c": 0, "x": 1, "y": 2, "d": 1}],
+          "bpmEvents": [{"b": 4, "m": 120}]}
+    _package(tmp_path, beatmaps={"Easy.dat": constant, "Hard.dat": variable, "Expert.dat": v3})
+    songs, report = prepare_songs(tmp_path, reserved_root=tmp_path / "absent")
+    assert len(songs) == 2
+    assert report["skip_count"] == 1
+    assert "tempo changes" in report["skipped"][0]["reason"]
+    assert report["skipped"][0]["beatmap_filename"] == "Hard.dat"
+
+
+def test_multiple_source_roots_dedupe_identical_beatmaps(tmp_path):
+    first, second = tmp_path / "first", tmp_path / "second"
+    good = {"_version": "2.2.0", "_notes": [_v2_note()]}
+    _package(first, "alpha", beatmaps={"Expert.dat": deepcopy(good)})
+    # beta copies alpha's beatmap and audio bytes; gamma is distinct.
+    _package(second, "beta", beatmaps={"Expert.dat": deepcopy(good)})
+    _package(second, "gamma", beatmaps={"ExpertPlus.dat": {"_version": "2.2.0", "_notes": [_v2_note(color=1)]}},
+             frequency=330)
+    songs, report = prepare_songs([first, second], reserved_root=tmp_path / "absent")
+    assert len(songs) == 2
+    assert report["duplicate_count"] == 1
+    assert report["duplicates"][0]["path"].endswith("Expert.dat")
+    assert "beta" in report["duplicates"][0]["path"]
+    assert report["source_roots"] == [str(first.resolve()), str(second.resolve())]
+    # A single root keeps the legacy singular report field.
+    songs, report = prepare_songs(first, reserved_root=tmp_path / "absent")
+    assert report["source_root"] == str(first.resolve()) and "source_roots" in report
+    assert report["duplicate_count"] == 0
+
+
+def test_prior_splits_pin_existing_groups_and_distribute_new_ones(tmp_path):
+    old = make_dummy_songs(seed=3)
+    prior = {song.metadata["group_id"]: song.metadata["split"] for song in old}
+    old_objects = {id(song) for song in old}
+    new = make_dummy_songs(seed=7)
+    for index, song in enumerate(new):
+        song.song_id = f"fresh-{index}"
+    combined = assign_splits([*old, *new], prior_splits=prior)
+    for song in combined:
+        if id(song) in old_objects:
+            assert song.metadata["split"] == prior[song.metadata["group_id"]]
+    fresh = [song for song in combined if song.metadata["group_id"] not in set(prior)]
+    assert fresh and all(song.metadata["split"] in ("train", "validation", "test") for song in fresh)
+    # Same set without pinning reproduces identical assignments as before.
+    plain = assign_splits([*make_dummy_songs(seed=3)], seed=3)
+    pinned = assign_splits([*make_dummy_songs(seed=3)], seed=3, prior_splits={})
+    assert [song.metadata["split"] for song in plain] == [song.metadata["split"] for song in pinned]
+
+
+def test_prior_splits_from_manifest(tmp_path):
+    manifest = {"songs": [{"song_id": "a", "metadata": {"group_id": "g1", "split": "test"}},
+                          {"song_id": "b", "group_id": "g2", "split": "validation"}],
+                "preparation": {"songs": [{"group_id": "g3", "split": "train"}]}}
+    _json(tmp_path / "manifest.json", manifest)
+    from training.beat_models.data import prior_splits_from_manifest
+    assert prior_splits_from_manifest(tmp_path) == {"g1": "test", "g2": "validation", "g3": "train"}
