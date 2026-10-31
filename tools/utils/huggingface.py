@@ -24,5 +24,10 @@ def model_download(model_branch=None):
                           local_dir=model_folder, local_dir_use_symlinks=False,
                           ignore_patterns=["Readme.md", ".git*"])
 
-    # check that model exists on the example of event generator
-    _ = get_full_model_path(config.event_gen_version)
+    # check that model exists: v2 bundles validate their manifest, legacy
+    # selections validate on the example of the event generator
+    if model_branch == "v2_expert":
+        from map_creation.v2_runtime import validate_production_bundle
+        validate_production_bundle(config.v2_model_bundle_path)
+    else:
+        _ = get_full_model_path(config.event_gen_version)
