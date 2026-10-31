@@ -32,9 +32,9 @@ use_mapper_selection = "v2_expert"
 
 # V2 generation bundle is independent of prediction/library folder settings.
 v2_model_bundle_path = "../Data/model/v2_expert"
-# Retained v1 lighting assets are independent of the selected v2 bundle.
-v1_lighting_model_path = "../Data/model/fav_15/tf_event_gen_2_12_5_5__22_18.h5"
-v1_lighting_vocabulary_path = "../Data/model/fav_15/onehot_encoder_events.pkl"
+# Retained v1 lighting assets ship inside the v2 bundle so one branch covers all.
+v1_lighting_model_path = "../Data/model/v2_expert/v1_lighting/tf_event_gen_2_12_5_5__22_18.h5"
+v1_lighting_vocabulary_path = "../Data/model/v2_expert/v1_lighting/onehot_encoder_events.pkl"
 v2_inference_threads = 2
 v2_timing_batch_size = 8
 v2_compile_inference = True

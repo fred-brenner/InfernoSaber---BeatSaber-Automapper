@@ -871,7 +871,7 @@ def build_app(check_updates=True):
                       "Else check the server logs and try another song",
                 placeholder="""Processing progress or ETA will appear here.
                 After latest 1 minute, it should display an ETA like that:
-                Loading AI Model: fav_15
+                Loading AI Model: v2_expert
                 Model Found
                 Starting multi map generator with 10 workers.
                 Checking and Normalizing Song Files...

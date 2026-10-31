@@ -2058,16 +2058,20 @@ centre containment was already airtight). Coverage in
   `main_app.run_process` uses the same `main_multi_par` path with forced
   `use_mapper_selection = "v2_expert"`.
 - Full suite: 1162 passed, 10 deselected (calm-effects included).
-- Model delivery: HF `BierHerr/InfernoSaber` is branch-per-selection;
-  `fav_15` branch already carries the required lighting assets. The new
-  `v2_expert` branch must contain the local
-  `../Data/model/v2_expert/` tree at branch root (32 files: `bundle.json`,
-  `normalization.json`, `vocabularies.json`, `evaluation.json`,
-  `README.txt`, `calibrations/`, `encoder/`, eight stage dirs). GitHub
-  release tag `v2.0.0.app1-reinstall` on `fred-brenner/InfernoSaber-App`
-  follows the appN convention; `-reinstall` is required since the bundle
-  is enforced by startup validation.
+- Model delivery: HF `BierHerr/InfernoSaber` is branch-per-selection. The
+  retained v1 lighting assets (`tf_event_gen_2_12_5_5__22_18.h5`,
+  `onehot_encoder_events.pkl`) are vendored inside the bundle at
+  `v2_expert/v1_lighting/` and `config.v1_lighting_*_path` points there —
+  the `v2_expert` branch is fully self-contained and no separate `fav_15`
+  fetch is needed. Upload the local `../Data/model/v2_expert/` tree at
+  branch root (34 files incl. `v1_lighting/`). GitHub release tag
+  `v2.0.0.app1-reinstall` on `fred-brenner/InfernoSaber-App` follows the
+  appN convention; `-reinstall` is required since the bundle is enforced
+  by startup validation.
 - `model_download` now validates v2 selections via
   `validate_production_bundle`; the legacy `tf_event_gen_` check would
   fail on the bundle layout. `update_model_file_paths` /
   `get_full_model_path` remain legacy-only helpers.
+- Vendored-lighting app run re-verified: `main_multi.py` produced all 8
+  packages with the "V1 lighting" stage decoding through
+  `v2_expert/v1_lighting/` (0 failures, ~51 s).
