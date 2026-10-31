@@ -37,13 +37,25 @@ def check_for_updates():
             github_url = f"https://api.github.com/repos/{repo_owner}/{repo_name}/releases"
 
             response = requests.get(github_url, timeout=10)
-            latest_version = response.json()[0]['tag_name']
-            requires_reinstall = latest_version.endswith('-reinstall')
-            latest_display_version = latest_version[:-len('-reinstall')] if requires_reinstall else latest_version
+            releases = response.json()
+            latest_version = releases[0]['tag_name']
+            latest_display_version = config.get_clean_version(latest_version)
             current_version = f"v{config.InfernoSaber_version}"
             current_display_version = f"v{config.get_clean_version()}"
 
             if latest_version != current_version:
+                requires_reinstall = latest_version.endswith('-reinstall')
+                if not requires_reinstall:
+                    # A "-reinstall" release published after the user's version
+                    # still forces a reinstall even when a newer release no
+                    # longer carries the flag.
+                    for release in releases:
+                        tag = release['tag_name']
+                        if tag == current_version:
+                            break
+                        if tag.endswith('-reinstall'):
+                            requires_reinstall = True
+                            break
                 if requires_reinstall:
                     update_check_response = (
                         f"Version <{latest_display_version}> requires a full reinstall. "
