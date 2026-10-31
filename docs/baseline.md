@@ -2045,3 +2045,29 @@ zips: 0 swing/box overlaps (previously also 0 centre-inside-box cases —
 centre containment was already airtight). Coverage in
 `test_v2_generation_pipeline.py` (`test_heuristic_walls_fill_only_note_free_lane_spans`,
 `test_validate_hazards_rejects_walls_overlapping_note_swings`).
+
+## Release readiness 2.0.0 (2026-10-31)
+
+- `InfernoSaber_version = "2.0.0.app1-reinstall"`; `get_clean_version`
+  serializes `2.0.0` into `info.dat` (verified in a generated package).
+- Intended app path verified end-to-end on CPU:
+  `python main_multi.py` (spawn workers, snapshot propagation,
+  `validate_production_bundle`, `combine_packages`) produced all 8
+  `12345_*.zip` song packages, 0 failures, ~63 s for 8 songs at NPS 3.
+  Packages contain `*.egg`, difficulty `.dat`s, `cover.jpg`, `info.dat`.
+  `main_app.run_process` uses the same `main_multi_par` path with forced
+  `use_mapper_selection = "v2_expert"`.
+- Full suite: 1162 passed, 10 deselected (calm-effects included).
+- Model delivery: HF `BierHerr/InfernoSaber` is branch-per-selection;
+  `fav_15` branch already carries the required lighting assets. The new
+  `v2_expert` branch must contain the local
+  `../Data/model/v2_expert/` tree at branch root (32 files: `bundle.json`,
+  `normalization.json`, `vocabularies.json`, `evaluation.json`,
+  `README.txt`, `calibrations/`, `encoder/`, eight stage dirs). GitHub
+  release tag `v2.0.0.app1-reinstall` on `fred-brenner/InfernoSaber-App`
+  follows the appN convention; `-reinstall` is required since the bundle
+  is enforced by startup validation.
+- `model_download` now validates v2 selections via
+  `validate_production_bundle`; the legacy `tf_event_gen_` check would
+  fail on the bundle layout. `update_model_file_paths` /
+  `get_full_model_path` remain legacy-only helpers.
