@@ -2064,7 +2064,10 @@ centre containment was already airtight). Coverage in
   `v2_expert/v1_lighting/` and `config.v1_lighting_*_path` points there —
   the `v2_expert` branch is fully self-contained and no separate `fav_15`
   fetch is needed. Upload the local `../Data/model/v2_expert/` tree at
-  branch root (34 files incl. `v1_lighting/`). GitHub release tag
+  branch root, excluding `*/report.json` and `evaluation.json` — the
+  bundle `files` manifest was trimmed to the 23 inference files so
+  downloaded bundles still pass `validate_production_bundle` (report
+  logs stay local only). GitHub release tag
   `v2.0.0.app1-reinstall` on `fred-brenner/InfernoSaber-App` follows the
   appN convention; `-reinstall` is required since the bundle is enforced
   by startup validation.
