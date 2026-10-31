@@ -100,13 +100,26 @@ def serialize_beatmap(state, bpm, version="v3"):
     for record in state.get("arcs", []):
         start, end = _span(record, "Arc")
         endpoints = record.get("endpoint_ids", [])
-        if not isinstance(endpoints, (list, tuple)) or len(endpoints) != 2:
-            raise ValueError("Arc requires exactly two existing colored endpoints")
-        head, tail = (identities.get(identity) for identity in endpoints)
-        if (head is None or tail is None or head["c"] != tail["c"]
-                or head["c"] != _integer(record["hand"], "Arc hand", maximum=1)
-                or head["b"] != start or tail["b"] != end):
-            raise ValueError("Arc endpoints must match existing same-hand notes and times")
+        head_spec = record.get("synthetic_head")
+        if head_spec is not None:
+            if not isinstance(endpoints, (list, tuple)) or len(endpoints) != 1 or not isinstance(head_spec, dict):
+                raise ValueError("Synthetic arc requires its tail endpoint and head spec")
+            tail = identities.get(endpoints[0])
+            if (tail is None or tail["c"] != _integer(record["hand"], "Arc hand", maximum=1)
+                    or tail["b"] != end):
+                raise ValueError("Synthetic arc tail must match an existing same-hand note")
+            head = {"b": start, "c": tail["c"],
+                    "x": _integer(head_spec.get("x"), "Arc head x", maximum=3),
+                    "y": _integer(head_spec.get("y"), "Arc head y", maximum=2),
+                    "d": _integer(head_spec.get("d"), "Arc head direction", maximum=8)}
+        else:
+            if not isinstance(endpoints, (list, tuple)) or len(endpoints) != 2:
+                raise ValueError("Arc requires exactly two existing colored endpoints")
+            head, tail = (identities.get(identity) for identity in endpoints)
+            if (head is None or tail is None or head["c"] != tail["c"]
+                    or head["c"] != _integer(record["hand"], "Arc hand", maximum=1)
+                    or head["b"] != start or tail["b"] != end):
+                raise ValueError("Arc endpoints must match existing same-hand notes and times")
         arc = {key: head[key] for key in ("b", "x", "y", "c", "d")}
         arc.update(tb=end, tx=tail["x"], ty=tail["y"], tc=tail["d"],
                    mu=_number(record["mu"], "Arc head multiplier"),

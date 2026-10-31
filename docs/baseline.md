@@ -1803,7 +1803,7 @@ scores. The proven path for the bomb head mirrors the wall fix: a masked
 categorical head (NONE + 12 cells) so cell scores compete against an explicit
 NONE logit — Arm F candidate.
 
-**Arm F — factorized bomb head (2026-10-30, training launched):**
+**Arm F — factorized bomb head (2026-10-30, evaluated, not adopted):**
 
 The pure 13-way categorical was rejected after finding 43.2% of positive bomb
 queries carry ≥2 cells — argmax cannot represent them. Instead the hazards
@@ -1816,7 +1816,73 @@ cell targets (no re-preparation); the flag rides
 `manifest["training"]["bomb_presence"]` for artifact rebuild. Levers as Arm E
 (`full-2026-10-27-feasible`, enabled-song supervision, corrupt .5/.5, negative
 weight .5) plus `hazards_bomb_presence = True`. Run:
-`runs/armf-presence-hazards`. Calibration and evaluation pending.
+`runs/armf-presence-hazards` (best epoch 13/80, val_pr_auc 0.465).
+
+Calibration (thr 0.28, parallel `--workers 7` sharded replay — see
+sparse-stage-repair.md) vs Arm E, same dataset/levers:
+
+| metric | Arm E | Arm F |
+|---|---|---|
+| bombs teacher-forced F1 | 0.154 | **0.235** |
+| bombs AR placements | 46742 spam (F1 .004) | **0 — silence** |
+| wall AR F1 | **0.616** | 0.435 |
+| wall TF F1 | 0.753 | 0.653 |
+
+The presence factor improved the teacher-forced signal and turned AR bombs
+from spam into clean silence — but the AR operating curve has no usable point
+(flood ~19714 placements below thr .10, zero at/above). Hiding bomb components
+from the history input during AR replay collapsed the flood to 69 false
+fires — the spam was ~97% own-history feedback — yet the head still never
+fires at reference locations. The bottleneck is now precisely isolated to
+autoregressive conditioning, not head parameterization: under own-decision
+history neither cell nor presence scores localize. Walls also regressed
+(shared-trunk cost of the extra head). Arm E remains the hazards candidate;
+the presence flag stays available but should default off for bundles until
+the conditioning gap is addressed (e.g. stronger/dedicated bomb-history
+corruption or self-history training).
+
+**Walls-only acceptance (2026-10-30):** bomb placement is now disabled at
+decode via `v2_hazard_bombs_enabled = False` (`hazard_bombs_enabled` decode
+option, also skips the rate-matching window). Bomb revisit is parked in
+TODO.md. Hazards stage = walls-only until the conditioning gap is closed.
+
+**Arcs operating-curve sweep (2026-10-30, `calibration-grid`, `--ar-grid .05`
+over the Arm E checkpoint):** the widened AR grid confirmed the original
+0.77 pick — the full-validation AR curve peaks there (F1 .068); there is no
+better threshold. Decomposition at 0.77: 71% of the 8,538 false attaches land
+on the 119 arc-*free* validation songs (~51/song) — the model floods songs it
+received zero attach supervision on (enabled-song masking). Remaining spam is
+concentrated in the start regime (F1 .007) vs continuation (.178). Two-tier
+start/run thresholds were also probed and fail: the model never emits
+attach ≥0.8 on empty AR history, so strict-start gives silence and
+lenient-run reignites the flood. Diagnosis: history-presence shortcut +
+unsupervised arc-free songs. Arm G (`arcs_history_corrupt_keep_guard=False`)
+removed the guaranteed recent attach so real empty-history starts could enter
+supervision — **evaluated 2026-10-30 and rejected**: it regressed on every
+axis (AR F1 .056 vs .068, false attaches 16,006 vs 8,538, arc-free fp 11,528
+vs 6,089, start F1 .005 vs .007). The history-presence shortcut hypothesis
+was wrong — the attach signal is diffuse under AR conditioning regardless of
+the keep-guard. Arm H (`arcs_enabled_song_supervision=False`, launched same
+day) supervises attach negatives on arc-free songs to teach per-map gating —
+**evaluated 2026-10-30 and rejected**: continuation F1 nearly doubled to .339
+(best AR regime of any arm) and enabled-song F1 rose to .254, but arc-free
+false attaches went 5× worse (33,157 vs 6,089, all cold-start) for net AR F1
+.058 vs Arm E .068. Decode cannot exploit the continuation gain: gating cold
+starts yields silence because the continuation regime needs a seeded arc in
+history. Conclusion across G + H: cold-start attach has no learnable signal
+under AR conditioning — the gap is structural, matching the bombs finding;
+fixing it needs training-side conditioning work (scheduled sampling /
+self-history), not another supervision lever.
+
+**Production arcs reverted to the pre-model heuristic (2026-10-31):**
+`v2_arcs_heuristic = True` decodes arcs through adjacent same-hand pairs +
+`validate_arcs` legacy gates (`slider_time_gap`, `slider_probability`,
+`slider_movement_minimum`, shared clearance) instead of the model attach head.
+The arcs checkpoint remains in the bundle undecoded; `v2_arcs_heuristic=False`
+restores the model path. Grounds: three repaired arms found no AR attach
+operating point — cold-start has no learnable signal under own-history
+conditioning, matching the bombs conclusion. Model arcs and bombs both remain
+parked as GPU-later TODO entries.
 
 Artifacts outside source control:
 
@@ -1831,3 +1897,151 @@ Artifacts outside source control:
 - Arm E dataset: `../Data/training/pipeline_v2/full-2026-10-27-feasible/dataset`
 - Arm E candidate bundle: `../Data/model/v2_expert_feasible-w50-c50`
 - Live spot-check outputs: `gpu/Data/prediction/new_map/{_armB,_armC,_armD}`
+
+## V2 legacy postprocessing ablation and note-mutator removal (2026-10-31)
+
+Controlled comparison `evaluation/evaluate_v2_postprocessing.py` — 10
+seed-paired arms × 2 songs ("BWB - Break the Horizon" 334.5 s/268.46 BPM,
+"Bunker Machen Laut") × requested NPS 3/5/8 = 60 CPU generations on the
+production `v2_expert` bundle, report `records.jsonl`/`report.json`. Zero
+residual hard-invariant violations in **every** arm — the clearance fixpoint
+(`enforce_note_flow_and_clearance`) alone is sufficient; it recuts/relocates
+instead of mass-deleting.
+
+**Timing.** Raw model events are already well-anchored: 99.2% within 50 ms of
+detected onsets, 21 ms mean (`timing_minimal`/`raw` arms). BPM alignment +
+onset snap mostly re-anchor filled events, not model ones. But the raw timing
+model emits only ~25-35% of the requested event density (e.g. 255 events ≈
+0.76/s at request 3.0/s), so `start_end_fill`/`density_fill_*`/
+`high_difficulty_fill_*` are load-bearing — without them realized density
+collapses to 0.65-3.0 NPS. **Fills kept; the event under-production is an
+upstream model gap, not a postprocessing defect.** `silence_removal` trims
+~240-290 filled events in silent spans — kept.
+
+**Notes.** On the filled stream the positions/arrows models emit ~1.05
+notes/event → density ≈ request. Then `legacy_note_flow` deleted 55-68%
+(e.g. 1311→446 at NPS 3) so production realized only ~0.45× of the requested
+NPS, and mirroring added notes the flow pass then culled (net +1-3%).
+`notes_minimal` arm: model notes + structural dedup/retained labeling +
+same-direction recut + clearance fixpoint → realized ≈ requested, residual
+violations 0/6 runs, more non-cardinal direction variety. Median same-hand
+IOI roughly halves (0.22s at NPS 8 — dense 16th streams; flagged for the
+live playability check, not provable from metrics).
+
+**Multiplier.** Near-inert: ≤4 accepted of 14-41 proposals per run
+(`no_multiplier` ≈ `full`). Kept — it is the learned expansion path, ~1.2 s.
+
+**Production change (dev branch).** `config.v2_cleanup_note_heuristics`
+added, default **False**: `v2_pipeline.generate` then runs its default
+postprocessors with `postprocess_notes(skip=LEGACY_NOTE_MUTATORS)` —
+`mirroring` and `legacy_note_flow` (incl. `flow_additions`) omitted;
+structural dedup, retained labeling, `same_direction_recut` and the
+clearance fixpoint still run. Set the flag `True` to restore the previous
+behavior. Verified live on "BWB - Break the Horizon" NPS 5 (CPU,
+production `v2_expert`): 1566 notes / 1389 unique onsets / 4.68 NPS,
+residual violations 0, `skipped_steps=["legacy_note_flow","mirroring"]`.
+In-game playability check (same-hand IOI halves at high density, e.g.
+median 0.11 s at NPS 8; ~37% dots at NPS 8 — both model-driven) remains a
+separate live evaluation.
+
+Artifacts: comparison report `records.jsonl`/`report.json` + per-run NPZ at
+`gpu/Data/training/evaluate_beats/results/v2-postprocessing-20261031/`; test
+`test_v2_postprocessing_evaluation.py` covers the skip mechanism, arms and
+the flag wiring.
+
+### Walls revert to the legacy obstacle generator (2026-10-31)
+
+In-game playtests showed the repaired hazards model holding walls
+continuously at fixed spots for long stretches and colliding with notes.
+Production walls therefore reverted to the original rule-based obstacle
+generator (`gen_obstacles.calculate_obstacles` over note-free lane spans,
+then `validate_hazards` margins/type/position and note clearance) via
+`v2_walls_heuristic = True`. The hazards model stage — rollout and query
+decode alike — is skipped entirely (bomb decoding was already off via
+`v2_hazard_bombs_enabled = False`); the checkpoint remains in the bundle
+and the flag restores it for future evaluation.
+
+Verified on CPU against production `v2_expert`: hazards stage reports
+`mode=heuristic` in ~0.01 s (vs ~42 s rollout), walls are intermittent
+outer-lane obstacles bounded by note-free spans, and out-of-contract
+candidates are still rejected by the shared clearance (e.g. 23 of ~56
+proposals on "BWB - Break the Horizon" NPS 5). Four playtest packages
+were regenerated and zipped under `Data/prediction/new_map/`:
+ExpertPlus/Expert wall counts 50/40, 35/36, 28/15 and 27/13 — vs 0–3
+under the model path. Unit/e2e coverage in
+`test_v2_generation_pipeline.py`; model-path tests pin the flag False.
+
+### Bounded onset snap after note cleanup (2026-10-31)
+
+New production postprocessing: `snap_note_times` (`v2_notes_onset_snap = True`)
+runs after note cleanup and before the retained snapshot/multiplier. Each note
+may move onto its nearest librosa onset peak inside
+`v2_notes_onset_snap_ioi_ratio` (0.15) of its own same-hand inter-onset
+interval; moves that would create same-cell, swing or same-hand-flow conflicts
+(the clearance rules, applied to both hands) are rejected. Chain spans shift
+with their anchor. Placing it before the multiplier keeps the retained-notes
+invariant intact.
+
+Verified on CPU against production `v2_expert` ("BWB - Move the Floor", NPS 3,
+1027 notes): 279 moved (mean 14.8 ms, max 390 ms — sparse hands allow large
+bounds), 1 blocked, 747 without an onset inside their bound; residual
+clearance violations stayed zero and retained-note equality holds. Distance
+to detected onsets improved modestly (median 59.1 -> 58.2 ms, share <=50 ms
+43.4% -> 44.4%): most post-fill notes simply sit farther from any detected
+peak than the 15% guardrail allows, which is the requested safety bound —
+widening `v2_notes_onset_snap_ioi_ratio` trades clearance safety for
+coverage. Unit/e2e coverage in `test_v2_note_onset_snap.py`.
+
+### Onset-detector comparison for the note snap (2026-10-31)
+
+Nine detection methods were compared on "BWB - Move the Floor" (168 s, 1027
+generated notes, snap bound = 15 % same-hand IOI). Metrics: onset count,
+share of notes with a target in bound (`moved`), pre/post-snap distance to
+each method's own peaks, and cross-method consensus (share of a method's
+onsets corroborated within 30 ms by any other method). A uniform-grid
+control at the same density separates real peaks from pure density.
+
+| method | N | moved% | preMed ms | cons% | verdict |
+|---|---|---|---|---|---|
+| librosa spectral flux (current) | 671 | 27.1 | 59.1 | 99.9 | the consensus set itself |
+| flux + backtrack (attack start) | 671 | 10.9 | 53.9 | 96.3 | targets sit early, worse |
+| multiband median flux | 675 | 27.3 | 59.5 | 98.7 | identical, no gain |
+| superflux (lag 2, max 3) | 632 | 26.6 | 89.3 | 98.9 | worse alignment |
+| percussive-only flux | 713 | 25.0 | 64.9 | 97.1 | no real gain |
+| aubio hfc / complex / specflux | 653-721 | 10.6-13.4 | ~62 | ~99 | worse than uniform — systematic ~20-40 ms offset (threshold-crossing latency) |
+| RMS energy peaks | 1148 | 25.9 | 36.3 | 43.3 | density buys distance, 57 % uncorroborated noise |
+| uniform control (671) | 671 | 15.6 | 63.5 | — | flux beats it clearly |
+
+Conclusion: the legacy librosa spectral-flux recipe is the best suited
+detector — its peaks are the ones every other method corroborates, and
+methods reporting onsets later (aubio) or earlier (backtrack) degrade
+below the uniform control because generated notes are timed against
+peak-style onsets.
+
+Detection-parameter sweep on the same recipe: lowering `delta` below
+`thresh_onbeat` buys little coverage (+2-4 pts) at falling consensus
+(88→77 %); shortening the refractory `wait` 8→4 frames (+10 % onsets,
+91 % consensus) is free. Post-snap distance to the strict strong-peak
+reference is identical for all variants (~58 ms median) — extra weak
+peaks never pull notes away from strong ones. Applied:
+`v2_notes_onset_snap_wait = 4` (config knob, frames at hop 512).
+Verified live: 296/1027 moved, 5 blocked, residual violations 0,
+median distance to detected peaks 53.9 → 50.4 ms. The four playtest
+packages under `Data/prediction/new_map/` were regenerated and zipped
+with the snap active (e.g. "No Sleep": 463/979 and 384/670 moved).
+
+### Wall clearance hardening (2026-10-31)
+
+Playtests spotted note swings passing through walls. Two gaps were closed:
+the `_heuristic_wall_candidates` lane scan grouped notes only by event-grid
+times, so onset-snapped notes and multiplier copies were invisible to
+`gen_obstacles` and could be spanned by proposals (off-grid notes now form
+their own groups while empty grid events keep their split-marker role); and
+`validate_hazards` only tested each note's centre cell — it now rejects a
+wall when any cell of a note's full sweep volume intersects the wall box
+inside `obstacle_time_gap` margins, matching the existing bomb rule.
+Verified on all eight exported difficulties of the regenerated playtest
+zips: 0 swing/box overlaps (previously also 0 centre-inside-box cases —
+centre containment was already airtight). Coverage in
+`test_v2_generation_pipeline.py` (`test_heuristic_walls_fill_only_note_free_lane_spans`,
+`test_validate_hazards_rejects_walls_overlapping_note_swings`).

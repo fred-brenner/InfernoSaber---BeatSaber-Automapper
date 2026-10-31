@@ -46,6 +46,10 @@ def parser():
     calibrate.add_argument("--artifact", required=True)
     calibrate.add_argument("--output", required=True)
     calibrate.add_argument("--batch-size", type=int, default=128)
+    calibrate.add_argument("--workers", type=int, default=1,
+                           help="Shard validation replays across N spawned processes")
+    calibrate.add_argument("--ar-grid", type=float,
+                           help="Also autoregressively replay every step (e.g. .1) besides the top three")
     concept = sub.add_parser("concept", help="Intermediate concept objects, with explicit review stops")
     concept.add_argument("--dataset", required=True)
     concept.add_argument("--song-id", help="Defaults to the first prepared song")
@@ -172,7 +176,9 @@ def main(argv=None):
     if args.command == "calibrate":
         from .artifacts import load_dataset
         from .calibration import calibrate_stage
-        calibrate_stage(load_dataset(args.dataset), args.stage, args.artifact, args.output, batch_size=args.batch_size)
+        calibrate_stage(load_dataset(args.dataset), args.stage, args.artifact, args.output,
+                        batch_size=args.batch_size, workers=args.workers, dataset_path=args.dataset,
+                        ar_grid=args.ar_grid)
         print(f"Validation calibration saved: {args.output}; no training or bundle changes")
         return 0
     if args.command == "smoke":

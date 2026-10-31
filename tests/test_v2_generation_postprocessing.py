@@ -335,3 +335,26 @@ def test_arc_conflicts_are_rejected_without_moving_notes(song, monkeypatch, fami
     post.validate_arcs(data, song)
     assert data["notes"] == before
     assert data["arcs"] == []
+
+
+def test_synthetic_turbo_arc_guides_first_note_and_keeps_clearance(song, monkeypatch):
+    for key, value in {"add_slider_flag": True, "slider_time_gap": [.5, 12.],
+                       "slider_movement_minimum": 3, "slider_probability": 0.}.items():
+        monkeypatch.setattr(config, key, value)
+    first = note(0, time=.5)
+    turbo = {"endpoint_ids": [0], "time": .15, "end_time": .5, "hand": 0,
+             "synthetic_head": {"x": 0, "y": 0, "d": 1}, "mu": 1., "tmu": 1., "anchor_mode": 1}
+    # Gap .35 is outside the window, movement is zero, probability is off —
+    # the guidance arc survives all three like the legacy turbo start.
+    data = state([first], arcs=[deepcopy(turbo)])
+    diagnostics = post.validate_arcs(data, song)
+    assert diagnostics["synthetic_start_arc"] == 1
+    assert data["arcs"][0]["endpoint_ids"] == [0]
+    data = state([first], bombs=[{"time": .3, "x": 0, "y": 0}], arcs=[deepcopy(turbo)])
+    diagnostics = post.validate_arcs(data, song)
+    assert diagnostics["synthetic_start_arc"] == 0 and data["arcs"] == []
+    bad = deepcopy(turbo)
+    bad["synthetic_head"] = {"x": 1, "y": 0, "d": 1}
+    data = state([first], arcs=[bad])
+    post.validate_arcs(data, song)
+    assert data["arcs"] == []

@@ -59,7 +59,7 @@ def processors():
     def notes(values, event_times, logger=None):
         return values, {}
 
-    def validate(state, song, logger=None):
+    def validate(state, song, logger=None, **_ignored):
         return {}
 
     return SimpleNamespace(postprocess_timing=timing, postprocess_notes=notes,
@@ -85,6 +85,7 @@ def test_timing_windows_are_target_free_and_batching_preserves_tails():
 
 def test_production_pipeline_uses_only_audio_and_keeps_all_output_families(monkeypatch):
     monkeypatch.setattr(config, "single_notes_only_flag", False)
+    monkeypatch.setattr(config, "v2_walls_heuristic", False)  # model decode: exercises the hazards stage
     song, vocab = audio_song(), vocabulary()
     predictors = dummy_predictors(vocab)
     predictors["timing"] = Timing()
@@ -112,6 +113,73 @@ def test_production_pipeline_uses_only_audio_and_keeps_all_output_families(monke
     assert any(len(query) > 1 for query in calls)
     assert "_tracks" not in result.state and "_occupancy" not in result.state
     assert result.review_stops == []
+
+
+def test_heuristic_walls_fill_only_note_free_lane_spans():
+    from map_creation.v2_pipeline import _heuristic_wall_candidates
+
+    events = np.asarray([0., 1., 2., 6., 7.])
+    notes = [{"time": float(time), "x": lane, "y": 1, "hand": 0, "d": 0}
+             for time in events for lane in (0, 1)]
+    walls = _heuristic_wall_candidates(notes, events)
+    assert len(walls) == 1
+    wall = walls[0]
+    assert wall["kind"] == "wall" and wall["x"] == 0 and wall["width"] == 1
+    assert 0 <= wall["y"] <= 2 and 1 <= wall["height"] <= 5
+    assert 2. < wall["time"] < wall["end_time"] < 6.
+    # Off-grid notes (snapped times, multiplier copies) anchor their own
+    # groups: the free span must split around the shifted note instead of
+    # spanning across it.
+    shifted = notes + [dict(notes[0], time=3.3)]
+    walls = _heuristic_wall_candidates(shifted, events)
+    assert len(walls) == 2
+    assert all(wall["end_time"] <= 3.3 or wall["time"] >= 3.3 for wall in walls)
+    assert not any(wall["time"] < 3.3 < wall["end_time"] for wall in walls)
+    # Dense streams and empty inputs leave no span for obstacles.
+    dense = [{"time": float(time), "x": lane, "y": 1, "hand": 0, "d": 0}
+             for time in np.arange(0., 7.) for lane in (0, 1, 2, 3)]
+    assert _heuristic_wall_candidates(dense, np.arange(0., 7.)) == []
+    assert _heuristic_wall_candidates([], events) == []
+
+
+def test_validate_hazards_rejects_walls_overlapping_note_swings():
+    from map_creation.v2_postprocessing import validate_hazards
+
+    song = audio_song()
+    wall = {"kind": "wall", "x": 0, "y": 1, "width": 1, "height": 1,
+            "time": 1.8, "end_time": 2.2}
+    note = {"time": 2.0, "x": 1, "y": 1, "hand": 0, "d": 3, "id": 0}
+    # A horizontal cut sweeps the whole row: the note centre sits outside the
+    # wall but its swing crosses it — rejected like the bomb rule.
+    state = {"notes": [dict(note)], "chains": [], "walls": [dict(wall)], "bombs": []}
+    out = validate_hazards(state, song)
+    assert state["walls"] == [] and out["rejected_walls"] == 1
+    # A dot at the same cell sweeps nothing — the wall stays.
+    state = {"notes": [dict(note, d=8)], "chains": [], "walls": [dict(wall)], "bombs": []}
+    validate_hazards(state, song)
+    assert len(state["walls"]) == 1
+    # A vertical cut sweeps the other column — the wall stays.
+    state = {"notes": [dict(note, d=0)], "chains": [], "walls": [dict(wall)], "bombs": []}
+    validate_hazards(state, song)
+    assert len(state["walls"]) == 1
+
+
+def test_heuristic_walls_bypass_the_hazards_predictor(monkeypatch):
+    monkeypatch.setattr(config, "v2_walls_heuristic", True)
+    song, vocab = audio_song(), vocabulary()
+    predictors = dummy_predictors(vocab)
+    predictors["timing"] = Timing()
+    del predictors["hazards"]  # any lookup would raise — proves the model is unused
+    settings = preparation_settings()
+    result = generate(song, 4., predictors, lambda times: np.zeros((len(times), 16), np.float32),
+                      settings, vocab, lighting_generator=lighting, postprocessors=processors(),
+                      random_factor=0, logger=lambda message: None)
+    assert result.stages["hazards"]["mode"] == "heuristic"
+    assert result.state["bombs"] == []
+    assert result.diagnostics["raw_decisions"]["wall_proposals"] == len(result.state["walls"])
+    assert all(wall["kind"] == "wall" and 0 <= wall["x"] < 4 and 0 <= wall["y"] <= 4
+               and wall["width"] >= 1 and wall["height"] >= 1
+               and 0 <= wall["time"] < wall["end_time"] for wall in result.state["walls"])
     raw, final = result.diagnostics["raw_decisions"], result.diagnostics["final_counts"]
     assert raw["position_events"] == 3 and raw["position_notes"] == raw["arrow_notes"] == 6
     assert raw["multiplier_non_none"] == final["learned_copies"] == 3
@@ -124,6 +192,58 @@ def test_production_pipeline_uses_only_audio_and_keeps_all_output_families(monke
     assert not result.state["raw_model_notes"].dtype.hasobject
 
 
+def test_heuristic_arc_candidates_pair_adjacent_same_hand_notes():
+    from map_creation.v2_pipeline import _heuristic_arc_candidates
+
+    notes = [{"id": 0, "time": 1., "hand": 0, "x": 0, "y": 0, "d": 8},
+             {"id": 1, "time": 2., "hand": 0, "x": 1, "y": 1, "d": 0},
+             {"id": 2, "time": 3., "hand": 0, "x": 2, "y": 0, "d": 1},
+             {"id": 3, "time": 1.5, "hand": 1, "x": 3, "y": 2, "d": 4},
+             {"id": 4, "time": 3., "hand": 1, "x": 0, "y": 2, "d": 5}]
+    candidates = _heuristic_arc_candidates(notes, 1.25)
+    assert [(c["endpoint_ids"], round(c["gap"], 10)) for c in candidates] == [
+        ([0], .7), ([3], 1.05), ([0, 1], 1.), ([3, 4], 1.5), ([1, 2], 1.)]
+    turbo = candidates[0]
+    assert turbo["synthetic_head"] == {"x": 0, "y": 0, "d": 8}
+    assert turbo["time"] == pytest.approx(.3) and turbo["end_time"] == 1.
+    assert turbo["anchor_mode"] == 1 and candidates[1]["anchor_mode"] == 1
+    assert all(c["kind"] == "arc" and c["mu"] == c["tmu"] == 1.25
+               and (c["anchor_mode"] == (1 if "synthetic_head" in c else 0))
+               for c in candidates)
+    same_time = [{"id": 0, "time": 1., "hand": 0, "x": 0, "y": 0, "d": 8},
+                 {"id": 1, "time": 1., "hand": 0, "x": 1, "y": 0, "d": 8}]
+    assert _heuristic_arc_candidates(same_time, 1.)[0]["endpoint_ids"] == [0]
+    assert all("synthetic_head" in c for c in _heuristic_arc_candidates(same_time, 1.))
+
+
+def test_heuristic_arcs_skip_the_model_and_validate_with_legacy_gap(monkeypatch):
+    monkeypatch.setattr(config, "v2_arcs_heuristic", True)
+    song, vocab = audio_song(), vocabulary()
+    predictors = dummy_predictors(vocab)
+    predictors["timing"] = Timing()
+    predictors["lighting"] = lambda inputs: pytest.fail("Production must use v1 lighting")
+    predictors["arcs"] = lambda inputs: pytest.fail("Heuristic arcs never query the model")
+    hooks = processors()
+    seen = {}
+
+    def validate(state, song, logger=None, settings=None, probability=None):
+        seen["settings"] = settings
+        return {}
+
+    hooks.validate_arcs = validate
+    settings = preparation_settings()
+    settings["hazard_feasibility_input"] = False
+    result = generate(song, 4., predictors, lambda times: np.zeros((len(times), 16), np.float32),
+                      settings, vocab, lighting_generator=lighting, postprocessors=hooks,
+                      random_factor=0, logger=lambda message: None)
+    assert result.stages["arcs"]["mode"] == "heuristic"
+    assert seen["settings"] == {"stage_policies": {}}
+    assert result.diagnostics["raw_decisions"]["arc_attachments"] == len(result.state["arcs"])
+    assert all(arc["mu"] == arc["tmu"] == config.slider_radius_multiplier
+               and len(arc["endpoint_ids"]) == (1 if "synthetic_head" in arc else 2)
+               for arc in result.state["arcs"])
+
+
 @pytest.mark.parametrize("repaired_contract", [False, True])
 def test_intensity_adjustment_conditions_timing_and_all_downstream_stages(monkeypatch, repaired_contract):
     from map_creation import v2_pipeline
@@ -131,6 +251,8 @@ def test_intensity_adjustment_conditions_timing_and_all_downstream_stages(monkey
 
     monkeypatch.setattr(config, "v2_intensity_scale", 1.5)
     monkeypatch.setattr(config, "v2_intensity_adjustment_strength", .8)
+    monkeypatch.setattr(config, "v2_arcs_heuristic", False)  # model decode: exercises arcs build_inputs
+    monkeypatch.setattr(config, "v2_walls_heuristic", False)  # model decode: exercises hazards build_inputs
     base, vocab = audio_song(), vocabulary()
     predictors, timing = dummy_predictors(vocab), Timing()
     shares = np.arange(1, len(base.arrays["bin_durations"]) + 1, dtype=np.float32)
@@ -236,6 +358,7 @@ def test_multiplier_histories_record_rejected_outputs_as_none(monkeypatch):
 
 def test_raw_hazard_and_arc_choices_survive_clearance_rejection_in_diagnostics(monkeypatch):
     monkeypatch.setattr(config, "single_notes_only_flag", False)
+    monkeypatch.setattr(config, "v2_walls_heuristic", False)  # model decode: raw proposals come from predictors
     song, vocab = audio_song(), vocabulary()
     predictors = dummy_predictors(vocab)
     predictors["timing"] = Timing()
@@ -245,12 +368,12 @@ def test_raw_hazard_and_arc_choices_survive_clearance_rejection_in_diagnostics(m
     settings["schedule"]["arc_max_gap_seconds"] = 6.
     hooks = processors()
 
-    def reject_hazards(state, song, logger=None):
+    def reject_hazards(state, song, logger=None, **_ignored):
         counts = {"rejected_walls": len(state["walls"]), "rejected_bombs": len(state["bombs"])}
         state["walls"], state["bombs"] = [], []
         return counts
 
-    def reject_arcs(state, song, logger=None):
+    def reject_arcs(state, song, logger=None, **_ignored):
         count = len(state["arcs"])
         state["arcs"] = []
         return {"rejected_arcs": count}

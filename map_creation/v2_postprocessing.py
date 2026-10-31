@@ -114,8 +114,20 @@ def _merge_candidates(candidates, duration):
     return merged
 
 
-def postprocess_timing(song, beats, audio_path, logger=None):
-    """Apply legacy timing cleanup while carrying count labels through moves."""
+_TIMING_STEPS = ("minimum_spacing", "high_difficulty_fill", "bpm_alignment", "onset_snap",
+                 "start_end_fill", "density_fill", "silence_removal")
+
+
+def postprocess_timing(song, beats, audio_path, logger=None, skip=()):
+    """Apply legacy timing cleanup while carrying count labels through moves.
+
+    ``skip`` names steps from ``_TIMING_STEPS`` to omit for controlled
+    comparisons. Legacy audio features are decoded lazily — skipping every
+    step that needs them avoids the legacy analysis entirely.
+    """
+    unknown = set(skip) - set(_TIMING_STEPS)
+    if unknown:
+        raise ValueError(f"Unknown timing postprocessing steps: {sorted(unknown)}")
     base = _base(song)
     duration, bpm = float(base.metadata["duration"]), float(base.metadata["bpm"])
     frame_times = np.asarray(base.arrays["frame_times"])
@@ -124,7 +136,7 @@ def postprocess_timing(song, beats, audio_path, logger=None):
                 for frame, time in zip(beats["event_frames"], beats["event_times"])]
     operations = []
     diagnostics = {"raw_events": len(original), "raw_retained_notes": sum(item["count"] for item in original),
-                   "operations": operations}
+                   "operations": operations, "skipped_steps": sorted(skip)}
 
     def record_operation(stage, previous, current, moved_times=0):
         operations.append({"stage": stage, "before_events": len(previous), "after_events": len(current),
@@ -138,16 +150,25 @@ def postprocess_timing(song, beats, audio_path, logger=None):
         return [], {**diagnostics, "events": 0, "retained_notes": 0, "merged_events": 0}
     candidates = []
     spacing_removed, merged_events = 0, 0
-    for candidate in original:
-        if not candidates or candidate["time"] - candidates[-1]["time"] >= config.min_beat_time - 1e-9:
-            candidates.append(candidate.copy())
-        elif candidate["time"] - candidates[-1]["time"] <= config.min_time_diff + 1e-9:
-            candidates[-1]["count"] = max(candidates[-1]["count"], candidate["count"])
-            merged_events += 1
-        else:
-            spacing_removed += 1
-    record_operation("minimum_spacing", original, candidates)
-    volume, onset, silent_times = _legacy_timing_features(audio_path)
+    if "minimum_spacing" in skip:
+        candidates = [item.copy() for item in original]
+    else:
+        for candidate in original:
+            if not candidates or candidate["time"] - candidates[-1]["time"] >= config.min_beat_time - 1e-9:
+                candidates.append(candidate.copy())
+            elif candidate["time"] - candidates[-1]["time"] <= config.min_time_diff + 1e-9:
+                candidates[-1]["count"] = max(candidates[-1]["count"], candidate["count"])
+                merged_events += 1
+            else:
+                spacing_removed += 1
+        record_operation("minimum_spacing", original, candidates)
+    features = None
+
+    def legacy_features():
+        nonlocal features
+        if features is None:
+            features = _legacy_timing_features(audio_path)
+        return features
 
     def replace_times(stage, times, moving=False, drop_zero=False):
         nonlocal candidates, merged_events
@@ -179,21 +200,25 @@ def postprocess_timing(song, beats, audio_path, logger=None):
         return np.asarray([item["time"] for item in candidates], np.float64)
 
     iterations = max(0, int(config.map_filler_iters))
-    for pass_index, (threshold, index) in enumerate(((5.5 * 4, int(iterations / 2) + 1), (8 * 4, iterations - 1))):
-        if candidates and iterations and config.max_speed >= threshold:
-            replace_times(f"high_difficulty_fill_{pass_index}", fill_map_times_scale(times(), min(iterations - 1, max(0, index))))
-    align = config.use_fixed_bpm is None or config.use_fixed_bpm <= 0
+    if "high_difficulty_fill" not in skip:
+        for pass_index, (threshold, index) in enumerate(((5.5 * 4, int(iterations / 2) + 1), (8 * 4, iterations - 1))):
+            if candidates and iterations and config.max_speed >= threshold:
+                replace_times(f"high_difficulty_fill_{pass_index}", fill_map_times_scale(times(), min(iterations - 1, max(0, index))))
+    align = (config.use_fixed_bpm is None or config.use_fixed_bpm <= 0) and "bpm_alignment" not in skip
     if candidates and align:
         replace_times("initial_bpm_alignment", align_beats_on_bpm(times(), bpm), moving=True)
-    if candidates:
+    if candidates and "onset_snap" not in skip:
         replace_times("onset_snap", sanity_check_timing2(None, times(), audio_path=audio_path), moving=True, drop_zero=True)
-    if candidates:
+    if candidates and "start_end_fill" not in skip:
+        volume, onset, _ = legacy_features()
         replace_times("start_end_fill", _start_end_times(times(), volume, onset))
-    for index in range(iterations):
-        if not candidates or len(candidates) > config.max_speed * 10 / 40 * candidates[-1]["time"] * config.add_beat_intensity / 100:
-            break
-        replace_times(f"density_fill_{index}", fill_map_times_scale(times(), index))
-    if candidates and config.add_silence_flag:
+    if "density_fill" not in skip:
+        for index in range(iterations):
+            if not candidates or len(candidates) > config.max_speed * 10 / 40 * candidates[-1]["time"] * config.add_beat_intensity / 100:
+                break
+            replace_times(f"density_fill_{index}", fill_map_times_scale(times(), index))
+    if candidates and config.add_silence_flag and "silence_removal" not in skip:
+        *_, silent_times = legacy_features()
         replace_times("silence_removal", remove_silent_times(times(), silent_times))
     if candidates and align:
         replace_times("final_bpm_alignment", align_beats_on_bpm(times(), bpm), moving=True)
@@ -682,8 +707,158 @@ def enforce_note_flow_and_clearance(notes, chains=None, protect_retained=True):
     return stats
 
 
-def postprocess_notes(notes, event_times, logger=None):
-    """Run the shared legacy flow pass, then establish stable retained anchors."""
+def _detect_onsets(audio_path):
+    """Detected onset peaks in seconds — same librosa recipe as the legacy snap."""
+    import librosa
+    factor = config.thresh_onbeat / config.thresh_onbeat_orig
+    frames = lambda count: max(1, int(count * factor))
+    samples, rate = librosa.load(str(audio_path), sr=44100)
+    envelope = librosa.onset.onset_strength(y=samples, sr=rate, hop_length=512)
+    onsets = librosa.onset.onset_detect(onset_envelope=envelope, sr=rate, hop_length=512,
+                                        backtrack=False, pre_max=frames(5), post_max=frames(5),
+                                        pre_avg=frames(7), post_avg=frames(8),
+                                        delta=config.thresh_onbeat,
+                                        wait=frames(int(getattr(config, "v2_notes_onset_snap_wait", 4))))
+    return np.asarray(librosa.frames_to_time(onsets, sr=rate, hop_length=512), np.float64)
+
+
+def _snap_violated(note, t_new, near, siblings, index, effective, eps, window, gap):
+    """Hard-clearance check for ``note`` moved to ``t_new``.
+
+    ``near`` carries every other note inside the swing window at their current
+    times; ``siblings``/``index`` describe the same-hand sequence for the flow
+    pair checks. Mirrors ``clearance_violations``: same-cell simultaneity,
+    both swing directions and same-hand repeats.
+    """
+    cell = (note["x"], note["y"])
+    own_dir = effective.get(note["id"])
+    swept = lambda other: (set() if effective.get(other["id"]) is None
+                           else set(_swept_cells(other["x"], other["y"], effective[other["id"]])))
+    own = set() if own_dir is None else set(_swept_cells(note["x"], note["y"], own_dir))
+    for other in near:
+        dt = other["time"] - t_new
+        if abs(dt) > window:
+            continue
+        occupied = (other["x"], other["y"]) == cell
+        if abs(dt) <= eps:
+            if occupied:
+                return True
+            if other["hand"] != note["hand"] and (cell in swept(other) or (other["x"], other["y"]) in own):
+                return True
+        elif other["hand"] != note["hand"]:
+            clash = cell in swept(other) if dt < 0 else (other["x"], other["y"]) in own
+            if clash or occupied:
+                return True
+    if note["d"] != 8:
+        previous = next((siblings[i] for i in range(index - 1, -1, -1)
+                         if siblings[i]["time"] < t_new - eps), None)
+        if previous is not None and not _flow_legal(
+                note["d"], (previous["time"], previous["x"], previous["y"], effective.get(previous["id"])),
+                note["x"], note["y"], t_new, gap):
+            return True
+    following = next((siblings[i] for i in range(index + 1, len(siblings))
+                      if siblings[i]["time"] > t_new + eps), None)
+    if following is not None and following["d"] != 8 and not _flow_legal(
+            following["d"], (t_new, note["x"], note["y"], own_dir),
+            following["x"], following["y"], following["time"], gap):
+        return True
+    return False
+
+
+def snap_note_times(notes, chains, audio_path, duration, ratio=None, logger=None):
+    """Snap each note onto its nearest detected onset within a bounded window.
+
+    The window is ``ratio`` of the note's own same-hand inter-onset interval
+    (the smaller gap to its same-hand neighbours — per-note, per-hand), so a
+    note can never reach another note's clearance zone. A candidate move is
+    applied only when ``_snap_violated`` finds no same-cell, swing or
+    same-hand-flow conflict — the same rules the clearance fixpoint resolves.
+    Chain spans move with their anchor note. Returns diagnostics."""
+    stats = {"notes": len(notes), "moved": 0, "blocked": 0, "no_onset": 0,
+             "mean_shift_ms": 0., "max_shift_ms": 0.}
+    if audio_path is None or not notes:
+        return stats
+    ratio = float(getattr(config, "v2_notes_onset_snap_ioi_ratio", 0.15) if ratio is None else ratio)
+    if not np.isfinite(ratio) or ratio <= 0:
+        return stats
+    onsets = _detect_onsets(audio_path)
+    if not len(onsets):
+        return stats
+    from bisect import bisect_left, insort
+    eps = float(getattr(config, "min_time_diff", .02))
+    window = max(eps, float(getattr(config, "v2_cleanup_swing_window", .15) or 0.))
+    gap = float(getattr(config, "v2_cleanup_same_dir_gap", .1) or 0.)
+    ordered = sorted(notes, key=lambda item: (item["time"], item["id"]))
+    _, effective = _history_context(ordered, eps)
+    per_hand = {hand: [note for note in ordered if note["hand"] == hand] for hand in (0, 1)}
+    index = {note["id"]: i for siblings in per_hand.values() for i, note in enumerate(siblings)}
+    live = sorted((note["time"], note["id"]) for note in ordered)
+    lookup = {note["id"]: note for note in ordered}
+    anchored = {note["id"]: [chain for chain in chains if chain.get("anchor_id") == note["id"]]
+                for note in ordered}
+    shifts = []
+    for note in ordered:
+        siblings, i = per_hand[note["hand"]], index[note["id"]]
+        ioi = min(note["time"] - siblings[i - 1]["time"] if i else math.inf,
+                  siblings[i + 1]["time"] - note["time"] if i + 1 < len(siblings) else math.inf)
+        if not np.isfinite(ioi) or ioi <= 0:
+            continue
+        bound = ratio * ioi
+        near_onsets = onsets[np.abs(onsets - note["time"]) <= bound + 1e-9]
+        if not len(near_onsets):
+            stats["no_onset"] += 1
+            continue
+        t_new = float(near_onsets[np.argmin(np.abs(near_onsets - note["time"]))])
+        if t_new == note["time"]:
+            continue
+        lo = bisect_left(live, (t_new - window - 1e-9, -1))
+        hi = bisect_left(live, (t_new + window + 1e-9, math.inf))
+        near = [lookup[other] for _, other in live[lo:hi] if other != note["id"]]
+        delta = t_new - note["time"]
+        if any(chain["end_time"] + delta >= duration for chain in anchored[note["id"]]) \
+                or _snap_violated(note, t_new, near, siblings, i, effective, eps, window, gap):
+            stats["blocked"] += 1
+            continue
+        live.remove((note["time"], note["id"]))
+        insort(live, (t_new, note["id"]))
+        note["time"] = t_new
+        for chain in anchored[note["id"]]:
+            chain["time"] += delta
+            chain["end_time"] += delta
+        shifts.append(delta)
+        stats["moved"] += 1
+    if shifts:
+        stats["mean_shift_ms"] = float(np.mean(np.abs(shifts)) * 1e3)
+        stats["max_shift_ms"] = float(np.max(np.abs(shifts)) * 1e3)
+    _report(logger, f"Onset snap: {stats['moved']} notes moved, "
+                    f"{stats['blocked']} blocked, {stats['no_onset']} without onset in range")
+    return stats
+
+
+_NOTE_STEPS = ("mirroring", "initial_single_note_filter", "legacy_note_flow",
+               "flow_additions", "same_direction_recut", "final_single_note_filter",
+               "clearance")
+
+# Legacy v1 note mutators that may be bypassed in production: the controlled
+# comparisons in evaluation/evaluate_v2_postprocessing.py showed the flow pass
+# culls ~half of sampled model notes (realized NPS ~0.5x requested) while the
+# structural pass plus the clearance fixpoint already reach zero residual
+# violations. ``flow_additions`` only exists inside the legacy flow pass.
+LEGACY_NOTE_MUTATORS = ("mirroring", "legacy_note_flow")
+
+
+def postprocess_notes(notes, event_times, logger=None, skip=()):
+    """Run the shared legacy flow pass, then establish stable retained anchors.
+
+    ``skip`` names steps from ``_NOTE_STEPS`` to omit for controlled
+    comparisons: mirroring, legacy_note_flow and the in-flow adders
+    (``flow_additions``: emphasis, breaks, added dots) are legacy heuristics;
+    the same-direction recut and the clearance fixpoint are invariant fixes;
+    dedup/retained-anchor labeling is structural and always runs.
+    """
+    unknown = set(skip) - set(_NOTE_STEPS)
+    if unknown:
+        raise ValueError(f"Unknown note postprocessing steps: {sorted(unknown)}")
     from training.beat_models.data import reduce_notes
 
     operations = []
@@ -706,7 +881,10 @@ def postprocess_notes(notes, event_times, logger=None):
     times = np.asarray(sorted(set(float(time) for time in event_times)), np.float64)
     if not len(times) or not notes:
         return [], {"input_notes": len(notes), "retained_notes": 0, "heuristic_notes": 0, "notes": 0,
-                    "operations": operations, **differences([])}
+                    "operations": operations, "skipped_steps": sorted(skip),
+                    "pre_clearance": {"same_cell_pairs": 0, "swing_into_pairs": 0, "flow_repeats": 0},
+                    "note_clearance": None, "same_direction_recut_notes": None,
+                    "same_direction_recut_stream_notes": 0, **differences([])}
     groups = {time: [] for time in times}
     for note in notes:
         groups.setdefault(float(note["time"]), []).extend([int(note[key]) for key in ("x", "y", "hand", "d")])
@@ -729,9 +907,9 @@ def postprocess_notes(notes, event_times, logger=None):
         flattened = transform(flattened)
         record_operation(stage, previous, grouped_counts(flattened))
 
-    if config.gimme_more_notes_flag:
+    if config.gimme_more_notes_flag and "mirroring" not in skip:
         apply_operation("mirroring", _v2_mirroring)
-    if config.single_notes_only_flag:
+    if config.single_notes_only_flag and "initial_single_note_filter" not in skip:
         apply_operation("initial_single_note_filter", remove_double_notes)
     def relaxed_flow(values):
         # Sampled v2 model output already carries human-like variety; the
@@ -750,6 +928,9 @@ def postprocess_notes(notes, event_times, logger=None):
                                                           config.shift_blocks_up_down_flag),
                      "correct_notes_all_flag": getattr(config, "v2_cleanup_cross_hand_adjust",
                                                        config.correct_notes_all_flag)}
+        if "flow_additions" in skip:
+            overrides.update({"emphasize_beats_flag": False, "add_breaks_flag": False,
+                              "add_dot_notes": 0})
         previous = {key: getattr(config, key) for key in overrides}
         try:
             for key, value in overrides.items():
@@ -759,14 +940,15 @@ def postprocess_notes(notes, event_times, logger=None):
             for key, value in previous.items():
                 setattr(config, key, value)
 
-    apply_operation("legacy_note_flow", relaxed_flow)
+    if "legacy_note_flow" not in skip:
+        apply_operation("legacy_note_flow", relaxed_flow)
     flat_flips = {"n": 0}
-    if float(getattr(config, "v2_cleanup_same_dir_recut", 0.) or 0.) > 0:
+    if float(getattr(config, "v2_cleanup_same_dir_recut", 0.) or 0.) > 0 and "same_direction_recut" not in skip:
         gap = float(getattr(config, "v2_cleanup_same_dir_gap", 0.1) or 0.)
         apply_operation("same_direction_recut",
                         lambda values: _recut_same_direction_repeats(values, times, gap, flat_flips))
     # Emphasis and mirroring must not undo the user's single-note selection.
-    if config.single_notes_only_flag:
+    if config.single_notes_only_flag and "final_single_note_filter" not in skip:
         apply_operation("final_single_note_filter", remove_double_notes)
     structured, source = [], []
     last_kept, same_stroke_gap = {}, float(getattr(config, "v2_cleanup_same_dir_gap", .1) or 0.)
@@ -813,11 +995,17 @@ def postprocess_notes(notes, event_times, logger=None):
         for index in selected:
             structured[int(index)]["kind"] = "retained"
     retained = sum(note["kind"] == "retained" for note in structured)
-    clearance = enforce_note_flow_and_clearance(structured, protect_retained=False)
+    # Corrections-needed measure: violations the fixpoint receives per arm.
+    pre_clearance = clearance_violations(structured) if structured else \
+        {"same_cell_pairs": 0, "swing_into_pairs": 0, "flow_repeats": 0}
+    clearance = (enforce_note_flow_and_clearance(structured, protect_retained=False)
+                 if "clearance" not in skip else None)
     diagnostics = {"input_notes": len(notes), "retained_notes": retained,
-                   "same_direction_recut_notes": clearance["flow_recuts"],
+                   "same_direction_recut_notes": clearance["flow_recuts"] if clearance else None,
                    "same_direction_recut_stream_notes": flat_flips["n"],
+                   "pre_clearance": pre_clearance,
                    "note_clearance": clearance,
+                   "skipped_steps": sorted(skip),
                    "heuristic_notes": len(structured) - retained, "notes": len(structured),
                    "ids_assigned_after_cleanup": True, "times_changed": False,
                    "operations": operations, **differences(structured)}
@@ -934,7 +1122,8 @@ def validate_hazards(state, song, logger=None):
             continue
         lo = int(np.searchsorted(times, start - before, side="left"))
         hi = int(np.searchsorted(times, end + after, side="right"))
-        if any(_wall_contains(wall, note) for note in occupied[lo:hi]):
+        if any(_wall_contains(wall, cell) for note in occupied[lo:hi]
+               for cell in _swing_cells(note)):
             continue
         walls.append(wall)
     bombs = []
@@ -968,6 +1157,7 @@ def validate_arcs(state, song, logger=None, *, settings=None, probability=None):
     from training.pipeline_v2.policies import repaired
     from training.pipeline_v2.arc_policy import eligible_gap
     accepted = []
+    synthetic = 0
     for arc in original:
         if not config.add_slider_flag:
             continue
@@ -975,6 +1165,16 @@ def validate_arcs(state, song, logger=None, *, settings=None, probability=None):
             accepted.append(arc)
             continue
         ids = arc.get("endpoint_ids", [])
+        head = arc.get("synthetic_head")
+        if head is not None:
+            # Guidance arc into the first note: skips gap/movement/probability
+            # like the legacy turbo start but keeps occupancy clearance.
+            if not _synthetic_arc_ok(arc, head, ids, notes, occupied, state):
+                continue
+            arc["_legacy_clearance_checked"] = True
+            synthetic += 1
+            accepted.append(arc)
+            continue
         if len(ids) != 2 or any(identity not in notes for identity in ids):
             continue
         head, tail = (notes[identity] for identity in ids)
@@ -1012,7 +1212,246 @@ def validate_arcs(state, song, logger=None, *, settings=None, probability=None):
         arc["_legacy_clearance_checked"] = True
         accepted.append(arc)
     state["arcs"] = accepted
-    diagnostics = {"rejected_arcs": len(original) - len(accepted), "synthetic_start_arc": False,
+    diagnostics = {"rejected_arcs": len(original) - len(accepted), "synthetic_start_arc": synthetic,
                    "clearance_geometry": "sampled_endpoint_segment"}
     _report(logger, f"Arc clearance: {len(accepted)} existing-endpoint arcs accepted")
     return diagnostics
+
+
+def _synthetic_arc_ok(arc, head, ids, notes, occupied, state):
+    """Validate a turbo-start record; geometry stays arc data, never a note."""
+    if (len(ids) != 1 or ids[0] not in notes
+            or not _integer_geometry(head, ("x", "y", "d"))
+            or not (0 <= head["x"] < 4 and 0 <= head["y"] < 3 and 0 <= head["d"] < 9)):
+        return False
+    tail = notes[ids[0]]
+    end = arc.get("end_time", -1)
+    if (tail["hand"] != arc.get("hand") or tail["time"] != end
+            or not 0 <= arc.get("time", -1) < end
+            or head["x"] != tail["x"] or head["y"] != tail["y"] or head["d"] != tail["d"]):
+        return False
+    if any(chain["hand"] == arc["hand"] and chain["time"] < arc["end_time"] and chain["end_time"] > arc["time"]
+           for chain in state.get("chains", [])):
+        return False
+    gap = arc["end_time"] - arc["time"]
+    steps = max(1, int(math.ceil(gap / .01)))
+    samples = [{"time": arc["time"] + alpha * gap, "x": head["x"], "y": head["y"]}
+               for alpha in np.linspace(0, 1, steps + 1)]
+    if any(abs(sample["time"] - bomb["time"]) <= .1 and _same_cell(sample, bomb)
+           for sample in samples for bomb in state.get("bombs", [])):
+        return False
+    if any(wall["time"] - .1 <= sample["time"] <= wall["end_time"] + .1 and _wall_contains(wall, sample)
+           for sample in samples for wall in state.get("walls", [])):
+        return False
+    neighbors = [note for note in occupied if note.get("id") not in ids
+                 and arc["time"] - config.min_time_diff <= note["time"] <= arc["end_time"] + config.min_time_diff]
+    if any(abs(sample["time"] - note["time"]) <= config.min_time_diff and _same_cell(sample, note)
+           for sample in samples for note in neighbors):
+        return False
+    return True
+
+
+def _arc_sample_points(state):
+    """Sampled (time, x, y) positions along accepted arcs.
+
+    Straight endpoint-segment sampling — the same convention ``validate_arcs``
+    uses for its bomb/wall/note clearance, so decorative objects skip the same
+    volume arcs already reserve.
+    """
+    notes = {note["id"]: note for note in state.get("notes", [])}
+    points = []
+    for arc in state.get("arcs", []):
+        ids = arc.get("endpoint_ids", [])
+        head = arc.get("synthetic_head")
+        if head is not None:
+            if len(ids) != 1 or ids[0] not in notes:
+                continue
+            tail, head_pos = notes[ids[0]], head
+        else:
+            if len(ids) != 2 or any(identity not in notes for identity in ids):
+                continue
+            head_pos, tail = (notes[identity] for identity in ids)
+        gap = arc["end_time"] - arc["time"]
+        steps = max(1, int(math.ceil(gap / .01)))
+        for alpha in np.linspace(0, 1, steps + 1):
+            points.append({"time": arc["time"] + alpha * gap,
+                           "x": head_pos["x"] + alpha * (tail["x"] - head_pos["x"]),
+                           "y": head_pos["y"] + alpha * (tail["y"] - head_pos["y"])})
+    return points
+
+
+def calm_area_pulses(state, song):
+    """Beat-grid pulse times inside note-free stretches.
+
+    A gap between consecutive gameplay objects — notes as points, chains as
+    their full span — qualifies when its note-free span reaches
+    ``v2_calm_effects_min_gap_seconds``. ``v2_calm_effects_edge_seconds`` keeps
+    pulses clear of the boundary objects so real silence keeps its empty
+    space. Pulse times sit on the bpm beat grid anchored at zero (the same
+    grid ``align_beats_on_bpm`` and the export factor use) with
+    ``v2_calm_effects_division`` pulses per beat. Returns (pulses,
+    diagnostics); each pulse carries its per-gap ``index`` for alternating
+    placement.
+    """
+    base = _base(song)
+    duration, bpm = float(base.metadata["duration"]), float(base.metadata["bpm"])
+    min_gap = max(float(getattr(config, "v2_calm_effects_min_gap_seconds", 4.) or 0.), 0.)
+    edge = max(float(getattr(config, "v2_calm_effects_edge_seconds", 1.) or 0.), 0.)
+    start_seconds = max(float(getattr(config, "v2_calm_effects_start_seconds", 1.5) or 0.), 0.)
+    division = max(int(getattr(config, "v2_calm_effects_division", 1) or 1), 1)
+    diagnostics = {"min_gap_seconds": min_gap, "edge_seconds": edge, "division": division,
+                   "start_seconds": start_seconds, "bpm": bpm, "gaps": 0, "pulses": 0}
+    if not state.get("notes") or not np.isfinite([duration, bpm]).all() or bpm <= 0:
+        return [], diagnostics
+    occupied = [[float(note["time"]), float(note["time"])] for note in state["notes"]]
+    occupied += [[float(chain["time"]), float(chain["end_time"])] for chain in state.get("chains", [])]
+    occupied.sort()
+    merged = []
+    for start, end in occupied:
+        if merged and start <= merged[-1][1]:
+            merged[-1][1] = max(merged[-1][1], end)
+        else:
+            merged.append([start, end])
+    intervals, cursor, touched = [], 0., False
+    for start, end in merged:
+        intervals.append((cursor, start, touched))
+        cursor, touched = max(cursor, end), True
+    intervals.append((cursor, duration, touched))
+    step = 60. / bpm / division
+    pulses = []
+    for low, high, occupied_low in intervals:
+        if high - low < min_gap - 1e-9:
+            continue
+        interior = (max(low + edge if occupied_low else low, start_seconds),
+                    high - edge if high < duration else high)
+        grid = np.arange(math.ceil(interior[0] / step - 1e-9) * step, interior[1], step)
+        grid = grid[grid >= interior[0] - 1e-9]
+        for index, time in enumerate(grid):
+            pulses.append({"time": float(time), "index": index, "gap": diagnostics["gaps"]})
+        diagnostics["gaps"] += 1
+    diagnostics["pulses"] = len(pulses)
+    return pulses, diagnostics
+
+
+# Per-gap placement themes; each maps a pulse's within-gap index to a
+# (wall_lanes, bomb_lane, flash_types, top_slab) motif or ``None`` for a rest
+# pulse. Deterministic rotation keeps regeneration reproducible while each
+# calm gap gets its own look.
+_CALM_THEMES = ("alternate", "pairs", "stagger", "phrase", "rest4", "sparse", "twin")
+
+
+def _calm_theme(gap_index):
+    themes = _CALM_THEMES if getattr(config, "v2_calm_effects_variety", True) else _CALM_THEMES[:1]
+    return themes[gap_index % len(themes)]
+
+
+def _calm_motif(theme, index):
+    """Resolve one pulse to (wall_lanes, bomb_lane, flash_types, top_slab) or None.
+
+    ``alternate`` mirrors sides every pulse; ``pairs`` and ``phrase`` hold a
+    side for two or four pulses; ``stagger`` steps between full pillars and
+    top slabs; ``rest4`` breathes every fourth pulse; ``sparse`` only plays
+    even indices; ``twin`` flashes both edge lanes on every fourth pulse as an
+    accent frame. All placements stay on the safe edge lanes/bottom corners.
+    """
+    side = index % 2
+    if theme == "pairs":
+        side = (index // 2) % 2
+    elif theme == "phrase":
+        side = (index // 4) % 2
+    elif theme == "sparse":
+        if index % 2:
+            return None
+        side = (index // 2) % 2
+    elif theme == "rest4" and index % 4 == 3:
+        return None
+    accent = theme == "twin" and index % 4 == 0
+    return ((0, 3) if accent else (3 * side,),
+            None if accent else 3 - 3 * side,
+            (2, 3) if accent else (2 + side,),
+            theme == "stagger" and index % 2 == 1)
+
+
+def add_calm_effects(state, song, pulses):
+    """Place decorative edge-lane wall flashes and bottom-corner bombs.
+
+    Each gap resolves its ``_calm_theme`` motif per pulse — side patterns,
+    rest beats, twin accents and pillar/slab steps — while bombs keep the
+    bottom corner opposite the wall. Elements skip cells an accepted arc
+    already sweeps through; ``validate_hazards`` then applies the legacy
+    margins, allowed types/positions and note clearance. Placement is visual
+    only — no element forces movement.
+    """
+    counts = {"walls": 0, "bombs": 0}
+    if not pulses:
+        return counts
+    base = _base(song)
+    duration, bpm = float(base.metadata["duration"]), float(base.metadata["bpm"])
+    # quarter-beat flashes with a micro-epsilon over the validator's minimum
+    # duration — float subtraction would otherwise dip just below it.
+    wall_seconds = max(float(getattr(config, "v2_calm_effects_wall_beats", .25)) * 60. / bpm,
+                       config.obstacle_min_duration + 1e-6)
+    want_walls = bool(getattr(config, "v2_calm_effects_walls", True)) and config.add_obstacle_flag
+    want_bombs = bool(getattr(config, "v2_calm_effects_bombs", True))
+    arcs = _arc_sample_points(state) if (want_walls or want_bombs) else []
+    themes = {}
+    for pulse in pulses:
+        theme = themes.setdefault(pulse["gap"], _calm_theme(pulse["gap"]))
+        motif = _calm_motif(theme, pulse["index"])
+        if motif is None:
+            continue
+        wall_lanes, bomb_lane, _, slab = motif
+        time = pulse["time"]
+        if want_walls:
+            for lane in wall_lanes:
+                wall = {"kind": "wall", "x": lane, "y": 2 if slab else 0, "width": 1,
+                        "height": 1 if slab else 3,
+                        "time": time, "end_time": min(time + wall_seconds, duration)}
+                if not any(wall["time"] - .1 <= point["time"] <= wall["end_time"] + .1
+                           and _wall_contains(wall, point) for point in arcs):
+                    state["walls"].append(wall)
+                    counts["walls"] += 1
+        if want_bombs and bomb_lane is not None:
+            bomb = {"time": time, "x": bomb_lane, "y": 0}
+            if not any(abs(point["time"] - time) <= .1 and _same_cell(point, bomb)
+                       for point in arcs):
+                state["bombs"].append(bomb)
+                counts["bombs"] += 1
+    state["walls"].sort(key=lambda wall: (wall["time"], wall["x"]))
+    state["bombs"].sort(key=lambda bomb: (bomb["time"], bomb["x"]))
+    return counts
+
+
+def add_calm_lighting(state, pulses):
+    """Append laser flashes at calm pulses following each gap's motif.
+
+    Existing model events keep priority: a pulse at a time that already has an
+    event of the same type is skipped. Value 6 is a red flash — short by
+    design so the space between beats stays empty. Rest pulses stay dark.
+    """
+    if not pulses or not getattr(config, "v2_calm_effects_lighting", True):
+        return 0
+    from bisect import insort
+    eps = float(getattr(config, "min_time_diff", .02))
+    events = state["lighting"]
+    by_type = {}
+    for event in events:
+        by_type.setdefault(event["type"], []).append(event["time"])
+    added, themes = 0, {}
+    for pulse in pulses:
+        theme = themes.setdefault(pulse["gap"], _calm_theme(pulse["gap"]))
+        motif = _calm_motif(theme, pulse["index"])
+        if motif is None:
+            continue
+        for event_type in motif[2]:
+            times = by_type.setdefault(event_type, [])
+            location = int(np.searchsorted(times, pulse["time"]))
+            if location < len(times) and times[location] - pulse["time"] <= eps:
+                continue
+            if location and pulse["time"] - times[location - 1] <= eps:
+                continue
+            events.append({"time": pulse["time"], "type": event_type, "value": 6})
+            insort(times, pulse["time"])
+            added += 1
+    events.sort(key=lambda event: event["time"])
+    return added

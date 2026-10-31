@@ -438,7 +438,8 @@ def rollout(song, state, vocab, options, predict, encoder=None, progress=None, r
     masked = bool(options.get("hazard_feasibility_decode"))
     temperature = float(options.get("hazard_sample_temperature", 0.) or 0.)
     sampling = masked and temperature > 0
-    rate = _BombRateWindow(options) if options.get("hazard_bomb_rate_decode") else None
+    rate = (_BombRateWindow(options)
+            if options.get("hazard_bomb_rate_decode") and options.get("hazard_bombs_enabled", True) else None)
     rng = np.random.default_rng() if rng is None else rng
     mask_redirects, cells_masked = 0, 0
     feasibility_inputs = bool(preparation_defaults(options).get("hazard_feasibility_input"))
@@ -460,6 +461,8 @@ def rollout(song, state, vocab, options, predict, encoder=None, progress=None, r
         if presence is not None:
             bombs[0] *= float(np.asarray(presence).reshape(-1)[0])
         choice, fires = int(wall[0].argmax()), bombs[0] >= threshold
+        if not options.get("hazard_bombs_enabled", True):
+            fires = np.zeros_like(fires)
         if query["kind"] == "wall":
             if masked:
                 feasible = decoder.feasible_wall_classes(query)

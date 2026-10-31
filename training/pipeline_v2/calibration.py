@@ -291,7 +291,8 @@ def _hazard_replay(song, predictor, vocab, options, threshold, fixed, upstream_s
     temperature = float(options.get("hazard_sample_temperature", 0.) or 0.)
     sampling = masked and temperature > 0
     # With rate-matching on, the swept threshold acts as the bomb_rate_factor.
-    rate = _BombRateWindow({**options, "bomb_rate_factor": threshold}) if options.get("hazard_bomb_rate_decode") else None
+    rate = (_BombRateWindow({**options, "bomb_rate_factor": threshold})
+            if options.get("hazard_bomb_rate_decode") and options.get("hazard_bombs_enabled", True) else None)
     rng = np.random.default_rng(int(options.get("hazard_sample_seed", 0)))
     mask_redirects, cells_masked = 0, 0
     for index, query in enumerate(queries):
@@ -301,6 +302,8 @@ def _hazard_replay(song, predictor, vocab, options, threshold, fixed, upstream_s
         if presence is not None:
             bombs *= float(np.asarray(presence).reshape(-1)[0])
         choice, fires = int(wall.argmax()), bombs >= threshold
+        if not options.get("hazard_bombs_enabled", True):
+            fires = np.zeros_like(fires)
         if query["kind"] == "wall":
             if masked:
                 feasible = decoder.feasible_wall_classes(query)
@@ -420,7 +423,7 @@ def replay_stage(song, stage, predictor, vocab, options, threshold=.5, *, condit
             "objective": heads[OBJECTIVE_HEAD[stage]], "objects": objects, "diagnostics": diagnostics}
 
 
-def _validation_songs(dataset, stage):
+def _validation_songs(dataset, stage, shard=None):
     """Select lazy records before opening their arrays; TEST is never read."""
     records = getattr(dataset.songs, "records", None)
     if records is not None:
@@ -433,8 +436,13 @@ def _validation_songs(dataset, stage):
                     if identities.get(token, split) != split:
                         raise ValueError("Recording identity leaks across calibration splits")
                     identities[token] = split
+        position = 0
         for index, record in enumerate(records):
             if stage_split(dataset.manifest, stage, record) == "validation":
+                keep = shard is None or position % shard[1] == shard[0]
+                position += 1
+                if not keep:
+                    continue
                 song = dataset.songs[index]
                 if (song.base.song_id != record["song_id"]
                         or any(song.base.metadata.get(key) != record.get(key) for key in ("group_id", "split"))
@@ -443,9 +451,12 @@ def _validation_songs(dataset, stage):
                     raise ValueError("Calibration song metadata disagrees with recording identity")
                 yield song
         return
+    position = 0
     for song in dataset.songs:
         if stage_split(dataset.manifest, stage, {"song_id": song.base.song_id, **song.base.metadata}) == "validation":
-            yield song
+            if shard is None or position % shard[1] == shard[0]:
+                yield song
+            position += 1
 
 
 def _aggregate(reports, stage):
@@ -482,14 +493,12 @@ def _aggregate(reports, stage):
             "songs": [{key: value for key, value in report.items() if key != "objects"} for report in reports]}
 
 
-def calibrate_stage(dataset, stage, artifact, output, *, batch_size=128):
-    """Save one checkpoint-bound sidecar after a 99-point validation sweep."""
+def _calibration_setup(dataset, stage, artifact):
+    """Validated sparse-stage predictor and provenance metadata for replays."""
     from .runner import load_stage_artifact
 
     if stage not in SPARSE_STAGES:
         raise ValueError("Calibration supports hazards, arcs and lighting")
-    if isinstance(batch_size, bool) or not isinstance(batch_size, int) or batch_size < 1:
-        raise ValueError("Calibration batch_size must be a positive integer")
     options = dataset.manifest.get("data_settings", {})
     if not repaired(options, stage) or dataset.manifest.get("status") != "prepared":
         raise ValueError("Calibration requires real prepared data with the repaired stage policy")
@@ -515,31 +524,117 @@ def calibrate_stage(dataset, stage, artifact, output, *, batch_size=128):
         import tensorflow as tf
 
         predictor = tf.function(predictor, reduce_retracing=True)
-    rankings = {threshold: [] for threshold in THRESHOLDS}
-    validation = []
-    for song in _validation_songs(dataset, stage):
+    return {"predictor": predictor, "options": options, "artifact_metadata": artifact_metadata,
+            "compiled_calls": compiled_calls, "arc_controls": arc_controls,
+            "indexed_split": indexed_split, "overlay_fingerprint": overlay_fingerprint}
+
+
+def _calibration_shard(task):
+    """Spawn-pool worker: replay one validation-song shard, return counts."""
+    from .artifacts import load_dataset
+
+    dataset = load_dataset(task["dataset"])
+    stage = task["stage"]
+    setup = _calibration_setup(dataset, stage, task["artifact"])
+    predictor, options = setup["predictor"], setup["options"]
+    shard = (task["shard"], task["shards"])
+    if task["mode"] == "sweep":
+        rankings, validation = {}, []
+        for song in _validation_songs(dataset, stage, shard=shard):
+            if stage not in song.examples or not len(song.examples[stage].times):
+                continue
+            validation.append({"song_id": song.base.song_id, "group_id": song.base.metadata["group_id"]})
+            outputs = teacher_forced_outputs(song, stage, predictor, dataset.vocabularies, options, task["batch_size"])
+            upstream = (_reference_state(song, dataset.vocabularies, options, hazards=stage == "arcs")
+                        if stage != "lighting" else None)
+            for threshold in THRESHOLDS:
+                replay = replay_stage(song, stage, predictor, dataset.vocabularies, options, threshold,
+                                      conditioning="teacher_forced", outputs=outputs, upstream_state=upstream,
+                                      retain_objects=False)
+                rankings.setdefault(threshold, []).append({"heads": replay["heads"]})
+        return {"validation": validation, "rankings": rankings}
+    reports = {threshold: [] for threshold in task["thresholds"]}
+    for song in _validation_songs(dataset, stage, shard=shard):
         if stage not in song.examples or not len(song.examples[stage].times):
             continue
-        validation.append({"song_id": song.base.song_id, "group_id": song.base.metadata["group_id"]})
-        outputs = teacher_forced_outputs(song, stage, predictor, dataset.vocabularies, options, batch_size)
-        upstream = _reference_state(song, dataset.vocabularies, options, hazards=stage == "arcs") if stage != "lighting" else None
-        for threshold in THRESHOLDS:
-            replay = replay_stage(song, stage, predictor, dataset.vocabularies, options, threshold,
-                                  conditioning="teacher_forced", outputs=outputs, upstream_state=upstream, retain_objects=False)
-            rankings[threshold].append({"heads": replay["heads"]})
+        for threshold in task["thresholds"]:
+            reports[threshold].append(
+                replay_stage(song, stage, predictor, dataset.vocabularies, options, threshold, retain_objects=False))
+    return {"reports": reports}
+
+
+def calibrate_stage(dataset, stage, artifact, output, *, batch_size=128, workers=1, dataset_path=None,
+                    ar_grid=None):
+    """Save one checkpoint-bound sidecar after a 99-point validation sweep."""
+    if isinstance(batch_size, bool) or not isinstance(batch_size, int) or batch_size < 1:
+        raise ValueError("Calibration batch_size must be a positive integer")
+    if isinstance(workers, bool) or not isinstance(workers, int) or workers < 1:
+        raise ValueError("Calibration workers must be a positive integer")
+    if ar_grid is not None and (isinstance(ar_grid, bool) or not isinstance(ar_grid, (int, float))
+                                or not np.isfinite(ar_grid) or ar_grid <= 0 or ar_grid >= .5):
+        raise ValueError("Calibration ar_grid must be a step inside (0, .5)")
+    setup = _calibration_setup(dataset, stage, artifact)
+    predictor, options = setup["predictor"], setup["options"]
+    artifact_metadata = setup["artifact_metadata"]
+    compiled_calls = setup["compiled_calls"]
+    arc_controls, indexed_split = setup["arc_controls"], setup["indexed_split"]
+    overlay_fingerprint = setup["overlay_fingerprint"]
+    rankings = {threshold: [] for threshold in THRESHOLDS}
+    validation = []
+    if workers > 1:
+        if dataset_path is None:
+            raise ValueError("Parallel calibration requires the dataset path for worker loading")
+        import multiprocessing as mp
+
+        tasks = [{"dataset": str(dataset_path), "stage": stage, "artifact": str(artifact),
+                  "shard": index, "shards": workers, "batch_size": batch_size, "mode": "sweep"}
+                 for index in range(workers)]
+        with mp.get_context("spawn").Pool(workers) as pool:
+            for partial in pool.map(_calibration_shard, tasks):
+                validation.extend(partial["validation"])
+                for threshold, rows in partial["rankings"].items():
+                    rankings[threshold].extend(rows)
+    else:
+        for song in _validation_songs(dataset, stage):
+            if stage not in song.examples or not len(song.examples[stage].times):
+                continue
+            validation.append({"song_id": song.base.song_id, "group_id": song.base.metadata["group_id"]})
+            outputs = teacher_forced_outputs(song, stage, predictor, dataset.vocabularies, options, batch_size)
+            upstream = _reference_state(song, dataset.vocabularies, options, hazards=stage == "arcs") if stage != "lighting" else None
+            for threshold in THRESHOLDS:
+                replay = replay_stage(song, stage, predictor, dataset.vocabularies, options, threshold,
+                                      conditioning="teacher_forced", outputs=outputs, upstream_state=upstream, retain_objects=False)
+                rankings[threshold].append({"heads": replay["heads"]})
     if not validation:
         raise ValueError("Calibration requires nonempty validation stage examples")
     teacher = [{"threshold": threshold, **_aggregate(reports, stage)} for threshold, reports in rankings.items()]
     for row in teacher:
         del row["songs"]
     teacher.sort(key=lambda row: (row["objective"]["f1"], row["threshold"]), reverse=True)
+    # Teacher-forced ranking can pick a region far from the autoregressive
+    # optimum (proven on hazards and arcs); a coarse AR grid widens coverage.
     shortlist = teacher[:3]
+    ar_thresholds = sorted(
+        {candidate["threshold"] for candidate in shortlist}
+        | ({round(float(threshold), 2) for threshold in np.arange(ar_grid, 1., ar_grid)} if ar_grid else set()))
     reranked = []
-    for candidate in shortlist:
-        threshold = candidate["threshold"]
-        reports = [replay_stage(song, stage, predictor, dataset.vocabularies, options, threshold, retain_objects=False)
-                   for song in _validation_songs(dataset, stage) if stage in song.examples and len(song.examples[stage].times)]
-        reranked.append({"threshold": threshold, **_aggregate(reports, stage)})
+    if workers > 1:
+        import multiprocessing as mp
+
+        tasks = [{"dataset": str(dataset_path), "stage": stage, "artifact": str(artifact),
+                  "shard": index, "shards": workers, "batch_size": batch_size, "mode": "replay",
+                  "thresholds": ar_thresholds}
+                 for index in range(workers)]
+        with mp.get_context("spawn").Pool(workers) as pool:
+            partials = pool.map(_calibration_shard, tasks)
+        for threshold in ar_thresholds:
+            reports = [report for partial in partials for report in partial["reports"][threshold]]
+            reranked.append({"threshold": threshold, **_aggregate(reports, stage)})
+    else:
+        for threshold in ar_thresholds:
+            reports = [replay_stage(song, stage, predictor, dataset.vocabularies, options, threshold, retain_objects=False)
+                       for song in _validation_songs(dataset, stage) if stage in song.examples and len(song.examples[stage].times)]
+            reranked.append({"threshold": threshold, **_aggregate(reports, stage)})
     reranked.sort(key=lambda row: (row["objective"]["f1"], row["threshold"]), reverse=True)
     selected = reranked[0]
     score = selected["objective"]
@@ -554,7 +649,10 @@ def calibrate_stage(dataset, stage, artifact, output, *, batch_size=128):
               "split_identity": indexed_split, "stage_split_fingerprint": overlay_fingerprint,
               "reproducibility": {"arc_clearance_controls": arc_controls} if stage == "arcs" else {},
               "teacher_forced_ranking": teacher, "autoregressive_shortlist": reranked,
-              "selection": "highest autoregressive decoded F1 among top three teacher-forced thresholds; ties choose higher threshold",
+              "selection": ("highest autoregressive decoded F1 among top three teacher-forced thresholds; "
+                            "ties choose higher threshold") if not ar_grid else
+                           (f"highest autoregressive decoded F1 over a {ar_grid} grid plus the top three "
+                            "teacher-forced thresholds; ties choose higher threshold"),
               "positive_cases_detected": bool(score["reference_positives"] and score["true_positive"]),
               "gameplay_validated": False, **execution_identity()}
     report["runtime"]["compiled_calls"] = compiled_calls

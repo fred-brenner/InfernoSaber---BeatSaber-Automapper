@@ -319,6 +319,28 @@ def test_bomb_presence_head_emits_and_derives_loss():
         models.build_model("arcs", bomb_presence=True)
 
 
+def test_bombs_disabled_gate_suppresses_all_fires():
+    probs = np.zeros(12)
+    probs[9] = .95
+    base = {"notes": [], "chains": []}
+
+    def predict(inputs):
+        return {"wall": np.asarray([[0., 1., 0.]]), "bombs": np.asarray([probs])}
+
+    enabled = rollout(song(duration=.5), base, VOCAB,
+                      {**options(obstacle_time_gap=[0., 0.]), "bomb_threshold": .5}, predict)
+    disabled = rollout(song(duration=.5), base, VOCAB,
+                       {**options(obstacle_time_gap=[0., 0.]), "bomb_threshold": .5,
+                        "hazard_bombs_enabled": False}, predict)
+    rate = rollout(song(duration=.5), base, VOCAB,
+                   {**options(obstacle_time_gap=[0., 0.]), "bomb_threshold": .5,
+                    "hazard_bombs_enabled": False, "hazard_bomb_rate_decode": True,
+                    "bomb_rate_seconds": 1., "bomb_score_floor": 0., "bomb_rate_factor": 9.}, predict)
+    assert enabled["bomb_proposals"] > 0
+    assert disabled["bomb_proposals"] == rate["bomb_proposals"] == 0
+    assert disabled["bomb_rate_matching"] is False and rate["bomb_rate_matching"] is False
+
+
 def test_unmasked_rollout_keeps_legacy_reject_flow():
     opts = options(obstacle_time_gap=[0., 0.])
     state = {"notes": [{"time": .05, "x": 0, "y": 1, "hand": 0, "d": 8}], "chains": []}

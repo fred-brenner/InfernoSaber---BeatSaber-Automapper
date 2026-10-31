@@ -53,7 +53,7 @@ def _corruption_classes(dataset, stage):
     return None
 
 
-def _corrupt_history(examples, stage, rng, rate, drop, classes=None):
+def _corrupt_history(examples, stage, rng, rate, drop, classes=None, keep_guard=True):
     """Empty sampled positive history records, simulating missed decisions.
 
     Records stay occupied: a missed object is a NONE row at inference too.
@@ -110,9 +110,12 @@ def _corrupt_history(examples, stage, rng, rate, drop, classes=None):
         raise ValueError(f"History corruption is undefined for {stage}")
     # A fully emptied window teaches "fire under all-NONE history" — the poisoned
     # cold-start conditional. Restore the most recent positive record instead.
-    for row in np.flatnonzero((before & mask).any(axis=1) & ~after.any(axis=1)):
-        slots = np.flatnonzero(before[row] & mask[row])
-        corrupted[row, slots[-1]] = history[row, slots[-1]]
+    # Arcs can disable this: guaranteeing a recent attach lets the model shortcut
+    # to "fire iff history has an arc" — the cascade behind continuation spam.
+    if keep_guard:
+        for row in np.flatnonzero((before & mask).any(axis=1) & ~after.any(axis=1)):
+            slots = np.flatnonzero(before[row] & mask[row])
+            corrupted[row, slots[-1]] = history[row, slots[-1]]
     inputs = dict(examples.inputs)
     inputs["history"] = corrupted
     return StageExamples(inputs, examples.targets, examples.weights, examples.times)
@@ -145,6 +148,7 @@ def batches(dataset, stage, split=None, batch_size=128, shuffle=False, rng=None,
             classes = _corruption_classes(dataset, stage) if corruption["rate"] > 0 else None
             examples = _corrupt_history(examples, stage, corruption_rng,
                                         corruption["rate"], corruption["drop"],
+                                        keep_guard=corruption.get("keep_guard", True),
                                         classes=classes)
         order = np.arange(len(examples.times))
         if shuffle:
@@ -410,6 +414,7 @@ def train_stage(dataset, stage, output, dry_run=True, epochs=None, batch_size=No
     report = {"kind": "v2_stage_training", "stage": stage, "status": "untrained", "dry_run": bool(dry_run),
               "optimizer_steps": 0, "conditioning": "reference", "history_conditioning": "strictly-preceding-teacher-forced",
               "history_corruption": {"rate": settings["history_corrupt_rate"], "drop": settings["history_corrupt_drop"],
+                                     "keep_guard": settings["history_corrupt_keep_guard"],
                                      "scope": "train split inputs only; validation/test stay reference"},
               "compatibility": identity, "architecture": architecture_settings(stage), **settings,
               "epochs": epochs, "batch_size": batch_size, "splits": counts,
@@ -433,7 +438,8 @@ def train_stage(dataset, stage, output, dry_run=True, epochs=None, batch_size=No
                                balance=balance, vocabularies=dataset.vocabularies if sparse else None)
     rng = np.random.default_rng(settings["seed"])
     corrupt_rng = np.random.default_rng(np.random.SeedSequence(settings["seed"]).spawn(1)[0])
-    corruption = {"rate": settings["history_corrupt_rate"], "drop": settings["history_corrupt_drop"]}
+    corruption = {"rate": settings["history_corrupt_rate"], "drop": settings["history_corrupt_drop"],
+                  "keep_guard": settings["history_corrupt_keep_guard"]}
     history = {"loss": [], "val_loss": [], "val_pr_auc": []}
     epoch_performance = []
     mode = settings["monitor_mode"]

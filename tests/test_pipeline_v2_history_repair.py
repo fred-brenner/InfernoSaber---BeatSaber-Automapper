@@ -207,6 +207,26 @@ class TestHistoryCorruption:
         for old, new in zip(clean, batches(dataset, "arcs", "train", batch_size=64)):
             np.testing.assert_array_equal(new.inputs["history"], old.inputs["history"])
 
+    def test_full_corruption_without_keep_guard_may_empty_windows(self, dataset):
+        from training.pipeline_v2.runner import batches
+
+        clean = list(batches(dataset, "arcs", "train", batch_size=64))
+        corrupted = list(batches(dataset, "arcs", "train", batch_size=64,
+                                 corruption={"rate": 1., "drop": 1., "keep_guard": False},
+                                 corruption_rng=np.random.default_rng(0)))
+        emptied = 0
+        for old, new in zip(clean, corrupted):
+            had = (old.inputs["history"] > 0).any(axis=-1)
+            kept = (new.inputs["history"] > 0).any(axis=-1)
+            emptied += int((had.any(axis=1) & ~kept.any(axis=1)).sum())
+            for key, value in old.inputs.items():
+                if key != "history":
+                    np.testing.assert_array_equal(new.inputs[key], value)
+            for name in ("targets", "weights"):
+                for key, value in getattr(old, name).items():
+                    np.testing.assert_array_equal(getattr(new, name)[key], value)
+        assert emptied > 0  # rate=1/drop=1 always empties; no record restored
+
     def test_zero_rate_is_a_noop(self, dataset):
         from training.pipeline_v2.runner import batches
 

@@ -94,7 +94,7 @@ reports failures instead of displaying unconditional success.
 ## Production stages and controls
 
 The order is audio/BPM → intensity/timing → timing cleanup → positions/arrows →
-legacy note cleanup → multiplier → hazards → arcs → package. V1 lighting uses
+note cleanup → multiplier → hazards → arcs → package. V1 lighting uses
 the cleaned gameplay timing sequence, with audio latents from the current
 `FixedEncoder`. It preserves the legacy 16-step block convention and pairs
 decoded events with the timestamp prefix. For `N` cleaned gameplay timestamps,
@@ -144,6 +144,18 @@ remaining position movers (`shift_blocks_up_down`, `correct_notes_all`), and
 `correct_notes_all_flag` and `sanity_direction_recut_flag` defaults preserve
 the v1 cleanup unchanged.
 
+As of 2026-10-31 `v2_cleanup_note_heuristics = False` skips the legacy v1 note
+mutators entirely — mirroring (`gimme_more_notes`) and the whole legacy flow
+pass including its emphasis/break/dot additions (`LEGACY_NOTE_MUTATORS` in
+`v2_postprocessing.py`). The controlled comparisons below showed the flow pass
+culled ~half of sampled model notes (realized NPS ~0.45× requested at all
+tested difficulties) while the structural pass — per-hand dedup, retained
+labeling — plus the direction recut and clearance fixpoint already leave zero
+residual violations on raw model output; removing the mutators makes realized
+NPS track the request (~0.8–1.2×). Set the flag `True` to restore the legacy
+cleanup for A/B checks. The `v2_cleanup_*` overrides above now only matter
+when the flag is enabled.
+
 Hard note invariants run as a bounded fixpoint
 (`enforce_note_flow_and_clearance`) both after dedup and once more after
 multiplier expansion, with retained-model notes contract-fixed whenever an
@@ -186,8 +198,10 @@ extra notes remain separate. Stable note IDs anchor expansions and arc endpoints
 Invalid/duplicate expansions and collisions are rejected without moving anchors.
 Single-note mode suppresses emphasis/mirroring conflicts and multiplier expansion.
 V2 supplies all bombs, walls and arcs, filtered by applicable legacy options and
-clearance against final notes and chain occupancy. Arcs require existing same-hand
-endpoints. The old synthetic slider turbo start is disabled. Current learned
+clearance against final notes and chain occupancy. Ordinary arcs require existing
+same-hand endpoints; the turbo-start guidance arc ends at each hand's first note
+with a synthetic head at `0.3 × t_first` (arc geometry only, never a note).
+Current learned
 thresholds remain unchanged for legacy bundles; absent arcs are reported, with no
 procedural fallback. Repaired production replacement artifacts select versioned
 hazard and arc policies. Experimental v2 lighting policies do not affect
@@ -202,6 +216,83 @@ autoregressive positive-case evaluation: **0/358 validation** and **0/66 curated
 arcs recovered. The disposable Insane packages also contain no arcs. Other stage
 assets are unchanged, and the previous bundle remains available for rollback.
 See the [evaluation and backup paths](baseline.md#arc-only-deployment-and-failed-positive-case-evaluation-2026-10-19).
+
+The 2026-10-31 arcs revert sets `v2_arcs_heuristic = True`: production arcs again
+use the pre-model implementation — adjacent same-hand endpoint pairs gated by
+`slider_time_gap`, `slider_probability`, `slider_movement_minimum` and the
+shared bomb/wall/note clearance in `validate_arcs`. The arcs model checkpoint
+stays in the bundle but is not decoded (`v2_arcs_heuristic = False` restores the
+model path); three repaired arms (E/G/H) found no usable autoregressive attach
+operating point — see [baseline](baseline.md). The legacy turbo start is active
+again through `slider_turbo_start`: each hand's first note receives a
+`synthetic_head` guidance arc (head spec on the record, one real endpoint), so
+the first cut direction is signalled before the map begins.
+
+The 2026-10-31 walls revert sets `v2_walls_heuristic = True`: production walls
+again use the pre-model `gen_obstacles` rule generator — obstacles fill spans
+where a lane stayed note-free, and `validate_hazards` then applies the legacy
+margins, allowed types/positions and note clearance. The hazards model stage
+is skipped entirely (bomb decoding was already disabled via
+`v2_hazard_bombs_enabled = False`); the checkpoint stays in the bundle and
+`v2_walls_heuristic = False` restores model decoding. Live playtests showed
+the model holding walls continuously at fixed spots and colliding with notes.
+
+The same-day wall clearance hardening closes two containment gaps: the lane
+scan now gives notes off the event grid (onset-snapped notes, multiplier
+copies) their own one-note groups — previously invisible, they could be
+spanned by proposals — and `validate_hazards` rejects a wall when any note's
+full sweep volume (not just its centre cell) intersects the wall box inside
+the `obstacle_time_gap` margins, matching the bomb rule. Exported packages
+verify zero swing/box overlaps.
+
+The 2026-10-31 onset snap adds `snap_note_times` (`v2_notes_onset_snap = True`):
+after note cleanup and before the retained snapshot/multiplier each note may
+move onto its nearest librosa onset peak within `v2_notes_onset_snap_ioi_ratio`
+(default `0.15`) of its own same-hand inter-onset interval — the smaller gap to
+its same-hand neighbours, evaluated per note. A candidate move is rejected when
+it would create a same-cell, swing-volume or same-hand-flow conflict against
+any other note (either hand) at their current times — the same rules the
+clearance fixpoint resolves — or push a chain past the song end; the note then
+keeps its model time. Running before the multiplier keeps the retained-notes
+invariant intact and lets expansion copies inherit snapped anchor offsets.
+`event_times` stay on the timing grid: lighting and the note-free wall spans
+still anchor there while shifted notes are protected by `validate_hazards`
+containment instead. Diagnostics land under `onset_snap` (`moved`, `blocked`,
+`no_onset`, `mean_shift_ms`, `max_shift_ms`); `v2_notes_onset_snap = False`
+disables the step for A/B. The detector reuses the legacy librosa
+spectral-flux recipe — a nine-method comparison (aubio, superflux, percussive,
+RMS, backtrack, uniform control) found it is the consensus peak set and the
+best suited for snap targets — with a shorter refractory
+(`v2_notes_onset_snap_wait = 4` frames instead of the legacy 8) for coverage;
+`thresh_onbeat` stays the peak threshold.
+
+The 2026-10-31 calm-effects stage (`v2_calm_effects = True`) fills note-free
+stretches the model intentionally leaves empty — a requested behaviour — with
+visual pulses instead of notes. `calm_area_pulses` finds gaps between gameplay
+objects (notes as points, chains as full spans) of at least
+`v2_calm_effects_min_gap_seconds` (default `4.0`) and emits beat-grid pulse
+times (`v2_calm_effects_division` per beat, anchored on the bpm grid at zero);
+`v2_calm_effects_edge_seconds` (default `1.0`) keeps pulses clear of the
+boundary objects so real silence keeps its empty space and the stage never
+reaches into played sections, and `v2_calm_effects_start_seconds` (default
+`1.5`) additionally keeps the map opening quiet. `add_calm_effects` resolves
+a per-gap placement theme — deterministic rotation through `alternate`,
+`pairs`, `stagger`, `phrase`, `rest4`, `sparse` and `twin` motifs
+(`v2_calm_effects_variety = False` restores the plain alternation) — placing
+`v2_calm_effects_wall_beats`-long wall flashes on the edge lanes (`x` 0/3,
+`v2_calm_effects_walls`) and bottom-corner bombs opposite the wall
+(`v2_calm_effects_bombs`), skipping cells an accepted arc already sweeps;
+`validate_hazards` then applies the same legacy margins, allowed types and
+note containment as generated walls, so no decorative object can collide with
+a note. `add_calm_lighting` merges matching left/right laser flash events
+(`v2_calm_effects_lighting`, types 2/3 value 6, both lasers on accent pulses,
+none on rest beats) into the retained v1 lighting output, skipping pulse
+times a model event of the same type already occupies. Each element toggle
+can disable its object family independently, and `add_obstacle_flag` still
+gates all walls including decorative ones. Placement is visual only —
+nothing forces movement or a cut — and the note stream is never modified;
+diagnostics land under `calm_effects` (`gaps`, `pulses`, `walls`, `bombs`,
+`lighting_events`, `hazard_clearance`).
 
 The 2026-10-20 hazard-only update also selects the repaired quarter-beat policy.
 Its checkpoint-bound bomb threshold is **0.97**; wall geometry remains categorical.
@@ -256,6 +347,50 @@ between calls. Reports record the controls and requested/effective NPS under
 `intensity_postprocessing`; prediction NPZ files save `raw_intensity`, adjusted
 `intensity`, and scalar `conditioning_nps`. Training, prepared targets and model
 artifacts retain their original contracts.
+
+## Postprocessing ablation comparisons
+
+`evaluation/evaluate_v2_postprocessing.py` isolates the legacy timing/note
+postprocessing contributions on real recordings. Both `postprocess_timing`
+and `postprocess_notes` accept an optional ``skip`` set naming steps to omit
+(`_TIMING_STEPS`/`_NOTE_STEPS` in `map_creation/v2_postprocessing.py`); the
+tool injects arm-specific wrappers through `generate(postprocessors=...)` and
+forces the multiplier's NONE class through a predictor wrapper — production
+code and defaults are unchanged. Each (song, requested NPS) pair reruns all
+arms with the same decoder seed so arms stay paired; raw intensity shares are
+cached per song. Diagnostic-only requests may also skip ``clearance`` and
+``minimum_spacing``.
+
+```bash
+python -m evaluation.evaluate_v2_postprocessing --plan --output /tmp/x
+python -m evaluation.evaluate_v2_postprocessing --execute \
+  --songs "BWB - Break the Horizon" "Bunker Machen Laut" --nps 3,5,8 \
+  --output ../Data/training/evaluate_beats/results/v2-postprocessing
+```
+
+Arms cover the all-steps legacy baseline, timing-only subsets (minimal, no fills,
+no alignment/snap, no silence), note-only subsets (minimal, no added notes),
+the multiplier alone and the raw model stream. Metrics include per-step
+event/note deltas, retained-vs-added events, snap distance to raw model
+times, distance to detected onsets and BPM grid, note composition and
+direction histograms, violations the fixpoint receives (`pre_clearance`) and
+leaves (`residual`), per-stage seconds, and downstream hazard/arc counts.
+Per-run note/event arrays are saved as NPZ under `arrays/`; incremental
+`records.jsonl` survives partial runs. These are internal consistency
+comparisons — they do not establish gameplay quality or human-map agreement.
+
+2026-10-31 results (2 songs × NPS 3/5/8 × 10 arms, seed-paired): raw model
+events already land ~21ms from detected onsets (99% within 50ms), yet the
+timing model under-produces events ~3-4× versus requested density, so the
+legacy fills stay load-bearing. Conversely the legacy note flow pass culled
+~50-60% of sampled notes — `full` realized only 1.25/2.12/4.56 NPS at
+requests 3/5/8 while `notes_minimal` (structure + clearance only) realized
+3.21/4.68/9.55 — which motivated skipping `LEGACY_NOTE_MUTATORS` in
+production. Mirroring/emphasis additions were ~round-tripped through the
+flow cull (net +1-3%). The learned multiplier was near-inert (≤4 accepted
+expansions of ~20-40 proposals per song) but costs ~1s and remains enabled.
+All arms reached zero residual violations — the clearance fixpoint alone
+enforces the hard invariants.
 
 ## Packages and diagnostics
 

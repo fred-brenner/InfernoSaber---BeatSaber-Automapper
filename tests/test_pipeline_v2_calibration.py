@@ -432,6 +432,28 @@ def test_arc_calibration_uses_effective_group_overlay_without_opening_test_or_re
     assert sum(song.base.metadata["split"] == "train" for song in selected) == 4
 
 
+def test_validation_song_shards_partition_without_overlap_or_loss():
+    summaries = [{"song_id": f"song-{index}", "group_id": f"group-{index}",
+                  "split": "validation" if index % 3 else "train", "positive_count": 1}
+                 for index in range(20)]
+
+    class Songs:
+        records = summaries
+
+        def __getitem__(self, index):
+            record = summaries[index]
+            return SimpleNamespace(base=SimpleNamespace(song_id=record["song_id"], metadata=record))
+
+    dataset = SimpleNamespace(songs=Songs(), manifest={"stage_splits": {}})
+    whole = [song.base.song_id for song in calibration._validation_songs(dataset, "lighting")]
+    shards = [[song.base.song_id for song in calibration._validation_songs(dataset, "lighting", shard=(index, 3))]
+              for index in range(3)]
+    assert sorted(song for part in shards for song in part) == sorted(whole)
+    assert sum(len(part) for part in shards) == len(whole)
+    assert all(shard == [song for position, song in enumerate(whole) if position % 3 == index]
+               for index, shard in enumerate(shards))
+
+
 def test_calibration_rejects_indexed_audio_alias_drift_and_cross_split_leakage():
     song = _lighting_song()
 

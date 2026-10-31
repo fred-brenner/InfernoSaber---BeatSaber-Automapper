@@ -7,7 +7,7 @@ from typing import Optional
 # config file for all important values
 # used in multiple codes
 ########################################
-InfernoSaber_version = "1.7.2.app1-reinstall"  # coded into the info.dat file
+InfernoSaber_version = "2.0.0.app1-reinstall"  # coded into the info.dat file
 
 
 def get_clean_version(version: Optional[str] = None) -> str:
@@ -42,12 +42,27 @@ v2_compile_inference = True
 v2_hazard_feasibility_decode = False
 # With feasibility decode on: sample among legal options at this temperature (0 = argmax).
 v2_hazard_sample_temperature = 0.0
+# Walls-only acceptance (2026-10-30): bomb placement disabled at decode — no
+# head/head-combination produced a usable autoregressive operating point yet.
+# Revisit entry lives in TODO.md; set True to re-enable bomb firing.
+v2_hazard_bombs_enabled = False
 # Experimental: rate-matching bomb decode — fire top-ranked eligible cells while the
 # trailing-window placed count lags the model's own expected bomb mass.
 v2_hazard_bomb_rate_decode = False
 v2_hazard_bomb_rate_seconds = 2.0   # trailing window for expected-vs-placed density
 v2_hazard_bomb_score_floor = 0.05   # minimum eligible-cell score to place at all
 v2_hazard_bomb_rate_factor = 0.0    # scales predicted mass; 0 = use calibrated threshold
+# Walls reverted to the pre-model implementation (2026-10-31): the legacy
+# gen_obstacles rule generator fills note-free lane spans and validate_hazards
+# applies the legacy margins/clearance — the model placed continuous walls at
+# fixed spots interfering with notes. The whole hazards model stage is skipped
+# (bombs already off); set False to decode walls with the model again.
+v2_walls_heuristic = True
+# Arcs reverted to the pre-model implementation (2026-10-31): adjacent same-hand
+# pairs gated by slider_time_gap/slider_probability/slider_movement_minimum in
+# validate_arcs. The arcs model had no usable autoregressive operating point
+# (see docs/baseline.md Arm E/G/H); set False to decode with the model again.
+v2_arcs_heuristic = True
 # Sample positions/arrows categories at this temperature (0 = argmax). Sampling
 # replaces the legacy random_note_map_factor mixture for note decoding.
 v2_note_sample_temperature = 0.9
@@ -152,11 +167,38 @@ v2_cleanup_edge_recut = False      # edge cuts are legal (swing may exit the gri
 v2_cleanup_cell_clash = True       # simultaneous notes must never share a cell (any hands)
 v2_cleanup_swing_clash = True      # no other-hand note in a cut's swept cells (approach+cut+exit)
 v2_cleanup_swing_window = .15      # forward horizon (s): a later-standing block still in reach
+v2_cleanup_note_heuristics = False  # run the legacy v1 note mutators (mirroring + flow pass
+                                   # incl. emphasis/break/dot additions); False keeps model
+                                   # notes — structural dedup, same-direction recut and the
+                                   # clearance fixpoint still apply (docs/generation-v2.md)
+v2_notes_onset_snap = True          # snap each note onto its nearest detected onset peak after
+                                   # the clearance fixpoint; bounded per note/hand, no model
+v2_notes_onset_snap_ioi_ratio = 0.15  # max shift as fraction of the note's own same-hand IOI
+                                   # (min of prev/next gap) — a note can never reach another
+                                   # note's clearance zone; 0 disables the snap effectively
+v2_notes_onset_snap_wait = 4         # onset-detect refractory in envelope frames (~46 ms at
+                                   # hop 512/44.1 kHz); the legacy snap uses 8 — shorter wins
+                                   # coverage at equal peak quality (docs/baseline.md)
 v2_arrow_approach_prior = 0.6      # override arrow with deterministic approach direction when the
                                    # hand approaches axis-aligned and model top prob is below this; 0 disables
 v2_arrows_variety = 0.5            # blend share of the reference bundle's arrows model at decode:
                                    # 0 = production arrows only, 1 = reference arrows only
 v2_arrows_reference_bundle = "../Data/model/v2_expert_noterepair-c50"  # variety (history-corrupted) arrows
+
+# Calm-area decoration (2026-10-31): note-free stretches keep zero notes but get
+# beat-synced visual pulses — short edge-lane walls, bottom-corner bombs and
+# alternating side-laser flashes — like human maps that decorate silent parts
+# without forcing movement. Master switch plus per-element toggles.
+v2_calm_effects = True             # decorative pulses inside note-free gaps
+v2_calm_effects_walls = True       # short alternating edge-lane wall flashes (add_obstacle_flag still applies)
+v2_calm_effects_bombs = True       # alternating bottom-corner bombs
+v2_calm_effects_lighting = True    # alternating left/right laser flash events
+v2_calm_effects_min_gap_seconds = 4.0   # note-free span required before pulses start
+v2_calm_effects_edge_seconds = 1.0      # clearance kept around boundary notes/chains
+v2_calm_effects_start_seconds = 1.5     # no pulses before this song time (quiet map open)
+v2_calm_effects_division = 1            # pulses per beat (1 = every beat, 2 = eighths)
+v2_calm_effects_wall_beats = 0.25       # flash wall duration as a beat fraction
+v2_calm_effects_variety = True          # rotate placement themes per gap (False = alternate only)
 
 add_waveform_pattern_flag = 0   # [0: off, 1: on, 2: double on]
 waveform_pattern = [
@@ -401,8 +443,9 @@ pipeline_v2_hazard_context_back_seconds = 0.5  # note-space lookback for hazard 
 pipeline_v2_hazard_context_bins = 10  # equal bins spanning [now-back, now+forward)
 pipeline_v2_hazard_feasibility_input = True  # gated: legal wall/bomb masks as hazard model inputs
 # Experimental Arm F: factorized hazard bomb head — a query-level presence sigmoid
-# multiplied into cell scores at decode. Supervision is derived from cell targets.
-hazards_bomb_presence = True
+# multiplied into cell scores at decode. Evaluated 2026-10-30: improved TF signal
+# but no usable autoregressive operating point and walls regressed — keep off.
+hazards_bomb_presence = False
 
 # Repaired sparse-stage targets; recorded in each new dataset, never applied to old artifacts.
 pipeline_v2_repair_sparse_stages = True
@@ -561,9 +604,13 @@ arcs_activation = 'relu'
 arcs_history_dropout = 0.1
 arcs_loss_weights = {'attach': 1.0, 'shape': 1.0, 'anchor': 1.0}
 arcs_shape_bounds = (0.0, 2.0)  # mu/tmu; out-of-range source controls are masked and reported
-arcs_enabled_song_supervision = True
+# Arm H-arcs: supervise attach negatives on arc-free songs too — ~72% of Arm E
+# false attaches land on songs with zero supervised attach gradient (2026-10-30).
+arcs_enabled_song_supervision = False
 arcs_history_corrupt_rate = 0.5
 arcs_history_corrupt_drop = 0.5
+# Arm G evaluated keep_guard=False and regressed (2026-10-30); restored.
+arcs_history_corrupt_keep_guard = True
 arcs_negative_supervision_weight = 0.5
 
 # Event prediction model configuration

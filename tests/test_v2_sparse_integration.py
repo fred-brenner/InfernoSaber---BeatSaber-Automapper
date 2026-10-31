@@ -94,8 +94,13 @@ def _lighting(times, encoder):
 
 def _generate(song, options):
     vocab = _vocab()
-    return generate(song, 4., _predictors(vocab), lambda times: np.zeros((len(times), 16), np.float32),
-                    options, vocab, lighting_generator=_lighting, postprocessors=_processors(), random_factor=0)
+    originals = config.v2_arcs_heuristic, config.v2_walls_heuristic
+    config.v2_arcs_heuristic = config.v2_walls_heuristic = False
+    try:
+        return generate(song, 4., _predictors(vocab), lambda times: np.zeros((len(times), 16), np.float32),
+                        options, vocab, lighting_generator=_lighting, postprocessors=_processors(), random_factor=0)
+    finally:
+        config.v2_arcs_heuristic, config.v2_walls_heuristic = originals
 
 
 def test_repaired_production_all_sparse_families_serialize_and_preserve_audio_source(monkeypatch):
@@ -141,6 +146,8 @@ def test_repaired_production_keeps_native_chains_with_all_other_object_families(
     monkeypatch.setattr(config, "slider_probability", 1.)
     monkeypatch.setattr(config, "slider_movement_minimum", 0.)
     monkeypatch.setattr(config, "add_slider_flag", True)
+    monkeypatch.setattr(config, "v2_arcs_heuristic", False)
+    monkeypatch.setattr(config, "v2_walls_heuristic", False)  # model decode: bombs/arcs/walls all asserted
     vocab = _vocab()
     vocab["multiplier"].append({"kind": "chain", "dx": 1, "dy": 0,
                                 "span": .1, "slices": 3, "squish": .75})

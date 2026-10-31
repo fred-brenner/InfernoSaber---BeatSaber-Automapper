@@ -7,6 +7,7 @@ its independent review stops; this path uses concrete application postprocessors
 from copy import deepcopy
 from numbers import Real
 from time import perf_counter
+from types import SimpleNamespace
 
 import numpy as np
 
@@ -162,6 +163,74 @@ _DIRECTION_VECTORS = {0: (0, 1), 1: (0, -1), 2: (-1, 0), 3: (1, 0),
                       4: (-1, 1), 5: (1, 1), 6: (-1, -1), 7: (1, -1), 8: (0, 0)}
 
 
+def _heuristic_wall_candidates(notes, event_times):
+    """Legacy rule-based obstacles on the final note stream.
+
+    ``gen_obstacles`` fills spans where a lane stayed note-free (the original
+    v1 obstacle model); ``validate_hazards`` then applies the legacy margins
+    and note clearance. Grid events anchor obstacle spans as before; notes off
+    the event grid (onset-snapped notes, multiplier copies) add their own
+    one-event groups so the lane scan can never span them, while grid events
+    left empty keep their ``times_empty`` split-marker role.
+    """
+    from .gen_obstacles import calculate_obstacles
+    eps = max(float(getattr(config, "min_time_diff", .02)), 1e-6)
+    groups = {float(time): [] for time in event_times}
+    extra = []  # (time, flat fields) clusters for notes not on the event grid
+    for note in sorted(notes, key=lambda note: (note["time"], note.get("id", 0))):
+        fields = [int(note[key]) for key in ("x", "y", "hand", "d")]
+        group = groups.get(float(note["time"]))
+        if group is not None:
+            group.extend(fields)
+        elif extra and float(note["time"]) - extra[-1][0] <= eps:
+            extra[-1][1].extend(fields)
+        else:
+            extra.append((float(note["time"]), fields))
+    clustered = dict(extra)
+    timings = np.asarray(sorted(list(groups) + list(clustered)), np.float64)
+    if not len(timings):
+        return []
+    try:
+        obstacles = calculate_obstacles([groups.get(time, clustered.get(time, []))
+                                         for time in timings], timings)
+    except IndexError:
+        return []  # no note-free spans: the legacy sorter cannot handle empty
+    return [{"x": int(obst[1]), "y": int(obst[2]), "width": int(obst[4]),
+             "height": int(obst[5]), "time": float(obst[0]),
+             "end_time": float(obst[0] + obst[3]), "kind": "wall"}
+            for obst in np.asarray(obstacles, np.float64).reshape(-1, 6)]
+
+
+def _heuristic_arc_candidates(notes, radius):
+    """All adjacent same-hand pairs; validate_arcs applies its own gap bounds.
+
+    The legacy turbo-start ends a synthetic-head guidance arc at each hand's
+    first note; v3 allows it because the head is arc geometry, not a note.
+    """
+    candidates = []
+    for hand in (0, 1):
+        ordered = sorted((note for note in notes if note["hand"] == hand),
+                         key=lambda note: (note["time"], note["id"]))
+        if ordered and config.slider_turbo_start and ordered[0]["time"] > 0:
+            first = ordered[0]
+            anchor = 2 if first["d"] in ({4, 0, 5} if hand == 0 else {6, 1, 7}) else 1
+            candidates.append({"kind": "arc", "time": .3 * first["time"],
+                               "end_time": float(first["time"]), "hand": hand,
+                               "endpoint_ids": [first["id"]],
+                               "synthetic_head": {"x": first["x"], "y": first["y"], "d": first["d"]},
+                               "gap": .7 * first["time"],
+                               "mu": radius, "tmu": radius, "anchor_mode": anchor})
+        for head, tail in zip(ordered, ordered[1:]):
+            gap = float(tail["time"] - head["time"])
+            if gap <= 0:
+                continue
+            candidates.append({"kind": "arc", "time": float(head["time"]),
+                               "end_time": float(tail["time"]), "hand": hand,
+                               "endpoint_ids": [head["id"], tail["id"]], "gap": gap,
+                               "mu": radius, "tmu": radius, "anchor_mode": 0})
+    return sorted(candidates, key=lambda candidate: (candidate["time"], candidate["hand"]))
+
+
 def _approach_snap(exit_state, note):
     """Deterministic cut prior: the direction an axis-aligned hand approach implies."""
     if exit_state is None:
@@ -261,6 +330,19 @@ def _validate_state(state, duration):
             raise ValueError("Invalid final v2 bomb")
     for arc in state["arcs"]:
         ids = arc.get("endpoint_ids", [])
+        head_spec = arc.get("synthetic_head")
+        if head_spec is not None:
+            if (len(ids) != 1 or ids[0] not in identities or not isinstance(head_spec, dict)
+                    or any(key not in head_spec or not float(head_spec[key]).is_integer()
+                           for key in ("x", "y", "d"))
+                    or not 0 <= head_spec.get("x", -1) < 4 or not 0 <= head_spec.get("y", -1) < 3
+                    or not 0 <= head_spec.get("d", -1) < 9
+                    or not 0 <= arc["time"] < arc["end_time"] < duration):
+                raise ValueError("Invalid final v2 synthetic arc")
+            tail = identities[ids[0]]
+            if tail["hand"] != arc["hand"] or tail["time"] != arc["end_time"]:
+                raise ValueError("A final v2 synthetic arc has a mismatched tail")
+            continue
         if len(ids) != 2 or any(identity not in identities for identity in ids):
             raise ValueError("A final v2 arc has missing endpoints")
         head, tail = (identities[identity] for identity in ids)
@@ -279,6 +361,22 @@ def generate(song, requested_nps, predictors, encoder, settings, vocabularies, *
         raise ValueError("Requested retained NPS must be finite and nonnegative")
     if postprocessors is None:
         from . import v2_postprocessing as postprocessors
+        if not getattr(config, "v2_cleanup_note_heuristics", True):
+            # Skip the legacy v1 note mutators; structural dedup, the
+            # same-direction recut and the clearance fixpoint still run.
+            base = postprocessors
+            postprocessors = SimpleNamespace(
+                postprocess_timing=base.postprocess_timing,
+                postprocess_notes=lambda *args, **kwargs: base.postprocess_notes(
+                    *args, skip=base.LEGACY_NOTE_MUTATORS, **kwargs),
+                validate_expansions=base.validate_expansions,
+                validate_hazards=base.validate_hazards,
+                validate_arcs=base.validate_arcs,
+                enforce_note_flow_and_clearance=base.enforce_note_flow_and_clearance,
+                snap_note_times=base.snap_note_times,
+                calm_area_pulses=base.calm_area_pulses,
+                add_calm_effects=base.add_calm_effects,
+                add_calm_lighting=base.add_calm_lighting)
     factor = getattr(config, "random_note_map_factor", 0.) if random_factor is None else random_factor
     if isinstance(factor, bool) or not np.isfinite(factor) or factor < 0:
         raise ValueError("Random factor must be finite and nonnegative")
@@ -392,6 +490,12 @@ def generate(song, requested_nps, predictors, encoder, settings, vocabularies, *
                                              [candidate["time"] for candidate in candidates], logger=logger)
     result.diagnostics["note_postprocessing"] = diagnostics
     result.stages["arrows"]["elapsed_seconds"] = perf_counter() - started
+    snap_times = getattr(postprocessors, "snap_note_times", None)
+    if snap_times is not None and getattr(config, "v2_notes_onset_snap", False) and state["notes"]:
+        snap_started = perf_counter()
+        result.diagnostics["onset_snap"] = snap_times(state["notes"], state["chains"],
+                                                      audio_path, duration, logger=logger)
+        result.diagnostics["onset_snap"]["elapsed_seconds"] = perf_counter() - snap_started
     started = perf_counter()
     retained = deepcopy([note for note in state["notes"] if note.get("kind") == "retained"])
     upstream = index_state({**state, "notes": retained, "chains": []})
@@ -438,7 +542,16 @@ def generate(song, requested_nps, predictors, encoder, settings, vocabularies, *
         result.diagnostics["note_clearance"] = clearance
     started = perf_counter()
     index_state(state)
-    if repaired(options, "hazards"):
+    if getattr(config, "v2_walls_heuristic", False):
+        _log(logger, "V2 hazards (heuristic)")
+        proposals = (_heuristic_wall_candidates(state["notes"], state["event_times"])
+                     if config.add_obstacle_flag else [])
+        state["walls"], state["bombs"] = proposals, []
+        raw["wall_proposals"] = len(proposals)
+        result.diagnostics["hazard_clearance"] = postprocessors.validate_hazards(state, song, logger=logger)
+        result.stages["hazards"] = {"mode": "heuristic", "walls": len(state["walls"]), "bombs": 0,
+                                    "elapsed_seconds": perf_counter() - started}
+    elif repaired(options, "hazards"):
         from training.pipeline_v2.hazard_sections import rollout
         report = rollout(song, state, vocabularies, options,
                          lambda inputs: _predict(predictors["hazards"], inputs), encoder,
@@ -485,35 +598,71 @@ def generate(song, requested_nps, predictors, encoder, settings, vocabularies, *
         result.stages["hazards"] = {"queries": len(queries), "walls": len(state["walls"]), "bombs": len(state["bombs"]),
                                      "elapsed_seconds": perf_counter() - started}
     started = perf_counter()
-    queries = arc_candidates(state["notes"], options)
-    state["_arc_options"] = options
-    encoder(np.asarray([query["time"] for query in queries], np.float64))
-    history, arc_rejections = [], {}
-    _log(logger, "V2 arcs")
-    lower, upper = options["arc_shape_bounds"]
-    for index, candidate in enumerate(queries):
-        output = _predict(predictors["arcs"], _inputs("arcs", song, state, candidate, history, encoder, options))
-        attach_probabilities = _distribution(output["attach"], (1, 2), "arc attachment")[0]
-        attach = int(attach_probabilities[1] >= options.get("arc_threshold", .5)) if repaired(options, "arcs") else int(attach_probabilities.argmax())
-        raw["arc_attachments"] += attach
-        shape = np.asarray(output["shape"], np.float32)
-        if shape.shape != (1, 2) or not np.isfinite(shape).all() or np.any((shape < lower) | (shape > upper)):
-            raise ValueError("Invalid arc controls")
-        anchor = int(_distribution(output["anchor"], (1, 3), "arc anchor")[0].argmax())
-        previous = len(state["arcs"])
-        if attach:
-            state["arcs"].append({**deepcopy(candidate), "mu": float(shape[0, 0]), "tmu": float(shape[0, 1]), "anchor_mode": anchor})
-            _rejections(arc_rejections, postprocessors.validate_arcs(state, song, logger=None))
-        attach = int(len(state["arcs"]) > previous)
-        _history(history, {"time": candidate["time"], "value": history_value({"attach": attach, "shape": shape[0].tolist(), "anchor": anchor})}, length)
-        _progress(logger, "arcs", index, len(queries))
-    result.diagnostics["arc_clearance"] = postprocessors.validate_arcs(state, song, logger=logger)
-    _rejections(arc_rejections, result.diagnostics["arc_clearance"])
-    result.diagnostics["arc_clearance"].update(arc_rejections)
-    result.stages["arcs"] = {"queries": len(queries), "arcs": len(state["arcs"]), "elapsed_seconds": perf_counter() - started}
+    if getattr(config, "v2_arcs_heuristic", False):
+        _log(logger, "V2 arcs (heuristic)")
+        radius = float(config.slider_radius_multiplier)
+        proposed = _heuristic_arc_candidates(state["notes"], radius)
+        state["arcs"] = proposed
+        raw["arc_attachments"] = len(proposed)
+        result.diagnostics["arc_clearance"] = postprocessors.validate_arcs(
+            state, song, logger=logger, settings={"stage_policies": {}})
+        result.stages["arcs"] = {"mode": "heuristic", "queries": len(proposed),
+                                 "arcs": len(state["arcs"]),
+                                 "elapsed_seconds": perf_counter() - started}
+    else:
+        queries = arc_candidates(state["notes"], options)
+        state["_arc_options"] = options
+        encoder(np.asarray([query["time"] for query in queries], np.float64))
+        history, arc_rejections = [], {}
+        _log(logger, "V2 arcs")
+        lower, upper = options["arc_shape_bounds"]
+        for index, candidate in enumerate(queries):
+            output = _predict(predictors["arcs"], _inputs("arcs", song, state, candidate, history, encoder, options))
+            attach_probabilities = _distribution(output["attach"], (1, 2), "arc attachment")[0]
+            attach = int(attach_probabilities[1] >= options.get("arc_threshold", .5)) if repaired(options, "arcs") else int(attach_probabilities.argmax())
+            raw["arc_attachments"] += attach
+            shape = np.asarray(output["shape"], np.float32)
+            if shape.shape != (1, 2) or not np.isfinite(shape).all() or np.any((shape < lower) | (shape > upper)):
+                raise ValueError("Invalid arc controls")
+            anchor = int(_distribution(output["anchor"], (1, 3), "arc anchor")[0].argmax())
+            previous = len(state["arcs"])
+            if attach:
+                state["arcs"].append({**deepcopy(candidate), "mu": float(shape[0, 0]), "tmu": float(shape[0, 1]), "anchor_mode": anchor})
+                _rejections(arc_rejections, postprocessors.validate_arcs(state, song, logger=None))
+            attach = int(len(state["arcs"]) > previous)
+            _history(history, {"time": candidate["time"], "value": history_value({"attach": attach, "shape": shape[0].tolist(), "anchor": anchor})}, length)
+            _progress(logger, "arcs", index, len(queries))
+        result.diagnostics["arc_clearance"] = postprocessors.validate_arcs(state, song, logger=logger)
+        _rejections(arc_rejections, result.diagnostics["arc_clearance"])
+        result.diagnostics["arc_clearance"].update(arc_rejections)
+        result.stages["arcs"] = {"mode": "model", "queries": len(queries), "arcs": len(state["arcs"]),
+                                 "elapsed_seconds": perf_counter() - started}
+    started = perf_counter()
+    calm_pulses = []
+    pulse_fn, place_fn = (getattr(postprocessors, "calm_area_pulses", None),
+                          getattr(postprocessors, "add_calm_effects", None))
+    if (pulse_fn is not None and place_fn is not None
+            and getattr(config, "v2_calm_effects", False)
+            and any(getattr(config, name, True) for name in
+                    ("v2_calm_effects_walls", "v2_calm_effects_bombs", "v2_calm_effects_lighting"))):
+        # Decorative beat pulses in note-free stretches: edge wall flashes,
+        # bottom-corner bombs and later laser flashes. Notes stay untouched.
+        _log(logger, "V2 calm effects")
+        calm_pulses, diagnostics = pulse_fn(state, song)
+        diagnostics.update(place_fn(state, song, calm_pulses))
+        if diagnostics["walls"] or diagnostics["bombs"]:
+            diagnostics["hazard_clearance"] = postprocessors.validate_hazards(state, song, logger=logger)
+        result.diagnostics["calm_effects"] = diagnostics
+        result.stages["calm_effects"] = {"pulses": len(calm_pulses),
+                                         "elapsed_seconds": perf_counter() - started}
     started = perf_counter()
     _log(logger, "V1 lighting")
     state["lighting"], lighting_report = lighting_generator(state["event_times"], encoder)
+    if calm_pulses and getattr(config, "v2_calm_effects_lighting", False) \
+            and getattr(postprocessors, "add_calm_lighting", None) is not None:
+        added = postprocessors.add_calm_lighting(state, calm_pulses)
+        diagnostics["lighting_events"] = added
+        result.stages["calm_effects"]["lighting_events"] = added
     raw["lighting_commands"] = len(state["lighting"])
     result.stages["lighting"] = {**lighting_report, "events": len(state["lighting"]),
                                  "elapsed_seconds": perf_counter() - started}

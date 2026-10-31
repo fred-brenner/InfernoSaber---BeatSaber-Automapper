@@ -79,6 +79,10 @@ def training_settings(stage):
         result[key] = _positive(getattr(config, f"{stage}_{key}", default), key, zero=True)
         if result[key] > 1:
             raise ValueError(f"{stage}_{key} must not exceed one")
+    keep = getattr(config, f"{stage}_history_corrupt_keep_guard", True)
+    if not isinstance(keep, bool):
+        raise ValueError(f"{stage}_history_corrupt_keep_guard must be boolean")
+    result["history_corrupt_keep_guard"] = keep
     return result
 
 

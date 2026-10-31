@@ -3,8 +3,13 @@
 ## Direction
 
 Revive the existing Beat Saber automapper incrementally. App startup and legacy model generation were verified on CPU and GPU.
-V2 application generation uses CPU, with seven v2 stages, the retained encoder,
-and exclusive v1 `fav_15` lighting; GPU remains the training runtime.
+V2 application generation uses CPU, with seven v2 stages (arcs and walls
+currently decoded by the pre-model heuristics — `v2_arcs_heuristic` /
+`v2_walls_heuristic = True`), a bounded onset-peak snap post-cleanup
+(`v2_notes_onset_snap`), a decorative calm-area pulse pass that adds edge wall
+flashes, corner bombs and laser flashes inside intentionally note-free gaps
+without touching notes (`v2_calm_effects`), the retained
+encoder, and exclusive v1 `fav_15` lighting; GPU remains the training runtime.
 WSL/Linux is the primary development environment; preserve Windows app
 compatibility. Complete the requested task, including small supporting 
 refactors when they simplify the change. Keep unrelated cleanup separate. 

@@ -58,6 +58,8 @@ def test_native_v3_serializes_each_family_once_with_independent_lighting(state):
     assert [event["b"] for event in document["basicBeatmapEvents"]] == [.5, .5, 5.]
     assert {event["et"] for event in document["basicBeatmapEvents"][:2]} == {0, 1}
     assert omissions == {"arcs": 0, "chain_bodies": 0, "walls": 0}
+
+
     assert state == before
     objects, diagnostic = _read_back(document)
     assert diagnostic["ignored_records"] == 0
@@ -67,6 +69,17 @@ def test_native_v3_serializes_each_family_once_with_independent_lighting(state):
     assert objects["chains"][0]["end_time"] == 1.5
     assert objects["walls"][0]["duration"] == 1.
     assert [event["time"] for event in objects["lighting"]] == [.25, .25, 2.5]
+
+
+def test_synthetic_turbo_arc_serializes_head_from_record(state):
+    state["arcs"].append({"time": .3, "end_time": 1., "hand": 0, "endpoint_ids": [0],
+                          "synthetic_head": {"x": 0, "y": 0, "d": 1},
+                          "mu": 1., "tmu": 1., "anchor_mode": 1})
+    document, omissions = export.serialize_beatmap(state, 120)
+    turbo = [item for item in document["sliders"] if item["b"] == .6]
+    assert turbo == [{"b": .6, "x": 0, "y": 0, "c": 0, "d": 1, "tb": 2.,
+                      "tx": 0, "ty": 0, "tc": 1, "mu": 1., "tmu": 1., "m": 1}]
+    assert len(document["colorNotes"]) == 3 and omissions["arcs"] == 0
 
 
 def test_legacy_retains_chain_heads_and_reports_unrepresentable_families(state):

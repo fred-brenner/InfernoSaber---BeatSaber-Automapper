@@ -205,6 +205,7 @@ class V2Runtime:
             key = {"hazards": "bomb_threshold", "arcs": "arc_threshold"}[stage]
             self.settings[key] = record["threshold"]
         self.settings["hazard_feasibility_decode"] = bool(getattr(config, "v2_hazard_feasibility_decode", False))
+        self.settings["hazard_bombs_enabled"] = bool(getattr(config, "v2_hazard_bombs_enabled", True))
         self.settings["hazard_sample_temperature"] = float(getattr(config, "v2_hazard_sample_temperature", 0.) or 0.)
         self.settings["hazard_bomb_rate_decode"] = bool(getattr(config, "v2_hazard_bomb_rate_decode", False))
         self.settings["hazard_bomb_rate_seconds"] = float(getattr(config, "v2_hazard_bomb_rate_seconds", 2.0) or 2.0)

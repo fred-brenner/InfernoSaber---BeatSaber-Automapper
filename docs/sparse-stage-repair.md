@@ -21,6 +21,12 @@ Independent v2 lighting is **not yet implemented for production — optional/def
 its contracts and tools below remain experimental. Useful autoregressive
 hazard and arc recovery remain unresolved. Experimental
 v2 lighting training or bundle replacement does not change the production path.
+Since 2026-10-31 production arcs bypass the model entirely
+(`v2_arcs_heuristic = True`): adjacent same-hand pairs pass the legacy
+`slider_time_gap`/`slider_probability`/`slider_movement_minimum` gates and
+shared clearance in `validate_arcs`; the arcs checkpoint stays in the bundle
+undecoded. Model bomb placement likewise stays gated off
+(`v2_hazard_bombs_enabled = False`); production hazards are walls-only.
 Wall vocabulary fitting and ordering remain unchanged: this corpus retains the
 17-category wall head and 19-row history embedding. Unsupported geometries stay
 masked or rejected; eligibility filtering does not resize the hazard network.
@@ -73,6 +79,12 @@ contract fields, and each checkpoint derives its input signature from its own
 `input_shapes` — legacy datasets and bundles stay byte-identical. The decode-side
 `hazard_feasibility_decode` flag remains useful for bundles without these inputs.
 
+**Walls-only decode gate:** `hazard_bombs_enabled` (config
+`v2_hazard_bombs_enabled`, currently `False`) suppresses every bomb fire in
+both `rollout` and calibration replay and skips the rate-matching window.
+Bomb heads, targets and history semantics stay intact — the gate only stops
+placement, so re-enabling needs no re-training.
+
 **Factorized bomb head (Arm F, gated):** `hazards_bomb_presence` (default off)
 adds a scalar sigmoid `bomb_presence` output — "does any bomb belong at this
 query" — alongside the masked 12-cell `bombs` scores that answer "where". The
@@ -98,6 +110,12 @@ per-record at `rate`/`drop`, then restores the most recent positive record in
 any sample that would otherwise lose *all* of them. Fully-emptied windows taught
 "fire under all-NONE history" — the poisoned cold-start conditional behind
 start-regime spam — whereas partial amnesia is the realistic decode failure.
+`*_history_corrupt_keep_guard` (default `True`) can disable the restore for a
+stage: emptied windows then survive, teaching cold-start decisions directly and
+removing "history already has a positive" as a shortcut cue. Useful where the
+guard's guarantee itself became the exploit (arcs' attach cascade), harmful
+where emptied windows dominate spam (hazards bombs). Reports record
+`history_corruption.keep_guard`.
 
 **Experimental v2 lighting:** the `default_basic_v1` profile supports types 0–4/values 0–12,
 ring types 8/9 canonicalized to value 0, and speed types 12/13/values 0–15.
@@ -200,7 +218,16 @@ re-preparation or architecture changes, configured per stage:
   bundle carrying the spec.
 
 Calibration ranks `.01–.99` by validation F1 through the real decoder, then
-autoregressively replays the best three. F1 ties select the higher threshold.
+autoregressively replays the best three. `calibrate --workers N` shards
+validation songs by position across N spawned processes (each lazily loads
+only its shard's NPZs plus the checkpoint); the parent merges per-threshold
+counters into the identical sidecar. Shards are disjoint and complete by
+construction. Sequential `--workers 1` remains the default.
+`calibrate --ar-grid STEP` additionally autoregressively replays every STEP
+(e.g. `.05`) on top of the teacher-forced top three — the TF ranking can pick
+a region far from the AR optimum (proven on hazards and arcs), so the
+shortlist alone is too narrow. The sidecar's `selection` records the widened
+grid. F1 ties select the higher threshold.
 Wall geometry stays categorical. The sidecar binds thresholds to checkpoint
 hashes, semantic contracts and the exact original training split identity.
 Calibration rejects compatible-looking data with different indexed splits or
