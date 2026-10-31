@@ -7,6 +7,7 @@ from pathlib import Path
 import os
 import queue
 import shutil
+import sys
 import time
 from functools import partial
 
@@ -132,6 +133,9 @@ def _combine_maps(song_list_potential, song_list_run, diff_list, export_results_
 
 
 def _run(n_workers, diff_list, export_results_to_bs, logger_callback, parallel):
+    # Windows consoles use cp1252; replace unmappable chars instead of dying mid-run.
+    if hasattr(sys.stdout, "reconfigure"):
+        sys.stdout.reconfigure(errors="replace")
     if isinstance(n_workers, bool) or int(n_workers) != n_workers or n_workers < 1:
         raise ValueError("Worker count must be a positive integer")
     n_workers = int(n_workers)

@@ -1,10 +1,12 @@
 """Versioned JSON/NPZ artifacts, independent of TensorFlow and application paths."""
 
+import contextlib
 import hashlib
 import importlib.metadata
 import json
 from pathlib import Path
 import platform
+import posixpath
 import sys
 
 import numpy as np
@@ -24,6 +26,21 @@ def json_value(value):
     if isinstance(value, Path):
         return str(value)
     return value
+
+
+@contextlib.contextmanager
+def posix_gfile_join():
+    """Work around keras saving_lib building HDF5 keys with os.path.join.
+
+    On Windows tf.io.gfile.join produces backslashes, which makes
+    load_weights() miss every stored layer group. HDF5 always uses "/"."""
+    import tensorflow.compat.v2 as tf
+    original = tf.io.gfile.join
+    tf.io.gfile.join = posixpath.join
+    try:
+        yield
+    finally:
+        tf.io.gfile.join = original
 
 
 def write_json(path, value):

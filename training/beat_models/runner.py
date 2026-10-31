@@ -66,7 +66,9 @@ def _load_model(path, stage, manifest, require_trained=False):
     checkpoint, metadata = load_model_manifest(path, stage, manifest)
     if require_trained and metadata.get("training", {}).get("status") != "trained":
         raise ValueError("Predicted training conditioning requires a trained intensity checkpoint")
-    return models.keras.models.load_model(checkpoint, compile=False), metadata
+    from .artifacts import posix_gfile_join
+    with posix_gfile_join():
+        return models.keras.models.load_model(checkpoint, compile=False), metadata
 
 
 def _profiles(songs, conditioning="reference", intensity_model=None, rng=None, noise_std=None):

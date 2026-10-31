@@ -12,7 +12,7 @@ import zipfile
 import numpy as np
 
 from tools.config import config
-from training.beat_models.artifacts import (file_hash, load_model_manifest, read_json,
+from training.beat_models.artifacts import (file_hash, load_model_manifest, posix_gfile_join, read_json,
                                            json_value, statistics_hash, validate_statistics)
 from training.beat_models.settings import architecture_settings as beat_architecture
 from training.beat_models.contracts import FEATURES, FRAME_SECONDS, REPRESENTATION, Song
@@ -249,7 +249,8 @@ class V2Runtime:
                 model = models.build_model(stage)
                 if _graph_signature(saved) != _graph_signature(json.loads(model.to_json())):
                     raise ValueError(f"Unsupported {stage} checkpoint graph")
-                model.load_weights(checkpoint)
+                with posix_gfile_join():
+                    model.load_weights(checkpoint)
                 parameters = manifest["training"].get("parameters")
                 if parameters is not None and parameters != model.count_params():
                     raise ValueError(f"{stage} checkpoint parameter count does not match its manifest")

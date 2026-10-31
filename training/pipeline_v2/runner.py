@@ -13,7 +13,7 @@ import zipfile
 
 import numpy as np
 
-from training.beat_models.artifacts import new_run_directory, write_json
+from training.beat_models.artifacts import new_run_directory, posix_gfile_join, write_json
 
 from .artifacts import execution_identity
 
@@ -264,7 +264,8 @@ def load_stage_artifact(path, stage, dataset=None):
                                bomb_presence=bool((manifest.get("training") or {}).get("bomb_presence")))
     if _checkpoint_signature(saved) != _checkpoint_signature(json.loads(model.to_json())):
         raise ValueError(f"Unsupported {stage} checkpoint graph; the current model does not match")
-    model.load_weights(checkpoint)
+    with posix_gfile_join():
+        model.load_weights(checkpoint)
     return model, manifest
 
 

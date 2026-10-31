@@ -225,7 +225,7 @@ def postprocess_timing(song, beats, audio_path, logger=None, skip=()):
     diagnostics.update(events=len(candidates), retained_notes=sum(item["count"] for item in candidates),
                        merged_events=merged_events, minimum_spacing_removed=spacing_removed,
                        timing_policy="legacy_cleanup_count_preserving")
-    _report(logger, f"Timing cleanup: {len(original)} → {len(candidates)} events")
+    _report(logger, f"Timing cleanup: {len(original)} -> {len(candidates)} events")
     return candidates, diagnostics
 
 
@@ -1009,7 +1009,7 @@ def postprocess_notes(notes, event_times, logger=None, skip=()):
                    "heuristic_notes": len(structured) - retained, "notes": len(structured),
                    "ids_assigned_after_cleanup": True, "times_changed": False,
                    "operations": operations, **differences(structured)}
-    _report(logger, f"Note flow: {len(notes)} → {len(structured)} notes ({retained} retained anchors)")
+    _report(logger, f"Note flow: {len(notes)} -> {len(structured)} notes ({retained} retained anchors)")
     return structured, diagnostics
 
 
