@@ -156,6 +156,14 @@ NPS track the request (~0.8–1.2×). Set the flag `True` to restore the legacy
 cleanup for A/B checks. The `v2_cleanup_*` overrides above now only matter
 when the flag is enabled.
 
+Because production skips that legacy pass, `allow_dot_notes = False` is
+enforced in the v2 structuring loop instead: a candidate dot whose siblings
+all offer legal cuts takes the best non-dot option, and a surviving dot is
+recut to its geometry-implied direction (`_dot_virtual_direction` — the
+same implied direction the clearance fixpoint uses) or, for a hand's first
+note, the legacy `first_note_layer_threshold` vertical fallback. Final notes
+never carry direction `8` unless dots are explicitly enabled.
+
 Hard note invariants run as a bounded fixpoint
 (`enforce_note_flow_and_clearance`) both after dedup and once more after
 multiplier expansion, with retained-model notes contract-fixed whenever an
@@ -236,6 +244,20 @@ is skipped entirely (bomb decoding was already disabled via
 `v2_hazard_bombs_enabled = False`); the checkpoint stays in the bundle and
 `v2_walls_heuristic = False` restores model decoding. Live playtests showed
 the model holding walls continuously at fixed spots and colliding with notes.
+
+The heuristic path also proposes gameplay bombs (`_heuristic_bomb_candidates`
+in `v2_pipeline.py`): each note contributes a bomb next to it with
+probability `v2_bombs_prob` (default `0.25`), placed on the lane the cut
+leaves free — a side cell for vertical cuts, the row above/below for
+horizontal cuts — while diagonal and dot cuts are skipped because their
+swing sweeps both axes. Placement uses the generation RNG, so proposals are
+deterministic for a given seed, and `validate_hazards` applies the same
+time/geometry margins, swing-volume and wall-overlap rejection as for
+walls. `add_bombs_flag` (default `True`, surfaced as "Add Bombs" in the
+app) gates every bomb family including calm-effect corner bombs, matching
+how `add_obstacle_flag` gates all walls; learned hazard decoding still
+emits bombs only when `v2_walls_heuristic = False` and
+`v2_hazard_bombs_enabled` allow it.
 
 The same-day wall clearance hardening closes two containment gaps: the lane
 scan now gives notes off the event grid (onset-snapped notes, multiplier

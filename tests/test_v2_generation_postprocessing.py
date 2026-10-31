@@ -18,7 +18,7 @@ def song():
 
 @pytest.fixture
 def timing_defaults(monkeypatch):
-    for key, value in {"use_fixed_bpm": 120, "min_beat_time": .0625, "min_time_diff": .02,
+    for key, value in {"min_beat_time": .0625, "min_time_diff": .02,
                        "map_filler_iters": 0, "add_start_end_beats": False,
                        "add_silence_flag": False}.items():
         monkeypatch.setattr(config, key, value)
@@ -50,7 +50,7 @@ def chain():
 def test_timing_moves_preserve_counts_and_near_merges_keep_largest(song, timing_defaults, monkeypatch):
     inputs = beats([.5, .51, .8], [1, 2, 1])
     monkeypatch.setattr(post, "sanity_check_timing2", lambda _, times, **kwargs: times + .2)
-    candidates, report = post.postprocess_timing(song, inputs, "unused.egg")
+    candidates, report = post.postprocess_timing(song, inputs, "unused.egg", skip=("bpm_alignment",))
     assert [item["count"] for item in candidates] == [2, 1]
     assert [item["time"] for item in candidates] == pytest.approx([.7, 1.])
     assert inputs["event_times"].tolist() == [.5, .51, .8]
@@ -62,14 +62,14 @@ def test_timing_moves_preserve_counts_and_near_merges_keep_largest(song, timing_
 
 def test_moved_near_events_merge_without_summing_counts(song, timing_defaults, monkeypatch):
     monkeypatch.setattr(post, "sanity_check_timing2", lambda _, times, **kwargs: np.asarray([.5, .515]))
-    candidates, report = post.postprocess_timing(song, beats([.4, .8], [1, 1]), "unused.egg")
+    candidates, report = post.postprocess_timing(song, beats([.4, .8], [1, 1]), "unused.egg", skip=("bpm_alignment",))
     assert candidates == [{"time": .5, "frame": 40, "count": 1}]
     assert report["merged_events"] == 1
 
 
 def test_rejected_onset_zero_does_not_absorb_a_valid_early_onset(song, timing_defaults, monkeypatch):
     monkeypatch.setattr(post, "sanity_check_timing2", lambda _, times, **kwargs: np.asarray([0., .015]))
-    candidates, _ = post.postprocess_timing(song, beats([.4, .8], [2, 1]), "unused.egg")
+    candidates, _ = post.postprocess_timing(song, beats([.4, .8], [2, 1]), "unused.egg", skip=("bpm_alignment",))
     assert [(item["time"], item["count"]) for item in candidates] == [(.015, 1)]
 
 
@@ -79,7 +79,7 @@ def test_filler_uses_strongest_nonzero_class_at_nearest_frame(song, timing_defau
     monkeypatch.setattr(config, "add_beat_max_bounds", [.1, .4, 3., 4.])
     inputs = beats([1., 3.], [1, 1])
     inputs["frame_probabilities"][200] = [.98, .001, .019]
-    candidates, report = post.postprocess_timing(song, inputs, "unused.egg")
+    candidates, report = post.postprocess_timing(song, inputs, "unused.egg", skip=("bpm_alignment",))
     assert [(item["time"], item["count"]) for item in candidates] == [(1., 1), (2., 2), (3., 1)]
     fill = next(item for item in report["operations"] if item["stage"] == "density_fill_0")
     assert fill == {"stage": "density_fill_0", "before_events": 2, "after_events": 3, "event_count_delta": 1,
@@ -87,7 +87,6 @@ def test_filler_uses_strongest_nonzero_class_at_nearest_frame(song, timing_defau
 
 
 def test_timing_diagnostics_record_alignment_and_silence_steps(song, timing_defaults, monkeypatch):
-    monkeypatch.setattr(config, "use_fixed_bpm", 0)
     monkeypatch.setattr(config, "add_silence_flag", True)
     monkeypatch.setattr(post, "_legacy_timing_features", lambda _: (np.zeros((100, 24)), np.zeros((100, 24)), [2.]))
     candidates, report = post.postprocess_timing(song, beats([1., 2.], [1, 2]), "unused.egg")
@@ -102,7 +101,7 @@ def test_timing_diagnostics_record_alignment_and_silence_steps(song, timing_defa
 def test_zero_density_never_loads_audio_or_fills(song, timing_defaults, monkeypatch):
     monkeypatch.setattr(config, "map_filler_iters", 10)
     monkeypatch.setattr(post, "_legacy_timing_features", lambda _: pytest.fail("empty timing must not decode audio"))
-    candidates, report = post.postprocess_timing(song, beats([], []), "unused.egg")
+    candidates, report = post.postprocess_timing(song, beats([], []), "unused.egg", skip=("bpm_alignment",))
     assert candidates == []
     assert report["retained_notes"] == 0
 
@@ -358,3 +357,59 @@ def test_synthetic_turbo_arc_guides_first_note_and_keeps_clearance(song, monkeyp
     data = state([first], arcs=[bad])
     post.validate_arcs(data, song)
     assert data["arcs"] == []
+
+
+def test_dots_recut_to_implied_direction_when_disabled(monkeypatch):
+    monkeypatch.setattr(config, "allow_dot_notes", False)
+    monkeypatch.setattr(config, "gimme_more_notes_flag", False)
+    monkeypatch.setattr(config, "single_notes_only_flag", False)
+    monkeypatch.setattr(post, "sanity_check_notes", lambda notes, _: notes)
+    notes = [note(0, time=1., x=1, y=1, direction=1), note(1, time=2., x=1, y=0, direction=8)]
+    actual, _ = post.postprocess_notes(notes, [1., 2.])
+    assert all(item["d"] != 8 for item in actual)
+    expected = post._dot_virtual_direction(1, 1, 1, 1, 0)
+    assert next(item["d"] for item in actual if item["time"] == 2.) == expected
+
+
+def test_first_dot_uses_legacy_vertical_fallback(monkeypatch):
+    monkeypatch.setattr(config, "allow_dot_notes", False)
+    monkeypatch.setattr(config, "gimme_more_notes_flag", False)
+    monkeypatch.setattr(config, "single_notes_only_flag", False)
+    monkeypatch.setattr(config, "first_note_layer_threshold", 1)
+    monkeypatch.setattr(post, "sanity_check_notes", lambda notes, _: notes)
+    upper, _ = post.postprocess_notes([note(0, time=1., y=1, direction=8)], [1.])
+    lower, _ = post.postprocess_notes([note(0, time=1., y=0, direction=8)], [1.])
+    assert upper[0]["d"] == 0 and lower[0]["d"] == 1
+
+
+def test_dots_pass_through_when_allowed(monkeypatch):
+    monkeypatch.setattr(config, "allow_dot_notes", True)
+    monkeypatch.setattr(config, "gimme_more_notes_flag", False)
+    monkeypatch.setattr(config, "single_notes_only_flag", False)
+    monkeypatch.setattr(post, "sanity_check_notes", lambda notes, _: notes)
+    actual, _ = post.postprocess_notes([note(0, time=1., y=1, direction=8)], [1.])
+    assert actual[0]["d"] == 8
+
+
+def test_bomb_flag_disables_all_bombs(song, monkeypatch):
+    monkeypatch.setattr(config, "add_bombs_flag", False)
+    data = state(walls=[{"time": 1., "end_time": 2., "x": 0, "y": 0, "width": 1, "height": 3}],
+                 bombs=[{"time": 4., "x": 3, "y": 0}])
+    post.validate_hazards(data, song)
+    assert data["walls"] != [] and data["bombs"] == []
+
+
+def test_heuristic_bomb_candidates_follow_the_free_axis(monkeypatch):
+    from map_creation.v2_pipeline import _heuristic_bomb_candidates
+    monkeypatch.setattr(config, "v2_bombs_prob", 1.)
+    notes = [note(0, x=0, y=1, direction=0),   # vertical cut -> side cell
+             note(1, x=3, y=1, direction=1),   # vertical cut -> side cell
+             note(2, x=0, y=0, direction=2),   # horizontal cut -> middle row
+             note(3, x=2, y=2, direction=3),   # horizontal cut -> middle row
+             note(4, x=0, y=0, direction=4),   # diagonal -> swept both axes
+             note(5, x=0, y=0, direction=8)]   # dot -> swept both axes
+    proposals = _heuristic_bomb_candidates(notes, np.random.default_rng(0))
+    assert len(proposals) == 4
+    assert {(item["x"], item["y"]) for item in proposals} == {(1, 1), (2, 1), (0, 1), (2, 1)}
+    monkeypatch.setattr(config, "v2_bombs_prob", 0.)
+    assert _heuristic_bomb_candidates(notes, np.random.default_rng(0)) == []

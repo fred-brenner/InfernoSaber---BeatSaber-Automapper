@@ -22,6 +22,8 @@ from training.pipeline_v2.policies import repaired
 
 
 def _log(logger, message):
+    if config.verbose_level <= 1:
+        return
     if logger is None:
         print(message, flush=True)
     else:
@@ -199,6 +201,34 @@ def _heuristic_wall_candidates(notes, event_times):
              "height": int(obst[5]), "time": float(obst[0]),
              "end_time": float(obst[0] + obst[3]), "kind": "wall"}
             for obst in np.asarray(obstacles, np.float64).reshape(-1, 6)]
+
+
+def _heuristic_bomb_candidates(notes, rng):
+    """Precision bombs beside notes on their non-swept axis.
+
+    A vertical cut sweeps its column, so the side cells stay free; a
+    horizontal cut sweeps its row, so the cells above/below stay free.
+    Diagonals and dots sweep both axes, so they propose nothing. Placement
+    prefers the side toward the lane centre (centred rows alternate sides by
+    note id); ``validate_hazards`` applies the real clearance and drops
+    proposals colliding with swings, walls or other bombs.
+    """
+    from .v2_postprocessing import _DIRECTION_GROUP
+    density = float(getattr(config, "v2_bombs_prob", 0.) or 0.)
+    proposals = []
+    for note in sorted(notes, key=lambda note: (note["time"], note.get("id", 0))):
+        if density <= 0 or rng.random() > density:
+            continue
+        group = _DIRECTION_GROUP.get(note["d"], 3)
+        x, y = int(note["x"]), int(note["y"])
+        if group == 0:          # vertical cut: neighbouring column cell is free
+            cell = (x + 1, y) if x < 2 else (x - 1, y)
+        elif group == 1:        # horizontal cut: cell above/below is free
+            cell = (x, 1) if y != 1 else (x, 2 if note.get("id", 0) % 2 else 0)
+        else:                   # diagonal cut or dot sweeps both axes
+            continue
+        proposals.append({"time": float(note["time"]), "x": cell[0], "y": cell[1], "kind": "bomb"})
+    return proposals
 
 
 def _heuristic_arc_candidates(notes, radius):
@@ -546,10 +576,14 @@ def generate(song, requested_nps, predictors, encoder, settings, vocabularies, *
         _log(logger, "V2 hazards (heuristic)")
         proposals = (_heuristic_wall_candidates(state["notes"], state["event_times"])
                      if config.add_obstacle_flag else [])
-        state["walls"], state["bombs"] = proposals, []
+        bomb_proposals = (_heuristic_bomb_candidates(state["notes"], rng)
+                          if config.add_bombs_flag else [])
+        state["walls"], state["bombs"] = proposals, bomb_proposals
         raw["wall_proposals"] = len(proposals)
+        raw["bomb_proposals"] = len(bomb_proposals)
         result.diagnostics["hazard_clearance"] = postprocessors.validate_hazards(state, song, logger=logger)
-        result.stages["hazards"] = {"mode": "heuristic", "walls": len(state["walls"]), "bombs": 0,
+        result.stages["hazards"] = {"mode": "heuristic", "walls": len(state["walls"]),
+                                    "bombs": len(state["bombs"]),
                                     "elapsed_seconds": perf_counter() - started}
     elif repaired(options, "hazards"):
         from training.pipeline_v2.hazard_sections import rollout

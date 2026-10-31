@@ -5,7 +5,9 @@
 Revive the existing Beat Saber automapper incrementally. App startup and legacy model generation were verified on CPU and GPU.
 V2 application generation uses CPU, with seven v2 stages (arcs and walls
 currently decoded by the pre-model heuristics — `v2_arcs_heuristic` /
-`v2_walls_heuristic = True`), a bounded onset-peak snap post-cleanup
+`v2_walls_heuristic = True`, with sparse adjacent-cell gameplay bombs from
+`_heuristic_bomb_candidates` gated by `add_bombs_flag`/`v2_bombs_prob`), a
+bounded onset-peak snap post-cleanup
 (`v2_notes_onset_snap`), a decorative calm-area pulse pass that adds edge wall
 flashes, corner bombs and laser flashes inside intentionally note-free gaps
 without touching notes (`v2_calm_effects`), the retained

@@ -291,9 +291,6 @@ class V2Runtime:
         path = Path(audio_path).resolve()
         if not path.is_file():
             raise ValueError(f"Audio file does not exist: {path}")
-        manual = getattr(config, "use_fixed_bpm", None)
-        if bpm is None and manual is not None and manual > 0:
-            bpm = manual
         stat = path.stat()
         key = (str(path), stat.st_size, stat.st_mtime_ns, bpm)
         with self._lock:

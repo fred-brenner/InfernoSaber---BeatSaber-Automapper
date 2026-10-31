@@ -170,15 +170,12 @@ def main(name_ar: list, debug_beats=False) -> bool:
     # return timing_ar
 
     # calculate bpm
-    if config.use_fixed_bpm is None or config.use_fixed_bpm <= 0:
-        file = paths.songs_pred + name_ar[0] + '.egg'
-        bpm, _ = get_file_bpm(file)  # 1.6
-        # align beats on bpm
-        timing_ar = align_beats_on_bpm(timing_ar, bpm)
-        # # average bpm for songs to make more similar (jump) speeds
-        # bpm = int((bpm + 120) / 2)
-    else:
-        bpm = config.use_fixed_bpm
+    file = paths.songs_pred + name_ar[0] + '.egg'
+    bpm, _ = get_file_bpm(file)  # 1.6
+    # align beats on bpm
+    timing_ar = align_beats_on_bpm(timing_ar, bpm)
+    # # average bpm for songs to make more similar (jump) speeds
+    # bpm = int((bpm + 120) / 2)
 
     # sanity check timings
     # map_times, pitch_algo = sanity_check_timing(name_ar[0], timing_ar, song_duration)  # 3.9
@@ -205,8 +202,7 @@ def main(name_ar: list, debug_beats=False) -> bool:
         # remove silent parts
         map_times = remove_silent_times(map_times, silent_times[0])
 
-    if config.use_fixed_bpm is None or config.use_fixed_bpm <= 0:
-        map_times = align_beats_on_bpm(map_times, bpm)
+    map_times = align_beats_on_bpm(map_times, bpm)
 
     if debug_beats:
         return map_times

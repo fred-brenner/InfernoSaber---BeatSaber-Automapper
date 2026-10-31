@@ -31,7 +31,7 @@ def _base(song):
 
 
 def _report(logger, message):
-    if logger:
+    if logger and config.verbose_level > 1:
         logger(message)
 
 
@@ -204,7 +204,7 @@ def postprocess_timing(song, beats, audio_path, logger=None, skip=()):
         for pass_index, (threshold, index) in enumerate(((5.5 * 4, int(iterations / 2) + 1), (8 * 4, iterations - 1))):
             if candidates and iterations and config.max_speed >= threshold:
                 replace_times(f"high_difficulty_fill_{pass_index}", fill_map_times_scale(times(), min(iterations - 1, max(0, index))))
-    align = (config.use_fixed_bpm is None or config.use_fixed_bpm <= 0) and "bpm_alignment" not in skip
+    align = "bpm_alignment" not in skip
     if candidates and align:
         replace_times("initial_bpm_alignment", align_beats_on_bpm(times(), bpm), moving=True)
     if candidates and "onset_snap" not in skip:
@@ -969,7 +969,9 @@ def postprocess_notes(notes, event_times, logger=None, skip=()):
                 def rank(option):
                     od = option[2]
                     if od == 8:
-                        return 0, 0
+                        # disallowed dots rank below legal cuts but above illegal
+                        # repeats; the survivor is recut to a direction below.
+                        return (0, 0) if config.allow_dot_notes else (1, 0)
                     steps = _step_distance(od, previous[3])
                     illegal = steps <= 1 or (steps == 2 and abs(option[0] - previous[1])
                                              + abs(option[1] - previous[2]) < 2)
@@ -980,6 +982,12 @@ def postprocess_notes(notes, event_times, logger=None, skip=()):
             effective = direction if direction != 8 else (
                 _dot_virtual_direction(previous[3], previous[1], previous[2], x, y)
                 if previous is not None and previous[3] is not None else None)
+            if direction == 8 and not config.allow_dot_notes:
+                # Model dots need a real cut direction: the geometry-implied
+                # one, or the legacy first-note vertical fallback.
+                direction = effective if effective is not None else \
+                    (0 if y >= config.first_note_layer_threshold else 1)
+                effective = direction
             last_kept[hand] = (time, x, y, effective)
             identity = len(structured)
             structured.append({"id": identity, "time": float(time), "hand": hand, "x": x, "y": y,
@@ -1129,7 +1137,7 @@ def validate_hazards(state, song, logger=None):
     bombs = []
     radius = max(config.min_time_diff, .1)
     for bomb in sorted(original_bombs, key=lambda item: item["time"]):
-        if not _integer_geometry(bomb, ("x", "y")):
+        if not config.add_bombs_flag or not _integer_geometry(bomb, ("x", "y")):
             continue
         if not (0 <= bomb["time"] < duration and 0 <= bomb["x"] < 4 and 0 <= bomb["y"] < 3):
             continue

@@ -369,6 +369,12 @@ def update_auto_cut_done(move_flag):
     return
 
 
+def set_verbose_level(verbose):
+    config.verbose_level = 2 if verbose else 1
+    update_dir_path('tools/config/config.py', 'verbose_level', config.verbose_level)
+    return
+
+
 def set_version_selector(version_value):
     config.bs_mapping_version = version_value
     update_dir_path('tools/config/config.py', 'bs_mapping_version', version_value)
@@ -436,6 +442,12 @@ def set_dot_notes(dot_notes_value):
 def set_add_obstacles(add_obstacles_value):
     config.add_obstacle_flag = add_obstacles_value
     update_dir_path('tools/config/config.py', 'add_obstacle_flag', add_obstacles_value)
+    return
+
+
+def set_add_bombs(add_bombs_value):
+    config.add_bombs_flag = add_bombs_value
+    update_dir_path('tools/config/config.py', 'add_bombs_flag', add_bombs_value)
     return
 
 
@@ -508,13 +520,6 @@ def set_arc_movement_min(arc_movement_min_value):
     return
 
 
-def set_bpm_overwrite(bpm_overwrite_flag):
-    if bpm_overwrite_flag:
-        config.use_fixed_bpm = 100
-    else:
-        config.use_fixed_bpm = 0
-    update_dir_path('tools/config/config.py', 'use_fixed_bpm', config.use_fixed_bpm)
-    return
 
 
 def song_counting():
@@ -741,6 +746,10 @@ def build_app(check_updates=True):
                 add_obstacles = gr.Checkbox(label="Add Obstacles", value=config.add_obstacle_flag,
                                             info="Add obstacles on the left/right with little movement.")
                 add_obstacles.input(set_add_obstacles, inputs=[add_obstacles], outputs=[])
+                # add bombs on/off
+                add_bombs = gr.Checkbox(label="Add Bombs", value=config.add_bombs_flag,
+                                        info="Place bombs beside notes as hazards to avoid.")
+                add_bombs.input(set_add_bombs, inputs=[add_bombs], outputs=[])
             with gr.Row():
                 # add sporty obstacles on/off
                 add_sporty_obstacles = gr.Checkbox(label="Add Sporty Obstacles", value=config.sporty_obstacles,
@@ -804,11 +813,7 @@ def build_app(check_updates=True):
                                              interactive=True, step=0.5, minimum=0, maximum=5,
                                              info="Note distance required to allow arcs.")
                 arc_movement_min.input(set_arc_movement_min, inputs=[arc_movement_min], outputs=[])
-                # add bpm overwrite
-                bpm_overwrite = gr.Checkbox(label="BPM Overwrite", value=config.use_fixed_bpm > 0,
-                                            info="Default False (uses real song bpm instead of fixed value). "
-                                                 "Activate only in case of note jump speed bugs in BS at high difficulties.")
-                bpm_overwrite.input(set_bpm_overwrite, inputs=[bpm_overwrite], outputs=[])
+
 
         ################################
         # TAB 3: Runtime
@@ -860,6 +865,12 @@ def build_app(check_updates=True):
                                                 info="Songs in 'y_done' will not be processed again, "
                                                      "until moved back to the input folder.")
                     auto_cut_done.input(update_auto_cut_done, inputs=[auto_cut_done], outputs=[])
+                    gr.Markdown("### Progress log")
+                    # verbose progress on/off
+                    verbose_log = gr.Checkbox(label="Verbose progress log",
+                                              value=config.verbose_level > 1,
+                                              info="Show detailed per-stage progress instead of song milestones only.")
+                    verbose_log.input(set_verbose_level, inputs=[verbose_log], outputs=[])
 
             # Run Button
             gr.Markdown("### Start Processing")
