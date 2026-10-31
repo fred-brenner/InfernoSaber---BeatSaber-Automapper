@@ -281,6 +281,7 @@ def _generate(song, monkeypatch):
 
 
 def test_generate_fills_long_note_free_gaps_with_decorative_pulses(monkeypatch):
+    monkeypatch.setattr(config, "v2_bombs_prob", 0.)  # calm bombs only
     result = _generate(_song(), monkeypatch)
     diagnostics = result.diagnostics["calm_effects"]
     assert diagnostics["gaps"] >= 1 and diagnostics["pulses"] > 0

@@ -166,6 +166,7 @@ def test_validate_hazards_rejects_walls_overlapping_note_swings():
 
 def test_heuristic_walls_bypass_the_hazards_predictor(monkeypatch):
     monkeypatch.setattr(config, "v2_walls_heuristic", True)
+    monkeypatch.setattr(config, "v2_bombs_prob", 0.)  # no bomb proposals
     song, vocab = audio_song(), vocabulary()
     predictors = dummy_predictors(vocab)
     predictors["timing"] = Timing()
