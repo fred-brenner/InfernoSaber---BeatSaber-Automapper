@@ -507,6 +507,12 @@ def set_random_behaviour(random_behaviour_value):
     return
 
 
+def set_note_sample_temperature(note_sample_temperature_value):
+    config.v2_note_sample_temperature = note_sample_temperature_value
+    update_dir_path('tools/config/config.py', 'v2_note_sample_temperature', note_sample_temperature_value)
+    return
+
+
 def set_add_arcs(add_arcs_value):
     config.add_slider_flag = add_arcs_value
     update_dir_path('tools/config/config.py', 'add_slider_flag', add_arcs_value)
@@ -791,9 +797,16 @@ def build_app(check_updates=True):
                 # set random behaviour value
                 random_behaviour = gr.Number(label="Random Behaviour", value=config.random_note_map_factor, precision=1,
                                              interactive=True, step=0.05, minimum=0, maximum=0.6,
-                                             info="Increase to produce different outcomes on each iteration. "
+                                             info="Varies the lighting choices on each iteration. "
                                                   "0 deactivates the feature.")
                 random_behaviour.input(set_random_behaviour, inputs=[random_behaviour], outputs=[])
+                # set v2 note sample temperature
+                note_sample_temperature = gr.Number(label="Note Sample Temperature",
+                                                    value=config.v2_note_sample_temperature, precision=1,
+                                                    interactive=True, step=0.1, minimum=0, maximum=2,
+                                                    info="Note variety: 0 repeats the same deterministic map, "
+                                                         "higher values sample more varied placements.")
+                note_sample_temperature.input(set_note_sample_temperature, inputs=[note_sample_temperature], outputs=[])
 
             with gr.Row():
                 # Set arc stats

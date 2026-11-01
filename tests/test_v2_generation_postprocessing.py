@@ -399,17 +399,55 @@ def test_bomb_flag_disables_all_bombs(song, monkeypatch):
     assert data["walls"] != [] and data["bombs"] == []
 
 
-def test_heuristic_bomb_candidates_follow_the_free_axis(monkeypatch):
+def test_validate_hazards_keeps_a_safe_area_around_notes(song, monkeypatch):
+    monkeypatch.setattr(config, "v2_bomb_note_time_gap", .4)
+    monkeypatch.setattr(config, "v2_bomb_note_cell_gap", 1)
+    head = note(0, time=5., x=0, y=1, direction=0)
+    adjacent = {"time": 5., "x": 1, "y": 1}   # beside the note, off the cut axis
+    corner = {"time": 5., "x": 3, "y": 2}     # more than one cell ring away
+    late = {"time": 5.5, "x": 1, "y": 1}      # adjacent cell, outside the time gap
+    data = state([head], bombs=[adjacent, corner, late])
+    report = post.validate_hazards(data, song)
+    assert data["bombs"] == [corner, late]
+    assert report == {"rejected_walls": 0, "rejected_bombs": 1}
+
+
+def test_bomb_safe_area_settings_restore_legacy_margins(song, monkeypatch):
+    monkeypatch.setattr(config, "v2_bomb_note_time_gap", .1)
+    monkeypatch.setattr(config, "v2_bomb_note_cell_gap", 0)
+    head = note(0, time=5., x=0, y=1, direction=0)
+    adjacent = {"time": 5., "x": 1, "y": 1}   # adjacent is legal under legacy margins
+    same = {"time": 5., "x": 0, "y": 1}       # same-cell overlap is still rejected
+    data = state([head], bombs=[adjacent, same])
+    post.validate_hazards(data, song)
+    assert data["bombs"] == [adjacent]
+
+
+def test_heuristic_bomb_candidates_stay_outside_the_note_safe_area(monkeypatch):
     from map_creation.v2_pipeline import _heuristic_bomb_candidates
     monkeypatch.setattr(config, "v2_bombs_prob", 1.)
-    notes = [note(0, x=0, y=1, direction=0),   # vertical cut -> side cell
-             note(1, x=3, y=1, direction=1),   # vertical cut -> side cell
-             note(2, x=0, y=0, direction=2),   # horizontal cut -> middle row
-             note(3, x=2, y=2, direction=3),   # horizontal cut -> middle row
-             note(4, x=0, y=0, direction=4),   # diagonal -> swept both axes
-             note(5, x=0, y=0, direction=8)]   # dot -> swept both axes
-    proposals = _heuristic_bomb_candidates(notes, np.random.default_rng(0))
-    assert len(proposals) == 4
-    assert {(item["x"], item["y"]) for item in proposals} == {(1, 1), (2, 1), (0, 1), (2, 1)}
+    monkeypatch.setattr(config, "v2_bomb_note_time_gap", .4)
+    monkeypatch.setattr(config, "v2_bomb_note_cell_gap", 1)
+    state = {"chains": [], "notes": [
+        note(0, time=1., x=0, y=1, direction=0),   # column swing -> only x>=2 free
+        note(1, time=2., x=1, y=0, direction=3),   # row swing -> only y=2 free
+        note(2, time=3., x=2, y=2, direction=5),   # diagonal swing -> only (3,0) free
+        note(3, time=4., x=1, y=1, direction=8)]}  # dot -> only x=3 free
+    proposals = _heuristic_bomb_candidates(state, np.random.default_rng(0))
+    assert [item["time"] for item in proposals] == [1., 2., 3., 4.]
+    assert proposals[0]["x"] >= 2
+    assert proposals[1]["y"] == 2
+    assert (proposals[2]["x"], proposals[2]["y"]) == (3, 0)
+    assert proposals[3]["x"] == 3
     monkeypatch.setattr(config, "v2_bombs_prob", 0.)
-    assert _heuristic_bomb_candidates(notes, np.random.default_rng(0)) == []
+    assert _heuristic_bomb_candidates(state, np.random.default_rng(0)) == []
+
+
+def test_heuristic_bomb_candidates_skip_fully_covered_times(monkeypatch):
+    from map_creation.v2_pipeline import _heuristic_bomb_candidates
+    monkeypatch.setattr(config, "v2_bombs_prob", 1.)
+    state = {"chains": [], "notes": [     # simultaneous swings cover the grid
+        note(0, x=0, y=1, direction=0), note(1, x=3, y=1, direction=1),
+        note(2, x=0, y=0, direction=2), note(3, x=2, y=2, direction=3),
+        note(4, x=0, y=0, direction=4), note(5, x=0, y=0, direction=8)]}
+    assert _heuristic_bomb_candidates(state, np.random.default_rng(0)) == []

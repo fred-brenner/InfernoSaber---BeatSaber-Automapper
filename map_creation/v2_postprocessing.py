@@ -1036,8 +1036,25 @@ def _occupied_notes(state):
     return occupied
 
 
+def _within_cell_gap(ax, ay, bx, by, cell_gap):
+    """Chebyshev cell margin; ``cell_gap`` 0 is same-cell, 1 adds all 8 neighbours."""
+    return abs(ax - bx) < cell_gap + .5 and abs(ay - by) < cell_gap + .5
+
+
 def _same_cell(first, second):
-    return abs(first["x"] - second["x"]) < .5 and abs(first["y"] - second["y"]) < .5
+    return _within_cell_gap(first["x"], first["y"], second["x"], second["y"], 0)
+
+
+def _bomb_safe_cells(occupied_window, cell_gap):
+    """Grid cells staying ``cell_gap`` rings clear of every windowed swing."""
+    free = {(x, y) for x in range(4) for y in range(3)}
+    for note in occupied_window:
+        for cell in _swing_cells(note):
+            free = {item for item in free
+                    if not _within_cell_gap(item[0], item[1], cell["x"], cell["y"], cell_gap)}
+        if not free:
+            break
+    return free
 
 
 def validate_expansions(state, song, logger=None):
@@ -1135,7 +1152,8 @@ def validate_hazards(state, song, logger=None):
             continue
         walls.append(wall)
     bombs = []
-    radius = max(config.min_time_diff, .1)
+    radius = max(float(getattr(config, "v2_bomb_note_time_gap", .8) or 0.), config.min_time_diff)
+    cell_gap = max(float(getattr(config, "v2_bomb_note_cell_gap", 1) or 0.), 0.)
     for bomb in sorted(original_bombs, key=lambda item: item["time"]):
         if not config.add_bombs_flag or not _integer_geometry(bomb, ("x", "y")):
             continue
@@ -1143,7 +1161,8 @@ def validate_hazards(state, song, logger=None):
             continue
         lo = int(np.searchsorted(times, bomb["time"] - radius, side="left"))
         hi = int(np.searchsorted(times, bomb["time"] + radius, side="right"))
-        if any(_same_cell(bomb, cell) for note in occupied[lo:hi] for cell in _swing_cells(note)):
+        if any(_within_cell_gap(bomb["x"], bomb["y"], cell["x"], cell["y"], cell_gap)
+               for note in occupied[lo:hi] for cell in _swing_cells(note)):
             continue
         if any(wall["time"] <= bomb["time"] <= wall["end_time"] and _wall_contains(wall, bomb) for wall in walls):
             continue

@@ -146,6 +146,9 @@ def test_repaired_production_keeps_native_chains_with_all_other_object_families(
     monkeypatch.setattr(config, "slider_probability", 1.)
     monkeypatch.setattr(config, "slider_movement_minimum", 0.)
     monkeypatch.setattr(config, "add_slider_flag", True)
+    # Legacy bomb margins: chain sweeps now keep a wide safe area bomb-free.
+    monkeypatch.setattr(config, "v2_bomb_note_time_gap", .1)
+    monkeypatch.setattr(config, "v2_bomb_note_cell_gap", 0)
     monkeypatch.setattr(config, "v2_arcs_heuristic", False)
     monkeypatch.setattr(config, "v2_walls_heuristic", False)  # model decode: bombs/arcs/walls all asserted
     vocab = _vocab()

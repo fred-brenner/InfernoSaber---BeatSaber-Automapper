@@ -203,31 +203,35 @@ def _heuristic_wall_candidates(notes, event_times):
             for obst in np.asarray(obstacles, np.float64).reshape(-1, 6)]
 
 
-def _heuristic_bomb_candidates(notes, rng):
-    """Precision bombs beside notes on their non-swept axis.
+def _heuristic_bomb_candidates(state, rng):
+    """Bombs at note times, in cells clear of every near-time swing's safe area.
 
-    A vertical cut sweeps its column, so the side cells stay free; a
-    horizontal cut sweeps its row, so the cells above/below stay free.
-    Diagonals and dots sweep both axes, so they propose nothing. Placement
-    prefers the side toward the lane centre (centred rows alternate sides by
-    note id); ``validate_hazards`` applies the real clearance and drops
-    proposals colliding with swings, walls or other bombs.
+    Each anchor note rolls ``v2_bombs_prob`` and may propose one bomb at its
+    own time, in a cell at least ``v2_bomb_note_cell_gap`` rings away from
+    every swing cell within ``v2_bomb_note_time_gap`` — the same box
+    ``validate_hazards`` enforces, so proposals only drop to wall or
+    other-bomb conflicts. Placement draws from the generation RNG and stays
+    deterministic per seed.
     """
-    from .v2_postprocessing import _DIRECTION_GROUP
+    from .v2_postprocessing import _bomb_safe_cells, _occupied_notes
     density = float(getattr(config, "v2_bombs_prob", 0.) or 0.)
-    proposals = []
-    for note in sorted(notes, key=lambda note: (note["time"], note.get("id", 0))):
+    time_gap = max(float(getattr(config, "v2_bomb_note_time_gap", .8) or 0.),
+                   float(getattr(config, "min_time_diff", .02) or 0.))
+    cell_gap = max(float(getattr(config, "v2_bomb_note_cell_gap", 1) or 0.), 0.)
+    occupied = sorted(_occupied_notes(state), key=lambda note: (note["time"], note.get("id", 0)))
+    times = np.asarray([entry["time"] for entry in occupied])
+    proposals, free_cells = [], {}
+    for note in sorted(state["notes"], key=lambda note: (note["time"], note.get("id", 0))):
         if density <= 0 or rng.random() > density:
             continue
-        group = _DIRECTION_GROUP.get(note["d"], 3)
-        x, y = int(note["x"]), int(note["y"])
-        if group == 0:          # vertical cut: neighbouring column cell is free
-            cell = (x + 1, y) if x < 2 else (x - 1, y)
-        elif group == 1:        # horizontal cut: cell above/below is free
-            cell = (x, 1) if y != 1 else (x, 2 if note.get("id", 0) % 2 else 0)
-        else:                   # diagonal cut or dot sweeps both axes
+        lo = int(np.searchsorted(times, note["time"] - time_gap, side="left"))
+        hi = int(np.searchsorted(times, note["time"] + time_gap, side="right"))
+        if (lo, hi) not in free_cells:
+            free_cells[lo, hi] = sorted(_bomb_safe_cells(occupied[lo:hi], cell_gap))
+        if not free_cells[lo, hi]:
             continue
-        proposals.append({"time": float(note["time"]), "x": cell[0], "y": cell[1], "kind": "bomb"})
+        x, y = free_cells[lo, hi][int(rng.integers(len(free_cells[lo, hi])))]
+        proposals.append({"time": float(note["time"]), "x": x, "y": y, "kind": "bomb"})
     return proposals
 
 
@@ -576,7 +580,7 @@ def generate(song, requested_nps, predictors, encoder, settings, vocabularies, *
         _log(logger, "V2 hazards (heuristic)")
         proposals = (_heuristic_wall_candidates(state["notes"], state["event_times"])
                      if config.add_obstacle_flag else [])
-        bomb_proposals = (_heuristic_bomb_candidates(state["notes"], rng)
+        bomb_proposals = (_heuristic_bomb_candidates(state, rng)
                           if config.add_bombs_flag else [])
         state["walls"], state["bombs"] = proposals, bomb_proposals
         raw["wall_proposals"] = len(proposals)

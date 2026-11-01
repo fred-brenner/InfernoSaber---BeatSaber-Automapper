@@ -330,6 +330,8 @@ class V2Runtime:
             if prepared.encoder.metadata.get("encoder_fingerprint") != self.encoder_fingerprint:
                 raise ValueError("Prepared audio belongs to a different retained encoder")
             reused_intensity = prepared.intensity is not None
+            # Re-read at call time: a resident runtime must honor live setting changes.
+            self.settings["note_sample_temperature"] = float(getattr(config, "v2_note_sample_temperature", 0.) or 0.)
             result = generate(prepared.song, requested_nps, self.predictors, prepared.encoder,
                               self.settings, self.vocabularies, audio_path=prepared.audio_path,
                               intensity=prepared.intensity, logger=logger, lighting_generator=self.lighting)

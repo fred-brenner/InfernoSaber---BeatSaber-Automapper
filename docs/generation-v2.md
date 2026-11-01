@@ -122,7 +122,8 @@ use the nearest timing frame's stronger one/two-note probability. Zero density
 remains empty. Mirroring, single-note mode, flow/movement, breaks, emphasis,
 waveform changes and dot controls run before learned expansion. Position and
 arrow categories are sampled from the model distributions at
-`config.v2_note_sample_temperature` (default `0.9`; `0` restores argmax). A
+`config.v2_note_sample_temperature` (default `0.9`; `0` restores argmax),
+exposed in the app as *Note Sample Temperature*. A
 one-note event samples jointly over the 24 hand/cell combinations weighted like
 the count-one argmax rule; a two-note event samples each hand independently.
 Sampling replaces the former `random_factor` noise mixture for note decoding,
@@ -252,14 +253,17 @@ is skipped entirely (bomb decoding was already disabled via
 the model holding walls continuously at fixed spots and colliding with notes.
 
 The heuristic path also proposes gameplay bombs (`_heuristic_bomb_candidates`
-in `v2_pipeline.py`): each note contributes a bomb next to it with
-probability `v2_bombs_prob` (default `0.25`), placed on the lane the cut
-leaves free — a side cell for vertical cuts, the row above/below for
-horizontal cuts — while diagonal and dot cuts are skipped because their
-swing sweeps both axes. Placement uses the generation RNG, so proposals are
-deterministic for a given seed, and `validate_hazards` applies the same
-time/geometry margins, swing-volume and wall-overlap rejection as for
-walls. `add_bombs_flag` (default `True`, surfaced as "Add Bombs" in the
+in `v2_pipeline.py`): each note rolls `v2_bombs_prob` (default `0.25`) and may
+place one bomb at its own time in a cell outside the note safe area. That
+area is a box — `v2_bomb_note_cell_gap` (default `1`, rings of grid cells
+around every swing cell) around every note within `v2_bomb_note_time_gap`
+(default `0.8` seconds on either side of the bomb) — so a bomb can never sit
+next to a note, not even across the non-cut axis. `validate_hazards` enforces
+the same box for every bomb family — heuristic, model-decoded and
+calm-effect — on top of its geometry and wall-overlap rejection. Placement
+draws from the generation RNG, so proposals are deterministic for a given
+seed; notes whose surroundings are fully covered propose nothing.
+`add_bombs_flag` (default `True`, surfaced as "Add Bombs" in the
 app) gates every bomb family including calm-effect corner bombs, matching
 how `add_obstacle_flag` gates all walls; learned hazard decoding still
 emits bombs only when `v2_walls_heuristic = False` and
