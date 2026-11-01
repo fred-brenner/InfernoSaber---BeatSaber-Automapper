@@ -630,3 +630,42 @@ obstacle_time_gap = np.asarray(obstacle_time_gap)
 obstacle_time_gap_orig = obstacle_time_gap
 thresh_beat_orig = thresh_beat
 thresh_onbeat_orig = thresh_onbeat
+
+# ---------------------------------------------------------
+# Persisted app/user overrides live in the untracked user_settings.py and are
+# applied here so tracked defaults stay clean for `git pull --ff-only`.
+# Derived settings are re-evaluated from the effective inputs unless the
+# derived name was overridden explicitly.
+try:
+    from tools.config import user_settings as _user_settings
+except Exception as _error:
+    if not isinstance(_error, ImportError):
+        print(f"Warning: could not load tools/config/user_settings.py ({_error}); using defaults.")
+    _user_settings = None
+if _user_settings is not None:
+    _overridden = {name for name in vars(_user_settings) if not name.startswith('_')}
+    globals().update({name: getattr(_user_settings, name) for name in _overridden})
+    use_mapper_selection = use_mapper_selection.lower()
+    obstacle_time_gap = np.asarray(obstacle_time_gap)
+    for _derived, _source in {
+        'intensity_random_seed': 'random_seed',
+        'timing_random_seed': 'random_seed',
+        'notes_random_seed': 'random_seed',
+        'positions_random_seed': 'random_seed',
+        'arrows_random_seed': 'random_seed',
+        'multiplier_random_seed': 'random_seed',
+        'hazards_random_seed': 'random_seed',
+        'lighting_random_seed': 'random_seed',
+        'arcs_random_seed': 'random_seed',
+        'max_speed_orig': 'max_speed',
+        'add_beat_intensity_orig': 'add_beat_intensity',
+        'silence_threshold_orig': 'silence_threshold',
+        'jump_speed_offset_orig': 'jump_speed_offset',
+        'obstacle_time_gap_orig': 'obstacle_time_gap',
+        'thresh_beat_orig': 'thresh_beat',
+        'thresh_onbeat_orig': 'thresh_onbeat',
+    }.items():
+        if _derived not in _overridden:
+            globals()[_derived] = globals()[_source]
+    del _derived, _source, _overridden
+del _user_settings

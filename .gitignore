@@ -1,3 +1,5 @@
 /.idea
 /*.pclprof
 /mnt/
+/tools/config/user_settings.py
+/tools/config/user_paths.py

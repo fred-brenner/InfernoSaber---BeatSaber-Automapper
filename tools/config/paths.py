@@ -19,6 +19,14 @@ dir_path = "/home/frede/.local/share/infernosaber-baseline/gpu/Data/"
 bs_song_path = ""
 bs_input_path = ""
 
+# Persisted app/user overrides (untracked): applied before the derived paths
+# below so a saved dir_path re-derives the whole workspace.
+try:
+    from tools.config.user_paths import *  # noqa: F401,F403
+except Exception as error:
+    if not isinstance(error, ImportError):
+        print(f"Warning: could not load tools/config/user_paths.py ({error}); using defaults.")
+
 ############################# (no need to change)
 # main workspace path
 main_path = os.path.abspath(os.getcwd())

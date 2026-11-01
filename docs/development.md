@@ -134,6 +134,8 @@ GPU workspace described in [gpu-execution.md](gpu-execution.md):
 - `tools/config/paths.py`: the data root above; `bs_song_path` remains empty.
 - `tools/config/config.py`: `fav_15`, `max_speed = 4 * 5.0`, one worker,
   `difficulty_1 = 5`, and all other difficulty slots set to zero.
+  (Runtime writes now go to the untracked `user_settings.py`/`user_paths.py`
+  overrides imported by these files.)
 - The app's generation callback passed `export_results_to_bs=False` because
   no Beat Saber library was configured. Keep the Beat Saber folder field empty
   for development runs.

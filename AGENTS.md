@@ -134,8 +134,11 @@ labels require verification before becoming current requirements.
 - Preserve the line endings of existing files when editing them. Keep any
   repository-wide normalization separate from functional work.
 - Current path helpers expect forward slashes and trailing `/` on directory paths.
-  Setup callbacks can persist paths into `tools/config/paths.py`; account for these
-  writes when checking the diff after a manual app run.
+  Runtime/app settings writes (`update_dir_path` for `config.py`/`paths.py`)
+  redirect to the untracked `tools/config/user_settings.py`/`user_paths.py`,
+  which both modules import so tracked files stay clean for `git pull --ff-only`;
+  expect these files after a manual app run rather than diffs to the tracked
+  config files.
 - When changing timing, distinguish elapsed seconds from serialized beat times.
   Preserve the currently implemented v3 output and v2 legacy option unless the
   requested task changes that compatibility.
