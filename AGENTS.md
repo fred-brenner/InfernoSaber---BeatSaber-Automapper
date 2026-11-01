@@ -142,6 +142,14 @@ labels require verification before becoming current requirements.
 - When changing timing, distinguish elapsed seconds from serialized beat times.
   Preserve the currently implemented v3 output and v2 legacy option unless the
   requested task changes that compatibility.
+- Releases: bump `InfernoSaber_version` in `tools/config/config.py`, commit
+  `Release X.Y.Z` on `main_app_dev`, fast-forward `main_app`, tag `vX.Y.Z`, push
+  branch+tag — then publish the GitHub release on the `fred-brenner/InfernoSaber-App`
+  launcher repo (target `main`), which is what the in-app update checker reads.
+  A `-reinstall` tag suffix forces the reinstall warning path for older installs.
+  Pinokio Update pulls `main_app` of this repo ff-only; tracked files must stay
+  clean on user machines (runtime settings persist to untracked
+  `tools/config/user_settings.py`/`user_paths.py`).
 
 ## Coding Rules
 
