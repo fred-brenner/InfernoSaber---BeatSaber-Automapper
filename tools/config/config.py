@@ -7,7 +7,7 @@ from typing import Optional
 # config file for all important values
 # used in multiple codes
 ########################################
-InfernoSaber_version = "2.0.0.app2-reinstall"  # coded into the info.dat file
+InfernoSaber_version = "2.0.0.app3"  # coded into the info.dat file
 
 
 def get_clean_version(version: Optional[str] = None) -> str:
