@@ -160,9 +160,9 @@ def on_browse_input_path():
     filename = filename.replace('\\\\', '/').replace('\\', '/')
     if filename:
         if os.path.isdir(filename):
-            if len(os.listdir(filename)) > 5:
-                return str(filename), 'Error: Please select an empty folder to set up InfernoSaber'
             if not os.path.basename(filename) == data_folder_name:
+                if len(os.listdir(filename)) > 5:
+                    return str(filename), 'Error: Please select an empty folder to set up InfernoSaber'
                 # filename = os.path.join(filename, data_folder_name)
                 filename += f"/{data_folder_name}"
                 if not os.path.isdir(filename):
