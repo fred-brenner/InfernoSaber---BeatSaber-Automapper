@@ -23,9 +23,11 @@ _PROGRESS = None
 _LABELS = ("Easy", "Normal", "Hard", "Expert", "ExpertPlus")
 
 
-def _emit(message, callback=None):
+def _emit(message, callback=None, important=False):
+    """CLI output always gets the full log; the app box only sees important
+    lines unless verbose progress is enabled (config.verbose_level > 1)."""
     print(message, flush=True)
-    if callback is not None:
+    if callback is not None and (important or config.verbose_level > 1):
         callback(message)
 
 
@@ -36,11 +38,11 @@ def _worker_init(snapshot, progress=None):
     _PROGRESS = progress
 
 
-def _worker_log(message):
+def _worker_log(message, important=False):
     if _PROGRESS is None:
         print(message, flush=True)
     else:
-        _PROGRESS.put(str(message))
+        _PROGRESS.put((str(message), bool(important)))
 
 
 def process_song(song_list_worker, total_runs):
@@ -54,7 +56,7 @@ def process_song(song_list_worker, total_runs):
                       "internal_difficulty": float(difficulty),
                       "error": f"{type(error).__name__}: {error}"}
             results.append(result)
-            _worker_log(f"Failed {result['song']} at {difficulty / 4:g} NPS: {result['error']}")
+            _worker_log(f"Failed {result['song']} at {difficulty / 4:g} NPS: {result['error']}", important=True)
     return results
 
 
@@ -144,7 +146,7 @@ def _run(n_workers, diff_list, export_results_to_bs, logger_callback, parallel):
     # Invalid bootstrap settings must fail here, not cause endless Pool respawns.
     configure_inference()
     validate_production_bundle(snapshot["config"]["v2_model_bundle_path"])
-    _emit("Checking and normalizing song files...", logger_callback)
+    _emit("Checking and normalizing song files...", logger_callback, important=True)
     input_path = snapshot["paths"]["songs_pred"]
     songs = check_music_files(sorted(os.listdir(input_path)), input_path)
     snapshot["config"]["use_mapper_selection"] = "v2_expert"
@@ -154,7 +156,17 @@ def _run(n_workers, diff_list, export_results_to_bs, logger_callback, parallel):
     records, packages, failures = [], [], []
     started = time.perf_counter()
     workers = min(n_workers, len(groups))
-    _emit(f"Generating {len(songs)} songs at {len(difficulties)} difficulties with {workers} CPU workers", logger_callback)
+    total_variants = sum(len(group) for group in groups)
+    _emit(f"Generating {len(songs)} songs at {len(difficulties)} difficulties with {workers} CPU workers",
+          logger_callback, important=True)
+
+    def _eta():
+        if not records:
+            return
+        per_variant = (time.perf_counter() - started) / len(records)
+        _emit(f"### ETA: {(total_variants - len(records)) * per_variant / 60:.1f} minutes. "
+              f"Time per song: {per_variant:.0f} s ###", logger_callback, important=True)
+
     if groups and parallel:
         context = mp.get_context("spawn")
         progress = context.Queue()
@@ -165,20 +177,23 @@ def _run(n_workers, diff_list, export_results_to_bs, logger_callback, parallel):
                 while finished < len(groups):
                     while True:
                         try:
-                            _emit(progress.get_nowait(), logger_callback)
+                            message, important = progress.get_nowait()
                         except queue.Empty:
                             break
+                        _emit(message, logger_callback, important=important)
                     try:
                         records.extend(results.next(timeout=.2))
                     except mp.TimeoutError:
                         continue
                     finished += 1
+                    _eta()
                     _emit(f"Completed {finished}/{len(groups)} work groups in {time.perf_counter() - started:.1f}s", logger_callback)
                 while True:
                     try:
-                        _emit(progress.get_nowait(), logger_callback)
+                        message, important = progress.get_nowait()
                     except queue.Empty:
                         break
+                    _emit(message, logger_callback, important=important)
         finally:
             progress.close()
             progress.join_thread()
@@ -187,6 +202,7 @@ def _run(n_workers, diff_list, export_results_to_bs, logger_callback, parallel):
             configure_inference()
             for group in groups:
                 records.extend(process_song(group, len(groups)))
+                _eta()
     failures.extend(record for record in records if record["status"] != "ok")
     # Handle packaging failures individually and keep completed variants for retry.
     for song in songs:
@@ -199,7 +215,8 @@ def _run(n_workers, diff_list, export_results_to_bs, logger_callback, parallel):
               "packages": packages, "failures": failures, "workers": workers,
               "elapsed_seconds": time.perf_counter() - started}
     report["report_path"] = save_report(report, root=snapshot["paths"]["temp_path"])
-    _emit(f"Finished: {len(packages)} complete song packages, {len(failures)} failures", logger_callback)
+    _emit(f"Finished: {len(packages)} complete song packages, {len(failures)} failures",
+          logger_callback, important=True)
     return report
 
 

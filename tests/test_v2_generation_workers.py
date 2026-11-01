@@ -219,3 +219,49 @@ def test_generation_requests_separate_automatic_expert_pass(tmp_path, monkeypatc
     assert requests == [5., 3.15]
     assert [(v['difficulty'], v['automatic_expert']) for v in packages] == [('ExpertPlus', False), ('Expert', True)]
     assert report['status'] == 'ok'
+
+
+def test_emit_keeps_full_cli_log_but_filters_app(capsys, monkeypatch):
+    app = []
+    monkeypatch.setattr(config, 'verbose_level', 1)
+    main_multi._emit('detail line', app.append)
+    main_multi._emit('milestone line', app.append, important=True)
+    assert app == ['milestone line']
+    monkeypatch.setattr(config, 'verbose_level', 2)
+    main_multi._emit('verbose line', app.append)
+    assert app == ['milestone line', 'verbose line']
+    out = capsys.readouterr().out
+    assert 'detail line' in out and 'milestone line' in out and 'verbose line' in out
+
+
+def test_worker_progress_items_carry_importance(monkeypatch):
+    from types import SimpleNamespace
+    items = []
+    monkeypatch.setattr(main_multi, '_PROGRESS', SimpleNamespace(put=items.append))
+    main_multi._worker_log('quiet detail')
+    main_multi._worker_log('loud failure', important=True)
+    assert items == [('quiet detail', False), ('loud failure', True)]
+
+
+def test_sequential_run_emits_eta_and_only_milestones_to_app(capsys, tmp_path, monkeypatch):
+    for name in ('alpha.egg', 'beta.egg'):
+        (tmp_path / name).write_bytes(b'x')
+    monkeypatch.setattr(paths, 'songs_pred', str(tmp_path) + '/')
+    monkeypatch.setattr(config, 'verbose_level', 1)
+    monkeypatch.setattr(main_multi, 'configure_inference', lambda: None)
+    monkeypatch.setattr(main_multi, 'validate_production_bundle', lambda *args, **kwargs: {})
+    monkeypatch.setattr(main_multi, 'check_music_files', lambda files, root: list(files))
+    monkeypatch.setattr(main_multi, 'process_song', lambda group, total: [
+        {'status': 'ok', 'song': Path(song).stem, 'internal_difficulty': difficulty, 'path': str(tmp_path)}
+        for song, difficulty in group])
+    monkeypatch.setattr(main_multi, '_combine_maps', lambda *args: [{'song': args[0]}])
+    monkeypatch.setattr(main_multi, 'save_report', lambda report, root=None: 'report.json')
+    app = []
+    result = main_multi._run(1, [3], False, app.append, parallel=False)
+    assert result['status'] == 'ok'
+    out = capsys.readouterr().out
+    assert out.count('### ETA:') == 2
+    assert 'Time per song:' in out
+    assert len(app) == len([line for line in app if line])
+    for line in app:
+        assert line.startswith(('Checking and normalizing', 'Generating', '### ETA:', 'Finished:')), line
