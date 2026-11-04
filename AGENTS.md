@@ -9,7 +9,10 @@ currently decoded by the pre-model heuristics — `v2_arcs_heuristic` /
 note safe area (`v2_bomb_note_cell_gap`/`v2_bomb_note_time_gap`) by
 `_heuristic_bomb_candidates`, gated by `add_bombs_flag`/`v2_bombs_prob`), a
 bounded onset-peak snap post-cleanup
-(`v2_notes_onset_snap`), a decorative calm-area pulse pass that adds edge wall
+(`v2_notes_onset_snap`), a configurable start-of-map safety zone
+(`v2_map_intro_no_notes_seconds`/`v2_map_intro_no_hazards_seconds`), strict
+≥135° same-hand flow (`v2_flow_min_turn_steps`), and a diagonal-direction cap
+(`v2_diagonal_max_fraction`), a decorative calm-area pulse pass that adds edge wall
 flashes, corner bombs and laser flashes inside intentionally note-free gaps
 without touching notes (`v2_calm_effects`), the retained
 encoder, and exclusive v1 `fav_15` lighting; GPU remains the training runtime.

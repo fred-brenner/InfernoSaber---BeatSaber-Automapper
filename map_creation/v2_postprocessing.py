@@ -4,7 +4,10 @@ All timestamps remain elapsed seconds. Legacy note mutators run once, before
 stable note IDs and expansion relationships are assigned. Clearance resolves
 same-time same-cell and swing-path conflicts; it prefers mutating heuristic or
 copied notes and only touches retained model notes when nothing else resolves
-the conflict.
+the conflict. A start-of-map floor drops early notes (``apply_intro_floor``;
+hazards get their own floor inside ``validate_hazards``) and a best-effort
+diagonal cap recuts excess diagonal cuts toward flow-legal adjacent cardinals
+— both run after note cleanup and onset snap, before the retained snapshot.
 
 Cut-direction convention: ``get_cut_dir_xy`` yields the approach vector — the
 hand enters from ``pos + step`` and exits through ``pos - step``. Both adjacent

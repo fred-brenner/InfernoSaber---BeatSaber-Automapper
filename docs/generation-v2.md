@@ -179,8 +179,10 @@ alternative fix exists:
 - no two notes share `(time, hand)` — deduplication keeps the best-flowing
   candidate, and same-hand same-cell duplicates are dropped;
 - consecutive same-hand notes separated by more than
-  `v2_cleanup_same_dir_gap` seconds must change cut direction by more than
-  90° (a 90° turn is allowed only when the hand travels at least two cells);
+  `v2_cleanup_same_dir_gap` seconds must change cut direction by at least
+  `v2_flow_min_turn_steps` 45° steps (default `3` = strict ≥135° with no
+  travel exemption; `<= 2` restores the legacy rule where a 90° turn is
+  allowed when the hand travels at least two cells);
   dots take an implied direction from geometry — the hand rests at the
   previous cut's exit cell, so a dot on the exit ray continues the stroke
   while a dot in the return zone inherits the pendulum reversal, and
@@ -297,6 +299,24 @@ RMS, backtrack, uniform control) found it is the consensus peak set and the
 best suited for snap targets — with a shorter refractory
 (`v2_notes_onset_snap_wait = 4` frames instead of the legacy 8) for coverage;
 `thresh_onbeat` stays the peak threshold.
+
+The 2026-11-04 note postprocessing update adds four knobs around that same
+post-snap boundary: `v2_map_intro_no_notes_seconds` (default `2.0`) drops
+notes starting before its floor and `v2_map_intro_no_hazards_seconds`
+(default `1.0`) rejects walls and bombs starting before theirs inside
+`validate_hazards` — generated and calm-effect hazards alike, counted under
+`rejected_intro` — so the opening seconds stay readable like human maps (`0`
+disables each zone); `v2_flow_min_turn_steps` (default `3`) is the strict
+≥135° same-hand turn of the clearance invariant above; and
+`v2_diagonal_max_fraction` (default `0.10`) caps diagonal cuts (directions
+4–7, dots counted in the base) by recutting an RNG-drawn excess to the
+cheapest flow-legal adjacent cardinal, vertical on ties. The note-side
+filters run after `snap_note_times` and before the retained snapshot and
+multiplier, so expansion copies and arcs see final note state; the hazard
+floor runs inside `validate_hazards`. The cap is best-effort — a diagonal
+whose adjacent cardinals are all illegal stays, so the realized fraction may
+exceed the cap. Diagnostics land under `intro_zones` (`notes_dropped`) and
+`diagonal_cap` (`recut`, `kept_over_cap`, `fraction_after`).
 
 The 2026-10-31 calm-effects stage (`v2_calm_effects = True`) fills note-free
 stretches the model intentionally leaves empty — a requested behaviour — with
