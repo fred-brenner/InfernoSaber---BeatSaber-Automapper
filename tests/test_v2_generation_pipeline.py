@@ -451,17 +451,24 @@ def test_same_direction_recut_flips_repeat():
     assert _step_distance(notes[3]["d"], notes[4]["d"]) >= 3
 
 
-def test_same_direction_recut_handles_near_repeats_and_exemptions():
+def test_same_direction_recut_handles_near_repeats_and_exemptions(monkeypatch):
     from map_creation.v2_postprocessing import recut_same_direction_notes, _step_distance
-    # 45° neighbour repeats violate the ≥90° rule for far-apart notes
+    # 45° neighbour repeats violate the ≥135° rule for far-apart notes
     notes = [_note(0, 0., 0, 1), _note(1, .5, 0, 6)]
     assert recut_same_direction_notes(notes) == 1
     assert _step_distance(notes[0]["d"], notes[1]["d"]) >= 3
-    # 90° changes are still too hectic for separated notes at one cell
+    # 90° changes are still too hectic for separated notes under the strict
+    # rule, at one cell or with two-cell travel
     notes = [_note(0, 0., 0, 1), _note(1, .5, 0, 2)]
     assert recut_same_direction_notes(notes) == 1
     assert _step_distance(notes[0]["d"], notes[1]["d"]) >= 3
-    # 90° is allowed when the hand travels at least two cells
+    notes = [_note(0, 0., 0, 1), _note(1, .5, 0, 2)]
+    notes[1]["x"], notes[1]["y"] = 3, 1
+    assert recut_same_direction_notes(notes) == 1
+    assert _step_distance(notes[0]["d"], notes[1]["d"]) >= 3
+    # v2_flow_min_turn_steps <= 2 restores the legacy rule: 90° is allowed
+    # when the hand travels at least two cells
+    monkeypatch.setattr(config, "v2_flow_min_turn_steps", 2)
     notes = [_note(0, 0., 0, 1), _note(1, .5, 0, 2)]
     notes[1]["x"], notes[1]["y"] = 3, 1
     assert recut_same_direction_notes(notes) == 0
@@ -570,9 +577,12 @@ def test_swing_into_later_note_is_resolved():
     assert stats["swing_recut"] + stats["swing_relocated"] + stats["swing_dropped"] == 0
 
 
-def test_swing_recut_respects_same_hand_flow():
+def test_swing_recut_respects_same_hand_flow(monkeypatch):
     from map_creation.v2_postprocessing import (clearance_violations, _step_distance,
                                                 enforce_note_flow_and_clearance)
+    # legacy rule keeps this pair flow-legal; the strict default would let the
+    # flow pass fix it before the swing clash is even checked
+    monkeypatch.setattr(config, "v2_flow_min_turn_steps", 2)
     # swinger is flow-legal against its predecessor (90° with 2-cell travel),
     # so the clash fix - not the flow pass - must supply the new direction;
     # any horizontal recut still sweeps the blocked cell, so it must leave the
