@@ -408,6 +408,7 @@ def generate(song, requested_nps, predictors, encoder, settings, vocabularies, *
                 validate_arcs=base.validate_arcs,
                 enforce_note_flow_and_clearance=base.enforce_note_flow_and_clearance,
                 snap_note_times=base.snap_note_times,
+                apply_intro_floor=base.apply_intro_floor,
                 calm_area_pulses=base.calm_area_pulses,
                 add_calm_effects=base.add_calm_effects,
                 add_calm_lighting=base.add_calm_lighting)
@@ -530,6 +531,12 @@ def generate(song, requested_nps, predictors, encoder, settings, vocabularies, *
         result.diagnostics["onset_snap"] = snap_times(state["notes"], state["chains"],
                                                       audio_path, duration, logger=logger)
         result.diagnostics["onset_snap"]["elapsed_seconds"] = perf_counter() - snap_started
+    intro_fn = getattr(postprocessors, "apply_intro_floor", None)
+    intro_floor = float(getattr(config, "v2_map_intro_no_notes_seconds", 0.) or 0.)
+    if intro_fn is not None and intro_floor > 0:
+        result.diagnostics["intro_zones"] = {
+            "no_notes_seconds": intro_floor,
+            "notes_dropped": intro_fn(state["notes"], intro_floor)}
     started = perf_counter()
     retained = deepcopy([note for note in state["notes"] if note.get("kind") == "retained"])
     upstream = index_state({**state, "notes": retained, "chains": []})

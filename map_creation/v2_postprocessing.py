@@ -835,6 +835,13 @@ def snap_note_times(notes, chains, audio_path, duration, ratio=None, logger=None
     return stats
 
 
+def apply_intro_floor(notes, cutoff_seconds):
+    """Drop notes starting before ``cutoff_seconds`` in place; return the count."""
+    before = len(notes)
+    notes[:] = [note for note in notes if note["time"] >= cutoff_seconds]
+    return before - len(notes)
+
+
 _NOTE_STEPS = ("mirroring", "initial_single_note_filter", "legacy_note_flow",
                "flow_additions", "same_direction_recut", "final_single_note_filter",
                "clearance")
@@ -1108,11 +1115,17 @@ def _swing_cells(note):
 
 
 def validate_hazards(state, song, logger=None):
-    """Filter model hazards with legacy margins, geometry modes and clearance."""
+    """Filter model hazards with legacy margins, geometry modes and clearance.
+
+    ``v2_map_intro_no_hazards_seconds`` additionally keeps the song opening
+    free of walls and bombs (generated and calm-effect hazards alike); those
+    rejections are reported under ``rejected_intro``."""
     duration = float(_base(song).metadata["duration"])
     occupied = sorted(_occupied_notes(state), key=lambda note: note["time"])
     times = np.asarray([note["time"] for note in occupied])
     before, after = map(float, config.obstacle_time_gap)
+    intro_floor = float(getattr(config, "v2_map_intro_no_hazards_seconds", 0.) or 0.)
+    rejected_intro = 0
     positions = config.sport_obstacle_positions if config.sporty_obstacles else config.norm_obstacle_positions
     allowed_lanes = {lane for side in positions for lane in side}
     allowed_types = config.sport_obstacle_allowed_types if config.sporty_obstacles else config.norm_obstacle_allowed_types
@@ -1120,7 +1133,9 @@ def validate_hazards(state, song, logger=None):
     original_walls, original_bombs = list(state.get("walls", [])), list(state.get("bombs", []))
     for wall in sorted(original_walls, key=lambda item: item["time"]):
         start, end = wall["time"], wall["end_time"]
-        if not config.add_obstacle_flag or not 0 <= start < end <= duration or end - start < config.obstacle_min_duration:
+        if (not config.add_obstacle_flag or not 0 <= start < end <= duration
+                or end - start < config.obstacle_min_duration or start < intro_floor):
+            rejected_intro += int(start < intro_floor)
             continue
         if not _integer_geometry(wall, ("x", "y", "width", "height")):
             continue
@@ -1157,7 +1172,9 @@ def validate_hazards(state, song, logger=None):
     for bomb in sorted(original_bombs, key=lambda item: item["time"]):
         if not config.add_bombs_flag or not _integer_geometry(bomb, ("x", "y")):
             continue
-        if not (0 <= bomb["time"] < duration and 0 <= bomb["x"] < 4 and 0 <= bomb["y"] < 3):
+        if (not (0 <= bomb["time"] < duration and 0 <= bomb["x"] < 4 and 0 <= bomb["y"] < 3)
+                or bomb["time"] < intro_floor):
+            rejected_intro += int(bomb["time"] < intro_floor)
             continue
         lo = int(np.searchsorted(times, bomb["time"] - radius, side="left"))
         hi = int(np.searchsorted(times, bomb["time"] + radius, side="right"))
@@ -1170,7 +1187,9 @@ def validate_hazards(state, song, logger=None):
             continue
         bombs.append(bomb)
     state.update(walls=walls, bombs=bombs)
-    diagnostics = {"rejected_walls": len(original_walls) - len(walls), "rejected_bombs": len(original_bombs) - len(bombs)}
+    diagnostics = {"rejected_walls": len(original_walls) - len(walls),
+                   "rejected_bombs": len(original_bombs) - len(bombs),
+                   "rejected_intro": rejected_intro}
     _report(logger, f"Hazard clearance: {len(walls)} walls and {len(bombs)} bombs accepted")
     return diagnostics
 

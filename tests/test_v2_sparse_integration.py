@@ -94,13 +94,18 @@ def _lighting(times, encoder):
 
 def _generate(song, options):
     vocab = _vocab()
-    originals = config.v2_arcs_heuristic, config.v2_walls_heuristic
+    originals = (config.v2_arcs_heuristic, config.v2_walls_heuristic,
+                 config.v2_map_intro_no_hazards_seconds)
+    # The 1.6 s fixture places hazards inside the production intro free zone;
+    # that filter has dedicated tests in test_v2_generation_postprocessing.py.
     config.v2_arcs_heuristic = config.v2_walls_heuristic = False
+    config.v2_map_intro_no_hazards_seconds = 0.
     try:
         return generate(song, 4., _predictors(vocab), lambda times: np.zeros((len(times), 16), np.float32),
                         options, vocab, lighting_generator=_lighting, postprocessors=_processors(), random_factor=0)
     finally:
-        config.v2_arcs_heuristic, config.v2_walls_heuristic = originals
+        (config.v2_arcs_heuristic, config.v2_walls_heuristic,
+         config.v2_map_intro_no_hazards_seconds) = originals
 
 
 def test_repaired_production_all_sparse_families_serialize_and_preserve_audio_source(monkeypatch):
@@ -151,6 +156,7 @@ def test_repaired_production_keeps_native_chains_with_all_other_object_families(
     monkeypatch.setattr(config, "v2_bomb_note_cell_gap", 0)
     monkeypatch.setattr(config, "v2_arcs_heuristic", False)
     monkeypatch.setattr(config, "v2_walls_heuristic", False)  # model decode: bombs/arcs/walls all asserted
+    monkeypatch.setattr(config, "v2_map_intro_no_hazards_seconds", 0.)  # 1.6 s fixture sits in the zone
     vocab = _vocab()
     vocab["multiplier"].append({"kind": "chain", "dx": 1, "dy": 0,
                                 "span": .1, "slices": 3, "squish": .75})

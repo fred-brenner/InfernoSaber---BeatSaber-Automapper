@@ -204,6 +204,12 @@ v2_calm_effects_division = 1            # pulses per beat (1 = every beat, 2 = e
 v2_calm_effects_wall_beats = 0.25       # flash wall duration as a beat fraction
 v2_calm_effects_variety = True          # rotate placement themes per gap (False = alternate only)
 
+# Start-of-map free zones (2026-11-04): keep the opening seconds readable like
+# human maps — notes and hazards (incl. calm-effect pulses) only appear past
+# these elapsed-time floors; 0 disables each zone.
+v2_map_intro_no_notes_seconds = 2.0    # drop notes before this time (s)
+v2_map_intro_no_hazards_seconds = 1.0  # drop walls/bombs starting before this (s)
+
 add_waveform_pattern_flag = 0   # [0: off, 1: on, 2: double on]
 waveform_pattern = [
     [0, 1, 2, 3, 2, 1],

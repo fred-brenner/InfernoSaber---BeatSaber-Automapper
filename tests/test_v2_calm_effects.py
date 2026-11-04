@@ -269,6 +269,10 @@ def _generate(song, monkeypatch):
                         lambda times, silent: np.asarray(times))
     monkeypatch.setattr(v2_postprocessing, "_start_end_times",
                         lambda times, volume, onset: np.asarray(times))
+    # The fixture's notes/hazards sit inside the intro free zones; the zones
+    # have dedicated tests in test_v2_generation_postprocessing.py.
+    monkeypatch.setattr(config, "v2_map_intro_no_notes_seconds", 0.)
+    monkeypatch.setattr(config, "v2_map_intro_no_hazards_seconds", 0.)
     song, vocab = song, _vocab()
     predictors = dummy_predictors(vocab)
     predictors["timing"] = _Timing()

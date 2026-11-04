@@ -475,6 +475,9 @@ def test_clearance_index_matches_frozen_legacy_geometry_chain_and_swing_rules(mo
     clearance = opts["stage_policies"]["hazards"]["clearance"]
     for key, value in clearance.items():
         monkeypatch.setattr(config, key, deepcopy(value))
+    # Parity covers the frozen legacy rules; the production-only intro floor
+    # would drop the time-0/.75 probes on top of them.
+    monkeypatch.setattr(config, "v2_map_intro_no_hazards_seconds", 0.)
     source = song(duration=12.)
     upstream = {"notes": [{"id": 0, "time": 1., "hand": 0, "x": 0, "y": 1, "d": 0}],
                 "chains": [{"id": 0, "anchor_id": 0, "time": 1., "end_time": 1.4,

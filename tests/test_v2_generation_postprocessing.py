@@ -245,7 +245,7 @@ def test_hazards_see_chain_interiors_and_preserve_colored_notes(song, monkeypatc
     assert data["notes"] == before
     assert data["walls"] == [walls[1]]
     assert data["bombs"] == [bombs[1]]
-    assert report == {"rejected_walls": 1, "rejected_bombs": 1}
+    assert report == {"rejected_walls": 1, "rejected_bombs": 1, "rejected_intro": 0}
 
 
 def test_obstacle_flag_only_disables_walls(song, monkeypatch):
@@ -409,7 +409,7 @@ def test_validate_hazards_keeps_a_safe_area_around_notes(song, monkeypatch):
     data = state([head], bombs=[adjacent, corner, late])
     report = post.validate_hazards(data, song)
     assert data["bombs"] == [corner, late]
-    assert report == {"rejected_walls": 0, "rejected_bombs": 1}
+    assert report == {"rejected_walls": 0, "rejected_bombs": 1, "rejected_intro": 0}
 
 
 def test_bomb_safe_area_settings_restore_legacy_margins(song, monkeypatch):
@@ -421,6 +421,37 @@ def test_bomb_safe_area_settings_restore_legacy_margins(song, monkeypatch):
     data = state([head], bombs=[adjacent, same])
     post.validate_hazards(data, song)
     assert data["bombs"] == [adjacent]
+
+
+def test_intro_floor_drops_notes_before_cutoff():
+    notes = [note(0, .5), note(1, 1.9), note(2, 2.0), note(3, 3.)]
+    assert post.apply_intro_floor(notes, 2.0) == 2
+    assert [n["time"] for n in notes] == [2.0, 3.]
+
+
+def test_intro_floor_zero_keeps_all():
+    notes = [note(0, 0.), note(1, .5)]
+    assert post.apply_intro_floor(notes, 0.) == 0
+    assert [n["time"] for n in notes] == [0., .5]
+
+
+def test_hazards_intro_floor_drops_early_walls_and_bombs(song, monkeypatch):
+    monkeypatch.setattr(config, "add_obstacle_flag", True)
+    monkeypatch.setattr(config, "sporty_obstacles", False)
+    monkeypatch.setattr(config, "v2_map_intro_no_hazards_seconds", 1.)
+    walls = [{"time": .4, "end_time": .9, "x": 0, "y": 0, "width": 1, "height": 3},
+             {"time": 1.2, "end_time": 1.6, "x": 0, "y": 0, "width": 1, "height": 3}]
+    bombs = [{"time": .9, "x": 3, "y": 0}, {"time": 1.5, "x": 3, "y": 0}]
+    data = state(walls=walls, bombs=bombs)
+    report = post.validate_hazards(data, song)
+    assert [wall["time"] for wall in data["walls"]] == [1.2]
+    assert [bomb["time"] for bomb in data["bombs"]] == [1.5]
+    assert report == {"rejected_walls": 1, "rejected_bombs": 1, "rejected_intro": 2}
+    monkeypatch.setattr(config, "v2_map_intro_no_hazards_seconds", 0.)
+    data = state(walls=walls, bombs=bombs)
+    report = post.validate_hazards(data, song)
+    assert len(data["walls"]) == 2 and len(data["bombs"]) == 2
+    assert report["rejected_intro"] == 0
 
 
 def test_heuristic_bomb_candidates_stay_outside_the_note_safe_area(monkeypatch):
