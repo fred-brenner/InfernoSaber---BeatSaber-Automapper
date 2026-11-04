@@ -325,10 +325,11 @@ def _rank_flow_candidates(original, candidates, others):
 
 
 def _flow_legal(direction, previous, x, y, time, same_stroke_gap):
-    """Relaxed >90° rule against a (time, x, y, effective direction) predecessor.
+    """Strict ≥135° rule against a (time, x, y, effective direction) predecessor.
 
-    Near-simultaneous pairs share one stroke and are exempt; a 90° change is
-    allowed when the hand physically travels at least two cells."""
+    Near-simultaneous pairs share one stroke and are exempt. With
+    ``v2_flow_min_turn_steps`` ≤ 2 the legacy rule returns: ≥135°, or 90°
+    when the hand physically travels at least two cells."""
     if previous is None:
         return True
     ptime, px, py, pdirection = previous
@@ -337,18 +338,21 @@ def _flow_legal(direction, previous, x, y, time, same_stroke_gap):
     steps = _step_distance(direction, pdirection)
     if steps <= 1:
         return False
-    return steps >= 3 or abs(x - px) + abs(y - py) >= 2
+    min_turn = int(getattr(config, "v2_flow_min_turn_steps", 3) or 3)
+    if min_turn <= 2:
+        return steps >= 3 or (steps == 2 and abs(x - px) + abs(y - py) >= 2)
+    return steps >= min_turn
 
 
 def _flow_direction(original, previous_direction, blocked=(), swing_from=None, forbidden_cells=None):
-    """Nearest reversal of ``original`` that keeps >90° from ``previous_direction``.
+    """Nearest reversal of ``original`` that keeps ≥135° from ``previous_direction``.
 
     Human flow resolves repeats with a swing back (~180°), so the candidate
     furthest from ``previous_direction`` wins; ties fall back to the smallest
     rotation away from ``original``. This keeps the forced fix inside the
     reversal vocabulary instead of manufacturing side cuts the model never
     asked for. ``blocked`` lists further directions the replacement must stay
-    >90° away from (used when recutting the earlier note of a pair). With
+    ≥135° away from (used when recutting the earlier note of a pair). With
     ``swing_from``/``forbidden_cells`` a candidate is rejected when one of its
     swept cells is occupied by a simultaneous other-hand note."""
     others = (previous_direction, *blocked)
@@ -362,8 +366,8 @@ def _recut_same_direction_repeats(flattened, times, same_stroke_gap, flipped=Non
     """Rotate a note that repeats its predecessor's cut within ±45°.
 
     Consecutive same-hand notes *farther* than ``same_stroke_gap`` seconds need
-    a >90° direction change, or ≥90° when the hand travels at least two cells
-    (the travel gives the swing room). Near-simultaneous pairs share one
+    a ≥135° direction change (``v2_flow_min_turn_steps`` ≤ 2 restores the
+    legacy 90°-with-two-cell-travel rule). Near-simultaneous pairs share one
     stroke and are exempt; dots never need a recut themselves but pass their
     geometry-implied direction on to the next note's check.
     ``flipped``, when given, is incremented per rewritten note.
@@ -669,7 +673,7 @@ def clearance_violations(notes):
 
 
 def enforce_note_flow_and_clearance(notes, chains=None, protect_retained=True):
-    """Fixpoint of the >90° recut and swing-clearance.
+    """Fixpoint of the ≥135° recut and swing-clearance.
 
     A swing at ``t`` sweeps ``pos + step → pos → pos - step``; an other-hand
     note standing on any of those cells at that instant — same time, or
@@ -980,8 +984,8 @@ def postprocess_notes(notes, event_times, logger=None, skip=()):
                         # repeats; the survivor is recut to a direction below.
                         return (0, 0) if config.allow_dot_notes else (1, 0)
                     steps = _step_distance(od, previous[3])
-                    illegal = steps <= 1 or (steps == 2 and abs(option[0] - previous[1])
-                                             + abs(option[1] - previous[2]) < 2)
+                    illegal = not _flow_legal(option[2], previous, option[0], option[1],
+                                              time, same_stroke_gap)
                     return illegal, -steps
                 x, y, direction = min(enumerate(options), key=lambda item: (*rank(item[1]), item[0]))[1]
             else:

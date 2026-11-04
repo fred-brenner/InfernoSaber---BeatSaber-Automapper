@@ -482,3 +482,39 @@ def test_heuristic_bomb_candidates_skip_fully_covered_times(monkeypatch):
         note(2, x=0, y=0, direction=2), note(3, x=2, y=2, direction=3),
         note(4, x=0, y=0, direction=4), note(5, x=0, y=0, direction=8)]}
     assert _heuristic_bomb_candidates(state, np.random.default_rng(0)) == []
+
+
+def test_flow_legal_requires_135_degrees_by_default(monkeypatch):
+    monkeypatch.setattr(config, "v2_flow_min_turn_steps", 3)
+    # middle down-right -> left up-right: 90° over a 2-cell travel (was legal)
+    assert not post._flow_legal(5, (0., 2, 1, 7), 0, 1, .5, .1)
+    # down-right -> up is 135°, still legal
+    assert post._flow_legal(0, (0., 2, 1, 7), 0, 1, .5, .1)
+    # same direction stays illegal
+    assert not post._flow_legal(7, (0., 0, 1, 7), 1, 1, .5, .1)
+    # same-stroke exemption unchanged
+    assert post._flow_legal(5, (0., 2, 1, 7), 0, 1, .05, .1)
+
+
+def test_flow_min_turn_two_restores_travel_exemption(monkeypatch):
+    monkeypatch.setattr(config, "v2_flow_min_turn_steps", 2)
+    assert post._flow_legal(5, (0., 2, 1, 7), 0, 1, .5, .1)       # 90° + 2 cells: legacy legal
+    assert not post._flow_legal(5, (0., 2, 1, 7), 1, 1, .5, .1)   # 90° + 1 cell: still illegal
+
+
+def test_dedup_survivor_keeps_a_135_degree_turn(monkeypatch):
+    for key, value in {"allow_dot_notes": True, "gimme_more_notes_flag": False,
+                       "single_notes_only_flag": False, "v2_cleanup_same_dir_recut": 0.,
+                       "v2_flow_min_turn_steps": 3}.items():
+        monkeypatch.setattr(config, key, value)
+    notes = [note(0, time=1., x=2, y=1, direction=7),
+             note(1, time=2., x=0, y=1, direction=5),   # 90° over a 2-cell travel: legacy-legal
+             note(2, time=2., x=3, y=0, direction=8)]   # dot on the exit cell: implied reversal
+    actual, _ = post.postprocess_notes(notes, [1., 2.],
+                                       skip=post.LEGACY_NOTE_MUTATORS + ("clearance",))
+    survivor = next(item for item in actual if item["time"] == 2.)
+    # the 90°+travel cut used to outrank the dot; now the dot's implied
+    # reversal (>=135° from down-right) is the only legal survivor
+    assert (survivor["x"], survivor["y"], survivor["d"]) == (3, 0, 8)
+    effective = post._dot_virtual_direction(7, 2, 1, survivor["x"], survivor["y"])
+    assert post._step_distance(effective, 7) >= 3
