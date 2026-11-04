@@ -174,6 +174,10 @@ v2_cleanup_edge_recut = False      # edge cuts are legal (swing may exit the gri
 v2_cleanup_cell_clash = True       # simultaneous notes must never share a cell (any hands)
 v2_cleanup_swing_clash = True      # no other-hand note in a cut's swept cells (approach+cut+exit)
 v2_cleanup_swing_window = .15      # forward horizon (s): a later-standing block still in reach
+v2_diagonal_max_fraction = 0.10    # cap diagonal cuts (d 4-7) at this fraction of all notes
+                                   # (dots counted); excess diagonals are recut to the cheapest
+                                   # flow-legal adjacent cardinal, vertical wins ties, a diagonal
+                                   # stays when no cardinal is legal; >= 1 disables
 v2_cleanup_note_heuristics = False  # run the legacy v1 note mutators (mirroring + flow pass
                                    # incl. emphasis/break/dot additions); False keeps model
                                    # notes — structural dedup, same-direction recut and the

@@ -518,3 +518,47 @@ def test_dedup_survivor_keeps_a_135_degree_turn(monkeypatch):
     assert (survivor["x"], survivor["y"], survivor["d"]) == (3, 0, 8)
     effective = post._dot_virtual_direction(7, 2, 1, survivor["x"], survivor["y"])
     assert post._step_distance(effective, 7) >= 3
+
+
+def test_diagonal_cap_limits_fraction():
+    # 20 notes 0.5 s apart; each hand alternates antipodal diagonals (d5/d6,
+    # 180 deg apart) so each note's adjacent cardinals sit 135 deg from both
+    # same-hand neighbours -> legal under the strict Task-2 rule
+    notes = [note(i, 1. + .5 * i, hand=i % 2, x=i % 4, y=1,
+                 direction=5 if (i // 2) % 2 == 0 else 6) for i in range(20)]
+    stats = post.apply_diagonal_cap(notes, rng=np.random.default_rng(0))
+    remaining = sum(n["d"] in (4, 5, 6, 7) for n in notes)
+    assert remaining <= int(0.10 * 20)
+    assert stats["diagonal_before"] == 20 and stats["diagonal_after"] == remaining
+
+
+def test_diagonal_cap_prefers_vertical_on_tie():
+    # lone diagonal: no neighbours -> both cardinals legal, equal cost -> vertical wins
+    notes = [note(0, 1., direction=7)]  # down-right -> candidates down(1) / right(3)
+    post.apply_diagonal_cap(notes, rng=np.random.default_rng(0))
+    assert notes[0]["d"] == 1
+
+
+def test_diagonal_cap_keeps_when_no_legal_cardinal():
+    # pin a diagonal between same-hand neighbours so both cardinals would be <135°
+    notes = [note(0, 1., direction=7), note(1, 2., x=0, y=1, direction=5),
+             note(2, 3., x=3, y=1, direction=4)]
+    post.apply_diagonal_cap(notes, rng=np.random.default_rng(0))
+    assert notes[1]["d"] == 5
+
+
+def test_diagonal_cap_deterministic_per_seed():
+    build = lambda: [note(i, 1. + .5 * i, hand=i % 2, x=i % 4, y=1,
+                          direction=5 if (i // 2) % 2 == 0 else 6) for i in range(20)]
+    a, b = build(), build()
+    post.apply_diagonal_cap(a, rng=np.random.default_rng(42))
+    post.apply_diagonal_cap(b, rng=np.random.default_rng(42))
+    assert [n["d"] for n in a] == [n["d"] for n in b]
+
+
+def test_diagonal_cap_disabled_at_one(monkeypatch):
+    monkeypatch.setattr(config, "v2_diagonal_max_fraction", 1.0)
+    notes = [note(i, 1. + .5 * i, hand=i % 2, x=i % 4, y=1,
+                 direction=5 if (i // 2) % 2 == 0 else 6) for i in range(20)]
+    post.apply_diagonal_cap(notes, rng=np.random.default_rng(42))
+    assert [n["d"] for n in notes] == [5 if (i // 2) % 2 == 0 else 6 for i in range(20)]

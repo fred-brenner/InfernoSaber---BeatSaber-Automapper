@@ -409,6 +409,7 @@ def generate(song, requested_nps, predictors, encoder, settings, vocabularies, *
                 enforce_note_flow_and_clearance=base.enforce_note_flow_and_clearance,
                 snap_note_times=base.snap_note_times,
                 apply_intro_floor=base.apply_intro_floor,
+                apply_diagonal_cap=base.apply_diagonal_cap,
                 calm_area_pulses=base.calm_area_pulses,
                 add_calm_effects=base.add_calm_effects,
                 add_calm_lighting=base.add_calm_lighting)
@@ -537,6 +538,10 @@ def generate(song, requested_nps, predictors, encoder, settings, vocabularies, *
         result.diagnostics["intro_zones"] = {
             "no_notes_seconds": intro_floor,
             "notes_dropped": intro_fn(state["notes"], intro_floor)}
+    diag_fn = getattr(postprocessors, "apply_diagonal_cap", None)
+    diag_cap = float(getattr(config, "v2_diagonal_max_fraction", 1.) or 0.)
+    if diag_fn is not None and state["notes"] and 0 <= diag_cap < 1:
+        result.diagnostics["diagonal_cap"] = diag_fn(state["notes"], state["chains"], rng=rng)
     started = perf_counter()
     retained = deepcopy([note for note in state["notes"] if note.get("kind") == "retained"])
     upstream = index_state({**state, "notes": retained, "chains": []})

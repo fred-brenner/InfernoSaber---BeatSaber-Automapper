@@ -846,6 +846,110 @@ def apply_intro_floor(notes, cutoff_seconds):
     return before - len(notes)
 
 
+# Diagonal direction → its two adjacent cardinals; recuts stay inside the
+# narrowest direction change so the fix reshapes the model's cut as little as
+# possible.
+_DIAGONAL_CARDINALS = {4: (0, 2), 5: (0, 3), 6: (1, 2), 7: (1, 3)}
+
+
+def apply_diagonal_cap(notes, chains=None, rng=None):
+    """Cap diagonal cuts (d 4-7) at ``v2_diagonal_max_fraction`` of all notes.
+
+    ``excess`` diagonals — ``len(diagonals) - int(cap * len(notes))``, dots
+    included in the base count — are drawn from ``rng`` (a numpy Generator, so
+    a generation seed reproduces the selection) and recut to an adjacent
+    cardinal. A candidate must pass ``_flow_legal`` against both same-hand
+    neighbours and ``_swing_clear`` against simultaneous other-hand cells;
+    neighbours are read with their *current* direction, so chosen notes are
+    processed in time order and earlier recuts constrain later ones (dots use
+    their ``incoming`` implied direction, except a dot successor whose implied
+    direction follows this note and is recomputed per candidate). The cheapest
+    legal cut by exit-cell → next-note Manhattan distance wins; ties prefer
+    the vertical cardinal. When no cardinal is legal the diagonal stays —
+    never dropped to satisfy a style metric. Chain heads follow their
+    anchor's direction like ``recut_same_direction_notes``. Returns run
+    statistics; ``>= 1`` disables the cap (negative clamps to 0)."""
+    rng = np.random.default_rng() if rng is None else rng
+    ordered = sorted(notes, key=lambda item: (item["time"], item["id"]))
+    diagonals = [note for note in ordered if note["d"] in (4, 5, 6, 7)]
+    stats = {"diagonal_before": len(diagonals), "diagonal_after": len(diagonals),
+             "recut": 0, "kept_over_cap": 0,
+             "fraction_after": len(diagonals) / len(ordered) if ordered else 0.}
+    cap = max(float(getattr(config, "v2_diagonal_max_fraction", 1.) or 0.), 0.)
+    excess = max(0, len(diagonals) - int(cap * len(notes)))
+    if ordered and cap < 1 and excess:
+        eps = float(getattr(config, "min_time_diff", .02))
+        window = max(eps, float(getattr(config, "v2_cleanup_swing_window", .15) or 0.))
+        gap = float(getattr(config, "v2_cleanup_same_dir_gap", .1) or 0.)
+        _, incoming = _history_context(ordered, eps)
+        other_cells = _other_hand_cells(ordered, eps, window)
+        per_hand = {}
+        for note in ordered:
+            per_hand.setdefault(note["hand"], []).append(note)
+        position = {note["id"]: index for siblings in per_hand.values()
+                    for index, note in enumerate(siblings)}
+
+        def effective(other):
+            return other["d"] if other["d"] != 8 else incoming.get(other["id"])
+
+        chosen = sorted((diagonals[index]
+                         for index in rng.choice(len(diagonals), size=excess, replace=False)),
+                        key=lambda item: (item["time"], item["id"]))
+        for note in chosen:
+            siblings, index = per_hand[note["hand"]], position[note["id"]]
+            time, x, y = note["time"], note["x"], note["y"]
+            before = index - 1
+            while before >= 0 and siblings[before]["time"] >= time - eps:
+                before -= 1
+            previous = siblings[before] if before >= 0 else None
+            prior = ((previous["time"], previous["x"], previous["y"], effective(previous))
+                     if previous is not None else None)
+            after = index + 1
+            while after < len(siblings) and siblings[after]["time"] <= time + eps:
+                after += 1
+            successor = siblings[after] if after < len(siblings) else None
+
+            def cost(candidate):
+                if successor is None:
+                    return 0
+                step = _DIRECTION_STEP[candidate]
+                return abs(x - step[0] - successor["x"]) + abs(y - step[1] - successor["y"])
+
+            def legal(candidate):
+                if not _flow_legal(candidate, prior, x, y, time, gap):
+                    return False
+                if successor is not None:
+                    if successor["d"] != 8:
+                        next_d = successor["d"]
+                    else:
+                        # the dot's implied direction follows the last note of
+                        # this note's simultaneous group — usually this note
+                        earlier = siblings[after - 1]
+                        base = candidate if earlier is note else effective(earlier)
+                        next_d = _dot_virtual_direction(base, earlier["x"], earlier["y"],
+                                                        successor["x"], successor["y"])
+                    if next_d is not None and not _flow_legal(
+                            next_d, (time, x, y, candidate),
+                            successor["x"], successor["y"], successor["time"], gap):
+                        return False
+                return _swing_clear((x, y), other_cells.get(note["id"]), candidate)
+
+            candidates = [candidate for candidate in _DIAGONAL_CARDINALS[note["d"]] if legal(candidate)]
+            if not candidates:
+                stats["kept_over_cap"] += 1
+                continue
+            note["d"] = min(candidates, key=lambda candidate: (cost(candidate), candidate not in (0, 1)))
+            stats["recut"] += 1
+        stats["diagonal_after"] = sum(note["d"] in (4, 5, 6, 7) for note in ordered)
+        stats["fraction_after"] = stats["diagonal_after"] / len(ordered)
+    anchors = {note["id"]: note for note in notes}
+    for chain in chains or []:
+        anchor = anchors.get(chain.get("anchor_id"))
+        if anchor is not None:
+            chain["d"] = anchor["d"]
+    return stats
+
+
 _NOTE_STEPS = ("mirroring", "initial_single_note_filter", "legacy_note_flow",
                "flow_additions", "same_direction_recut", "final_single_note_filter",
                "clearance")
