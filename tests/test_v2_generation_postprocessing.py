@@ -1615,7 +1615,8 @@ def test_onset_coverage_inserts_missed_strong_onsets_after_alignment(song, timin
     monkeypatch.setattr(config, "v2_onset_fill_flag", True)
     monkeypatch.setattr(config, "v2_fill_entry_delay_seconds", 0.)
     monkeypatch.setattr(post, "_detect_onset_peaks",
-                        lambda path: (np.asarray([2.5, 4., 6.]), np.asarray([.9, .3, .8])))
+                        lambda path: (np.asarray([2.5, 4., 6.]), np.asarray([.9, .3, .8]),
+                                      np.ones(3)))
     # if coverage ran before the final alignment the insert would be moved too
     monkeypatch.setattr(post, "align_beats_on_bpm", lambda times, bpm: np.asarray(times) + .01)
     candidates, report = post.postprocess_timing(song, beats([1., 2.45, 5., 9.], [1, 1, 1, 1]),
@@ -1630,7 +1631,7 @@ def test_onset_coverage_inserts_missed_strong_onsets_after_alignment(song, timin
 def test_onset_coverage_respects_entry_gate_and_silence(song, timing_defaults, monkeypatch):
     monkeypatch.setattr(config, "v2_onset_fill_flag", True)
     monkeypatch.setattr(post, "_detect_onset_peaks",
-                        lambda path: (np.asarray([6.]), np.asarray([.9])))
+                        lambda path: (np.asarray([6.]), np.asarray([.9]), np.ones(1)))
     monkeypatch.setattr(config, "v2_fill_entry_delay_seconds", 10.)
     candidates, report = post.postprocess_timing(song, beats([1., 5., 9.], [1, 1, 1]),
                                                  "unused.egg", skip=("bpm_alignment",))
@@ -1650,7 +1651,8 @@ def test_onset_coverage_respects_entry_gate_and_silence(song, timing_defaults, m
 def test_onset_coverage_flag_off_and_skippable(song, timing_defaults, monkeypatch):
     called = []
     monkeypatch.setattr(post, "_detect_onset_peaks",
-                        lambda path: called.append(1) or (np.asarray([6.]), np.asarray([.9])))
+                        lambda path: called.append(1) or (np.asarray([6.]), np.asarray([.9]),
+                                                          np.ones(1)))
     candidates, _ = post.postprocess_timing(song, beats([1., 5., 9.], [1, 1, 1]),
                                             "unused.egg", skip=("bpm_alignment",))
     assert not called  # fixture pins v2_onset_fill_flag off
@@ -1659,3 +1661,57 @@ def test_onset_coverage_flag_off_and_skippable(song, timing_defaults, monkeypatc
                                             "unused.egg",
                                             skip=("bpm_alignment", "onset_coverage"))
     assert not called
+
+
+def test_onset_coverage_loudness_tier(song, timing_defaults, monkeypatch):
+    monkeypatch.setattr(config, "v2_onset_fill_flag", True)
+    monkeypatch.setattr(config, "v2_fill_entry_delay_seconds", 0.)
+    monkeypatch.setattr(config, "v2_onset_fill_loudness_quantile", .6)
+    monkeypatch.setattr(config, "v2_onset_fill_loudness_strength_quantile", .25)
+    # strengths sorted [.45,.45,.9,.9] -> p50 .675, p25 .45; loudness p60 -> .9
+    monkeypatch.setattr(post, "_detect_onset_peaks",
+                        lambda path: (np.asarray([2.5, 4., 6., 8.]),
+                                      np.asarray([.9, .45, .45, .9]),
+                                      np.asarray([.9, .9, .1, .9])))
+    candidates, report = post.postprocess_timing(song, beats([1., 2.45, 5., 9.], [1, 1, 1, 1]),
+                                                 "unused.egg", skip=("bpm_alignment",))
+    # 2.5 covered by the 2.45 event; 4.0 admitted only through the loudness
+    # tier; 6.0 has the same strength but sits in a quiet section; 8.0 tier-1
+    assert [item["time"] for item in candidates] == pytest.approx([1., 2.45, 4., 5., 8., 9.])
+    assert report["onset_coverage_added"] == 2
+    assert report["onset_coverage_loud_admitted"] == 1
+
+
+def test_onset_coverage_bypasses_note_runway_but_keeps_delay(song, timing_defaults, monkeypatch):
+    # subdivision fills wait for v2_fill_entry_min_notes after a pause, but
+    # onset-anchored coverage is a real audio hit — it only keeps the delay.
+    monkeypatch.setattr(config, "v2_onset_fill_flag", True)
+    monkeypatch.setattr(config, "v2_fill_entry_delay_seconds", 1.)
+    monkeypatch.setattr(config, "v2_fill_entry_pause_beats", 4.)
+    monkeypatch.setattr(config, "v2_fill_entry_min_notes", 4)
+    monkeypatch.setattr(post, "_detect_onset_peaks",
+                        lambda path: (np.asarray([5.5, 6.5, 7.5]),
+                                      np.asarray([.9, .9, .9]),
+                                      np.ones(3)))
+    # gap 1.0 -> 5.0 at 120 bpm is 8 beats: entry at 5.0, delay ends at 6.0,
+    # while the fill runway would need a 4th candidate that never comes.
+    candidates, report = post.postprocess_timing(song, beats([1., 5.], [1, 1]),
+                                                 "unused.egg", skip=("bpm_alignment",))
+    assert [item["time"] for item in candidates] == pytest.approx([1., 5., 6.5, 7.5])
+    assert report["onset_coverage_added"] == 2
+
+
+def test_onset_coverage_loudness_tier_disabled(song, timing_defaults, monkeypatch):
+    monkeypatch.setattr(config, "v2_onset_fill_flag", True)
+    monkeypatch.setattr(config, "v2_fill_entry_delay_seconds", 0.)
+    monkeypatch.setattr(config, "v2_onset_fill_loudness_quantile", 0.)
+    monkeypatch.setattr(post, "_detect_onset_peaks",
+                        lambda path: (np.asarray([4., 8.]),
+                                      np.asarray([.45, .9]),
+                                      np.asarray([.9, .9])))
+    candidates, report = post.postprocess_timing(song, beats([1., 5., 9.], [1, 1, 1]),
+                                                 "unused.egg", skip=("bpm_alignment",))
+    # with the tier off, the sub-median .45 onset at 4.0 is not admitted
+    assert [item["time"] for item in candidates] == pytest.approx([1., 5., 8., 9.])
+    assert report["onset_coverage_added"] == 1
+    assert report["onset_coverage_loud_admitted"] == 0

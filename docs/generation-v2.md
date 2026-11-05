@@ -208,10 +208,20 @@ the final alignment so inserts stay on the onset) appends events at strong
 detected onsets the model missed: onsets above the
 `v2_onset_fill_strength_quantile` (default `0.5`) share of detected-onset
 envelope strengths, farther than `v2_onset_fill_window_seconds` (default
-`0.12`) from every candidate, gated by entry windows, detected silence and
-the fill floor, counted under `onset_coverage_added`; `v2_onset_fill_flag`
-(default `True`) or the step name disables it, and a missing `audio_path`
-skips it silently.
+`0.12`) from every candidate, gated by detected silence and the fill floor,
+counted under `onset_coverage_added`; `v2_onset_fill_flag` (default `True`)
+or the step name disables it, and a missing `audio_path` skips it silently.
+A second, loudness-gated admission tier opens where an onset sits inside a
+loud section — its smoothed-RMS loudness above
+`v2_onset_fill_loudness_quantile` (default `0.6`) of all onset loudness —
+admitting onsets down to `v2_onset_fill_loudness_strength_quantile` (default
+`0.25`); `0` on the loudness quantile disables the tier and admissions are
+counted separately under `onset_coverage_loud_admitted`. Coverage inserts
+keep the post-entry `v2_fill_entry_delay_seconds` delay but not the
+`v2_fill_entry_min_notes` runway, which exists to throttle synthetic
+subdivision fills: onset hits are real audio events, and a sparse stream
+would otherwise stretch the runway over exactly the loud sections coverage
+exists to repair.
 
 Arrows decoding optionally mixes in a second model: when
 `v2_arrows_variety` is above `0` the runtime also loads the arrows stage of

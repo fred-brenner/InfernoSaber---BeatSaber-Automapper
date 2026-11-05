@@ -313,11 +313,23 @@ v2_fill_min_interval_min_seconds = .035 # hard lower bound for high-NPS maps
 # on audible hits. Detected onsets stronger than the quantile share of all
 # detected onsets and farther than v2_onset_fill_window_seconds from every
 # candidate are appended as events (count from the model's own frame
-# probabilities), still respecting entry gates, detected silence and the
-# fill floor. Runs after the final bpm alignment so inserts stay on the onset.
+# probabilities), respecting detected silence, the fill floor and the
+# post-entry delay — but not the N-note entry runway, which only throttles
+# synthetic subdivision fills (onset hits are real audio events, and a sparse
+# stream would otherwise stretch the runway over exactly the loud sections
+# coverage exists to repair). Runs after the final bpm alignment so inserts
+# stay on the onset.
 v2_onset_fill_flag = True             # insert candidates at strong uncovered onsets
 v2_onset_fill_window_seconds = .12    # onset is "covered" by an event inside +- this (s)
 v2_onset_fill_strength_quantile = .5  # keep onsets at/above this envelope-strength quantile
+# Loudness tier (2026-11-06): in sections loud enough for their onsets to sit
+# above v2_onset_fill_loudness_quantile of all onset loudness (RMS smoothed
+# over the window below), coverage also admits onsets down to the lower
+# strength quantile — busy loud sections under-trigger the timing model more
+# often than quiet ones, where the strict bar still applies. 0 disables it.
+v2_onset_fill_loudness_quantile = .6          # onset loudness bar for the second tier
+v2_onset_fill_loudness_strength_quantile = .25  # relaxed strength bar in loud sections
+v2_onset_fill_loudness_smooth_seconds = 1.    # RMS averaging window = "section is loud"
 
 add_waveform_pattern_flag = 0   # [0: off, 1: on, 2: double on]
 waveform_pattern = [

@@ -330,17 +330,25 @@ def postprocess_timing(song, beats, audio_path, logger=None, skip=()):
     start_fill_suppressed = 0
     min_interval = _fill_min_interval()
 
-    def fill_blocked():
-        nonlocal entry_blocked_windows
+    def _entry_intervals(min_notes):
         pause = float(getattr(config, "v2_fill_entry_pause_beats", 4.0) or 0.) * 60. / bpm
         delay = float(getattr(config, "v2_fill_entry_delay_seconds", 0.) or 0.)
-        min_notes = int(getattr(config, "v2_fill_entry_min_notes", 0) or 0)
         # pause <= 0 disables pause detection: only the map start is an entry
         current = times()
         entries = _section_entries(current, pause) if pause > 0 else np.asarray([current[0]])
-        intervals = _blocked_intervals(entries, delay, current, min_notes)
+        return _blocked_intervals(entries, delay, current, min_notes)
+
+    def fill_blocked():
+        nonlocal entry_blocked_windows
+        intervals = _entry_intervals(int(getattr(config, "v2_fill_entry_min_notes", 0) or 0))
         entry_blocked_windows = len(intervals)
         return intervals
+
+    def coverage_blocked():
+        # Onset-anchored inserts are real audio hits, one per onset and already
+        # spaced by the fill floor — they keep the post-entry delay but not the
+        # N-note runway, which exists to throttle synthetic subdivision fills.
+        return _entry_intervals(0)
 
     detected_silence = None
     gap_fill_source_used = None
@@ -441,12 +449,21 @@ def postprocess_timing(song, beats, audio_path, logger=None, skip=()):
     if candidates and align:
         replace_times("final_bpm_alignment", align_beats_on_bpm(times(), bpm), moving=True)
     onset_coverage_added = 0
+    onset_coverage_loud_admitted = 0
     if candidates and "onset_coverage" not in skip \
             and getattr(config, "v2_onset_fill_flag", False) and audio_path is not None:
-        peaks, strengths = _detect_onset_peaks(audio_path)
+        peaks, strengths, loudness = _detect_onset_peaks(audio_path)
         if len(peaks):
             quantile = min(max(float(getattr(config, "v2_onset_fill_strength_quantile", .5) or 0.), 0.), 1.)
-            peaks = peaks[strengths >= np.quantile(strengths, quantile)]
+            admitted = strengths >= np.quantile(strengths, quantile)
+            loud_quantile = min(max(float(getattr(config, "v2_onset_fill_loudness_quantile", 0.) or 0.), 0.), 1.)
+            if loud_quantile > 0:
+                low = min(max(float(getattr(config, "v2_onset_fill_loudness_strength_quantile", .25) or 0.), 0.), 1.)
+                loud = loudness >= np.quantile(loudness, loud_quantile)
+                tier2 = loud & (strengths >= np.quantile(strengths, low))
+                onset_coverage_loud_admitted = int(np.sum(tier2 & ~admitted))
+                admitted |= tier2
+            peaks = peaks[admitted]
             window = float(getattr(config, "v2_onset_fill_window_seconds", .12) or .12)
             current = times()
             index = np.searchsorted(current, peaks)
@@ -455,7 +472,7 @@ def postprocess_timing(song, beats, audio_path, logger=None, skip=()):
                 near = current[max(0, i - 1):i + 1]
                 if not len(near) or np.min(np.abs(near - peak)) > window:
                     missed.append(float(peak))
-            kept = _filter_fill_times(current, missed, fill_blocked(),
+            kept = _filter_fill_times(current, missed, coverage_blocked(),
                                       silent_spans=silent_spans(force=True),
                                       min_interval=min_interval)
             if len(kept):
@@ -467,7 +484,8 @@ def postprocess_timing(song, beats, audio_path, logger=None, skip=()):
                        gap_fill_source_used=gap_fill_source_used,
                        entry_blocked_windows=entry_blocked_windows,
                        start_fill_suppressed=start_fill_suppressed,
-                       onset_coverage_added=onset_coverage_added)
+                       onset_coverage_added=onset_coverage_added,
+                       onset_coverage_loud_admitted=onset_coverage_loud_admitted)
     _report(logger, f"Timing cleanup: {len(original)} -> {len(candidates)} events")
     return candidates, diagnostics
 
@@ -962,7 +980,11 @@ def enforce_note_flow_and_clearance(notes, chains=None, protect_retained=True):
 
 
 def _detect_onset_peaks(audio_path):
-    """Detected onset peaks in seconds with their envelope strengths."""
+    """Detected onset peaks in seconds with envelope strengths and local loudness.
+
+    Loudness is RMS energy smoothed over v2_onset_fill_loudness_smooth_seconds
+    sampled at each peak frame — it separates "audible hit inside a loud
+    section" from "transient inside a quiet passage" for the coverage tiers."""
     import librosa
     factor = config.thresh_onbeat / config.thresh_onbeat_orig
     frames = lambda count: max(1, int(count * factor))
@@ -974,7 +996,12 @@ def _detect_onset_peaks(audio_path):
                                         delta=config.thresh_onbeat,
                                         wait=frames(int(getattr(config, "v2_notes_onset_snap_wait", 4))))
     times = np.asarray(librosa.frames_to_time(onsets, sr=rate, hop_length=512), np.float64)
-    return times, np.asarray(envelope[onsets], np.float64)
+    rms = librosa.feature.rms(y=samples, hop_length=512)[0]
+    width = max(1, int(float(getattr(config, "v2_onset_fill_loudness_smooth_seconds", 1.) or 1.)
+                       * rate / 512))
+    smooth = np.convolve(rms, np.ones(width) / width, mode="same")
+    loudness = np.asarray(smooth[np.clip(onsets, 0, len(smooth) - 1)], np.float64)
+    return times, np.asarray(envelope[onsets], np.float64), loudness
 
 
 def _detect_onsets(audio_path):

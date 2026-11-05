@@ -494,3 +494,33 @@ pending playtest verdict on whether density now feels right.
 Deferred density levers if still sparse after playtest: cap scale
 (vetoed for now), v1-style leaky per-timestep measurement, promoting
 model-supported singles to doubles (adds notes at zero same-hand cost).
+
+## Round 4 — loudness-tier coverage + entry-runway split (2026-11-06)
+
+Playtest report: No Sleep ~40s has full-volume percussion but almost no
+notes. Data: the section has the song-highest RMS (0.41); the model fired 3
+of ~11 detected onsets there, and tier-1 coverage (p50 strength) admitted
+only ~5 more — mid-strength onsets inside the loud section fell under the
+global bar. On the 5.0 stream the remaining onsets were also unreachable:
+the entry gate blocks fills until the 4th note after a pause, and the sparse
+stream stretched that runway from 38.37s to 41.28s — the under-triggering
+that created the "pause" gated the very coverage meant to repair it.
+
+Shipped (v2-only, configurable):
+- `_detect_onset_peaks` now also returns per-onset local loudness (RMS
+  smoothed over `v2_onset_fill_loudness_smooth_seconds` 1.0s).
+- Loudness tier: onsets in loud sections (loudness >=
+  `v2_onset_fill_loudness_quantile` .6 of onset loudness) are admitted down
+  to `v2_onset_fill_loudness_strength_quantile` .25; 0 disables the tier.
+  Quiet passages keep the strict bar; loud sections get the extra beats —
+  the requested "loudness as an additional source", with onsets carrying
+  the timing and loudness modulating admission. Diagnostic:
+  `onset_coverage_loud_admitted`.
+- Coverage keeps the post-entry `v2_fill_entry_delay_seconds` delay but no
+  longer waits for the `v2_fill_entry_min_notes` runway — that throttle is
+  for synthetic subdivision fills, not audio-anchored hits.
+
+Verified live: No Sleep 5.0 file — the 39.9->41.1 hole now reads 39.93,
+40.32, 40.89, 41.09, 41.28, 41.48 (~0.4s spacing through the loudest
+section). Batch: coverage +20..+121 events/song; final 5.0-file counts
+347-926 notes; cap still the dominant culler (~40-55% of positions).
