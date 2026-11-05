@@ -534,6 +534,10 @@ def generate(song, requested_nps, predictors, encoder, settings, vocabularies, *
         result.diagnostics["onset_snap"]["elapsed_seconds"] = perf_counter() - snap_started
     intro_fn = getattr(postprocessors, "apply_intro_floor", None)
     intro_floor = float(getattr(config, "v2_map_intro_no_notes_seconds", 0.) or 0.)
+    # TODO: multiplier expansion copies with a negative dt would land back
+    # inside this note-free zone (no second floor runs after expansion);
+    # design-accepted today — revisit if a fitted vocabulary gains negative
+    # offsets.
     if intro_fn is not None and intro_floor > 0:
         result.diagnostics["intro_zones"] = {
             "no_notes_seconds": intro_floor,

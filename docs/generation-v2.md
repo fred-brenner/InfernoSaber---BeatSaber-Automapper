@@ -310,13 +310,15 @@ disables each zone); `v2_flow_min_turn_steps` (default `3`) is the strict
 ≥135° same-hand turn of the clearance invariant above; and
 `v2_diagonal_max_fraction` (default `0.10`) caps diagonal cuts (directions
 4–7, dots counted in the base) by recutting an RNG-drawn excess to the
-cheapest flow-legal adjacent cardinal, vertical on ties. The note-side
-filters run after `snap_note_times` and before the retained snapshot and
-multiplier, so expansion copies and arcs see final note state; the hazard
+cheapest flow-legal adjacent cardinal, vertical on ties; `>= 1` disables the
+cap. The note-side filters run after `snap_note_times` and before the
+retained snapshot and multiplier, so expansion copies and arcs see final
+note state; the hazard
 floor runs inside `validate_hazards`. The cap is best-effort — a diagonal
 whose adjacent cardinals are all illegal stays, so the realized fraction may
 exceed the cap. Diagnostics land under `intro_zones` (`notes_dropped`) and
-`diagonal_cap` (`recut`, `kept_over_cap`, `fraction_after`).
+`diagonal_cap` (`diagonal_before`, `diagonal_after`, `recut`,
+`kept_over_cap`, `fraction_after`).
 
 The 2026-10-31 calm-effects stage (`v2_calm_effects = True`) fills note-free
 stretches the model intentionally leaves empty — a requested behaviour — with

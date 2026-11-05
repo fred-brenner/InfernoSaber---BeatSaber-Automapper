@@ -167,7 +167,9 @@ v2_cleanup_same_dir_recut = 0.5    # enforce >=135° direction changes between s
 v2_cleanup_same_dir_gap = 0.1      # same-stroke exemption (s): closer notes may repeat a direction
 v2_flow_min_turn_steps = 3         # minimum turn between separated same-hand cuts in 45° steps
                                    # (3 = 135°, no travel exemption); <=2 restores the legacy
-                                   # 90°-with->=2-cell-travel rule
+                                   # 90°-with->=2-cell-travel rule; 4 = only 180° reversals
+                                   # legal, >=5 makes every separated pair illegal (undocumented
+                                   # territory)
 v2_cleanup_updown_shift = False    # effective shift_blocks_up_down_flag during v2 cleanup
 v2_cleanup_cross_hand_adjust = False  # effective correct_notes_all_flag during v2 cleanup
 v2_cleanup_edge_recut = False      # edge cuts are legal (swing may exit the grid); kept off
