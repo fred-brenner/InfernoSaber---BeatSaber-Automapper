@@ -62,42 +62,13 @@ def add_start_end_beats(map_times, x_volume, x_onset):
     return map_times
 
 
-def main(name_ar: list, debug_beats=False) -> bool:
-    if len(name_ar) > 1:
-        print("Multi-core song generation currently not implemented!")
-        exit()
+def beat_proposals(name_ar: list) -> dict:
+    """Run the v1 beat pipeline up to its proposed beat times.
 
-    # update configuration
-    if config.add_silence_flag:
-        config.add_beat_intensity = config.add_beat_intensity_orig + 10
-        config.silence_threshold = (1 - 0.5 * (config.max_speed_orig / 40)) * \
-                                   config.silence_threshold_orig
-        if config.silence_threshold < 0.02:
-            config.silence_threshold = 0.02
-
-    if config.emphasize_beats_flag:
-        if config.add_silence_flag:
-            config.add_beat_intensity = config.add_beat_intensity_orig
-        else:
-            config.add_beat_intensity = config.add_beat_intensity_orig - 10
-
-    config.obstacle_time_gap = config.obstacle_time_gap_orig * (1 - config.max_speed / 80)
-    if min(config.obstacle_time_gap) <= 0.1:
-        config.obstacle_time_gap = np.asarray([0.1, 0.25])
-    if config.sporty_obstacles:
-        config.jump_speed_offset = config.jump_speed_offset_orig - 0.3
-        if config.add_silence_flag or config.emphasize_beats_flag:
-            config.add_beat_intensity -= 5
-        else:
-            config.add_beat_intensity = config.add_beat_intensity_orig - 5
-
-    factor = get_factor_from_max_speed(config.max_speed, 1.5, 0.5)
-    config.thresh_beat = config.thresh_beat_orig * factor
-    factor = get_factor_from_max_speed(config.max_speed, 1.3, 0.1)
-    config.thresh_onbeat = config.thresh_onbeat_orig * factor
-
-    # print(f"Beat intensity: {config.add_beat_intensity}")
-
+    Returns ``timing_ar`` in elapsed seconds — post ``sanity_check_beat``,
+    before BPM alignment — plus the audio/model features ``main`` consumes
+    downstream (``silent_times``, ``pitch_input``, ``pitch_times``,
+    ``song_input``, ``x_volume``, ``x_onset``)."""
     # load song data
     song_input, pitch_input = find_beats(name_ar, train_data=False)
 
@@ -160,6 +131,58 @@ def main(name_ar: list, debug_beats=False) -> bool:
     timing_ar = y_beat * np.arange(0, len(y_beat), 1)
     timing_ar = timing_ar.astype(float) / config.beat_spacing
     timing_ar = timing_ar[timing_ar > config.window]
+
+    return {"timing_ar": timing_ar, "silent_times": silent_times,
+            "pitch_input": pitch_input, "pitch_times": pitch_times,
+            "song_input": song_input, "x_volume": x_volume, "x_onset": x_onset}
+
+
+def main(name_ar: list, debug_beats=False) -> bool:
+    if len(name_ar) > 1:
+        print("Multi-core song generation currently not implemented!")
+        exit()
+
+    # update configuration
+    if config.add_silence_flag:
+        config.add_beat_intensity = config.add_beat_intensity_orig + 10
+        config.silence_threshold = (1 - 0.5 * (config.max_speed_orig / 40)) * \
+                                   config.silence_threshold_orig
+        if config.silence_threshold < 0.02:
+            config.silence_threshold = 0.02
+
+    if config.emphasize_beats_flag:
+        if config.add_silence_flag:
+            config.add_beat_intensity = config.add_beat_intensity_orig
+        else:
+            config.add_beat_intensity = config.add_beat_intensity_orig - 10
+
+    config.obstacle_time_gap = config.obstacle_time_gap_orig * (1 - config.max_speed / 80)
+    if min(config.obstacle_time_gap) <= 0.1:
+        config.obstacle_time_gap = np.asarray([0.1, 0.25])
+    if config.sporty_obstacles:
+        config.jump_speed_offset = config.jump_speed_offset_orig - 0.3
+        if config.add_silence_flag or config.emphasize_beats_flag:
+            config.add_beat_intensity -= 5
+        else:
+            config.add_beat_intensity = config.add_beat_intensity_orig - 5
+
+    factor = get_factor_from_max_speed(config.max_speed, 1.5, 0.5)
+    config.thresh_beat = config.thresh_beat_orig * factor
+    factor = get_factor_from_max_speed(config.max_speed, 1.3, 0.1)
+    config.thresh_onbeat = config.thresh_onbeat_orig * factor
+
+    # print(f"Beat intensity: {config.add_beat_intensity}")
+
+    # load song data
+    proposals = beat_proposals(name_ar)
+    song_input = proposals["song_input"]
+    pitch_input = proposals["pitch_input"]
+    silent_times = proposals["silent_times"]
+    pitch_times = proposals["pitch_times"]
+    x_volume = proposals["x_volume"]
+    x_onset = proposals["x_onset"]
+    timing_ar = proposals["timing_ar"]
+
     # add beats between far beats
     if config.max_speed >= 5.5 * 4:
         timing_ar = fill_map_times_scale(timing_ar, scale_index=int(config.map_filler_iters / 2) + 1)

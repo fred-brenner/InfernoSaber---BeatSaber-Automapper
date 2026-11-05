@@ -303,6 +303,28 @@ def test_max_gap_fill_bpm_grid_source(song, timing_defaults, monkeypatch):
     assert [item["time"] for item in candidates] == [1., 2., 2.5, 3., 3.5, 4., 4.5, 5., 5.5, 6., 6.5, 7., 8.]
 
 
+def test_gap_fill_v1_beat_source_inserts_predicted_times(song, timing_defaults, monkeypatch):
+    monkeypatch.setattr(config, "v2_max_note_gap_seconds", 4.0)
+    monkeypatch.setattr(config, "v2_gap_fill_source", "v1_beat")
+    monkeypatch.setattr(post, "_v1_beat_times", lambda path: np.asarray([3.0, 5.5]))
+    candidates, _ = post.postprocess_timing(song, beats([1., 8.], [1, 1]),
+                                            "unused.egg", skip=("bpm_alignment",))
+    assert [item["time"] for item in candidates] == [1., 3., 5.5, 8.]
+
+
+def test_gap_fill_v1_beat_falls_back_to_onsets(song, timing_defaults, monkeypatch):
+    monkeypatch.setattr(config, "v2_max_note_gap_seconds", 4.0)
+    monkeypatch.setattr(config, "v2_gap_fill_source", "v1_beat")
+    def boom(path):
+        raise FileNotFoundError("missing bundle")
+    monkeypatch.setattr(post, "_v1_beat_times", boom)
+    monkeypatch.setattr(post, "_detect_onsets", lambda _: np.asarray([4.0]))
+    candidates, report = post.postprocess_timing(song, beats([1., 8.], [1, 1]),
+                                                 "unused.egg", skip=("bpm_alignment",))
+    assert [item["time"] for item in candidates] == [1., 4., 8.]
+    assert report.get("gap_fill_source_used") == "onsets"  # fallback recorded
+
+
 def test_training_first_cut_selects_anchor_after_heuristic_cleanup(monkeypatch):
     monkeypatch.setattr(config, "gimme_more_notes_flag", False)
     monkeypatch.setattr(config, "single_notes_only_flag", False)

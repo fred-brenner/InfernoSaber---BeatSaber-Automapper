@@ -196,7 +196,8 @@ def postprocess_timing(song, beats, audio_path, logger=None, skip=()):
     # No nonzero timing proposals means there is no anchor to fill. In
     # particular, requested zero density must remain empty.
     if not original:
-        return [], {**diagnostics, "events": 0, "retained_notes": 0, "merged_events": 0}
+        return [], {**diagnostics, "events": 0, "retained_notes": 0, "merged_events": 0,
+                    "gap_fill_source_used": None}
     candidates = []
     spacing_removed, merged_events = 0, 0
     if "minimum_spacing" in skip:
@@ -255,6 +256,7 @@ def postprocess_timing(song, beats, audio_path, logger=None, skip=()):
         return _blocked_intervals(entries, delay)
 
     detected_silence = None
+    gap_fill_source_used = None
 
     def silent_spans(force=False):
         """Detected silent spans, decoded once and only when fills/snap gate on them.
@@ -314,7 +316,9 @@ def postprocess_timing(song, beats, audio_path, logger=None, skip=()):
                     continue
                 if pool is None:
                     # decode candidates and silence only when a dead zone exists
-                    pool = _gap_candidate_times(source, audio_path, bpm, duration)
+                    used = {"source": source}
+                    pool = _gap_candidate_times(source, audio_path, bpm, duration, used)
+                    gap_fill_source_used = used["source"]
                     spans = silent_spans()
                 for t in pool[(pool > a + edge) & (pool < b - edge)]:
                     if _inside_spans(t, spans) or (inserted and t - inserted[-1] < config.min_beat_time):
@@ -326,7 +330,8 @@ def postprocess_timing(song, beats, audio_path, logger=None, skip=()):
         replace_times("final_bpm_alignment", align_beats_on_bpm(times(), bpm), moving=True)
     diagnostics.update(events=len(candidates), retained_notes=sum(item["count"] for item in candidates),
                        merged_events=merged_events, minimum_spacing_removed=spacing_removed,
-                       timing_policy="legacy_cleanup_count_preserving")
+                       timing_policy="legacy_cleanup_count_preserving",
+                       gap_fill_source_used=gap_fill_source_used)
     _report(logger, f"Timing cleanup: {len(original)} -> {len(candidates)} events")
     return candidates, diagnostics
 
@@ -831,20 +836,45 @@ def _detect_onsets(audio_path):
     return np.asarray(librosa.frames_to_time(onsets, sr=rate, hop_length=512), np.float64)
 
 
-def _gap_candidate_times(source, audio_path, bpm, duration):
+def _v1_beat_times(audio_path):
+    """Beat times (seconds) predicted by the trained v1 beat-TCN, inference only.
+
+    The bundle lives at ``model/<v2_gap_fill_v1_bundle>/``; ``scoped_settings``
+    restores the temporary ``paths.model_path`` override afterwards so v1
+    config/path state never leaks into the v2 run."""
+    from pathlib import Path
+
+    from evaluation.legacy_generator import beat_proposals
+    from map_creation.v2_generation import scoped_settings
+    from tools.config import paths
+
+    name = Path(audio_path).stem
+    with scoped_settings():
+        paths.model_path = paths.dir_path + f"model/{config.v2_gap_fill_v1_bundle}/"
+        return np.asarray(beat_proposals([name])["timing_ar"], np.float64)
+
+
+def _gap_candidate_times(source, audio_path, bpm, duration, used=None):
     """Insertion-time pool for the max-gap safety net, selected by ``source``.
 
     ``"onsets"`` reuses the librosa spectral-flux peaks and ``"bpm_grid"`` the
-    whole-beat lattice; ``"v1_beat"`` is the slot for the trained v1 beat-TCN
-    provider — until that bridge lands it falls back to detected onsets.
-    """
+    whole-beat lattice; ``"v1_beat"`` runs the trained v1 beat-TCN and falls
+    back to detected onsets when its bundle is missing or inference fails.
+    ``used``, when given, receives the actually decoded source as
+    ``used["source"]`` so callers can record the fallback."""
     if source == "onsets":
         return _detect_onsets(audio_path)
     if source == "bpm_grid":
         step = 60. / bpm
         return np.arange(step, duration, step)
     if source == "v1_beat":
-        return _detect_onsets(audio_path)
+        try:
+            return _v1_beat_times(audio_path)
+        except Exception as error:
+            print(f"Warning: v1_beat gap fill unavailable ({error}); using detected onsets")
+            if used is not None:
+                used["source"] = "onsets"
+            return _detect_onsets(audio_path)
     raise ValueError(f"Unknown v2_gap_fill_source: {source!r}")
 
 
