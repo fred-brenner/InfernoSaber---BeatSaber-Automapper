@@ -78,7 +78,13 @@ v2_intensity_adjustment_strength = 0.8  # fraction of the target change applied 
 # timing model's event classes (single/double) before the per-frame argmax,
 # lifting borderline frames into events. Must stay < 1 so a fully silent
 # frame can never flip; 0 restores pure argmax.
-v2_timing_event_bias = 0.1
+# timing model's event classes (single/double) before the per-frame argmax,
+# lifting borderline frames into events. Must stay < 1 so a fully silent
+# frame can never flip; 0 restores pure argmax. 2026-11-06: raised 0.1 -> 0.3
+# for recall — the model stays silent on many audible hits in loud sections
+# (measured ~2x raw event rate on under-triggering songs); downstream stages
+# (silence removal, spacing floor, speed cap) absorb the accuracy cost.
+v2_timing_event_bias = 0.3
 
 # select song metadata search mode
 enable_auto_metadata = True  # if True, tries to get song metadata from song name

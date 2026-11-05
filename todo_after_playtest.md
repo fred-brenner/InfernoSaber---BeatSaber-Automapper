@@ -524,3 +524,19 @@ Verified live: No Sleep 5.0 file — the 39.9->41.1 hole now reads 39.93,
 40.32, 40.89, 41.09, 41.28, 41.48 (~0.4s spacing through the loudest
 section). Batch: coverage +20..+121 events/song; final 5.0-file counts
 347-926 notes; cap still the dominant culler (~40-55% of positions).
+
+## Round 5 — timing recall bias 0.1 -> 0.3 (2026-11-06)
+
+Verdict on round 4: better, not enough — user asked to trade model accuracy
+for recall. `v2_timing_event_bias` now `0.3` (added to the event classes
+before the per-frame argmax; `max(P1,P2) > P0 - bias` fires). Measured on
+stored probabilities: raw event rate roughly doubles on under-triggering
+songs (No Sleep 0.78 -> 1.75+/s, Orbit the Block 0.66 -> 1.53+/s); fully
+silent frames still cannot flip (bias < 1 guard). False-positive cost is
+absorbed downstream — silence removal, spacing floor, speed cap.
+
+Batch: raw model events ~doubled everywhere (198->393 No Sleep, 294->580
+Orbit the Block, 838->1009 Keks-Alarm). Final 5.0-file notes up on 7/8
+songs (No Sleep 347->411, Orbit the Block 654->790, Bunker 505->587;
+Turn the Night On flat 504). Coverage adds less now (+16..+86) — the model
+covers more hits itself. Cap still removes ~half the stream positions.

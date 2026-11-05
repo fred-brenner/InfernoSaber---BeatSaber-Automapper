@@ -147,9 +147,11 @@ insertions; `_TIMING_STEPS` reads `minimum_spacing`, `high_difficulty_fill`,
 `density_fill`, `max_gap_fill` — silence removal now runs before the density
 loop so refills cannot undo it, and a max-gap safety net trails it — the
 initial/final BPM alignments bookend the sequence. Before the timing argmax the
-one/two-note classes receive `v2_timing_event_bias` (default `0.1`, must stay
+one/two-note classes receive `v2_timing_event_bias` (default `0.3`, must stay
 `< 1` so a fully silent frame can never flip; `0` restores pure argmax), a
-playtest-tunable experiment lifting borderline frames into events. After map
+playtest-tunable experiment lifting borderline frames into events — raised
+from `0.1` after playtests showed the model under-triggering on audible hits
+in loud sections (~2x raw event rate on the weakest songs at `0.3`). After map
 start and every note-free pause of at least `v2_fill_entry_pause_beats` beats
 (default `4.0`; `0` leaves only the map start as an entry), the subdivision fills (`high_difficulty_fill`,
 `density_fill`) may not insert for `v2_fill_entry_delay_seconds` (default
