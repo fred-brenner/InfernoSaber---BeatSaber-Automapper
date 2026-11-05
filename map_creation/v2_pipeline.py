@@ -417,6 +417,7 @@ def generate(song, requested_nps, predictors, encoder, settings, vocabularies, *
                 apply_fast_counter_sweep=base.apply_fast_counter_sweep,
                 apply_diagonal_cap=base.apply_diagonal_cap,
                 apply_speed_cap=base.apply_speed_cap,
+                speed_cap_scale=base.speed_cap_scale,
                 calm_area_pulses=base.calm_area_pulses,
                 add_calm_effects=base.add_calm_effects,
                 add_calm_lighting=base.add_calm_lighting)
@@ -560,7 +561,9 @@ def generate(song, requested_nps, predictors, encoder, settings, vocabularies, *
     if diag_fn is not None and state["notes"] and 0 <= diag_cap < 1:
         result.diagnostics["diagonal_cap"] = diag_fn(state["notes"], state["chains"], rng=rng)
     speed_cap = getattr(postprocessors, "apply_speed_cap", None)
-    speed_scale = float(getattr(config, "v2_speed_cap_scale", 1.) or 0.)
+    scale_fn = getattr(postprocessors, "speed_cap_scale", None)
+    speed_scale = scale_fn() if scale_fn is not None \
+        else float(getattr(config, "v2_speed_cap_scale", 1.) or 0.)
     if speed_cap is not None and state["notes"] and speed_scale > 0:
         # Primary pass while every note is still mutable; the retained
         # snapshot below records the capped set.

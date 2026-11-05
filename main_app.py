@@ -816,7 +816,8 @@ def build_app(check_updates=True):
                 intensity = gr.Number(label="Beat Intensity (%)", value=config.add_beat_intensity, precision=0,
                                       interactive=True, step=5, minimum=70, maximum=125,
                                       info="Acts as multiplier to the difficulty target. "
-                                           "High values will enforce more notes in calm sections.")
+                                           "High values enforce more notes in calm sections "
+                                           "and allow faster same-hand movement (v2 speed cap).")
                 intensity.input(set_intensity, inputs=[intensity], outputs=[])
                 # set silence threshold
                 silence_threshold = gr.Number(label="Silence Threshold (%)", value=config.silence_threshold_percentage,

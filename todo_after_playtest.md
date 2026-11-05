@@ -571,3 +571,19 @@ Sanity flag: No Sleep 5.0 top same-hand speed now 25.8 u/s (vs 16.1 at
 scale 1.5) — at the new bound and arguably past comfortable for the
 difficulty; 56 notes in the 35-45s window. If playtest says overshoot,
 1.5 remains the verified-good middle.
+
+## Round 8 — Beat Intensity field drives the v2 speed cap (2026-11-06)
+
+User confirmed scale 2.0 is the right NPS-5 target and asked to connect the
+app's Beat Intensity (%) field to it: 100% == 2.0, others scale linearly.
+Audit first: the field already gates the density-fill budget in v1
+(legacy_generator) and v2 (v2_postprocessing candidate bound) and is
+shifted +-5..10 per variant by _difficulty_settings flags — so it now
+governs note density AND allowed speed coherently. Implementation:
+speed_cap_scale() returns v2_speed_cap_scale * add_beat_intensity_orig/100
+(orig = user value before flag adjustments; flag shifts stay density-only).
+add_beat_intensity default 95 -> 100 so the validated 2.0 ships at the
+default UI value (side effect: +5% fill-budget bound for v1 and v2 — tiny,
+same direction as the recent density work). UI info text documents the new
+speed role. Verified live: speed_cap_value 26.7 across the batch —
+identical bound to the scale-2.0 run.

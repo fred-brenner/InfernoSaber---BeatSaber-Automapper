@@ -970,6 +970,7 @@ def speed_defaults(monkeypatch):
     for key, value in {"max_speed": 32., "reaction_time": 1.15,
                        "reaction_time_fact": .013, "cdf": 1.2, "cdf_lr": 1.15,
                        "min_time_diff": .02, "v2_speed_cap_scale": 1.,
+                       "add_beat_intensity_orig": 100.,
                        "v2_speed_cap_start_notes": 0, "v2_speed_cap_start_factor": .35,
                        "v2_cleanup_same_dir_gap": .1, "v2_cleanup_swing_window": .15,
                        "v2_flow_min_turn_steps": 3}.items():
@@ -1018,6 +1019,26 @@ def test_speed_cap_scale_scales_the_cap(speed_defaults, monkeypatch):
     notes = build()
     post.apply_speed_cap(notes)
     assert [item["id"] for item in notes] == [0, 1]
+
+
+def test_speed_cap_scales_with_beat_intensity(speed_defaults, monkeypatch):
+    # the app's Beat Intensity field multiplies v2_speed_cap_scale linearly:
+    # 100% keeps the configured reference, 50% halves the allowed speed
+    from tools.utils.numpy_shorts import get_factor_from_max_speed
+    base = 32. * get_factor_from_max_speed(32., .5, 1)
+    build = lambda: [note(0, 1., x=0, y=1, direction=1),
+                     note(1, 1.1, x=3, y=1, direction=1)]
+    monkeypatch.setattr(config, "v2_speed_cap_scale", 2.)
+    monkeypatch.setattr(config, "add_beat_intensity_orig", 200.)
+    notes = build()
+    stats = post.apply_speed_cap(notes)
+    assert [item["id"] for item in notes] == [0, 1]
+    assert stats["speed_cap_value"] == pytest.approx(base * 4.)
+    monkeypatch.setattr(config, "add_beat_intensity_orig", 50.)
+    notes = build()
+    stats = post.apply_speed_cap(notes)
+    assert [item["id"] for item in notes] == [0]
+    assert stats["speed_cap_value"] == pytest.approx(base)
 
 
 def test_speed_cap_disabled_at_zero_scale(speed_defaults, monkeypatch):

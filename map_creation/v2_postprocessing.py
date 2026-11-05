@@ -1485,6 +1485,23 @@ def apply_diagonal_cap(notes, chains=None, rng=None):
     return stats
 
 
+def speed_cap_scale():
+    """Effective v2 speed-cap scale.
+
+    ``v2_speed_cap_scale`` is the reference at 100% beat intensity; the app's
+    Beat Intensity (%) field scales it linearly (100 -> x1, 50 -> x0.5), so
+    one dial governs note density and allowed movement speed together. Reads
+    ``add_beat_intensity_orig`` — the user-visible value before per-variant
+    silence/emphasize/sporty adjustments, which shift the fill budget only."""
+    scale = float(getattr(config, "v2_speed_cap_scale", 1.) or 0.)
+    intensity = getattr(config, "add_beat_intensity_orig", None)
+    if intensity is None:
+        intensity = getattr(config, "add_beat_intensity", None)
+    if intensity is not None:
+        scale *= float(intensity) / 100.
+    return scale
+
+
 def apply_speed_cap(notes, chains=None, rng=None, logger=None, drop_retained=True):
     """Drop a note of any same-hand pair above the v1 movement cap.
 
@@ -1520,7 +1537,7 @@ def apply_speed_cap(notes, chains=None, rng=None, logger=None, drop_retained=Tru
     ``apply_fast_counter_sweep`` would need to fix again. Returns run
     statistics; ``speed_cap_value`` is the effective base cap before the
     start ramp."""
-    scale = float(getattr(config, "v2_speed_cap_scale", 1.) or 0.)
+    scale = speed_cap_scale()
     value = config.max_speed * get_factor_from_max_speed(config.max_speed, .5, 1) * scale
     stats = {"speed_cap_dropped": 0, "speed_cap_chains_dropped": 0,
              "speed_cap_recuts": 0, "speed_cap_retained_skipped": 0,
