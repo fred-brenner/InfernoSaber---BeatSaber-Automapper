@@ -13,7 +13,9 @@ diagonal cap recuts excess diagonal cuts toward flow-legal adjacent cardinals
 A movement-speed cap (``apply_speed_cap``) runs once before the retained
 snapshot, while every note is still mutable, and again after expansion and
 the clearance fixpoint with retained notes frozen; the v1 gate it restores
-lived inside the skipped legacy flow pass.
+lived inside the skipped legacy flow pass. A counter-direction sweep
+(``apply_fast_counter_sweep``) then recuts non-retained notes expansion left
+inside fast pairs it never saw.
 
 Cut-direction convention: ``get_cut_dir_xy`` yields the approach vector — the
 hand enters from ``pos + step`` and exits through ``pos - step``. Both adjacent
@@ -520,7 +522,8 @@ def _flow_legal(direction, previous, x, y, time, same_stroke_gap):
     return steps >= min_turn
 
 
-def _flow_direction(original, previous_direction, blocked=(), swing_from=None, forbidden_cells=None):
+def _flow_direction(original, previous_direction, blocked=(), swing_from=None,
+                    forbidden_cells=None, exclude=()):
     """Nearest reversal of ``original`` that keeps ≥135° from ``previous_direction``.
 
     Human flow resolves repeats with a swing back (~180°), so the candidate
@@ -528,12 +531,14 @@ def _flow_direction(original, previous_direction, blocked=(), swing_from=None, f
     rotation away from ``original``. This keeps the forced fix inside the
     reversal vocabulary instead of manufacturing side cuts the model never
     asked for. ``blocked`` lists further directions the replacement must stay
-    ≥135° away from (used when recutting the earlier note of a pair). With
-    ``swing_from``/``forbidden_cells`` a candidate is rejected when one of its
-    swept cells is occupied by a simultaneous other-hand note."""
+    ≥135° away from (used when recutting the earlier note of a pair) and
+    ``exclude`` removes directions outright (e.g. the counter family inside a
+    fast pair). With ``swing_from``/``forbidden_cells`` a candidate is
+    rejected when one of its swept cells is occupied by a simultaneous
+    other-hand note."""
     others = (previous_direction, *blocked)
-    candidates = [d for d in range(8)
-                  if all(_step_distance(d, other) >= 3 for other in others)
+    candidates = [d for d in range(8) if d not in exclude
+                  and all(_step_distance(d, other) >= 3 for other in others)
                   and _swing_clear(swing_from, forbidden_cells, d)]
     return _rank_flow_candidates(original, candidates, others)
 
@@ -1069,6 +1074,11 @@ def apply_intro_floor(notes, cutoff_seconds):
 _COUNTER_FAMILY = {0: (0, 4, 5), 2: (1, 6, 7)}
 
 
+def _counter_direction(note):
+    """The cut opposes the note's row: top-row down-family / bottom-row up-family."""
+    return note["d"] in _COUNTER_FAMILY.get(note["y"], ())
+
+
 def apply_fast_direction_rules(notes, rng=None, logger=None):
     """Collapse chaotic directions inside fast same-hand runs to ping-pong.
 
@@ -1139,8 +1149,7 @@ def apply_fast_direction_rules(notes, rng=None, logger=None):
                     angle = _DIRECTION_ANGLE[pred_d]
                     allowed |= {_ANGLE_DIRECTION[(angle + step) % 8]
                                 for step in (-1, 1, 3, 5)}
-            counter = (counter_mode and note["id"] in runs
-                       and note["d"] in _COUNTER_FAMILY.get(y, ()))
+            counter = counter_mode and note["id"] in runs and _counter_direction(note)
             if counter or (allowed is not None and note["d"] != 8
                            and note["d"] not in allowed):
                 successor = seq[index + 1] if index + 1 < len(seq) else None
@@ -1182,6 +1191,78 @@ def apply_fast_direction_rules(notes, rng=None, logger=None):
                     f"{stats['fast_simplified']} simplified, "
                     f"{stats['fast_counter_recuts']} counter recuts "
                     f"(expected speed {expected:.1f})")
+    return stats
+
+
+def apply_fast_counter_sweep(notes, rng=None, logger=None):
+    """Recut counter directions inside fast pairs formed after the snapshot.
+
+    Multiplier copies inherit their anchor's cut, so expansion — and the
+    speed cap's deletions — can leave fast same-hand pairs the pre-snapshot
+    ``apply_fast_direction_rules`` never saw. Only non-retained notes are
+    eligible: retained ones are contract-fixed against the snapshot
+    ``generate`` verifies at the end. A counter-directional member (the
+    same ``_counter_direction`` predicate) is recut to a legal direction
+    with the counter family excluded from the pool; when nothing is legal
+    the note keeps its cut (legality-first, like the other passes). The
+    ping-pong/±45° simplification does not rerun — counter only. Dots are
+    untouched and pass their geometry-implied direction on. Returns run
+    stats."""
+    stats = {"fast_pairs_checked": 0, "fast_counter_recuts": 0}
+    threshold = float(getattr(config, "v2_fast_gap_seconds", .2) or 0.)
+    if (threshold <= 0 or len(notes) < 2
+            or getattr(config, "v2_fast_counter_direction", "recut") != "recut"):
+        return stats
+    ordered = sorted(notes, key=lambda item: (item["time"], item["id"]))
+    per_hand = {hand: [note for note in ordered if note["hand"] == hand]
+                for hand in (0, 1)}
+    fast = set()
+    for seq in per_hand.values():
+        for previous, current in zip(seq, seq[1:]):
+            if current["time"] - previous["time"] < threshold:
+                stats["fast_pairs_checked"] += 1
+                fast.update((previous["id"], current["id"]))
+    if not fast:
+        return stats
+    eps = float(getattr(config, "min_time_diff", .02))
+    window = max(eps, float(getattr(config, "v2_cleanup_swing_window", .15) or 0.))
+    gap = float(getattr(config, "v2_cleanup_same_dir_gap", .1) or 0.)
+    cells = _other_hand_cells(ordered, eps, window)
+    for seq in per_hand.values():
+        previous = None  # (time, x, y, effective direction through dots)
+        for index, note in enumerate(seq):
+            time, x, y = note["time"], note["x"], note["y"]
+            if (note["id"] in fast and note.get("kind") != "retained"
+                    and _counter_direction(note)):
+                successor = seq[index + 1] if index + 1 < len(seq) else None
+
+                def legal(candidate):
+                    if not _flow_legal(candidate, previous, x, y, time, gap):
+                        return False
+                    if successor is not None:
+                        next_d = successor["d"] if successor["d"] != 8 else \
+                            _dot_virtual_direction(candidate, x, y,
+                                                   successor["x"], successor["y"])
+                        if next_d is not None and not _flow_legal(
+                                next_d, (time, x, y, candidate),
+                                successor["x"], successor["y"], successor["time"], gap):
+                            return False
+                    return _swing_clear((x, y), cells.get(note["id"]), candidate)
+
+                candidates = [d for d in range(8)
+                              if d not in _COUNTER_FAMILY.get(y, ()) and legal(d)]
+                if candidates:
+                    pred_d = previous[3] if previous is not None else None
+                    note["d"] = _rank_flow_candidates(
+                        note["d"], candidates, () if pred_d is None else (pred_d,))
+                    stats["fast_counter_recuts"] += 1
+            # dots get their implied direction from geometry, alternating the pendulum
+            effective = note["d"] if note["d"] != 8 else (
+                _dot_virtual_direction(previous[3], previous[1], previous[2], x, y)
+                if previous is not None else None)
+            previous = (time, x, y, effective)
+    _report(logger, f"Fast counter sweep: {stats['fast_pairs_checked']} pairs, "
+                    f"{stats['fast_counter_recuts']} counter recuts")
     return stats
 
 
@@ -1303,35 +1384,45 @@ def apply_diagonal_cap(notes, chains=None, rng=None):
 
 
 def apply_speed_cap(notes, chains=None, rng=None, logger=None, drop_retained=True):
-    """Drop the later note of any same-hand pair above the v1 movement cap.
+    """Drop a note of any same-hand pair above the v1 movement cap.
 
     The legacy ``correct_notes`` gate lives inside ``legacy_note_flow``, which
     ``v2_cleanup_note_heuristics = False`` skips, so nothing else bounds
     travel per second. The pair cost is ``calc_note_speed`` on consecutive
-    kept same-hand notes; the cap is ``max_speed * get_factor_from_max_speed(
-    max_speed, .5, 1)`` scaled by ``v2_speed_cap_scale`` (nonpositive disables
-    the pass) and, for the first ``v2_speed_cap_start_notes`` combined
-    chronological positions, a linear ``v2_speed_cap_start_factor`` → 1 ramp
-    keyed on the later note — v1's ``decr_speed_val``/``decr_speed_range``
-    start ramp without its end half. Dropping the later note (v1 dropped the
-    whole timestep) keeps the other hand's; anchored copies and chains go
-    with it so no expansion is orphaned. Each deletion re-checks the
-    newly-adjacent pair for speed and ``_flow_legal`` — an illegal successor
-    is recut via ``_flow_direction`` or dropped when no legal recut exists —
-    iterating to a fixpoint bounded at twice the note count (deletion-only,
-    so it always converges). ``drop_retained=False`` freezes retained notes —
+    kept same-hand notes; the cap composes like v1 — ``ramped = max_speed *
+    ramp`` with ``ramp`` the linear ``v2_speed_cap_start_factor`` → 1 ramp
+    over the first ``v2_speed_cap_start_notes`` combined chronological
+    positions keyed on the later note (v1's ``decr_speed_val``/
+    ``decr_speed_range`` start ramp without its end half), then
+    ``cap = ramped * get_factor_from_max_speed(ramped, .5, 1) *
+    v2_speed_cap_scale`` (nonpositive scale disables the pass). Evaluating
+    the factor on the ramped value tightens early positions further than
+    scaling the base cap. Dropping the later note (v1 dropped the whole
+    timestep) keeps the other hand's; anchored copies and chains go with it
+    so no expansion is orphaned. Each deletion re-checks the newly-adjacent
+    pair for speed and ``_flow_legal`` — an illegal successor is recut via
+    ``_flow_direction`` or dropped when no legal recut exists — iterating
+    to a fixpoint bounded at twice the note count (deletion-only, so it
+    always converges). ``drop_retained=False`` freezes retained notes —
     production snapshots them before multiplier expansion and verifies them
-    at the end of ``generate``: a violating pair whose later note is retained
-    is instead counted once as ``speed_cap_retained_skipped`` and the walk
-    moves on, so the note still becomes the predecessor for the next check.
-    Copies and heuristic notes still drop or recut normally. Returns run
+    at the end of ``generate``: a violating pair whose later note is
+    retained is resolved through the earlier one instead — a mutable
+    earlier note drops on overspeed, and a revealed flow violation recuts
+    or drops it — so only a retained→retained pair is counted skipped
+    (``speed_cap_retained_skipped`` for overspeed, ``speed_cap_flow_skipped``
+    for flow, once per note and reason) and the frozen note still becomes
+    the predecessor for the next check. Copies and heuristic notes still
+    drop or recut normally. A recut inside a fast pair
+    (``v2_fast_gap_seconds``) keeps the counter-direction family out of its
+    candidate pool, so the pass cannot create what
+    ``apply_fast_counter_sweep`` would need to fix again. Returns run
     statistics; ``speed_cap_value`` is the effective base cap before the
     start ramp."""
     scale = float(getattr(config, "v2_speed_cap_scale", 1.) or 0.)
     value = config.max_speed * get_factor_from_max_speed(config.max_speed, .5, 1) * scale
     stats = {"speed_cap_dropped": 0, "speed_cap_chains_dropped": 0,
              "speed_cap_recuts": 0, "speed_cap_retained_skipped": 0,
-             "speed_cap_value": value}
+             "speed_cap_flow_skipped": 0, "speed_cap_value": value}
     if scale <= 0 or len(notes) < 2:
         return stats
     ordered = sorted(notes, key=lambda item: (item["time"], item["id"]))
@@ -1341,18 +1432,31 @@ def apply_speed_cap(notes, chains=None, rng=None, logger=None, drop_retained=Tru
     ramp = np.linspace(start_factor, 1., start_notes) if start_notes else ()
 
     def cap(note):
+        # v1 composition: the ramp scales max_speed before the factor is
+        # evaluated, so early positions tighten beyond a scaled base cap.
         index = position[note["id"]]
-        return value * (ramp[index] if index < start_notes else 1.)
+        ramped = config.max_speed * (ramp[index] if index < start_notes else 1.)
+        return ramped * get_factor_from_max_speed(ramped, .5, 1) * scale
 
     gap = float(getattr(config, "v2_cleanup_same_dir_gap", .1) or 0.)
     eps = float(getattr(config, "min_time_diff", .02))
     window = max(eps, float(getattr(config, "v2_cleanup_swing_window", .15) or 0.))
     alive = {note["id"] for note in ordered}
-    spared = set()  # retained notes already spared under drop_retained=False
+    spared = set()  # (stat key, note id) already counted under drop_retained=False
     copies_of = {}
     for note in ordered:
         if note.get("kind") == "copy" and note.get("anchor_id") is not None:
             copies_of.setdefault(note["anchor_id"], []).append(note["id"])
+    # Initial fast-pair membership; it only shrinks as notes drop, so it is a
+    # conservative gate for the counter-family exclusion below.
+    fast_ids = set()
+    fast_gap = float(getattr(config, "v2_fast_gap_seconds", .2) or 0.)
+    if getattr(config, "v2_fast_counter_direction", "recut") == "recut" and fast_gap > 0:
+        for hand in (0, 1):
+            seq = [note for note in ordered if note["hand"] == hand]
+            for first, second in zip(seq, seq[1:]):
+                if second["time"] - first["time"] < fast_gap:
+                    fast_ids.update((first["id"], second["id"]))
     needs_flow = set()
     for _ in range(max(1, 2 * len(ordered))):
         changed = False
@@ -1402,14 +1506,21 @@ def apply_speed_cap(notes, chains=None, rng=None, logger=None, drop_retained=Tru
                     mark_followers(victim)
 
             def frozen(note):
-                # True when the note must survive untouched: a retained later
-                # note under drop_retained=False. Counted once per note.
-                if drop_retained or note.get("kind") != "retained":
-                    return False
-                if note["id"] not in spared:
-                    spared.add(note["id"])
-                    stats["speed_cap_retained_skipped"] += 1
-                return True
+                # True when the note must survive untouched: a retained
+                # note under drop_retained=False.
+                return not drop_retained and note.get("kind") == "retained"
+
+            def skip(note, key):
+                # Count a retained->retained pair once per frozen later note
+                # and reason (overspeed vs revealed flow violation).
+                if (key, note["id"]) not in spared:
+                    spared.add((key, note["id"]))
+                    stats[key] += 1
+
+            def counter_excluded(note):
+                # Recuts inside a fast pair keep the counter family out of
+                # the candidate pool.
+                return _COUNTER_FAMILY.get(note["y"], ()) if note["id"] in fast_ids else ()
 
             index = 0
             while index < len(seq):
@@ -1433,24 +1544,62 @@ def apply_speed_cap(notes, chains=None, rng=None, logger=None, drop_retained=Tru
                                         current["time"] - previous["time"])
                 if speed > cap(current):
                     if frozen(current):
-                        index = following
+                        if frozen(previous):
+                            # retained->retained overspeed: unresolvable
+                            skip(current, "speed_cap_retained_skipped")
+                            index = following
+                            continue
+                        # the earlier note is equally responsible; with the
+                        # later one frozen it is the only mutable choice
+                        drop(previous)
+                        changed = True
                         continue
                     drop(current)
                     changed = True
                     continue
                 if current["id"] in needs_flow:
-                    needs_flow.discard(current["id"])
                     implied = effective(index)
                     prior = (previous["time"], previous["x"], previous["y"], implied)
                     if current["d"] != 8 and not _flow_legal(
                             current["d"], prior, current["x"], current["y"],
                             current["time"], gap):
                         if frozen(current):
-                            index = following
+                            if frozen(previous):
+                                # retained->retained flow: unresolvable; the
+                                # mark is consumed once, on the skip
+                                needs_flow.discard(current["id"])
+                                skip(current, "speed_cap_flow_skipped")
+                                index = following
+                                continue
+                            # the mutable earlier note carries the fix: recut
+                            # it against the frozen successor and its own
+                            # predecessor, or drop it when nothing is legal
+                            earlier = index - 1
+                            while earlier >= 0 and seq[earlier]["id"] not in alive:
+                                earlier -= 1
+                            blocked = ()
+                            if earlier >= 0:
+                                implied_before = effective(earlier)
+                                if implied_before is not None:
+                                    blocked = (implied_before,)
+                            changed = True
+                            recut = _flow_direction(
+                                previous["d"], current["d"], blocked,
+                                swing_from=(previous["x"], previous["y"]),
+                                forbidden_cells=cells.get(previous["id"]),
+                                exclude=counter_excluded(previous))
+                            if recut == 8:
+                                drop(previous)
+                            else:
+                                previous["d"] = recut
+                                stats["speed_cap_recuts"] += 1
+                                mark_followers(previous["id"])
                             continue
+                        needs_flow.discard(current["id"])
                         recut = _flow_direction(current["d"], implied,
                                                 swing_from=(current["x"], current["y"]),
-                                                forbidden_cells=cells.get(current["id"]))
+                                                forbidden_cells=cells.get(current["id"]),
+                                                exclude=counter_excluded(current))
                         changed = True
                         if recut == 8:
                             drop(current)
@@ -1459,6 +1608,7 @@ def apply_speed_cap(notes, chains=None, rng=None, logger=None, drop_retained=Tru
                             stats["speed_cap_recuts"] += 1
                             mark_followers(current["id"])
                         continue
+                    needs_flow.discard(current["id"])
                 index = following
         if not changed:
             break
@@ -1472,8 +1622,12 @@ def apply_speed_cap(notes, chains=None, rng=None, logger=None, drop_retained=Tru
         anchor = anchors.get(chain.get("anchor_id"))
         if anchor is not None:
             chain["d"] = anchor["d"]
-    spared_note = (f", {stats['speed_cap_retained_skipped']} retained skipped"
-                   if stats["speed_cap_retained_skipped"] else "")
+    skipped = []
+    if stats["speed_cap_retained_skipped"]:
+        skipped.append(f"{stats['speed_cap_retained_skipped']} retained overspeed")
+    if stats["speed_cap_flow_skipped"]:
+        skipped.append(f"{stats['speed_cap_flow_skipped']} retained flow")
+    spared_note = f", {' + '.join(skipped)} skipped" if skipped else ""
     _report(logger, f"Speed cap: {stats['speed_cap_dropped']} notes and "
                     f"{stats['speed_cap_chains_dropped']} chains dropped, "
                     f"{stats['speed_cap_recuts']} recuts{spared_note} (cap {value:.1f})")

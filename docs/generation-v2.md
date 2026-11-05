@@ -391,18 +391,31 @@ first, preferring the allowed pool. `apply_speed_cap` — the v1
 `sanity_check_notes` movement gate v2 otherwise skips — then runs twice:
 once just before the retained snapshot while every note is still mutable,
 and again after multiplier expansion and the post-expansion fixpoint with
-`drop_retained=False`, so copies and heuristic notes still drop while a
-violating retained note is only counted. Consecutive same-hand notes over
-`max_speed * get_factor_from_max_speed` scaled by
-`v2_speed_cap_scale` (default `1.0`; `<= 0` disables) drop their later
-note, with a linear `v2_speed_cap_start_factor` (default `.35`) → 1 ramp
-over the first `v2_speed_cap_start_notes` (default `30`) combined
-positions; each deletion re-checks the new adjacency for speed and flow
-(recut or drop) to a deletion-only fixpoint. Diagnostics land under
-`fast_directions` (`fast_pairs`, `fast_simplified`, `fast_counter_recuts`),
-`speed_cap` (`speed_cap_dropped`, `speed_cap_recuts`, `speed_cap_value`)
-and `speed_cap_post_expansion` (same counters plus
-`speed_cap_retained_skipped`).
+`drop_retained=False`, so copies and heuristic notes still drop while
+retained notes are never touched. Consecutive same-hand notes over
+`ramped * get_factor_from_max_speed(ramped)` scaled by
+`v2_speed_cap_scale` (default `1.0`; `<= 0` disables) resolve by dropping a
+note: `ramped` is `max_speed` times a linear
+`v2_speed_cap_start_factor` (default `.35`) → 1 ramp over the first
+`v2_speed_cap_start_notes` (default `30`) combined positions, and the
+factor is evaluated on the ramped value exactly like v1; each deletion
+re-checks the new adjacency for speed and flow (recut or drop) to a
+deletion-only fixpoint. In the post-expansion pass a violating pair whose
+later note is frozen resolves through the earlier one — a mutable earlier
+note drops on overspeed, and a revealed flow violation recuts or drops it —
+so only retained→retained pairs count as skipped
+(`speed_cap_retained_skipped` for overspeed, `speed_cap_flow_skipped` for
+flow). A recut inside a fast pair keeps the counter family out of its
+candidate pool. Right after, `apply_fast_counter_sweep` recuts
+counter-directional *non-retained* notes inside fast pairs the
+pre-snapshot rules never saw — expansion copies inherit their anchor's
+cut — gated on `v2_fast_counter_direction = "recut"` and
+`v2_fast_gap_seconds > 0`. Diagnostics land under `fast_directions`
+(`fast_pairs`, `fast_simplified`, `fast_counter_recuts`), `speed_cap`
+(`speed_cap_dropped`, `speed_cap_recuts`, `speed_cap_value`),
+`speed_cap_post_expansion` (same counters plus `speed_cap_retained_skipped`
+and `speed_cap_flow_skipped`) and `fast_counter_sweep`
+(`fast_pairs_checked`, `fast_counter_recuts`).
 
 The 2026-10-31 calm-effects stage (`v2_calm_effects = True`) fills note-free
 stretches the model intentionally leaves empty — a requested behaviour — with

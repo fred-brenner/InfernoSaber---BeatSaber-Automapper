@@ -414,6 +414,7 @@ def generate(song, requested_nps, predictors, encoder, settings, vocabularies, *
                 snap_note_times=base.snap_note_times,
                 apply_intro_floor=base.apply_intro_floor,
                 apply_fast_direction_rules=base.apply_fast_direction_rules,
+                apply_fast_counter_sweep=base.apply_fast_counter_sweep,
                 apply_diagonal_cap=base.apply_diagonal_cap,
                 apply_speed_cap=base.apply_speed_cap,
                 calm_area_pulses=base.calm_area_pulses,
@@ -615,6 +616,16 @@ def generate(song, requested_nps, predictors, encoder, settings, vocabularies, *
         result.diagnostics["speed_cap_post_expansion"] = speed_cap(
             state["notes"], state["chains"], rng=rng, logger=logger,
             drop_retained=False)
+    counter_sweep = getattr(postprocessors, "apply_fast_counter_sweep", None)
+    if (counter_sweep is not None and state["notes"]
+            and getattr(config, "v2_fast_counter_direction", "recut") == "recut"
+            and float(getattr(config, "v2_fast_gap_seconds", .2) or 0.) > 0):
+        # Copies inherit their anchor's cut, so expansion and the speed cap's
+        # deletions can leave fast pairs the pre-snapshot rules never saw:
+        # sweep counter directions over non-retained notes only, keeping the
+        # retained-snapshot invariant verified at the end of generate().
+        result.diagnostics["fast_counter_sweep"] = counter_sweep(
+            state["notes"], rng=rng, logger=logger)
     started = perf_counter()
     index_state(state)
     if getattr(config, "v2_walls_heuristic", False):

@@ -1085,8 +1085,8 @@ def test_speed_cap_drop_retained_false_spares_retained(speed_defaults):
 
 
 def test_speed_cap_drop_retained_false_skips_retained_recuts(speed_defaults):
-    # B (a copy) dies to the cap; the revealed A->C repeat would recut, but C
-    # is retained -> spared and counted instead of mutated
+    # B (a copy) dies to the cap; the revealed A->C repeat would recut, but
+    # both notes are retained -> the pair counts as a flow skip, unmutated
     notes = [note(0, 1., x=0, y=1, direction=0),
              {**note(1, 1.05, x=3, y=2, direction=1), "kind": "copy", "anchor_id": 0},
              note(2, 2., x=1, y=1, direction=0)]
@@ -1094,7 +1094,85 @@ def test_speed_cap_drop_retained_false_skips_retained_recuts(speed_defaults):
     assert [item["id"] for item in notes] == [0, 2]
     assert notes[1]["d"] == 0
     assert stats["speed_cap_dropped"] == 1
-    assert stats["speed_cap_recuts"] == 0 and stats["speed_cap_retained_skipped"] == 1
+    assert stats["speed_cap_recuts"] == 0
+    assert stats["speed_cap_retained_skipped"] == 0
+    assert stats["speed_cap_flow_skipped"] == 1
+
+
+def test_speed_cap_start_ramp_composes_like_v1(speed_defaults, monkeypatch):
+    # v1 evaluates get_factor_from_max_speed on the ramped speed: position 1
+    # caps at 32 * r * factor(32 * r) ~= 7.14 with r = ramp[1] ~= .3724,
+    # where scaling the finished base cap by r would allow ~9.14 — the 8.0
+    # cells/s pair below sits between the two compositions.
+    monkeypatch.setattr(config, "v2_speed_cap_start_notes", 30)
+    ramp = .35 + .65 / 29  # np.linspace(.35, 1., 30)[1]
+    expected = 32 * ramp * post.get_factor_from_max_speed(32 * ramp, .5, 1)
+    assert expected == pytest.approx(7.14, abs=.01)
+    notes = [note(0, 1., x=0, y=1, direction=1),
+             note(1, 1.627, x=3, y=1, direction=0)]  # ~8.0 cells/s
+    stats = post.apply_speed_cap(notes)
+    assert [item["id"] for item in notes] == [0]
+    assert stats["speed_cap_dropped"] == 1
+
+
+def test_speed_cap_frozen_pair_drops_mutable_earlier(speed_defaults):
+    # the earlier note of an overspeed pair is equally responsible: with the
+    # later note frozen a mutable earlier one drops instead of skipping
+    notes = [{**note(0, 1., x=0, y=1, direction=1, kind="copy"), "anchor_id": 1},
+             note(1, 1.05, x=3, y=1, direction=1)]
+    stats = post.apply_speed_cap(notes, drop_retained=False)
+    assert [item["id"] for item in notes] == [1]
+    assert stats["speed_cap_dropped"] == 1
+    assert stats["speed_cap_retained_skipped"] == 0
+
+
+def test_speed_cap_retained_pair_counts_speed_skip(speed_defaults):
+    # retained->retained overspeed cannot resolve: counted once, both kept
+    notes = [note(0, 1., x=0, y=1, direction=1),
+             note(1, 1.05, x=3, y=1, direction=1)]
+    stats = post.apply_speed_cap(notes, drop_retained=False)
+    assert [item["id"] for item in notes] == [0, 1]
+    assert stats["speed_cap_dropped"] == 0
+    assert stats["speed_cap_retained_skipped"] == 1
+    assert stats["speed_cap_flow_skipped"] == 0
+
+
+def test_speed_cap_frozen_flow_recuts_mutable_earlier(speed_defaults):
+    # copy B dies to the cap; the revealed A->C repeat is a flow violation —
+    # with C retained the mutable earlier note is recut instead of skipped
+    notes = [note(0, 1., x=0, y=1, direction=0, kind="heuristic"),
+             {**note(1, 1.05, x=3, y=2, direction=1, kind="copy"), "anchor_id": 2},
+             note(2, 2., x=1, y=1, direction=0)]
+    stats = post.apply_speed_cap(notes, drop_retained=False)
+    assert [item["id"] for item in notes] == [0, 2]
+    assert notes[0]["d"] != 0 and post._step_distance(notes[0]["d"], 0) >= 3
+    assert stats["speed_cap_dropped"] == 1 and stats["speed_cap_recuts"] == 1
+    assert stats["speed_cap_flow_skipped"] == 0
+
+
+def test_speed_cap_frozen_flow_drops_earlier_without_legal_recut(speed_defaults, monkeypatch):
+    # same setup but no legal recut exists -> the mutable earlier note drops
+    monkeypatch.setattr(post, "_flow_direction", lambda *args, **kwargs: 8)
+    notes = [note(0, 1., x=0, y=1, direction=0, kind="heuristic"),
+             {**note(1, 1.05, x=3, y=2, direction=1, kind="copy"), "anchor_id": 2},
+             note(2, 2., x=1, y=1, direction=0)]
+    stats = post.apply_speed_cap(notes, drop_retained=False)
+    assert [item["id"] for item in notes] == [2]
+    assert stats["speed_cap_dropped"] == 2
+    assert stats["speed_cap_recuts"] == 0 and stats["speed_cap_flow_skipped"] == 0
+
+
+def test_speed_cap_recut_inside_fast_pair_excludes_counter(speed_defaults):
+    # copy B dies to the cap; C's revealed recut must avoid the counter
+    # family: without the exclusion the down-left d4 wins on original
+    # distance, inside a fast pair the up-left d6 takes it
+    notes = [note(0, 1., x=0, y=1, direction=3, kind="heuristic"),
+             {**note(1, 1.05, x=3, y=2, direction=1, kind="copy"), "anchor_id": 2},
+             note(2, 1.24, x=1, y=0, direction=5, kind="heuristic")]
+    stats = post.apply_speed_cap(notes, drop_retained=False)
+    assert [item["id"] for item in notes] == [0, 2]
+    assert notes[1]["d"] == 6
+    assert stats["speed_cap_recuts"] == 1
 
 
 def test_generate_wires_intro_floor_and_diagonal_cap(monkeypatch):
@@ -1162,6 +1240,7 @@ def test_generate_wires_intro_floor_and_diagonal_cap(monkeypatch):
     assert "diagonal_cap" in result.diagnostics
     assert "speed_cap" in result.diagnostics
     assert "speed_cap_post_expansion" in result.diagnostics
+    assert "fast_counter_sweep" in result.diagnostics
     assert min(note["time"] for note in result.state["notes"]) >= 2.0
 
 
@@ -1423,3 +1502,59 @@ def test_fast_run_deterministic_per_seed(fast_defaults):
     post.apply_fast_direction_rules(a, rng=np.random.default_rng(42))
     post.apply_fast_direction_rules(b, rng=np.random.default_rng(42))
     assert [(n["x"], n["y"], n["d"]) for n in a] == [(n["x"], n["y"], n["d"]) for n in b]
+
+
+def test_fast_counter_sweep_recuts_copies(fast_defaults):
+    # top-row down-right copy after an up-left cut: counter family — a fast
+    # pair expansion created after the pre-snapshot rules
+    notes = [note(0, 1.0, x=0, y=2, direction=4),
+             {**note(1, 1.15, x=0, y=2, direction=7, kind="copy"), "anchor_id": 0}]
+    stats = post.apply_fast_counter_sweep(notes)
+    assert notes[1]["d"] == 3
+    assert stats == {"fast_pairs_checked": 1, "fast_counter_recuts": 1}
+
+
+def test_fast_counter_sweep_never_touches_retained(fast_defaults):
+    # the retained member of the run keeps its contract-fixed cut while a
+    # heuristic counter note in the same run still recuts
+    notes = [note(0, 1.0, x=0, y=2, direction=4),
+             note(1, 1.15, x=0, y=2, direction=7),                  # retained: skipped
+             note(2, 1.30, x=3, y=0, direction=4, kind="heuristic")]  # bottom-row up-left
+    stats = post.apply_fast_counter_sweep(notes)
+    assert notes[1]["d"] == 7
+    assert notes[2]["d"] != 4
+    assert stats == {"fast_pairs_checked": 2, "fast_counter_recuts": 1}
+
+
+def test_fast_counter_sweep_ignores_slow_pairs(fast_defaults):
+    notes = [note(0, 1.0, x=0, y=2, direction=4),
+             {**note(1, 1.6, x=0, y=2, direction=7, kind="copy"), "anchor_id": 0}]
+    stats = post.apply_fast_counter_sweep(notes)
+    assert notes[1]["d"] == 7
+    assert stats == {"fast_pairs_checked": 0, "fast_counter_recuts": 0}
+
+
+def test_fast_counter_sweep_keeps_counter_when_no_legal_candidate(fast_defaults):
+    # the only non-counter direction legal against the down-left predecessor
+    # (right, d3) sits 0° from the successor's own cut -> nothing legal, keep
+    notes = [note(0, 1.0, x=0, y=1, direction=6),
+             {**note(1, 1.15, x=1, y=0, direction=5, kind="copy"), "anchor_id": 0},
+             note(2, 1.30, x=2, y=1, direction=3)]
+    stats = post.apply_fast_counter_sweep(notes)
+    assert notes[1]["d"] == 5
+    assert stats == {"fast_pairs_checked": 2, "fast_counter_recuts": 0}
+
+
+def test_fast_counter_sweep_disabled_knobs_no_op(fast_defaults, monkeypatch):
+    build = lambda: [note(0, 1.0, x=0, y=2, direction=4),
+                     {**note(1, 1.15, x=0, y=2, direction=7, kind="copy"), "anchor_id": 0}]
+    monkeypatch.setattr(config, "v2_fast_counter_direction", "off")
+    notes = build()
+    stats = post.apply_fast_counter_sweep(notes)
+    assert notes[1]["d"] == 7
+    assert stats == {"fast_pairs_checked": 0, "fast_counter_recuts": 0}
+    monkeypatch.setattr(config, "v2_fast_counter_direction", "recut")
+    monkeypatch.setattr(config, "v2_fast_gap_seconds", 0.)
+    notes = build()
+    stats = post.apply_fast_counter_sweep(notes)
+    assert notes[1]["d"] == 7 and stats["fast_counter_recuts"] == 0

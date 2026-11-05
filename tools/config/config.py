@@ -190,10 +190,12 @@ v2_diagonal_max_fraction = 0.10    # cap diagonal cuts (d 4-7) at this fraction 
 v2_speed_cap_scale = 1.0           # multiplier on the v1 movement-speed cap
                                    # (max_speed * get_factor_from_max_speed distance/s between
                                    # consecutive same-hand notes); <= 0 disables the pass
-v2_speed_cap_start_notes = 30      # first N combined chronological note positions ramp the
-                                   # cap in (v1 decr_speed_range); 0 disables the ramp
-v2_speed_cap_start_factor = .35    # cap multiplier at the first note position, rising
-                                   # linearly to 1 (v1 decr_speed_val)
+v2_speed_cap_start_notes = 30      # first N combined chronological note positions ramp
+                                   # max_speed in (v1 decr_speed_range); 0 disables the ramp
+v2_speed_cap_start_factor = .35    # max_speed multiplier at the first note position,
+                                   # rising linearly to 1 (v1 decr_speed_val); the cap's
+                                   # get_factor_from_max_speed is evaluated on the ramped
+                                   # value, like v1
 v2_fast_gap_seconds = .2           # same-hand gap below which consecutive notes form a
                                    # fast run: each note's direction is restricted to
                                    # its predecessor's, the 180° reverse and (admitted
