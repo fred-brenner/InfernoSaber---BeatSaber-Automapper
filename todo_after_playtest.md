@@ -540,3 +540,19 @@ Orbit the Block, 838->1009 Keks-Alarm). Final 5.0-file notes up on 7/8
 songs (No Sleep 347->411, Orbit the Block 654->790, Bunker 505->587;
 Turn the Night On flat 504). Coverage adds less now (+16..+86) — the model
 covers more hits itself. Cap still removes ~half the stream positions.
+
+## Round 6 — speed cap scale 1.0 -> 1.5 (2026-11-06)
+
+Density now acceptable to the user; experiment: relax the v2 speed cap to
+1.5x the v1 formula (cap at NPS 5: 13.33 -> 20.0 u/s same-hand).
+
+Batch: cap drops fell ~35-40% (No Sleep 427->284, Orbit the Block 659->434)
+and recuts rose (cap now recuts rather than drops). Final 5.0-file notes up
+26-35% everywhere: No Sleep 411->554, Orbit the Block 790->1015, Orbit
+Candy 772->1040, Break the Horizon 972->1228, Keks 569->764, Bunker
+505->587, Turn the Night On 504->680, Move the Floor 485->644.
+
+Sanity: No Sleep 5.0 file tops at 16.1 u/s same-hand (was 8.9 under the
+strict cap) — fast Expert territory, inside the new 20.0 bound; the 40s
+section sustains ~5 notes/s. The 3.15 file stays <= 7.8 u/s. Trade-off to
+watch in playtest: fast bursts are now denser AND faster.
