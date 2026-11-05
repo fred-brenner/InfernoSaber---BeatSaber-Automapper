@@ -12,11 +12,12 @@ import time
 from functools import partial
 
 from tools.config import config, paths
-from bs_shift.export_map import check_music_files
+from bs_shift.export_map import check_music_files, shutil_copy_maps
+from map_creation.v1_generation import V1_MAPPER_SELECTIONS, ensure_v1_bundle
 from map_creation.v2_generation import (apply_snapshot, configure_inference, generate_song,
                                        save_report, scoped_settings, settings_snapshot)
 from map_creation.v2_runtime import validate_production_bundle
-from map_creation.v2_export import combine_packages
+from map_creation.v2_export import combine_packages, write_zip
 
 
 _PROGRESS = None
@@ -50,7 +51,12 @@ def process_song(song_list_worker, total_runs):
     results = []
     for song, difficulty in song_list_worker:
         try:
-            results.append(generate_song(song, float(difficulty), logger=_worker_log))
+            generator = generate_song
+            if config.use_mapper_selection != "v2_expert":
+                # Lazy: the module is TF-free, but keeps the worker contract patchable.
+                from map_creation.v1_generation import generate_song_v1
+                generator = generate_song_v1
+            results.append(generator(song, float(difficulty), logger=_worker_log))
         except Exception as error:
             result = {"status": "failed", "song": Path(song).stem,
                       "internal_difficulty": float(difficulty),
@@ -94,8 +100,34 @@ def combine_maps(song_list_potential, song_list_run, diff_list, export_results_t
                          export_results_to_bs, settings_snapshot())
 
 
+def _combine_v1_packages(song_list_potential, song_list_run, export_results_to_bs, run_config, run_paths):
+    """Zip each 1234_<speed>_<name> v1 folder directly, never a combined 12345_* package."""
+    packages = []
+    for filename in song_list_potential:
+        name = Path(filename).stem
+        records = [record for record in song_list_run if record["song"] == name and record["status"] == "ok"]
+        if not records:
+            continue
+        variants = []
+        for record in records:
+            zip_path = write_zip(record["path"],
+                                 f"{run_paths['new_map_path']}{record['internal_difficulty']:.1f}_{name}.zip")
+            variants.append({"path": record["path"], "zip": zip_path})
+            if export_results_to_bs:
+                shutil_copy_maps(f"{record['internal_difficulty']:.1f}_{name}")
+        packages.append({"song": name, "variants": variants})
+        if run_config["auto_move_song_afterwards"]:
+            done = Path(run_paths["songs_pred"]) / "y_done"
+            done.mkdir(exist_ok=True)
+            shutil.move(str(Path(run_paths["songs_pred"]) / filename), str(done / filename))
+    return packages
+
+
 def _combine_maps(song_list_potential, song_list_run, diff_list, export_results_to_bs, snapshot):
     run_config, run_paths = snapshot["config"], snapshot["paths"]
+    if run_config.get("use_mapper_selection", "v2_expert") != "v2_expert":
+        return _combine_v1_packages(song_list_potential, song_list_run, export_results_to_bs,
+                                    run_config, run_paths)
     packages = []
     for filename in song_list_potential:
         name = Path(filename).stem
@@ -134,7 +166,7 @@ def _combine_maps(song_list_potential, song_list_run, diff_list, export_results_
     return packages
 
 
-def _run(n_workers, diff_list, export_results_to_bs, logger_callback, parallel):
+def _run(n_workers, diff_list, export_results_to_bs, logger_callback, parallel, model_selection=None):
     # Windows consoles use cp1252; replace unmappable chars instead of dying mid-run.
     if hasattr(sys.stdout, "reconfigure"):
         sys.stdout.reconfigure(errors="replace")
@@ -142,14 +174,20 @@ def _run(n_workers, diff_list, export_results_to_bs, logger_callback, parallel):
         raise ValueError("Worker count must be a positive integer")
     n_workers = int(n_workers)
     difficulties = _difficulties(diff_list)
-    snapshot = settings_snapshot()
     # Invalid bootstrap settings must fail here, not cause endless Pool respawns.
     configure_inference()
-    validate_production_bundle(snapshot["config"]["v2_model_bundle_path"])
+    selection = model_selection or "v2_expert"
+    if selection != "v2_expert" and selection not in V1_MAPPER_SELECTIONS:
+        raise ValueError(f"Unknown mapper selection: {selection}")
+    if selection == "v2_expert":
+        validate_production_bundle(config.v2_model_bundle_path)
+    else:
+        ensure_v1_bundle(selection)  # calls update_model_file_paths internally
+    snapshot = settings_snapshot()  # AFTER ensure — workers inherit paths.model_path
+    snapshot["config"]["use_mapper_selection"] = selection
     _emit("Checking and normalizing song files...", logger_callback, important=True)
     input_path = snapshot["paths"]["songs_pred"]
     songs = check_music_files(sorted(os.listdir(input_path)), input_path)
-    snapshot["config"]["use_mapper_selection"] = "v2_expert"
     if len(difficulties) > 1:
         snapshot["config"]["create_expert_flag"] = False
     groups = _groups(songs, difficulties, n_workers)
@@ -220,8 +258,10 @@ def _run(n_workers, diff_list, export_results_to_bs, logger_callback, parallel):
     return report
 
 
-def main_multi_par(n_workers: int, diff_list: list, export_results_to_bs=True, logger_callback=None):
-    return _run(n_workers, diff_list, export_results_to_bs, logger_callback, parallel=True)
+def main_multi_par(n_workers: int, diff_list: list, export_results_to_bs=True, logger_callback=None,
+                   model_selection=None):
+    return _run(n_workers, diff_list, export_results_to_bs, logger_callback, parallel=True,
+                model_selection=model_selection)
 
 
 def main_multi(diff_list: list, export_results_to_bs=True):

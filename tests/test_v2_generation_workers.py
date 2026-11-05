@@ -124,7 +124,7 @@ assert callable(main_app.build_app)
     assert result.returncode == 0, result.stderr
 
 
-def test_main_repeated_calls_restore_offsets_and_accept_legacy_model_argument(tmp_path, monkeypatch):
+def test_main_repeated_calls_restore_offsets_and_default_to_v2_expert(tmp_path, monkeypatch):
     import main
     monkeypatch.setattr(paths, 'songs_pred', str(tmp_path) + '/')
     monkeypatch.setattr(main, 'validate_production_bundle', lambda: {})
@@ -137,7 +137,7 @@ def test_main_repeated_calls_restore_offsets_and_accept_legacy_model_argument(tm
     monkeypatch.setattr(main, 'write_zip', lambda *args: str(tmp_path / 'song.zip'))
     initial = config.jump_speed_offset_orig
     for _ in range(2):
-        result = main.main('fav_15', 20, False, js_offset=.5)
+        result = main.main(None, 20, False, js_offset=.5)
         assert result['status'] == 'ok'
     assert calls == [('v2_expert', initial + .5, 20)] * 2
     assert config.jump_speed_offset_orig == initial
@@ -265,3 +265,56 @@ def test_sequential_run_emits_eta_and_only_milestones_to_app(capsys, tmp_path, m
     assert len(app) == len([line for line in app if line])
     for line in app:
         assert line.startswith(('Checking and normalizing', 'Generating', '### ETA:', 'Finished:')), line
+
+
+def test_process_song_routes_to_v1_for_legacy_selection(monkeypatch):
+    from types import SimpleNamespace
+    monkeypatch.setattr(config, "use_mapper_selection", "fav_15")
+    calls = []
+    monkeypatch.setitem(sys.modules, "map_creation.v1_generation",
+                        SimpleNamespace(generate_song_v1=lambda n, d, logger=None: calls.append((n, d)) or {"status": "ok", "song": n, "internal_difficulty": d, "path": "p"}))
+    records = main_multi.process_song([("song.egg", 20.)], 1)
+    assert calls == [("song.egg", 20.)] and records[0]["status"] == "ok"
+
+
+def test_run_validates_v1_bundle_for_legacy_selection(tmp_path, monkeypatch):
+    seen = []
+    monkeypatch.setattr(paths, "songs_pred", str(tmp_path) + "/")
+    monkeypatch.setattr(paths, "temp_path", str(tmp_path) + "/")
+    monkeypatch.setattr(main_multi, "ensure_v1_bundle", lambda sel: seen.append(sel))
+    monkeypatch.setattr(main_multi, "validate_production_bundle",
+                        lambda *a, **kw: seen.append("v2_bundle"))
+    monkeypatch.setattr(main_multi, "check_music_files", lambda files, path: [])
+    main_multi._run(1, [6.0], False, None, parallel=False, model_selection="fav_15")
+    assert seen == ["fav_15"]  # v1 path: ensure, not v2 bundle validation
+
+
+def test_run_keeps_v2_validation_by_default(tmp_path, monkeypatch):
+    seen = []
+    monkeypatch.setattr(paths, "songs_pred", str(tmp_path) + "/")
+    monkeypatch.setattr(paths, "temp_path", str(tmp_path) + "/")
+    monkeypatch.setattr(main_multi, "ensure_v1_bundle", lambda sel: seen.append(sel))
+    monkeypatch.setattr(main_multi, "validate_production_bundle",
+                        lambda *a, **kw: seen.append("v2_bundle"))
+    monkeypatch.setattr(main_multi, "check_music_files", lambda files, path: [])
+    main_multi._run(1, [6.0], False, None, parallel=False)
+    assert seen == ["v2_bundle"]
+
+
+def test_combine_maps_zips_v1_folders_without_combining(tmp_path, monkeypatch):
+    monkeypatch.setattr(paths, 'new_map_path', str(tmp_path) + '/')
+    monkeypatch.setattr(config, 'auto_move_song_afterwards', False)
+    monkeypatch.setattr(config, 'use_mapper_selection', 'fav_15')
+    folder = tmp_path / '1234_20.0_song'
+    folder.mkdir()
+    zips, copies = [], []
+    monkeypatch.setattr(main_multi, 'write_zip',
+                        lambda source, target: zips.append((source, target)) or target)
+    monkeypatch.setattr(main_multi, 'shutil_copy_maps', lambda name: copies.append(name) or True)
+    monkeypatch.setattr(main_multi, 'combine_packages',
+                        lambda *a, **k: pytest.fail('v1 folders must not be combined'))
+    record = {'song': 'song', 'status': 'ok', 'internal_difficulty': 20., 'path': str(folder)}
+    result = main_multi.combine_maps(['song.egg'], [record], [20.], True)
+    assert zips == [(str(folder), f"{tmp_path}/20.0_song.zip")]
+    assert copies == ['20.0_song']
+    assert result == [{'song': 'song', 'variants': [{'path': str(folder), 'zip': zips[0][1]}]}]
