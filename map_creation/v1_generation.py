@@ -62,7 +62,11 @@ def generate_song_v1(name: str, internal_difficulty: float, logger=None) -> dict
         update_model_file_paths(check_model_exists=False)
         config.max_speed = config.max_speed_orig = difficulty
         _emit(f"{name}: v1 model '{config.use_mapper_selection}' at {difficulty / 4:g} NPS", logger)
-        status = legacy_main([name])  # single name only: main() exit()s on longer lists
+        try:
+            status = legacy_main([name])  # single name only: main() exit()s on longer lists
+        except SystemExit as error:  # deeper v1 exit()s (sanity_check, gen_sliders)
+            raise RuntimeError(
+                f"v1 generation aborted for {name} (exit code {error.code})") from error
     folder = Path(paths.new_map_path) / f"1234_{difficulty:.1f}_{name}"
     if status is not False or not folder.is_dir():
         raise RuntimeError(f"v1 generation failed for {name} (status={status})")

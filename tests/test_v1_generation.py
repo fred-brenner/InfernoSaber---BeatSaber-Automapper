@@ -40,6 +40,21 @@ def test_generate_song_v1_restores_config(monkeypatch, tmp_path):
     assert config.max_speed_orig == original and config.max_speed == original
 
 
+def test_generate_song_v1_system_exit_becomes_runtime_error(monkeypatch, tmp_path):
+    original = config.max_speed_orig
+
+    def crash(names):  # deeper v1 exit()s: sanity_check/gen_sliders kill spawn workers
+        config.max_speed = -1.
+        raise SystemExit(1)
+
+    fake = SimpleNamespace(main=crash)
+    monkeypatch.setitem(sys.modules, "evaluation.legacy_generator", fake)
+    monkeypatch.setattr(paths, "new_map_path", str(tmp_path) + "/")
+    with pytest.raises(RuntimeError, match="exit code 1"):
+        generate_song_v1("song", 20.0)
+    assert config.max_speed_orig == original and config.max_speed == original
+
+
 def test_ensure_v1_bundle_downloads_missing_assets(monkeypatch, tmp_path):
     calls = {"paths": 0, "download": []}
     monkeypatch.setattr(config, "use_mapper_selection", "v2_expert")
