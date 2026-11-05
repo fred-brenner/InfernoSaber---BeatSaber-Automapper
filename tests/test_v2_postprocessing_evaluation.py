@@ -113,8 +113,10 @@ def test_each_timing_step_is_independently_skippable(monkeypatch):
     counts[[200, 500]] = 1
     monkeypatch.setattr(config, "max_speed", 32.)
     # the fixture gap (2.0->5.0 s) is below the default net threshold; pin it
-    # off so a future smaller value cannot send "x.egg" into librosa
+    # off so a future smaller value cannot send "x.egg" into librosa — same
+    # for the onset-coverage decode
     monkeypatch.setattr(config, "v2_max_note_gap_seconds", 0.)
+    monkeypatch.setattr(config, "v2_onset_fill_flag", False)
 
     calls.clear()
     postprocess_timing(song, beats(counts), "x.egg", skip=("onset_snap",))

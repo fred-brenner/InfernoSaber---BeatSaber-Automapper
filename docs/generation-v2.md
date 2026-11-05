@@ -185,6 +185,34 @@ of `v2_fill_respect_silence`) and `min_beat_time` apart. The net is a
 dead-zone backstop: it intentionally ignores entry-ramp windows — a gap
 beyond the threshold overrides the style gate.
 
+The 2026-11-06 tempo/density round adds three pieces. `v2_bpm_octave_correct`
+(default `True`) repairs doubled auto-detected tempos at audio preparation —
+the whole-song pulse tracker favours subdivisions, so detections at or above
+`v2_bpm_octave_min_bpm` (default `180`) are halved while the onset-envelope
+autocorrelation supports it (`ac(2T) > ac(T)`) and no energy sits at the
+doubled rate (`ac(T/2)` below `v2_bpm_octave_subbeat_max`, default `0.15` —
+the veto keeping genuinely fast songs intact), never below
+`v2_bpm_octave_min_result` (default `90`). One correction inside
+`V2Runtime.prepare_audio` keeps every consumer consistent — entry pauses,
+BPM alignment, grid fills, calm pulses and the exported BPM field; manual
+BPM input is never corrected and the detected value is recorded as
+`bpm_detected` in song metadata and pipeline diagnostics. The v1 path reads
+`get_file_bpm` directly and is untouched. Every insertion channel
+(subdivision, start/end, gap-net and coverage fills) keeps the
+difficulty-scaled `v2_fill_min_interval_seconds` spacing floor (default
+`0.09`, calibrated at `v2_fill_min_interval_nps` `5.0`, inversely scaled with
+map NPS and clamped to `v2_fill_min_interval_min_seconds` `0.035` — nps 10
+maps get `0.045`), so fills cannot generate sub-playable streams the speed
+cap then culls in bulk. And a new `onset_coverage` timing step (last, after
+the final alignment so inserts stay on the onset) appends events at strong
+detected onsets the model missed: onsets above the
+`v2_onset_fill_strength_quantile` (default `0.5`) share of detected-onset
+envelope strengths, farther than `v2_onset_fill_window_seconds` (default
+`0.12`) from every candidate, gated by entry windows, detected silence and
+the fill floor, counted under `onset_coverage_added`; `v2_onset_fill_flag`
+(default `True`) or the step name disables it, and a missing `audio_path`
+skips it silently.
+
 Arrows decoding optionally mixes in a second model: when
 `v2_arrows_variety` is above `0` the runtime also loads the arrows stage of
 `v2_arrows_reference_bundle` (currently the history-corrupted

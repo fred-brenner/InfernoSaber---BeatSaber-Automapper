@@ -448,3 +448,49 @@ v1 fav_15 stays untouched. Status: **all four implemented** — `32f1b4c`
   y=0 & d in {0,4,5}) before the general simplify rule, preferring the
   allowed pool then any legal non-counter direction. Slow areas keep the
   cuts — the rule only applies inside fast runs.
+
+# Playtest round 3 — v2 density vs playability (2026-11-06)
+
+Round-2 maps verified safe but read as "way too sparse" (~1.7 raw NPS on the
+requested-5.0 file). Ablation on No Sleep Expert attributed the loss:
+entry/start gates ~61 notes, the new v1-derived speed cap ~245 — and relaxing
+the cap to 3x only recovered 305/491, i.e. the cap was honestly deleting
+genuinely-unplayable fill output, not miscalibrated. Root cause found: the
+whole-song pulse tracker detects a *subdivision* tempo — No Sleep detected
+309.6 BPM against a true ~155 (onset autocorrelation: ac(395ms)=0.62 vs
+ac(186ms)=0.44), so every beat-relative mechanism ran at half real-time and
+fills manufactured impossible 48–97 ms streams. The user's "same cap as v1"
+challenge resolved: identical formula, but v1 measures first-note-of-timestep
+pairs (leaky) while v2 measures real same-hand transitions — and v2
+diagnostics show `expected_speed` 15.5–23.2 u/s vs the 13.33 cap at NPS 5,
+so the v1-calibrated cap is systematically ~1.3–1.7x stricter on the v2
+stream. Speed cap kept at scale 1.0 per user decision.
+
+Shipped (all v2-only, configurable):
+- `v2_bpm_octave_correct` + `min_bpm 180`/`subbeat_max 0.15`/`min_result 90`:
+  auto-detected BPMs at/above the gate are halved while ac(2T)>ac(T) and
+  ac(T/2) stays under the veto. Corrects `metadata["bpm"]` once inside
+  `V2Runtime.prepare_audio` so entry pauses, alignments, grid fills, calm
+  pulses and the exported BPM field all agree; `bpm_detected` recorded in
+  metadata + diagnostics. Manual BPM respected; v1 path untouched.
+- `v2_fill_min_interval_seconds .09` / `_nps 5.0` / `_min_seconds .035`:
+  every insertion channel keeps `base*ref_nps/nps` spacing (nps 10 -> .045,
+  nps 20 -> .035) — fills can't create sub-playable streams.
+- `v2_onset_fill_flag` / `_window_seconds .12` / `_strength_quantile .5`:
+  new `onset_coverage` timing step (after final alignment) appends events at
+  strong onsets the model missed — directly addresses "the model doesn't
+  trigger when there is a note". Gated by entry windows, detected silence
+  and the floor; diagnostics under `onset_coverage_added`.
+
+Live batch (8 songs, NPS 5): BPM corrected on 6 (Break the Horizon
+268.5->134.2, Move the Floor 300->150, No Sleep 309.6->154.8, Orbit the
+Block 287.6->143.8, Turn the Night On 254.6->127.3; Orbit Candy unchanged
+at 256.7), veto kept Keks-Alarm 191 and Bunker 198. Onset coverage added
++15..+112 events per difficulty. Cap still drops ~45-55% of note positions
+everywhere — expected: the stream's intended speed exceeds the v1 cap.
+Maps land ~2.6-3.2 raw NPS on the requested-5.0 file (vs ~1.7 before) —
+pending playtest verdict on whether density now feels right.
+
+Deferred density levers if still sparse after playtest: cap scale
+(vetoed for now), v1-style leaky per-timestep measurement, promoting
+model-supported singles to doubles (adds notes at zero same-hand cost).

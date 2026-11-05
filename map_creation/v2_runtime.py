@@ -300,15 +300,27 @@ class V2Runtime:
             if key == self._prepared_key:
                 self._cache_metrics["prepared_audio_cache_hits"] += 1
                 return self._prepared
+            octave_repair = None
             if bpm is None:
-                from .find_bpm import get_file_bpm
+                from .find_bpm import get_file_bpm, octave_corrected_bpm
                 bpm = get_file_bpm(path)[0]
                 if not np.isfinite(bpm) or bpm <= 0:
                     raise ValueError("No positive tempo could be estimated; set the existing manual BPM control")
+                if getattr(config, "v2_bpm_octave_correct", True):
+                    corrected = octave_corrected_bpm(
+                        path, bpm,
+                        float(getattr(config, "v2_bpm_octave_min_bpm", 180.)),
+                        float(getattr(config, "v2_bpm_octave_subbeat_max", .15)),
+                        float(getattr(config, "v2_bpm_octave_min_result", 90.)))
+                    if corrected != bpm:
+                        octave_repair = (float(bpm), float(corrected))
+                        bpm = corrected
             if isinstance(bpm, bool) or not np.isfinite(bpm) or bpm <= 0:
                 raise ValueError("BPM must be finite and positive")
             arrays, metadata = extract_features(decode_audio(path))
             metadata["bpm"] = float(bpm)
+            if octave_repair is not None:
+                metadata["bpm_detected"] = octave_repair[0]
             song = normalize_songs([Song(path.stem, metadata, arrays)], self.statistics)[0]
             _validate_audio_song(song)
             encoder = FixedEncoder(decode_encoder_audio(path), self._encode, self.encoder_fingerprint,

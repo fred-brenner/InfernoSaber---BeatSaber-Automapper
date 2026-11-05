@@ -21,7 +21,9 @@ def timing_defaults(monkeypatch):
     for key, value in {"min_beat_time": .0625, "min_time_diff": .02,
                        "map_filler_iters": 0, "add_start_end_beats": False,
                        "add_silence_flag": False,
-                       "v2_fill_entry_min_notes": 0, "v2_suppress_start_fill": False}.items():
+                       "v2_fill_entry_min_notes": 0, "v2_suppress_start_fill": False,
+                       "v2_fill_min_interval_seconds": 0.,
+                       "v2_onset_fill_flag": False}.items():
         monkeypatch.setattr(config, key, value)
     monkeypatch.setattr(post, "_legacy_timing_features", lambda _: (np.zeros((100, 24)), np.zeros((100, 24)), []))
     monkeypatch.setattr(post, "sanity_check_timing2", lambda _, times, **kwargs: times)
@@ -1558,3 +1560,102 @@ def test_fast_counter_sweep_disabled_knobs_no_op(fast_defaults, monkeypatch):
     notes = build()
     stats = post.apply_fast_counter_sweep(notes)
     assert notes[1]["d"] == 7 and stats["fast_counter_recuts"] == 0
+
+
+
+def test_fill_min_interval_scales_inversely_with_nps(monkeypatch):
+    monkeypatch.setattr(config, "v2_fill_min_interval_seconds", .09)
+    monkeypatch.setattr(config, "v2_fill_min_interval_nps", 5.)
+    monkeypatch.setattr(config, "v2_fill_min_interval_min_seconds", .035)
+    monkeypatch.setattr(config, "max_speed", 20.)
+    assert post._fill_min_interval() == pytest.approx(.09)
+    monkeypatch.setattr(config, "max_speed", 40.)   # nps 10 -> half the floor
+    assert post._fill_min_interval() == pytest.approx(.045)
+    monkeypatch.setattr(config, "max_speed", 80.)   # nps 20 -> clamped at the hard floor
+    assert post._fill_min_interval() == pytest.approx(.035)
+    monkeypatch.setattr(config, "max_speed", 10.)   # nps 2.5 -> never exceeds the base
+    assert post._fill_min_interval() == pytest.approx(.09)
+    monkeypatch.setattr(config, "v2_fill_min_interval_seconds", 0.)
+    assert post._fill_min_interval() == 0.
+
+
+def test_fill_min_interval_culls_dense_fill_proposals(song, timing_defaults, monkeypatch):
+    monkeypatch.setattr(config, "map_filler_iters", 1)
+    monkeypatch.setattr(config, "max_speed", 20.)
+    monkeypatch.setattr(config, "add_beat_intensity", 50.)
+    monkeypatch.setattr(config, "v2_fill_entry_delay_seconds", 0.)
+    monkeypatch.setattr(config, "v2_fill_entry_pause_beats", 0.)
+    monkeypatch.setattr(post, "fill_map_times_scale",
+                        lambda times, index=5: np.asarray([1., 1.04, 2., 2.03, 3.]))
+    monkeypatch.setattr(config, "v2_fill_min_interval_seconds", .09)
+    monkeypatch.setattr(config, "v2_fill_min_interval_nps", 5.)
+    candidates, _ = post.postprocess_timing(song, beats([1., 3.], [1, 1]), "unused.egg",
+                                            skip=("bpm_alignment",))
+    assert [item["time"] for item in candidates] == pytest.approx([1., 2., 3.])
+    monkeypatch.setattr(config, "v2_fill_min_interval_seconds", 0.)
+    candidates, _ = post.postprocess_timing(song, beats([1., 3.], [1, 1]), "unused.egg",
+                                            skip=("bpm_alignment",))
+    assert [item["time"] for item in candidates] == pytest.approx([1., 1.04, 2., 2.03, 3.])
+
+
+def test_start_end_fill_additions_respect_min_interval(song, timing_defaults, monkeypatch):
+    monkeypatch.setattr(config, "v2_fill_min_interval_seconds", .09)
+    monkeypatch.setattr(config, "v2_fill_min_interval_nps", 5.)
+    monkeypatch.setattr(config, "max_speed", 20.)
+    monkeypatch.setattr(post, "_start_end_times",
+                        lambda times, volume, onset: np.sort(np.r_[times, .5, .55, 9.5, 9.53]))
+    candidates, report = post.postprocess_timing(song, beats([1., 5., 9.], [1, 1, 1]),
+                                                 "unused.egg", skip=("bpm_alignment",))
+    assert [item["time"] for item in candidates] == pytest.approx([.5, 1., 5., 9., 9.5])
+    assert next(op for op in report["operations"]
+                if op["stage"] == "start_end_fill")["event_count_delta"] == 2
+
+
+def test_onset_coverage_inserts_missed_strong_onsets_after_alignment(song, timing_defaults, monkeypatch):
+    monkeypatch.setattr(config, "v2_onset_fill_flag", True)
+    monkeypatch.setattr(config, "v2_fill_entry_delay_seconds", 0.)
+    monkeypatch.setattr(post, "_detect_onset_peaks",
+                        lambda path: (np.asarray([2.5, 4., 6.]), np.asarray([.9, .3, .8])))
+    # if coverage ran before the final alignment the insert would be moved too
+    monkeypatch.setattr(post, "align_beats_on_bpm", lambda times, bpm: np.asarray(times) + .01)
+    candidates, report = post.postprocess_timing(song, beats([1., 2.45, 5., 9.], [1, 1, 1, 1]),
+                                                 "unused.egg")
+    # events moved +.01 by the alignment, but the 2.5 onset is still covered;
+    # 4.0 filtered by the strength quantile; 6.0 inserted un-moved (post-alignment)
+    assert [item["time"] for item in candidates] == pytest.approx([1.02, 2.47, 5.02, 6., 9.02])
+    assert report["onset_coverage_added"] == 1
+    assert any(op["stage"] == "onset_coverage" for op in report["operations"])
+
+
+def test_onset_coverage_respects_entry_gate_and_silence(song, timing_defaults, monkeypatch):
+    monkeypatch.setattr(config, "v2_onset_fill_flag", True)
+    monkeypatch.setattr(post, "_detect_onset_peaks",
+                        lambda path: (np.asarray([6.]), np.asarray([.9])))
+    monkeypatch.setattr(config, "v2_fill_entry_delay_seconds", 10.)
+    candidates, report = post.postprocess_timing(song, beats([1., 5., 9.], [1, 1, 1]),
+                                                 "unused.egg", skip=("bpm_alignment",))
+    assert [item["time"] for item in candidates] == pytest.approx([1., 5., 9.])
+    assert report["onset_coverage_added"] == 0
+
+    monkeypatch.setattr(config, "v2_fill_entry_delay_seconds", 0.)
+    monkeypatch.setattr(config, "add_silence_flag", True)
+    monkeypatch.setattr(post, "_legacy_timing_features",
+                        lambda _: (np.zeros((100, 24)), np.zeros((100, 24)), np.asarray([6.])))
+    candidates, report = post.postprocess_timing(song, beats([1., 5., 9.], [1, 1, 1]),
+                                                 "unused.egg", skip=("bpm_alignment",))
+    assert [item["time"] for item in candidates] == pytest.approx([1., 5., 9.])
+    assert report["onset_coverage_added"] == 0
+
+
+def test_onset_coverage_flag_off_and_skippable(song, timing_defaults, monkeypatch):
+    called = []
+    monkeypatch.setattr(post, "_detect_onset_peaks",
+                        lambda path: called.append(1) or (np.asarray([6.]), np.asarray([.9])))
+    candidates, _ = post.postprocess_timing(song, beats([1., 5., 9.], [1, 1, 1]),
+                                            "unused.egg", skip=("bpm_alignment",))
+    assert not called  # fixture pins v2_onset_fill_flag off
+    monkeypatch.setattr(config, "v2_onset_fill_flag", True)
+    candidates, _ = post.postprocess_timing(song, beats([1., 5., 9.], [1, 1, 1]),
+                                            "unused.egg",
+                                            skip=("bpm_alignment", "onset_coverage"))
+    assert not called

@@ -285,6 +285,40 @@ v2_gap_fill_v1_bundle = "fav_15" # experimental: v1 beat-TCN bundle supplying th
                                  # "v1_beat" source — its K.clear_session() inside a
                                  # cached-predictor worker was never exercised live
 
+# Detected-tempo octave repair (2026-11-06, v2 only): the whole-song pulse
+# tracker favours subdivisions, so detections far above the genre's beat
+# range (e.g. ~310 BPM for a ~155 track) arrive doubled and every
+# beat-relative stage — entry pauses, bpm alignment/grid fills, calm pulses,
+# the exported BPM field — runs at half real-time. An auto-detected BPM at or
+# above v2_bpm_octave_min_bpm is halved while the onset autocorrelation
+# supports it (ac(2T) > ac(T)) and no energy sits at the doubled rate
+# (ac(T/2) below v2_bpm_octave_subbeat_max — the veto that keeps genuinely
+# fast songs like 191 BPM intact). Manual BPM input is never corrected.
+v2_bpm_octave_correct = True      # halve clearly-doubled auto-detected tempos
+v2_bpm_octave_min_bpm = 180.      # only check detections at/above this BPM
+v2_bpm_octave_subbeat_max = 0.15  # veto: halving requires ac(T/2) below this
+v2_bpm_octave_min_result = 90.    # never correct below this BPM
+
+# Fill interval floor (2026-11-06): inserted candidates (subdivision,
+# start/end, gap-net and onset-coverage fills) keep this minimum spacing from
+# existing and already-accepted times, so fills cannot create unplayable
+# streams the speed cap then has to cull in bulk. The floor scales down with
+# difficulty — effective = base * ref_nps / nps clamped to [min_seconds,
+# base]: nps 5 -> 0.09 s, nps 10 -> 0.045 s, nps 20 -> min_seconds.
+v2_fill_min_interval_seconds = 0.09     # fill spacing floor at the reference NPS; 0 disables
+v2_fill_min_interval_nps = 5.0          # NPS the base floor is calibrated for
+v2_fill_min_interval_min_seconds = .035 # hard lower bound for high-NPS maps
+
+# Missed-onset coverage (2026-11-06): the timing model sometimes stays silent
+# on audible hits. Detected onsets stronger than the quantile share of all
+# detected onsets and farther than v2_onset_fill_window_seconds from every
+# candidate are appended as events (count from the model's own frame
+# probabilities), still respecting entry gates, detected silence and the
+# fill floor. Runs after the final bpm alignment so inserts stay on the onset.
+v2_onset_fill_flag = True             # insert candidates at strong uncovered onsets
+v2_onset_fill_window_seconds = .12    # onset is "covered" by an event inside +- this (s)
+v2_onset_fill_strength_quantile = .5  # keep onsets at/above this envelope-strength quantile
+
 add_waveform_pattern_flag = 0   # [0: off, 1: on, 2: double on]
 waveform_pattern = [
     [0, 1, 2, 3, 2, 1],

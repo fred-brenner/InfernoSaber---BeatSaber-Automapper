@@ -438,6 +438,7 @@ def generate(song, requested_nps, predictors, encoder, settings, vocabularies, *
     result = PipelineResult(status, {key: [] for key in ("notes", "chains", "walls", "bombs", "arcs", "lighting")},
                             diagnostics={"requested_retained_nps": float(requested_nps),
                                          "duration_seconds": duration, "bpm": bpm,
+                                         "bpm_detected": float(song.metadata.get("bpm_detected", bpm)),
                                          "rejected_expansions": [], "export_ready": False,
                                          "random_factor": factor, "note_sample_temperature": temperature,
                                          "scheduler": deepcopy(schedule)})

@@ -124,3 +124,49 @@ def test_cli_prints_scalar_bpm_and_filename(click_file):
     measured, filename = result.stdout.strip().split(maxsplit=1)
     assert_equivalent_tempo(float(measured), 127.3)
     assert filename == str(path)
+
+
+def _inject_envelope(monkeypatch, envelope):
+    """Feed ``octave_corrected_bpm`` a synthetic onset envelope (43 fps frames)."""
+    monkeypatch.setattr(find_bpm.librosa, "load", lambda *a, **k: (None, 22050))
+    monkeypatch.setattr(find_bpm.librosa.onset, "onset_strength",
+                        lambda **kwargs: np.asarray(envelope, np.float64))
+
+
+def test_octave_correction_halves_doubled_detection(monkeypatch):
+    # period-16 frames (~372 ms, true ~161 BPM): strong beats plus weak
+    # half-grid onsets — a doubled 310 BPM reading sees ac(2T)>ac(T), no T/2
+    envelope = np.zeros(1300)
+    envelope[::16] = 1.
+    envelope[8::16] = .3
+    _inject_envelope(monkeypatch, envelope)
+    assert find_bpm.octave_corrected_bpm("unused.wav", 310.) == pytest.approx(155.)
+    # and a second halving stops once T/2 holds the former-T energy
+    envelope2 = np.zeros(1300)
+    envelope2[::16] = 1.
+    _inject_envelope(monkeypatch, envelope2)
+    assert find_bpm.octave_corrected_bpm("unused.wav", 310.) == pytest.approx(155.)
+
+
+def test_octave_correction_vetoes_doubled_rate_energy(monkeypatch):
+    # same doubled signature plus genuine quarter-grid energy — the veto keeps
+    # the detected tempo (the correct fast songs show exactly this)
+    envelope = np.zeros(1300)
+    envelope[::16] = 1.
+    envelope[8::16] = .3
+    envelope[4::8] = .7
+    _inject_envelope(monkeypatch, envelope)
+    assert find_bpm.octave_corrected_bpm("unused.wav", 310.) == 310.
+
+
+def test_octave_correction_respects_gates(monkeypatch):
+    called = []
+    monkeypatch.setattr(find_bpm.librosa, "load",
+                        lambda *a, **k: called.append(1) or (None, 22050))
+    # below the check threshold the detection passes through, audio untouched
+    assert find_bpm.octave_corrected_bpm("unused.wav", 150., min_bpm=180.) == 150.
+    assert not called
+    # a halving that would land below the result floor never runs either
+    assert find_bpm.octave_corrected_bpm("unused.wav", 170., min_bpm=100.,
+                                         min_result=100.) == 170.
+    assert not called

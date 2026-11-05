@@ -79,6 +79,46 @@ def get_file_bpm(path, params=None):
     return [bpm, total_frames / samplerate]
 
 
+def octave_corrected_bpm(path, bpm, min_bpm=180., subbeat_max=.15, min_result=90.):
+    """Halve a detected tempo while onset periodicity marks it doubled.
+
+    The whole-song pulse estimate favours subdivisions: a doubled detection
+    shows stronger onset autocorrelation at twice its period (the real beat)
+    and little at half its period (no energy at the doubled rate). The
+    ``subbeat_max`` veto keeps genuinely fast songs intact — a correct tempo
+    still has subdivision energy at T/2. Returns the possibly-halved BPM;
+    detections below ``min_bpm`` or failing the checks pass through. Callers
+    decide scope — v2 applies this to auto-detected tempo only.
+    """
+    bpm = float(bpm)
+    if not np.isfinite(bpm) or bpm < min_bpm or bpm / 2 < min_result:
+        return bpm
+    audio, rate = librosa.load(str(path), sr=22050, mono=True)
+    envelope = librosa.onset.onset_strength(y=audio, sr=rate, hop_length=512)
+    if not np.any(envelope):
+        return bpm
+    corr = np.correlate(envelope - envelope.mean(), envelope - envelope.mean(),
+                        "full")[len(envelope) - 1:]
+    if corr[0] <= 0:
+        return bpm
+    corr /= corr[0]
+    fps = rate / 512
+
+    def support(seconds):
+        """Peak autocorrelation within +-10% of the given lag in seconds."""
+        lag = seconds * fps
+        lo, hi = max(1, int(lag * .9)), min(len(corr), int(lag * 1.1) + 1)
+        return float(corr[lo:hi].max()) if hi > lo else 0.
+
+    corrected = bpm
+    while corrected >= min_bpm and corrected / 2 >= min_result:
+        period = 60. / corrected
+        if support(2 * period) <= support(period) or support(period / 2) >= subbeat_max:
+            break
+        corrected /= 2
+    return corrected
+
+
 if __name__ == '__main__':
     import argparse
 

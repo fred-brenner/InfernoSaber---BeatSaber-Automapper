@@ -55,9 +55,10 @@ def _generate(monkeypatch, snap_enabled):
     # snap assertions (zones are covered in test_v2_generation_postprocessing).
     monkeypatch.setattr(config, "v2_map_intro_no_notes_seconds", 0.)
     monkeypatch.setattr(config, "v2_map_intro_no_hazards_seconds", 0.)
-    # The dense onset grid below would also feed the max-gap fill; the note
-    # snap tests assert per-note moves on the sparse fixture only.
+    # The dense onset grid below would also feed the max-gap fill and onset
+    # coverage; the note snap tests assert per-note moves on the sparse fixture.
     monkeypatch.setattr(config, "v2_max_note_gap_seconds", 0.)
+    monkeypatch.setattr(config, "v2_onset_fill_flag", False)
     # Real postprocess_* run (postprocessors=None); only the audio externals are
     # stubbed — the onset detector itself is patched to a dense 20 ms grid.
     monkeypatch.setattr(v2_postprocessing, "sanity_check_timing2",
