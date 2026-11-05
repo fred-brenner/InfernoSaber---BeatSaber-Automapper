@@ -270,6 +270,43 @@ def test_onset_snap_non_silent_ignores_fill_silence_gate(song, timing_defaults, 
     assert [item["time"] for item in candidates] == [1.02, 8.01]
 
 
+def test_onset_snap_unmatched_never_restores_inside_silence(song, timing_defaults, monkeypatch):
+    # "never" restores the unmatched event even inside a detected silent
+    # span; 4.54 sits in a merged-span hole so silence_removal cannot cull
+    # it downstream — same fixture as the non_silent drop test above
+    monkeypatch.setattr(config, "add_silence_flag", True)
+    monkeypatch.setattr(config, "v2_onset_snap_unmatched_policy", "never")
+    monkeypatch.setattr(config, "v2_max_note_gap_seconds", 0.)  # isolate the snap policy
+    hop = config.hop_size / config.samplerate_music
+    frames = np.asarray([4.0 + i * hop for i in range(15)]
+                        + [4.0 + (17 + i) * hop for i in range(15)])  # 3*hop hole ~4.5
+    monkeypatch.setattr(post, "_legacy_timing_features",
+                        lambda _: (np.zeros((100, 24)), np.zeros((100, 24)), frames))
+    monkeypatch.setattr(post, "sanity_check_timing2", lambda _, times, **kw: np.asarray([1.02, 0., 8.01]))
+    candidates, _ = post.postprocess_timing(song, beats([1., 4.54, 8.], [1, 1, 1]),
+                                            "unused.egg", skip=("bpm_alignment",))
+    assert [item["time"] for item in candidates] == [1.02, 4.54, 8.01]
+
+
+def test_fill_silence_gate_off_never_decodes_silence(song, timing_defaults, monkeypatch):
+    # fills under respect=False must not burn the legacy decode: the cached
+    # detection stays empty until a gated-or-forced call asks for it
+    monkeypatch.setattr(config, "add_silence_flag", True)
+    monkeypatch.setattr(config, "v2_fill_respect_silence", False)
+    monkeypatch.setattr(config, "v2_onset_snap_unmatched_policy", "always")
+    monkeypatch.setattr(config, "map_filler_iters", 1)
+    monkeypatch.setattr(config, "max_speed", 40.)
+    monkeypatch.setattr(config, "v2_max_note_gap_seconds", 0.)
+    monkeypatch.setattr(post, "_legacy_timing_features",
+                        lambda _: pytest.fail("fills-only respect=False must not decode"))
+    insert = np.asarray([1., 4.15, 6., 9.])
+    monkeypatch.setattr(post, "fill_map_times_scale", lambda times, idx: insert)
+    candidates, _ = post.postprocess_timing(song, beats([1., 6., 9.], [1, 1, 1]),
+                                            "unused.egg",
+                                            skip=("bpm_alignment", "silence_removal", "start_end_fill"))
+    assert [item["time"] for item in candidates] == [1., 4.15, 6., 9.]
+
+
 def test_max_gap_fill_inserts_onset_times(song, timing_defaults, monkeypatch):
     monkeypatch.setattr(config, "v2_max_note_gap_seconds", 4.0)
     monkeypatch.setattr(config, "v2_gap_fill_edge_seconds", 0.5)
@@ -323,6 +360,58 @@ def test_gap_fill_v1_beat_falls_back_to_onsets(song, timing_defaults, monkeypatc
                                                  "unused.egg", skip=("bpm_alignment",))
     assert [item["time"] for item in candidates] == [1., 4., 8.]
     assert report.get("gap_fill_source_used") == "onsets"  # fallback recorded
+
+
+def test_max_gap_fill_never_refills_detected_silence(song, timing_defaults, monkeypatch):
+    # the fill-respect flag scopes to subdivision fills: the net must stay
+    # out of detected silence even with v2_fill_respect_silence=False, or it
+    # would refill spans silence_removal just emptied (it runs earlier)
+    monkeypatch.setattr(config, "add_silence_flag", True)
+    monkeypatch.setattr(config, "v2_fill_respect_silence", False)
+    monkeypatch.setattr(config, "v2_max_note_gap_seconds", 4.0)
+    monkeypatch.setattr(config, "v2_gap_fill_edge_seconds", 0.5)
+    frames = np.asarray([3. + i * (config.hop_size / config.samplerate_music) for i in range(30)])
+    monkeypatch.setattr(post, "_legacy_timing_features",
+                        lambda _: (np.zeros((100, 24)), np.zeros((100, 24)), frames))
+    monkeypatch.setattr(post, "_detect_onsets", lambda _: np.asarray([2., 3.5, 7.8]))
+    candidates, _ = post.postprocess_timing(song, beats([1., 9.], [1, 1]),
+                                            "unused.egg", skip=("bpm_alignment",))
+    # interior (1.5, 8.5): 3.5 sits inside the detected span -> skipped
+    assert [item["time"] for item in candidates] == [1., 2., 7.8, 9.]
+
+
+def test_max_gap_fill_unknown_source_raises_before_any_gap(song, timing_defaults, monkeypatch):
+    # eager validation: a bogus source raises even when no dead zone exists
+    monkeypatch.setattr(config, "v2_max_note_gap_seconds", 4.0)
+    monkeypatch.setattr(config, "v2_gap_fill_source", "bogus")
+    with pytest.raises(ValueError, match="v2_gap_fill_source"):
+        post.postprocess_timing(song, beats([1., 2.], [1, 1]), "unused.egg",
+                                skip=("bpm_alignment",))
+
+
+def test_max_gap_fill_requires_audio_unless_bpm_grid(song, timing_defaults, monkeypatch):
+    # production always resolves an audio path; without one only the bpm
+    # lattice can still fill (it decodes nothing)
+    monkeypatch.setattr(config, "v2_max_note_gap_seconds", 4.0)
+    with pytest.raises(ValueError, match="audio_path"):
+        post.postprocess_timing(song, beats([1., 8.], [1, 1]), None,
+                                skip=("bpm_alignment",))
+    monkeypatch.setattr(config, "v2_gap_fill_source", "bpm_grid")
+    candidates, _ = post.postprocess_timing(song, beats([1., 8.], [1, 1]), None,
+                                            skip=("bpm_alignment",))
+    assert [item["time"] for item in candidates] == [1., 2., 2.5, 3., 3.5, 4., 4.5, 5., 5.5, 6., 6.5, 7., 8.]
+
+
+def test_max_gap_fill_edge_floors_at_min_beat_time(song, timing_defaults, monkeypatch):
+    # the edge alone keeps inserts min_beat_time off the bounding events:
+    # values below it (incl. negative) clamp up to the spacing floor
+    monkeypatch.setattr(config, "v2_max_note_gap_seconds", 4.0)
+    monkeypatch.setattr(config, "v2_gap_fill_edge_seconds", -1.)
+    monkeypatch.setattr(post, "_detect_onsets", lambda _: np.asarray([1.04, 2., 7.9]))
+    candidates, _ = post.postprocess_timing(song, beats([1., 8.], [1, 1]),
+                                            "unused.egg", skip=("bpm_alignment",))
+    # interior (1.0625, 7.9375): 1.04 is too close to the bound, 7.9 kept
+    assert [item["time"] for item in candidates] == [1., 2., 7.9, 8.]
 
 
 def test_training_first_cut_selects_anchor_after_heuristic_cleanup(monkeypatch):

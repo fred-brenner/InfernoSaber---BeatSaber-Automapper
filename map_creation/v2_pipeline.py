@@ -66,6 +66,10 @@ def infer_beats(song, requested_nps, predictors, batch_size=8, intensity=None):
     """Batch independent timing windows without reading any target arrays."""
     if isinstance(batch_size, bool) or not isinstance(batch_size, int) or batch_size < 1:
         raise ValueError("V2 timing batch size must be a positive integer")
+    bias = getattr(config, "v2_timing_event_bias", 0.)
+    if (isinstance(bias, (bool, np.bool_)) or not isinstance(bias, Real)
+            or not np.isfinite(bias) or not 0 <= bias < 1):
+        raise ValueError("v2_timing_event_bias must be a finite numeric value within [0, 1)")
     bins, frames = len(song.arrays["bin_durations"]), len(song.arrays["frame_times"])
     started = perf_counter()
     if intensity is None:
@@ -88,10 +92,6 @@ def infer_beats(song, requested_nps, predictors, batch_size=8, intensity=None):
             for row, start in enumerate(selected):
                 valid = min(CORE, frames - start)
                 probabilities[start:start + valid] = output[row, :valid]
-    bias = getattr(config, "v2_timing_event_bias", 0.)
-    if (isinstance(bias, (bool, np.bool_)) or not isinstance(bias, Real)
-            or not np.isfinite(bias) or not 0 <= bias < 1):
-        raise ValueError("v2_timing_event_bias must be a finite numeric value within [0, 1)")
     counts = (probabilities + [0, bias, bias]).argmax(axis=-1).astype(np.int32)
     event_frames = np.flatnonzero(counts)
     return {"raw_intensity": raw_shares.copy(), "intensity": shares, "conditioning_nps": conditioning_nps,

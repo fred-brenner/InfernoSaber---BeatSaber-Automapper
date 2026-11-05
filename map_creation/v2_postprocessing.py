@@ -175,9 +175,11 @@ def postprocess_timing(song, beats, audio_path, logger=None, skip=()):
     ``start_end_fill``, ``silence_removal``, ``density_fill``,
     ``max_gap_fill`` (the one ``bpm_alignment`` name covers the bookending
     initial/final alignments). Subdivision fills keep insertions out of
-    post-entry ramp windows and detected silent spans; unmatched onset-snap
-    events follow ``v2_onset_snap_unmatched_policy``; ``max_gap_fill``
-    backstops any remaining dead zone from ``v2_gap_fill_source``.
+    post-entry ramp windows and — gated by ``v2_fill_respect_silence`` —
+    detected silent spans; unmatched onset-snap events follow
+    ``v2_onset_snap_unmatched_policy``; ``max_gap_fill`` backstops any
+    remaining dead zone from ``v2_gap_fill_source``, always keeping inserts
+    out of detected silent spans (independent of the fill gate).
 
     ``skip`` names steps from ``_TIMING_STEPS`` to omit for controlled
     comparisons. Legacy audio features are decoded lazily — skipping every
@@ -261,6 +263,7 @@ def postprocess_timing(song, beats, audio_path, logger=None, skip=()):
     def fill_blocked():
         pause = float(getattr(config, "v2_fill_entry_pause_beats", 4.0) or 0.) * 60. / bpm
         delay = float(getattr(config, "v2_fill_entry_delay_seconds", 0.) or 0.)
+        # pause <= 0 disables pause detection: only the map start is an entry
         entries = _section_entries(times(), pause) if pause > 0 else np.asarray([times()[0]])
         return _blocked_intervals(entries, delay)
 
@@ -273,12 +276,17 @@ def postprocess_timing(song, beats, audio_path, logger=None, skip=()):
         The cached detection keys on ``add_silence_flag`` alone so call order
         cannot leak the gate state; ``v2_fill_respect_silence`` applies per
         call. ``force`` bypasses that fill gate — the onset-snap unmatched
-        policy must still cull events inside detected silence."""
+        policy and the max-gap net must still cull events inside detected
+        silence. ``detected_silence`` stays undecoded until a gated or forced
+        call, so fills alone under ``v2_fill_respect_silence=False`` never
+        trigger the legacy decode."""
         nonlocal detected_silence
+        if not force and not config.v2_fill_respect_silence:
+            return []
         if detected_silence is None:
             detected_silence = (_silent_spans(legacy_features()[2])
                                 if config.add_silence_flag else [])
-        return detected_silence if force or config.v2_fill_respect_silence else []
+        return detected_silence
 
     iterations = max(0, int(config.map_filler_iters))
     if "high_difficulty_fill" not in skip:
@@ -291,10 +299,10 @@ def postprocess_timing(song, beats, audio_path, logger=None, skip=()):
     if candidates and align:
         replace_times("initial_bpm_alignment", align_beats_on_bpm(times(), bpm), moving=True)
     if candidates and "onset_snap" not in skip:
-        snapped = sanity_check_timing2(None, times(), audio_path=audio_path)
         policy = getattr(config, "v2_onset_snap_unmatched_policy", "always")
         if policy not in ("always", "non_silent", "never"):
             raise ValueError(f"Unknown v2_onset_snap_unmatched_policy: {policy!r}")
+        snapped = sanity_check_timing2(None, times(), audio_path=audio_path)
         if policy != "always":
             spans = silent_spans(force=True) if policy == "non_silent" else ()
             snapped = np.asarray([original if marker <= 0 and (policy == "never" or not _inside_spans(original, spans))
@@ -317,8 +325,14 @@ def postprocess_timing(song, beats, audio_path, logger=None, skip=()):
     if candidates and "max_gap_fill" not in skip:
         max_gap = float(getattr(config, "v2_max_note_gap_seconds", 0.) or 0.)
         if max_gap > 0:
-            edge = float(getattr(config, "v2_gap_fill_edge_seconds", .5) or 0.)
             source = getattr(config, "v2_gap_fill_source", "onsets")
+            if source not in ("onsets", "bpm_grid", "v1_beat"):
+                raise ValueError(f"Unknown v2_gap_fill_source: {source!r}")
+            if audio_path is None and source != "bpm_grid":
+                raise ValueError(f"v2_gap_fill_source {source!r} requires an audio_path")
+            # the edge alone keeps inserts min_beat_time off the bounding events
+            edge = max(float(getattr(config, "v2_gap_fill_edge_seconds", .5) or 0.),
+                       config.min_beat_time)
             current, inserted, pool, spans = times(), [], None, ()
             for a, b in zip(current, current[1:]):
                 if b - a <= max_gap:
@@ -328,7 +342,8 @@ def postprocess_timing(song, beats, audio_path, logger=None, skip=()):
                     used = {"source": source}
                     pool = _gap_candidate_times(source, audio_path, bpm, duration, used)
                     gap_fill_source_used = used["source"]
-                    spans = silent_spans()
+                    # detected silence is a detection property, not a fill gate
+                    spans = silent_spans(force=True)
                 for t in pool[(pool > a + edge) & (pool < b - edge)]:
                     if _inside_spans(t, spans) or (inserted and t - inserted[-1] < config.min_beat_time):
                         continue
