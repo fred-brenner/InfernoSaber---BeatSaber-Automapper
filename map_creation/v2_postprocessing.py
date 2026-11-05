@@ -1075,15 +1075,19 @@ def apply_fast_direction_rules(notes, rng=None, logger=None):
     disables both rules) is a fast pair; runs extend transitively through
     consecutive fast pairs. Inside a run, each note's allowed direction set is
     its predecessor's direction plus the 180° reverse, union the ±45°
-    neighbours admitted per note with probability
-    ``min(1, expected / local)`` — ``expected`` is the mean ``calc_note_speed``
-    over *every* same-hand pair in the map (the per-map average at this NPS)
-    and ``local`` the pair's own cost, so a pair moving at the map average
-    keeps ±45° almost always while an extreme burst converges to strict
-    ping-pong. A note outside its set is recut to an allowed direction that
-    stays ``_flow_legal`` against both same-hand neighbours and
-    ``_swing_clear`` of simultaneous other-hand cells; when nothing is legal
-    the note keeps its direction (legality-first, like the diagonal cap).
+    family admitted per note with probability
+    ``min(1, expected / local)`` — the reverse's own ±45° neighbours (the
+    135°/225° off-reversals, the only ±45° cuts ``_flow_legal`` admits
+    between separated strokes) plus the predecessor's ±45° neighbours,
+    which only same-stroke pairs can play. ``expected`` is the mean
+    ``calc_note_speed`` over *every* same-hand pair in the map (the per-map
+    average at this NPS) and ``local`` the pair's own cost, so a pair moving
+    at the map average keeps the ±45° family almost always while an
+    extreme burst converges to strict ping-pong. A note outside its set is
+    recut to an allowed direction that stays ``_flow_legal`` against both
+    same-hand neighbours and ``_swing_clear`` of simultaneous other-hand
+    cells; when nothing is legal the note keeps its direction
+    (legality-first, like the diagonal cap).
     With ``v2_fast_counter_direction = "recut"`` ("off"/"keep" disables), run
     members whose cut opposes their row (top-row down-family d 1/6/7,
     bottom-row up-family d 0/4/5) are recut first — preferring the allowed
@@ -1132,8 +1136,8 @@ def apply_fast_direction_rules(notes, rng=None, logger=None):
                 allowed = {pred_d, _REVERSE_DIRECTION[pred_d]}
                 if rng.uniform() < (min(1., expected / local) if local > 0 else 1.):
                     angle = _DIRECTION_ANGLE[pred_d]
-                    allowed |= {_ANGLE_DIRECTION[(angle - 1) % 8],
-                                _ANGLE_DIRECTION[(angle + 1) % 8]}
+                    allowed |= {_ANGLE_DIRECTION[(angle + step) % 8]
+                                for step in (-1, 1, 3, 5)}
             counter = (counter_mode and note["id"] in runs
                        and note["d"] in _COUNTER_FAMILY.get(y, ()))
             if counter or (allowed is not None and note["d"] != 8

@@ -198,7 +198,11 @@ v2_fast_gap_seconds = .2           # same-hand gap below which consecutive notes
                                    # fast run: each note's direction is restricted to
                                    # its predecessor's, the 180° reverse and (admitted
                                    # at min(1, expected/local pair speed)) the ±45°
-                                   # neighbours; <= 0 disables both fast rules
+                                   # family — the reverse's own ±45° neighbours (the
+                                   # 135°/225° off-reversals, the only ±45° cuts legal
+                                   # between separated strokes) plus the predecessor's
+                                   # ±45° neighbours for same-stroke pairs;
+                                   # <= 0 disables both fast rules
 v2_fast_counter_direction = "recut"  # inside fast runs, recut cuts opposing their row
                                    # first (top-row down-family 1/6/7, bottom-row
                                    # up-family 0/4/5), preferring the allowed pool;

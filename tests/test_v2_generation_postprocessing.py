@@ -1151,15 +1151,42 @@ def fast_defaults(monkeypatch):
 
 
 def test_fast_run_collapses_to_ping_pong(fast_defaults):
-    # .15 s same-hand chain: every direction is >=135°-legal input but outside
-    # the ping-pong set; each recut lands on the predecessor's 180° reverse
+    # .15 s same-hand chain with the ±45° draw denied: every direction is
+    # >=135°-legal input but outside {pred, REVERSE(pred)}; each recut lands
+    # on the predecessor's 180° reverse
     notes = [note(0, 1.0, x=0, y=1, direction=1),
              note(1, 1.15, x=1, y=1, direction=5),
              note(2, 1.30, x=2, y=1, direction=6),
              note(3, 1.45, x=3, y=1, direction=5)]
-    stats = post.apply_fast_direction_rules(notes, rng=np.random.default_rng(0))
+    stats = post.apply_fast_direction_rules(notes, rng=SimpleNamespace(uniform=lambda: 1.))
     assert [item["d"] for item in notes] == [1, 0, 1, 0]
     assert stats["fast_pairs"] == 3 and stats["fast_simplified"] == 3
+
+
+def test_fast_run_admitted_draw_keeps_off_reversals(fast_defaults):
+    # same chain with the ±45° draw admitted: 5 after 1 and 6 after 5 are
+    # legal off-reversals (135°/225°) inside the widened set -> kept, while a
+    # cut outside the set (4 is +90° from 5) still recuts into the reversal
+    # family {REVERSE, REVERSE±45°}
+    notes = [note(0, 1.0, x=0, y=1, direction=1),
+             note(1, 1.15, x=1, y=1, direction=5),
+             note(2, 1.30, x=2, y=1, direction=6),
+             note(3, 1.45, x=3, y=1, direction=5)]
+    stats = post.apply_fast_direction_rules(notes, rng=SimpleNamespace(uniform=lambda: 0.))
+    assert [item["d"] for item in notes] == [1, 5, 6, 5]
+    assert stats["fast_pairs"] == 3 and stats["fast_simplified"] == 0
+
+    notes = [note(0, 1.0, x=0, y=1, direction=1),
+             note(1, 1.15, x=1, y=1, direction=5),
+             note(2, 1.30, x=2, y=1, direction=4)]
+    stats = post.apply_fast_direction_rules(notes, rng=SimpleNamespace(uniform=lambda: 0.))
+    reverse = post._REVERSE_DIRECTION[5]
+    angle = post._DIRECTION_ANGLE[reverse]
+    family = {reverse, post._ANGLE_DIRECTION[(angle - 1) % 8],
+              post._ANGLE_DIRECTION[(angle + 1) % 8]}
+    assert notes[1]["d"] == 5
+    assert notes[2]["d"] in family
+    assert stats["fast_simplified"] == 1
 
 
 def test_fast_run_slow_pairs_untouched(fast_defaults):
@@ -1198,6 +1225,21 @@ def test_fast_run_denies_45_at_extreme_local_speed(fast_defaults):
     notes = build()
     post.apply_fast_direction_rules(notes, rng=SimpleNamespace(uniform=lambda: .01))
     assert notes[1]["d"] == 4
+
+
+def test_fast_run_off_reversal_reachable_for_separated_pair(fast_defaults):
+    # .15 s sits between same_dir_gap (.1) and fast_gap (.2): the pair no
+    # longer shares a stroke, so _flow_legal demands >=135° and only the
+    # reversal cone can ever be legal — the admitted ±45° draw is what makes
+    # an off-reversal cut reachable here at all
+    build = lambda: [note(0, 1.0, x=0, y=1, direction=1),
+                     note(1, 1.15, x=1, y=1, direction=5)]
+    notes = build()
+    post.apply_fast_direction_rules(notes, rng=SimpleNamespace(uniform=lambda: 0.))
+    assert notes[1]["d"] == 5   # 135° off-reversal of the down cut: kept
+    notes = build()
+    post.apply_fast_direction_rules(notes, rng=SimpleNamespace(uniform=lambda: 1.))
+    assert notes[1]["d"] == 0   # denied draw collapses to the 180° reverse
 
 
 def test_fast_run_counter_direction_recut(fast_defaults):
@@ -1239,25 +1281,27 @@ def test_fast_run_disabled_at_zero_gap(fast_defaults, monkeypatch):
 
 
 def test_fast_run_keeps_direction_when_no_legal_candidate(fast_defaults):
-    # note1's only allowed recut (up) would sit 90° from note2's right cut and
-    # note2's (down-right) 90° from note3's down-left cut, so both keep their
-    # chaotic-but-legal directions; note3 recuts to the reverse of right
+    # denied ±45° draw: note1's only allowed recut (up) would sit 90° from
+    # note2's right cut and note2's (down-right) 90° from note3's down-left
+    # cut, so both keep their chaotic-but-legal directions; note3 recuts to
+    # the reverse of right
     notes = [note(0, 1.0, x=0, y=1, direction=1),
              note(1, 1.15, x=1, y=1, direction=4),
              note(2, 1.30, x=2, y=1, direction=3),
              note(3, 1.45, x=3, y=1, direction=6)]
-    stats = post.apply_fast_direction_rules(notes, rng=np.random.default_rng(0))
+    stats = post.apply_fast_direction_rules(notes, rng=SimpleNamespace(uniform=lambda: 1.))
     assert [item["d"] for item in notes] == [1, 4, 3, 2]
     assert stats["fast_pairs"] == 3 and stats["fast_simplified"] == 1
 
 
 def test_fast_run_dot_predecessor_feeds_implied_direction(fast_defaults):
     # a dot after a right cut on the opposite side inherits the left reversal;
-    # the chaotic successor is recut against left's allowed set
+    # with the ±45° draw denied the chaotic successor is recut against left's
+    # allowed set
     notes = [note(0, 1.0, x=3, y=1, direction=3),
              note(1, 1.1, x=0, y=1, direction=8),
              note(2, 1.25, x=2, y=1, direction=5)]
-    stats = post.apply_fast_direction_rules(notes, rng=np.random.default_rng(0))
+    stats = post.apply_fast_direction_rules(notes, rng=SimpleNamespace(uniform=lambda: 1.))
     assert [item["d"] for item in notes] == [3, 8, 3]
     assert stats["fast_simplified"] == 1
 
