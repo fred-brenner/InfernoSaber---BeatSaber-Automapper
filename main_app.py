@@ -18,11 +18,15 @@ from app_helper.update_dir_path import update_dir_path
 # from main import main
 from main_multi import main_multi_par
 from tools.config import paths, config
+from tools.config.mapper_selection import update_model_file_paths
+from map_creation.v1_generation import V1_MAPPER_SELECTIONS, ensure_v1_bundle
 from map_creation.v2_runtime import validate_production_bundle
 
 data_folder_name = 'Data'
 bs_folder_name = "Beat Saber_Data/CustomLevels"
 bs_folder_name2 = "SharedMaps/CustomLevels"
+
+MAPPER_CHOICES = ["v2_expert", *V1_MAPPER_SELECTIONS]
 
 update_check_response = None
 
@@ -310,12 +314,22 @@ def run_process(num_workers, use_model, diff1, diff2, diff3, diff4, diff5):
         time.sleep(1)
         return
 
-    config.use_mapper_selection = "v2_expert"
-    progress_log = ["Checking local v2_expert bundle and retained v1 lighting"]
+    selection = use_model or "v2_expert"
+    config.use_mapper_selection = selection
+    if selection == "v2_expert":
+        progress_log = ["Checking local v2_expert bundle and retained v1 lighting"]
+    else:
+        progress_log = [f"Downloading/validating model: {selection}"]
     log_queue = queue.Queue()
     yield "\n".join(progress_log)
     try:
-        validate_production_bundle()
+        if selection == "v2_expert":
+            # Repoint model paths for this selection; the bundle check below
+            # is the real v2 validation (no legacy tf_* files at bundle root).
+            update_model_file_paths(check_model_exists=False)
+            validate_production_bundle()
+        else:
+            ensure_v1_bundle(selection)
     except Exception as error:
         yield f"Error: {type(error).__name__}: {error}"
         return
@@ -337,7 +351,8 @@ def run_process(num_workers, use_model, diff1, diff2, diff3, diff4, diff5):
     def generate():
         try:
             outcome["report"] = main_multi_par(
-                int(num_workers), diff, export_results_to_bs, logger_callback)
+                int(num_workers), diff, export_results_to_bs, logger_callback,
+                model_selection=use_model)
         except Exception as error:
             outcome["error"] = f"{type(error).__name__}: {error}"
             logger_callback(f"Error: {outcome['error']}")
@@ -680,9 +695,9 @@ def build_app(check_updates=True):
                     # Dropdown Menu for Model Selection
                     gr.Markdown("### Model Selection")
                     model_selector = gr.Dropdown(
-                        choices=["v2_expert"],
-                        label="Model", value="v2_expert", interactive=False,
-                        info="Local v2 inference bundle. Configure v2_model_bundle_path in config.py."
+                        choices=MAPPER_CHOICES,
+                        label="Model", value="v2_expert", interactive=True,
+                        info="v2_expert is the current production model; the rest are legacy v1 presets kept for comparison"
                     )
 
                 with gr.Column():

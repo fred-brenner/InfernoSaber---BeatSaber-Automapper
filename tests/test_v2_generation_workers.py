@@ -146,9 +146,10 @@ def test_main_repeated_calls_restore_offsets_and_default_to_v2_expert(tmp_path, 
 def test_app_surfaces_worker_failures(monkeypatch):
     import main_app
     monkeypatch.setattr(main_app, 'get_summary', lambda *args: 'Ready')
+    monkeypatch.setattr(main_app, 'update_model_file_paths', lambda *args, **kwargs: None)
     monkeypatch.setattr(main_app, 'validate_production_bundle', lambda: {})
-    monkeypatch.setattr(main_app, 'main_multi_par', lambda *args: {'failures': [{'error': 'broken'}]})
-    result = list(main_app.run_process(2, 'fav_15', 3, 5, 0, 0, 0))
+    monkeypatch.setattr(main_app, 'main_multi_par', lambda *args, **kwargs: {'failures': [{'error': 'broken'}]})
+    result = list(main_app.run_process(2, 'v2_expert', 3, 5, 0, 0, 0))
     assert result[-1].endswith('Process failed: 1 failed variants/packages')
     assert 'successfully' not in result[-1]
 
