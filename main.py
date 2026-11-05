@@ -6,6 +6,7 @@ import time
 # import sys
 
 from tools.config import paths, config
+from map_creation.v1_generation import ensure_v1_bundle, generate_song_v1
 from map_creation.v2_generation import generate_song, scoped_settings
 from map_creation.v2_export import write_zip
 from map_creation.v2_runtime import validate_production_bundle
@@ -23,7 +24,7 @@ def main(use_model=None, diff=None, export_results_to_bs=True,
          slider_movement_min=None, legacy_mode=None, single_mode=None,
          logger_callback=None):
     with scoped_settings():
-        config.use_mapper_selection = "v2_expert"
+        config.use_mapper_selection = use_model or "v2_expert"
         # change difficulty
         if diff is not None:
             config.max_speed = diff
@@ -71,7 +72,10 @@ def main(use_model=None, diff=None, export_results_to_bs=True,
                 config.bs_mapping_version = 'v2'
             else:
                 config.bs_mapping_version = 'v3'
-        validate_production_bundle()
+        if config.use_mapper_selection == "v2_expert":
+            validate_production_bundle()
+        else:
+            ensure_v1_bundle(use_model)
         if logger_callback:
             logger_callback("Production models verified")
         results, failures = [], []
@@ -89,7 +93,10 @@ def main(use_model=None, diff=None, export_results_to_bs=True,
             song_name = song_name[:-4]
             print(f"Analyzing song: {song_name} ({i + 1} of {len(song_list)})")
             try:
-                result = generate_song(song_name, logger=logger_callback)
+                if config.use_mapper_selection == "v2_expert":
+                    result = generate_song(song_name, logger=logger_callback)
+                else:
+                    result = generate_song_v1(song_name, config.max_speed)
                 # Count a completed song only after its archive is available.
                 result["zip_path"] = write_zip(result["path"],
                     f'{paths.new_map_path}{config.max_speed_orig:.1f}_{song_name}.zip')

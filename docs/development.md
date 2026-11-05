@@ -221,9 +221,10 @@ weights. Every song/BPS pair starts with the same configured settings, sets both
 `max_speed` and `max_speed_orig` to four times the BPS setting, and seeds Python
 and NumPy (`--seed`, default 3). Audio is copied afresh into a disposable directory
 for every pair. Configuration, paths, and random state are restored afterward.
-The command calls the existing `gen_beats.main(..., debug_beats=True)` path,
-which loads only the beat model and returns **processed timing proposals** before
-note generation, map creation, or Beat Saber export. It does not normalize the
+The command calls the existing `evaluation.legacy_generator.main(...,
+debug_beats=True)` path, which loads only the beat model and returns
+**processed timing proposals** before note generation, map creation, or
+Beat Saber export. It does not normalize the
 source audio or use the legacy training-map importer.
 
 Reference loading currently supports v2 `Info.dat` with v2 or v3 beatmaps,

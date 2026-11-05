@@ -20,6 +20,10 @@ fills plus a pluggable max-gap safety net
 flashes, corner bombs and laser flashes inside intentionally note-free gaps
 without touching notes (`v2_calm_effects`), the retained
 encoder, and exclusive v1 `fav_15` lighting; GPU remains the training runtime.
+The five v1 presets remain selectable legacy options in the app and CLI
+(`fav_15`, `pp3_15`, `easy_15`, `hard_15`, `expert_15`); a v1 selection
+downloads its model folder on demand and runs the unchanged legacy pipeline
+to per-difficulty `1234_*` folders.
 WSL/Linux is the primary development environment; preserve Windows app
 compatibility. Complete the requested task, including small supporting 
 refactors when they simplify the change. Keep unrelated cleanup separate. 

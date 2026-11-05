@@ -20,7 +20,7 @@ Prediction and optional Beat Saber library paths stay separately configured in
 `tools/config/paths.py`. No training datasets or historical source paths are
 required. Missing assets or incompatible selected production contracts fail
 explicitly; v2 bundle hashes, normalization, encoder identity and vocabularies
-remain validated. Generation does not download models or train them.
+remain validated. V2 generation does not download models or train them.
 
 ## Existing commands
 
@@ -37,10 +37,15 @@ The existing single-song command and environment variables remain available:
 max_speed=5 inferno_model=fav_15 python main.py
 ```
 
-`inferno_model` and the Python `main(use_model=...)` argument remain accepted for
-calling compatibility; both select v2. `max_speed=5` on the command line requests
-5 retained colored notes per second. The Python function's `diff` argument and
-internal `config.max_speed` retain the historical factor of four: `diff=20`
+`inferno_model` and the Python `main(use_model=...)` argument select the mapper:
+`v2_expert` when unset, or one of the five legacy v1 presets (`fav_15`,
+`pp3_15`, `easy_15`, `hard_15`, `expert_15`). A v1 preset downloads its model
+folder from Hugging Face on first use and runs the unchanged legacy generator —
+no v2 postprocessing — writing per-difficulty `1234_<speed>_<name>` folders
+instead of combined `12345_*` v2 packages. `max_speed=5` on the command line
+requests 5 retained colored notes per second under v2 (the legacy difficulty
+scale under v1). The Python function's `diff` argument and internal
+`config.max_speed` retain the historical factor of four: `diff=20`
 means 5 NPS. This internal value still drives legacy cleanup, NJS and jump offset.
 `main.py` continues to disable library export in its CLI defaults.
 
@@ -58,13 +63,18 @@ from main_multi import main_multi_par
 result = main_multi_par(2, [3, 5], export_results_to_bs=False)
 ```
 
+A v1 preset runs the same call with `model_selection="fav_15"`; each per-difficulty
+v1 folder is zipped directly, never combined into a `12345_*` package.
+
 Call multiprocessing from a guarded `if __name__ == '__main__':` entry point.
 The app, `main_multi`, and `main_multi_par` signatures remain available;
 `main_training.py` selects the seven production v2 stages. Explicit experimental
 lighting training uses `python -m training.pipeline_v2 train --stage lighting`;
 see [training selection](pipeline-v2.md#small-development-launcher).
 
-The app displays only `v2_expert`. Importing any main script does not build the
+The app model dropdown lists `v2_expert` (the default) followed by the five
+legacy v1 presets; parameter groups that do not apply to the selected model
+stay hidden. Importing any main script does not build the
 UI, check for updates, or load TensorFlow. Explicit `main_app.build_app()` builds
 the UI; `build_app(check_updates=False)` also skips the startup update check.
 
@@ -504,8 +514,8 @@ legacy omissions, per-stage durations and cache metrics. Companion numeric NPZ
 files contain raw/adjusted intensity shares, effective conditioning NPS, raw timing
 probabilities/counts, processed events, pre-cleanup model notes and final notes;
 they load with `allow_pickle=False`. The historical v1 runner
-now lives in `evaluation/legacy_generator.py` for explicitly requested benchmarks;
-it is not an application model-selection option.
+lives in `evaluation/legacy_generator.py`; the app and CLI v1 presets invoke it
+unchanged through `map_creation/v1_generation.py`, and benchmarks call it directly.
 
 See [baseline acceptance](baseline.md) for the executed checks and finished sample
 packages. GPU inference, native Windows execution and in-game playability require

@@ -47,10 +47,14 @@ and note cleanup remain between the learned stages.
 
 Existing `main.py`, `main_multi.py`, and `main_app.py` commands and map folders
 remain available. Difficulty 5 requests 5 retained colored notes per second;
-postprocessing and expansion can change the final density. Legacy model arguments
-are still accepted and select v2. Configure `v2_model_bundle_path` in
+postprocessing and expansion can change the final density. The five legacy v1
+presets (`fav_15`, `pp3_15`, `easy_15`, `hard_15`, `expert_15`) remain selectable
+in the app dropdown and through `inferno_model`/`use_model`; a v1 preset
+downloads its model folder from Hugging Face on first use and runs the unchanged
+legacy pipeline — no v2 postprocessing — writing per-difficulty `1234_*` folders
+instead of combined `12345_*` packages. Configure `v2_model_bundle_path` in
 `tools/config/config.py`, together with `v1_lighting_model_path` and
-`v1_lighting_vocabulary_path`; generation never downloads a replacement model.
+`v1_lighting_vocabulary_path`; v2 generation never downloads a replacement model.
 
 See [generation commands](docs/generation-v2.md),
 [model architecture](docs/model-architecture.md), and
