@@ -139,7 +139,7 @@ git commit -m "Gate v2 subdivision fills behind a post-pause entry ramp"
 - Produces:
   - `_silent_spans(silent_times) -> list[tuple[float, float]]` — merges silent frame times (≈34.6 ms spacing) into `(lo, hi)` spans, closing gaps `< 4 * hop` ≈ 138 ms (`hop = config.hop_size / config.samplerate_music` = 512/14800).
   - `_inside_spans(t: float, spans) -> bool` — membership test shared with Tasks 3 and 5.
-  - `silent_spans()` — a lazy closure inside `postprocess_timing` computing `_silent_spans(legacy_features()[2])` once, only when `config.add_silence_flag and config.v2_fill_respect_silence` (keeps the lazy-decode contract).
+  - `silent_spans()` — a lazy closure inside `postprocess_timing` computing `_silent_spans(legacy_features()[2])` once, only when `config.add_silence_flag and config.v2_fill_respect_silence` (keeps the lazy-decode contract). (Shipped refinement: signature is `silent_spans(force=False)` — the cache keys on `add_silence_flag` alone, `v2_fill_respect_silence` applies per call, and detection-level consumers pass `force=True`; see controller rulings.)
 - Consumes: Task 1's `_filter_fill_times` — extend its signature: `_filter_fill_times(previous, new_times, blocked, silent_spans=())` drops insertions inside either kind of interval.
 - `legacy_features()` third return is the `silent_times` array (frame times in seconds).
 
@@ -183,7 +183,7 @@ Expected: FAIL — `density_fill` currently precedes `silence_removal`; silent-s
 - `config.py`: `v2_fill_respect_silence = True`.
 - `_TIMING_STEPS` (`:117-118`): move `"silence_removal"` before `"density_fill"` (final order per Global Constraints).
 - `_silent_spans(silent_times)` helper: sorted frame times → merge runs with inter-frame gap `< 4 * (config.hop_size / config.samplerate_music)` into `(first, last)` spans; return `[]` for empty input.
-- In `postprocess_timing`: move the `silence_removal` block (`:220-222`) above the `density_fill` loop. Add a `silent_spans()` lazy closure computing `_silent_spans(legacy_features()[2])` once, only when `config.add_silence_flag and config.v2_fill_respect_silence` — reuse it in the fill filters AND the Task-3 snap policy.
+- In `postprocess_timing`: move the `silence_removal` block (`:220-222`) above the `density_fill` loop. Add a `silent_spans()` lazy closure computing `_silent_spans(legacy_features()[2])` once, only when `config.add_silence_flag and config.v2_fill_respect_silence` — reuse it in the fill filters AND the Task-3 snap policy (snap/gap-net calls use `force=True` — detection is independent of the fill gate).
 - Extend `_filter_fill_times` with `silent_spans=()`; pass `silent_spans=silent_spans()` at both fill call sites.
 
 - [ ] **Step 4: Run tests to verify they pass**
