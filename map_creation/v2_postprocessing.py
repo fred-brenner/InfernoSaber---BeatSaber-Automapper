@@ -170,6 +170,15 @@ _TIMING_STEPS = ("minimum_spacing", "high_difficulty_fill", "bpm_alignment", "on
 def postprocess_timing(song, beats, audio_path, logger=None, skip=()):
     """Apply legacy timing cleanup while carrying count labels through moves.
 
+    Step order follows ``_TIMING_STEPS``: ``minimum_spacing``,
+    ``high_difficulty_fill``, ``bpm_alignment``, ``onset_snap``,
+    ``start_end_fill``, ``silence_removal``, ``density_fill``,
+    ``max_gap_fill`` (the one ``bpm_alignment`` name covers the bookending
+    initial/final alignments). Subdivision fills keep insertions out of
+    post-entry ramp windows and detected silent spans; unmatched onset-snap
+    events follow ``v2_onset_snap_unmatched_policy``; ``max_gap_fill``
+    backstops any remaining dead zone from ``v2_gap_fill_source``.
+
     ``skip`` names steps from ``_TIMING_STEPS`` to omit for controlled
     comparisons. Legacy audio features are decoded lazily — skipping every
     step that needs them avoids the legacy analysis entirely.

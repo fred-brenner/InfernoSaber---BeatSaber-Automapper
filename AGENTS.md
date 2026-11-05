@@ -12,7 +12,11 @@ bounded onset-peak snap post-cleanup
 (`v2_notes_onset_snap`), a configurable start-of-map safety zone
 (`v2_map_intro_no_notes_seconds`/`v2_map_intro_no_hazards_seconds`), strict
 ≥135° same-hand flow (`v2_flow_min_turn_steps`), a diagonal-direction cap
-(`v2_diagonal_max_fraction`), and a decorative calm-area pulse pass that adds edge wall
+(`v2_diagonal_max_fraction`), post-pause entry-ramped, silence-aware timing
+fills plus a pluggable max-gap safety net
+(`v2_fill_entry_delay_seconds`/`v2_fill_respect_silence`/
+`v2_onset_snap_unmatched_policy`/`v2_max_note_gap_seconds`/
+`v2_gap_fill_source`), and a decorative calm-area pulse pass that adds edge wall
 flashes, corner bombs and laser flashes inside intentionally note-free gaps
 without touching notes (`v2_calm_effects`), the retained
 encoder, and exclusive v1 `fav_15` lighting; GPU remains the training runtime.

@@ -131,6 +131,41 @@ which produced degenerate near-uniform argmax patterns; the setting still feeds
 the separate original v1 lighting score weighting through
 `config.random_note_map_factor`.
 
+The 2026-11-04 timing/density update reorders the cleanup and gates its
+insertions; `_TIMING_STEPS` reads `minimum_spacing`, `high_difficulty_fill`,
+`bpm_alignment`, `onset_snap`, `start_end_fill`, `silence_removal`,
+`density_fill`, `max_gap_fill` — silence removal now runs before the density
+loop so refills cannot undo it, and a max-gap safety net trails it — the
+initial/final BPM alignments bookend the sequence. Before the timing argmax the
+one/two-note classes receive `v2_timing_event_bias` (default `0.1`, must stay
+`< 1` so a fully silent frame can never flip; `0` restores pure argmax), a
+playtest-tunable experiment lifting borderline frames into events. After map
+start and every note-free pause of at least `v2_fill_entry_pause_beats` beats
+(default `4.0`), the subdivision fills (`high_difficulty_fill`,
+`density_fill`) may not insert for `v2_fill_entry_delay_seconds` (default
+`1.0`; `0` disables) — an entry ramp recomputed at each fill site on the
+then-current times; model events already inside the window are kept, and
+`start_end_fill` as an edge fill stays ungated. With
+`v2_fill_respect_silence` (default `True`) the same fills also skip detected
+silent spans (silent frame times merged into spans, gaps under four hops
+closed). The timing onset snap zeroes events with no onset peak in reach, and
+`v2_onset_snap_unmatched_policy` (default `"non_silent"`) keeps them unless
+inside a detected silent span — `"always"` is the legacy drop-all, `"never"`
+keeps them all; the `"non_silent"` check keys on `add_silence_flag` alone,
+deliberately independent of `v2_fill_respect_silence`. Finally
+`v2_max_note_gap_seconds` (default `4.0`; `0` disables — a playtest-tunable
+experiment like the bias and the low-intensity boost below) bounds the
+largest tolerated note-free gap: `max_gap_fill` inserts candidate times from
+`v2_gap_fill_source` — `"onsets"` (default; the shared librosa spectral-flux
+detector), `"bpm_grid"` (whole-beat lattice) or `"v1_beat"` (the trained v1
+beat-TCN under `model/<v2_gap_fill_v1_bundle>/`, default `"fav_15"`; requires
+a downloaded v1 bundle, and any failure logs a warning and falls back to
+`"onsets"`, recorded under `gap_fill_source_used`) — inset
+`v2_gap_fill_edge_seconds` (default `0.5`) from the bounding events, still
+silent-span gated and `min_beat_time` apart. The net is a dead-zone
+backstop: it intentionally ignores entry-ramp windows — a gap beyond the
+threshold overrides the style gate.
+
 Arrows decoding optionally mixes in a second model: when
 `v2_arrows_variety` is above `0` the runtime also loads the arrows stage of
 `v2_arrows_reference_bundle` (currently the history-corrupted
@@ -363,7 +398,7 @@ Generation adjusts the intensity profile before timing inference. The four
 
 | Setting | Default | Meaning |
 | --- | --- | --- |
-| `v2_intensity_low_boost` | `0.1` | Fraction of the deficit below uniform density to lift. |
+| `v2_intensity_low_boost` | `0.3` | Fraction of the deficit below uniform density to lift. Experiment value (was `0.1`) — more notes in quiet parts; playtest-tunable. |
 | `v2_intensity_high_reduction` | `0.1` | Fraction of the excess above uniform density to trim. |
 | `v2_intensity_scale` | `1.0` | Overall target gain; one preserves average conditioning NPS. |
 | `v2_intensity_adjustment_strength` | `0.8` | Fraction of the change toward the configured target to apply. |
@@ -389,7 +424,7 @@ profile with zero conditioning NPS and skips timing prediction. Zero requested
 NPS stays empty. Strength zero preserves the original conditioning exactly.
 
 The defaults gently flatten the profile while preserving its average density:
-relative intensities `0.5 / 1.5` become `0.54 / 1.46`. With both shaping controls
+relative intensities `0.5 / 1.5` become `0.60 / 1.40`. With both shaping controls
 set to one, the same inputs become `0.9 / 1.1` at strength `0.8`. Scale `1.25`
 with strength `0.8` raises average conditioning NPS by 20%. These changes affect
 conditioning; the timing decoder, gameplay cleanup and note expansion still
