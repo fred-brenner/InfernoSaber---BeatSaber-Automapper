@@ -125,11 +125,24 @@ def _section_entries(times, pause_seconds):
     return times[np.r_[True, np.diff(times) >= pause_seconds]]
 
 
-def _blocked_intervals(entries, delay):
-    """Post-entry windows where subdivision fills are gated; empty when off."""
-    if delay <= 0:
+def _blocked_intervals(entries, delay, times=(), min_notes=0):
+    """Post-entry windows where subdivision fills are gated; empty when off.
+
+    Each entry blocks ``[entry, entry + delay)`` union ``[entry, t_k)`` with
+    ``t_k`` the ``min_notes``-th kept candidate at/after the entry — map end
+    when fewer remain."""
+    if delay <= 0 and min_notes <= 0:
         return []
-    return [(float(entry), float(entry) + delay) for entry in entries]
+    times = np.sort(np.asarray(times, np.float64))
+    intervals = []
+    for entry in entries:
+        end = float(entry) + max(0., float(delay))
+        if min_notes > 0:
+            index = int(np.searchsorted(times, float(entry))) + min_notes - 1
+            end = max(end, float(times[index]) if index < len(times) else math.inf)
+        if end > float(entry):
+            intervals.append((float(entry), end))
+    return intervals
 
 
 def _silent_spans(silent_times):
@@ -175,11 +188,14 @@ def postprocess_timing(song, beats, audio_path, logger=None, skip=()):
     ``start_end_fill``, ``silence_removal``, ``density_fill``,
     ``max_gap_fill`` (the one ``bpm_alignment`` name covers the bookending
     initial/final alignments). Subdivision fills keep insertions out of
-    post-entry ramp windows and — gated by ``v2_fill_respect_silence`` —
-    detected silent spans; unmatched onset-snap events follow
-    ``v2_onset_snap_unmatched_policy``; ``max_gap_fill`` backstops any
-    remaining dead zone from ``v2_gap_fill_source``, always keeping inserts
-    out of detected silent spans (independent of the fill gate).
+    post-entry ramp windows — ``v2_fill_entry_delay_seconds`` union a
+    ``v2_fill_entry_min_notes`` kept-candidate count gate — and, gated by
+    ``v2_fill_respect_silence``, detected silent spans; unmatched onset-snap
+    events follow ``v2_onset_snap_unmatched_policy``; ``max_gap_fill``
+    backstops any remaining dead zone from ``v2_gap_fill_source``, always
+    keeping inserts out of detected silent spans (independent of the fill
+    gate). ``start_end_fill`` drops its start-segment inserts while
+    ``v2_suppress_start_fill`` and the intro note floor are both active.
 
     ``skip`` names steps from ``_TIMING_STEPS`` to omit for controlled
     comparisons. Legacy audio features are decoded lazily — skipping every
@@ -208,7 +224,8 @@ def postprocess_timing(song, beats, audio_path, logger=None, skip=()):
     # particular, requested zero density must remain empty.
     if not original:
         return [], {**diagnostics, "events": 0, "retained_notes": 0, "merged_events": 0,
-                    "gap_fill_source_used": None}
+                    "gap_fill_source_used": None, "entry_blocked_windows": 0,
+                    "start_fill_suppressed": 0}
     candidates = []
     spacing_removed, merged_events = 0, 0
     if "minimum_spacing" in skip:
@@ -260,12 +277,20 @@ def postprocess_timing(song, beats, audio_path, logger=None, skip=()):
     def times():
         return np.asarray([item["time"] for item in candidates], np.float64)
 
+    entry_blocked_windows = 0
+    start_fill_suppressed = 0
+
     def fill_blocked():
+        nonlocal entry_blocked_windows
         pause = float(getattr(config, "v2_fill_entry_pause_beats", 4.0) or 0.) * 60. / bpm
         delay = float(getattr(config, "v2_fill_entry_delay_seconds", 0.) or 0.)
+        min_notes = int(getattr(config, "v2_fill_entry_min_notes", 0) or 0)
         # pause <= 0 disables pause detection: only the map start is an entry
-        entries = _section_entries(times(), pause) if pause > 0 else np.asarray([times()[0]])
-        return _blocked_intervals(entries, delay)
+        current = times()
+        entries = _section_entries(current, pause) if pause > 0 else np.asarray([current[0]])
+        intervals = _blocked_intervals(entries, delay, current, min_notes)
+        entry_blocked_windows = len(intervals)
+        return intervals
 
     detected_silence = None
     gap_fill_source_used = None
@@ -311,7 +336,14 @@ def postprocess_timing(song, beats, audio_path, logger=None, skip=()):
         replace_times("onset_snap", snapped, moving=True, drop_zero=True)
     if candidates and "start_end_fill" not in skip:
         volume, onset, _ = legacy_features()
-        replace_times("start_end_fill", _start_end_times(times(), volume, onset))
+        current = times()
+        proposed = _start_end_times(current, volume, onset)
+        if getattr(config, "v2_suppress_start_fill", False) \
+                and float(getattr(config, "v2_map_intro_no_notes_seconds", 0.) or 0.) > 0:
+            # only added events sit before the first event — the end segment stays
+            start_fill_suppressed = int(np.count_nonzero(proposed < current[0]))
+            proposed = proposed[proposed >= current[0]]
+        replace_times("start_end_fill", proposed)
     if candidates and config.add_silence_flag and "silence_removal" not in skip:
         *_, silent_times = legacy_features()
         replace_times("silence_removal", remove_silent_times(times(), silent_times))
@@ -355,7 +387,9 @@ def postprocess_timing(song, beats, audio_path, logger=None, skip=()):
     diagnostics.update(events=len(candidates), retained_notes=sum(item["count"] for item in candidates),
                        merged_events=merged_events, minimum_spacing_removed=spacing_removed,
                        timing_policy="legacy_cleanup_count_preserving",
-                       gap_fill_source_used=gap_fill_source_used)
+                       gap_fill_source_used=gap_fill_source_used,
+                       entry_blocked_windows=entry_blocked_windows,
+                       start_fill_suppressed=start_fill_suppressed)
     _report(logger, f"Timing cleanup: {len(original)} -> {len(candidates)} events")
     return candidates, diagnostics
 

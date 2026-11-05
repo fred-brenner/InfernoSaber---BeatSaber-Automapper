@@ -225,13 +225,21 @@ v2_calm_effects_variety = True          # rotate placement themes per gap (False
 # these elapsed-time floors; 0 disables each zone.
 v2_map_intro_no_notes_seconds = 2.0    # drop notes before this time (s)
 v2_map_intro_no_hazards_seconds = 1.0  # drop walls/bombs starting before this (s)
+v2_suppress_start_fill = True          # start_end_fill drops its pre-first-event inserts
+                                       # while the note floor is active; the end segment
+                                       # is unchanged (False = legacy opening burst)
 
 # Fill entry ramp (2026-11-04): after map start and after every note-free pause
 # of at least v2_fill_entry_pause_beats beats, subdivision fills are gated for
 # v2_fill_entry_delay_seconds — only whole-beat model events enter there.
+# (2026-11-05) Each blackout also runs until the v2_fill_entry_min_notes-th kept
+# candidate after its entry (union of both windows).
 v2_fill_entry_delay_seconds = 1.0  # subdivision-fill blackout after each entry (s); 0 disables
 v2_fill_entry_pause_beats = 4.0    # note-free gap counting as a new section entry (beats);
                                    # 0 = only the map start counts as an entry
+v2_fill_entry_min_notes = 4        # each entry's fill blackout also covers the span up to
+                                   # the k-th kept candidate after it (fewer remaining =
+                                   # gated to map end); 0 disables the count gate
 v2_fill_respect_silence = True     # keep subdivision fills out of detected silent spans
 
 # Onset-snap unmatched policy (2026-11-04): the timing onset snap zeroes model

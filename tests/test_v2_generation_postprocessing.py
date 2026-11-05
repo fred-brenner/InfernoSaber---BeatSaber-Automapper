@@ -20,7 +20,8 @@ def song():
 def timing_defaults(monkeypatch):
     for key, value in {"min_beat_time": .0625, "min_time_diff": .02,
                        "map_filler_iters": 0, "add_start_end_beats": False,
-                       "add_silence_flag": False}.items():
+                       "add_silence_flag": False,
+                       "v2_fill_entry_min_notes": 0, "v2_suppress_start_fill": False}.items():
         monkeypatch.setattr(config, key, value)
     monkeypatch.setattr(post, "_legacy_timing_features", lambda _: (np.zeros((100, 24)), np.zeros((100, 24)), []))
     monkeypatch.setattr(post, "sanity_check_timing2", lambda _, times, **kwargs: times)
@@ -146,6 +147,93 @@ def test_entry_ramp_disabled_at_zero_delay(song, timing_defaults, monkeypatch):
     candidates, _ = post.postprocess_timing(song, beats([1., 5., 9.], [1, 1, 1]),
                                             "unused.egg", skip=("bpm_alignment",))
     assert [item["time"] for item in candidates] == [1., 5., 5.5, 9.]
+
+
+def test_entry_count_gate_blocks_until_kth_kept_candidate(song, timing_defaults, monkeypatch):
+    # count gate only (delay off): 4-beat pause = 2.0 s at 120 bpm -> entries
+    # 1.0 and 7.0; each window runs to the 4th kept candidate at/after it
+    monkeypatch.setattr(config, "map_filler_iters", 1)
+    monkeypatch.setattr(config, "max_speed", 40.)
+    monkeypatch.setattr(config, "v2_fill_entry_delay_seconds", 0.)
+    monkeypatch.setattr(config, "v2_fill_entry_min_notes", 4)
+    monkeypatch.setattr(config, "v2_fill_entry_pause_beats", 4.0)
+    monkeypatch.setattr(config, "v2_max_note_gap_seconds", 0.)  # isolate the count gate
+    insert = np.asarray([1., 1.5, 2., 2.5, 3., 3.5, 4., 4.5, 5., 7., 7.5, 8., 9., 9.5])
+    monkeypatch.setattr(post, "fill_map_times_scale", lambda times, idx: insert)
+    candidates, report = post.postprocess_timing(song, beats([1., 2., 3., 4., 7., 8., 9.], [1] * 7),
+                                                 "unused.egg", skip=("bpm_alignment",))
+    # [1,4) blocked (1.5/2.5/3.5 dropped; 4.5/5. released by the 4th note);
+    # the >=pause gap restarts the count at 7.0 — only three kept candidates
+    # follow it, so [7,inf) is gated and 7.5/9.5 stay out
+    assert [item["time"] for item in candidates] == [1., 2., 3., 4., 4.5, 5., 7., 8., 9.]
+    assert report["entry_blocked_windows"] == 2
+
+
+def test_entry_count_gate_unions_with_delay_window(song, timing_defaults, monkeypatch):
+    # union of both windows: the 6 s delay outreaches the count gate at entry
+    # 1.0, so 4.5 (already past the 4th candidate) is still blocked; 7.5 passes
+    monkeypatch.setattr(config, "map_filler_iters", 1)
+    monkeypatch.setattr(config, "max_speed", 40.)
+    monkeypatch.setattr(config, "v2_fill_entry_delay_seconds", 6.)
+    monkeypatch.setattr(config, "v2_fill_entry_min_notes", 4)
+    monkeypatch.setattr(config, "v2_fill_entry_pause_beats", 4.0)
+    monkeypatch.setattr(config, "v2_max_note_gap_seconds", 0.)  # isolate the union
+    insert = np.asarray([1., 2., 2.5, 3., 4., 4.5, 7.5, 8.9, 9., 9.4])
+    monkeypatch.setattr(post, "fill_map_times_scale", lambda times, idx: insert)
+    candidates, _ = post.postprocess_timing(song, beats([1., 2., 3., 4., 9.], [1] * 5),
+                                            "unused.egg", skip=("bpm_alignment",))
+    # entry 1: [1,4) union [1,7) -> 2.5/4.5 blocked; entry 9: [9,15) union
+    # [9,inf) -> 9.4 blocked; 7.5/8.9 kept
+    assert [item["time"] for item in candidates] == [1., 2., 3., 4., 7.5, 8.9, 9.]
+
+
+def test_entry_count_gate_zero_preserves_delay_only(song, timing_defaults, monkeypatch):
+    # 0 disables the count gate: only the seconds-delay windows apply
+    monkeypatch.setattr(config, "map_filler_iters", 1)
+    monkeypatch.setattr(config, "max_speed", 40.)
+    monkeypatch.setattr(config, "v2_fill_entry_delay_seconds", 1.0)
+    monkeypatch.setattr(config, "v2_fill_entry_min_notes", 0)
+    monkeypatch.setattr(config, "v2_fill_entry_pause_beats", 4.0)
+    monkeypatch.setattr(config, "v2_max_note_gap_seconds", 0.)
+    insert = np.asarray([1., 5., 5.5, 6.2, 9.])
+    monkeypatch.setattr(post, "fill_map_times_scale", lambda times, idx: insert)
+    candidates, report = post.postprocess_timing(song, beats([1., 5., 9.], [1, 1, 1]),
+                                                 "unused.egg", skip=("bpm_alignment",))
+    assert [item["time"] for item in candidates] == [1., 5., 6.2, 9.]
+    assert report["entry_blocked_windows"] == 3
+
+
+def test_start_fill_suppressed_drops_only_start_segment(song, timing_defaults, monkeypatch):
+    # flag on + intro floor active: inserts before the first event are dropped,
+    # the end segment survives
+    monkeypatch.setattr(config, "v2_suppress_start_fill", True)
+    monkeypatch.setattr(config, "v2_map_intro_no_notes_seconds", 2.)
+    monkeypatch.setattr(config, "v2_max_note_gap_seconds", 0.)
+    monkeypatch.setattr(post, "_start_end_times",
+                        lambda times, volume, onset: np.sort(np.r_[times, [.2, .4, 9.5]]))
+    candidates, report = post.postprocess_timing(song, beats([2., 8.], [1, 1]),
+                                                 "unused.egg", skip=("bpm_alignment",))
+    assert [item["time"] for item in candidates] == [2., 8., 9.5]
+    assert report["start_fill_suppressed"] == 2
+
+
+def test_start_fill_suppression_needs_flag_and_intro_floor(song, timing_defaults, monkeypatch):
+    # flag off or a zero floor both restore the legacy opening inserts
+    monkeypatch.setattr(config, "v2_map_intro_no_notes_seconds", 2.)
+    monkeypatch.setattr(config, "v2_max_note_gap_seconds", 0.)
+    monkeypatch.setattr(post, "_start_end_times",
+                        lambda times, volume, onset: np.sort(np.r_[times, [.2, 9.5]]))
+    candidates, report = post.postprocess_timing(song, beats([2., 8.], [1, 1]),
+                                                 "unused.egg", skip=("bpm_alignment",))
+    assert [item["time"] for item in candidates] == [.2, 2., 8., 9.5]
+    assert report["start_fill_suppressed"] == 0
+
+    monkeypatch.setattr(config, "v2_suppress_start_fill", True)
+    monkeypatch.setattr(config, "v2_map_intro_no_notes_seconds", 0.)
+    candidates, report = post.postprocess_timing(song, beats([2., 8.], [1, 1]),
+                                                 "unused.egg", skip=("bpm_alignment",))
+    assert [item["time"] for item in candidates] == [.2, 2., 8., 9.5]
+    assert report["start_fill_suppressed"] == 0
 
 
 def test_density_fill_skips_silent_spans(song, timing_defaults, monkeypatch):
