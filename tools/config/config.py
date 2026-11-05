@@ -230,7 +230,8 @@ v2_map_intro_no_hazards_seconds = 1.0  # drop walls/bombs starting before this (
 # of at least v2_fill_entry_pause_beats beats, subdivision fills are gated for
 # v2_fill_entry_delay_seconds — only whole-beat model events enter there.
 v2_fill_entry_delay_seconds = 1.0  # subdivision-fill blackout after each entry (s); 0 disables
-v2_fill_entry_pause_beats = 4.0    # note-free gap counting as a new section entry (beats)
+v2_fill_entry_pause_beats = 4.0    # note-free gap counting as a new section entry (beats);
+                                   # 0 = only the map start counts as an entry
 v2_fill_respect_silence = True     # keep subdivision fills out of detected silent spans
 
 # Onset-snap unmatched policy (2026-11-04): the timing onset snap zeroes model
@@ -242,12 +243,17 @@ v2_onset_snap_unmatched_policy = "non_silent"
 # Max-gap safety net (2026-11-04): after all timing fills/removals, any
 # remaining note-free gap beyond v2_max_note_gap_seconds gets candidates
 # inserted from v2_gap_fill_source, inset v2_gap_fill_edge_seconds from the
-# gap's bounding events and still gated by detected silent spans; inserted
-# times flow through the normal note decode like model events.
+# gap's bounding events and still gated by detected silent spans (always —
+# independent of v2_fill_respect_silence, which scopes to the subdivision
+# fills); inserted times flow through the normal note decode like model events.
 v2_max_note_gap_seconds = 4.0    # largest tolerated note-free gap (s); 0 disables
 v2_gap_fill_edge_seconds = 0.5   # clearance kept next to the events bounding a gap
-v2_gap_fill_source = "onsets"    # candidate pool: "onsets" | "bpm_grid" | "v1_beat"
-v2_gap_fill_v1_bundle = "fav_15" # v1 beat-TCN bundle supplying the "v1_beat" source
+                                 # (values below min_beat_time clamp up to it)
+v2_gap_fill_source = "onsets"    # candidate pool: "onsets" | "bpm_grid" | "v1_beat";
+                                 # "onsets" is the proven default, "v1_beat" experimental
+v2_gap_fill_v1_bundle = "fav_15" # experimental: v1 beat-TCN bundle supplying the
+                                 # "v1_beat" source — its K.clear_session() inside a
+                                 # cached-predictor worker was never exercised live
 
 add_waveform_pattern_flag = 0   # [0: off, 1: on, 2: double on]
 waveform_pattern = [

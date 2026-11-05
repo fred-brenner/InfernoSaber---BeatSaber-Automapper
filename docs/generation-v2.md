@@ -141,7 +141,7 @@ one/two-note classes receive `v2_timing_event_bias` (default `0.1`, must stay
 `< 1` so a fully silent frame can never flip; `0` restores pure argmax), a
 playtest-tunable experiment lifting borderline frames into events. After map
 start and every note-free pause of at least `v2_fill_entry_pause_beats` beats
-(default `4.0`), the subdivision fills (`high_difficulty_fill`,
+(default `4.0`; `0` leaves only the map start as an entry), the subdivision fills (`high_difficulty_fill`,
 `density_fill`) may not insert for `v2_fill_entry_delay_seconds` (default
 `1.0`; `0` disables) — an entry ramp recomputed at each fill site on the
 then-current times; model events already inside the window are kept, and
@@ -156,15 +156,18 @@ deliberately independent of `v2_fill_respect_silence`. Finally
 `v2_max_note_gap_seconds` (default `4.0`; `0` disables — a playtest-tunable
 experiment like the bias and the low-intensity boost below) bounds the
 largest tolerated note-free gap: `max_gap_fill` inserts candidate times from
-`v2_gap_fill_source` — `"onsets"` (default; the shared librosa spectral-flux
-detector), `"bpm_grid"` (whole-beat lattice) or `"v1_beat"` (the trained v1
-beat-TCN under `model/<v2_gap_fill_v1_bundle>/`, default `"fav_15"`; requires
-a downloaded v1 bundle, and any failure logs a warning and falls back to
-`"onsets"`, recorded under `gap_fill_source_used`) — inset
-`v2_gap_fill_edge_seconds` (default `0.5`) from the bounding events, still
-silent-span gated and `min_beat_time` apart. The net is a dead-zone
-backstop: it intentionally ignores entry-ramp windows — a gap beyond the
-threshold overrides the style gate.
+`v2_gap_fill_source` — `"onsets"` (default and the proven option; the shared
+librosa spectral-flux detector), `"bpm_grid"` (whole-beat lattice) or
+`"v1_beat"` (experimental: the trained v1 beat-TCN under
+`model/<v2_gap_fill_v1_bundle>/`, default `"fav_15"`; requires a downloaded
+v1 bundle, and any failure prints a warning and falls back to `"onsets"`,
+recorded under `gap_fill_source_used`; its `K.clear_session()` inside a
+cached-predictor worker has never been exercised live) — inset
+`v2_gap_fill_edge_seconds` (default `0.5`, floored at `min_beat_time`) from
+the bounding events, still silent-span gated (unconditionally — independent
+of `v2_fill_respect_silence`) and `min_beat_time` apart. The net is a
+dead-zone backstop: it intentionally ignores entry-ramp windows — a gap
+beyond the threshold overrides the style gate.
 
 Arrows decoding optionally mixes in a second model: when
 `v2_arrows_variety` is above `0` the runtime also loads the arrows stage of
