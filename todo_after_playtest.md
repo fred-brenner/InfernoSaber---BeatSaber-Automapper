@@ -556,3 +556,18 @@ Sanity: No Sleep 5.0 file tops at 16.1 u/s same-hand (was 8.9 under the
 strict cap) — fast Expert territory, inside the new 20.0 bound; the 40s
 section sustains ~5 notes/s. The 3.15 file stays <= 7.8 u/s. Trade-off to
 watch in playtest: fast bursts are now denser AND faster.
+
+## Round 7 — speed cap scale 2.0 (2026-11-06)
+
+User: 1.5 was "still within expected limits" — testing the upper rung.
+Cap at NPS 5: 26.7 u/s same-hand.
+
+Batch: final 5.0-file notes up another 15-21% over r6: No Sleep 554->657,
+Orbit the Block 1015->1223, Break the Horizon 1228->1480, Orbit Candy
+1040->1194, Keks 764->889, Turn the Night On 680->803, Move the Floor
+644->766, Bunker 587->850. Cap drops fell again (No Sleep 284->181).
+
+Sanity flag: No Sleep 5.0 top same-hand speed now 25.8 u/s (vs 16.1 at
+scale 1.5) — at the new bound and arguably past comfortable for the
+difficulty; 56 notes in the 35-45s window. If playtest says overshoot,
+1.5 remains the verified-good middle.

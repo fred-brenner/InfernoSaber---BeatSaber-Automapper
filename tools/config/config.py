@@ -193,11 +193,11 @@ v2_diagonal_max_fraction = 0.10    # cap diagonal cuts (d 4-7) at this fraction 
                                    # (dots counted); excess diagonals are recut to the cheapest
                                    # flow-legal adjacent cardinal, vertical wins ties, a diagonal
                                    # stays when no cardinal is legal; >= 1 disables
-v2_speed_cap_scale = 1.5           # multiplier on the v1 movement-speed cap
+v2_speed_cap_scale = 2.0           # multiplier on the v1 movement-speed cap
                                    # (max_speed * get_factor_from_max_speed distance/s between
                                    # consecutive same-hand notes); <= 0 disables the pass.
-                                   # 2026-11-06: 1.0 -> 1.5 playtest experiment — with recall-boosted
-                                   # density the v1-calibrated cap culled ~half the stream positions
+                                   # 2026-11-06: 1.0 -> 1.5 -> 2.0 playtest tuning — 1.5 stayed
+                                   # inside expected limits; testing the upper rung
 v2_speed_cap_start_notes = 30      # first N combined chronological note positions ramp
                                    # max_speed in (v1 decr_speed_range); 0 disables the ramp
 v2_speed_cap_start_factor = .35    # max_speed multiplier at the first note position,
