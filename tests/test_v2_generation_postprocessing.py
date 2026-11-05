@@ -540,7 +540,9 @@ def test_diagonal_cap_prefers_vertical_on_tie():
 
 
 def test_diagonal_cap_keeps_when_no_legal_cardinal():
-    # pin a diagonal between same-hand neighbours so both cardinals would be <135°
+    # candidate up(0) is 135°-legal vs the d7 predecessor but only 45° from
+    # the d4 successor; candidate right(3) is 135°-legal vs that successor but
+    # 45° from the predecessor — no cardinal is legal against both neighbours
     notes = [note(0, 1., direction=7), note(1, 2., x=0, y=1, direction=5),
              note(2, 3., x=3, y=1, direction=4)]
     post.apply_diagonal_cap(notes, rng=np.random.default_rng(0))
@@ -562,3 +564,66 @@ def test_diagonal_cap_disabled_at_one(monkeypatch):
                  direction=5 if (i // 2) % 2 == 0 else 6) for i in range(20)]
     post.apply_diagonal_cap(notes, rng=np.random.default_rng(42))
     assert [n["d"] for n in notes] == [5 if (i // 2) % 2 == 0 else 6 for i in range(20)]
+
+
+def test_generate_wires_intro_floor_and_diagonal_cap(monkeypatch):
+    """generate() runs the intro floor and diagonal cap with floors enabled —
+    stub predictors and stubbed legacy audio helpers, no model assets."""
+    from map_creation import v2_pipeline
+    from training.beat_models.contracts import CORE, Song
+    from training.pipeline_v2.pipeline import dummy_predictors
+    from training.pipeline_v2.settings import preparation_settings
+
+    monkeypatch.setattr(post, "sanity_check_timing2",
+                        lambda name, times, audio_path=None: np.asarray(times))
+    monkeypatch.setattr(post, "align_beats_on_bpm", lambda times, bpm: np.asarray(times))
+    monkeypatch.setattr(post, "fill_map_times_scale",
+                        lambda times, index=5: np.asarray(times))
+    monkeypatch.setattr(post, "_legacy_timing_features",
+                        lambda audio_path: (np.zeros((2, 2)), np.zeros((2, 2)), np.empty(0)))
+    monkeypatch.setattr(post, "remove_silent_times",
+                        lambda times, silent: np.asarray(times))
+    monkeypatch.setattr(post, "_start_end_times",
+                        lambda times, volume, onset: np.asarray(times))
+    for key, value in {"v2_map_intro_no_notes_seconds": 2.,
+                       "v2_map_intro_no_hazards_seconds": 1.,
+                       "v2_diagonal_max_fraction": .1,
+                       "v2_cleanup_note_heuristics": False}.items():
+        monkeypatch.setattr(config, key, value)
+    song = Song("wiring", {"duration": 11., "bpm": 120.},
+                {"features": np.zeros((1100, 82), np.float32),
+                 "coarse_features": np.zeros((11, 82), np.float32),
+                 "frame_times": np.arange(1100, dtype=np.float64) / 100,
+                 "bin_durations": np.ones(11, np.float32)})
+    vocab = {"multiplier": [{"kind": "none"}],
+             "walls": [{"kind": "none"}],
+             "lighting": [{"type": 0, "value": 1}]}
+
+    class _Timing:
+        status = "dummy"
+
+        def __call__(self, inputs):
+            values = np.zeros((len(inputs["audio"]), CORE, 3), np.float32)
+            values[..., 0] = 1
+            # window-local frames: 0.5/1.0 s land below the intro floor,
+            # 3.0 s stays above it (later windows repeat the pattern)
+            for frame in (50, 100, 300):
+                values[:, frame, 0] = 0
+                values[:, frame, 1] = 1
+            return {"counts": values}
+
+    def lighting(times, encoder):
+        return ([{"time": float(time), "type": 0, "value": 1} for time in times],
+                {"backend": "v1", "queries": len(times)})
+
+    predictors = dummy_predictors(vocab)
+    predictors["timing"] = _Timing()
+    settings = preparation_settings()
+    settings["schedule"]["arc_max_gap_seconds"] = 6.
+    result = v2_pipeline.generate(song, 4., predictors,
+                                  lambda times: np.zeros((len(times), 16), np.float32),
+                                  settings, vocab, lighting_generator=lighting,
+                                  random_factor=0, logger=lambda message: None)
+    assert result.diagnostics["intro_zones"]["notes_dropped"] >= 1
+    assert "diagonal_cap" in result.diagnostics
+    assert min(note["time"] for note in result.state["notes"]) >= 2.0

@@ -341,7 +341,10 @@ def _flow_legal(direction, previous, x, y, time, same_stroke_gap):
     steps = _step_distance(direction, pdirection)
     if steps <= 1:
         return False
-    min_turn = int(getattr(config, "v2_flow_min_turn_steps", 3) or 3)
+    # Missing/None selects the strict default; an explicit 0 already means
+    # <= 2 and must not be coerced back to 3.
+    configured = getattr(config, "v2_flow_min_turn_steps", None)
+    min_turn = 3 if configured is None else int(configured)
     if min_turn <= 2:
         return steps >= 3 or (steps == 2 and abs(x - px) + abs(y - py) >= 2)
     return steps >= min_turn
@@ -867,8 +870,9 @@ def apply_diagonal_cap(notes, chains=None, rng=None):
     processed in time order and earlier recuts constrain later ones (dots use
     their ``incoming`` implied direction, except a dot successor whose implied
     direction follows this note and is recomputed per candidate). The cheapest
-    legal cut by exit-cell → next-note Manhattan distance wins; ties prefer
-    the vertical cardinal. When no cardinal is legal the diagonal stays —
+    legal cut by the previous cut's exit-cell → candidate approach-cell
+    Manhattan distance wins (no predecessor leaves all costs equal); ties
+    prefer the vertical cardinal. When no cardinal is legal the diagonal stays —
     never dropped to satisfy a style metric. Chain heads follow their
     anchor's direction like ``recut_same_direction_notes``. Returns run
     statistics; ``>= 1`` disables the cap (negative clamps to 0)."""
@@ -913,10 +917,22 @@ def apply_diagonal_cap(notes, chains=None, rng=None):
             successor = siblings[after] if after < len(siblings) else None
 
             def cost(candidate):
-                if successor is None:
+                # Spec metric (todo_after_playtest.md case 3): cells the hand
+                # must travel from the previous same-hand cut's exit cell
+                # (``pos - step``; a dot exits through its implied direction's
+                # cell, or its own cell when no direction is implied) to this
+                # candidate's approach cell (``pos + step``). No predecessor
+                # leaves every candidate at the same cost.
+                if previous is None:
                     return 0
+                implied = prior[3]
+                if implied is None:
+                    exit_x, exit_y = previous["x"], previous["y"]
+                else:
+                    pstep = _DIRECTION_STEP[implied]
+                    exit_x, exit_y = previous["x"] - pstep[0], previous["y"] - pstep[1]
                 step = _DIRECTION_STEP[candidate]
-                return abs(x - step[0] - successor["x"]) + abs(y - step[1] - successor["y"])
+                return abs(exit_x - (x + step[0])) + abs(exit_y - (y + step[1]))
 
             def legal(candidate):
                 if not _flow_legal(candidate, prior, x, y, time, gap):
