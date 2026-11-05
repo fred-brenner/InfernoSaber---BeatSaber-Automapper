@@ -275,7 +275,16 @@ def postprocess_timing(song, beats, audio_path, logger=None, skip=()):
     if candidates and align:
         replace_times("initial_bpm_alignment", align_beats_on_bpm(times(), bpm), moving=True)
     if candidates and "onset_snap" not in skip:
-        replace_times("onset_snap", sanity_check_timing2(None, times(), audio_path=audio_path), moving=True, drop_zero=True)
+        snapped = sanity_check_timing2(None, times(), audio_path=audio_path)
+        policy = getattr(config, "v2_onset_snap_unmatched_policy", "always")
+        if policy not in ("always", "non_silent", "never"):
+            raise ValueError(f"Unknown v2_onset_snap_unmatched_policy: {policy!r}")
+        if policy != "always":
+            spans = silent_spans() if policy == "non_silent" else ()
+            snapped = np.asarray([original if marker <= 0 and (policy == "never" or not _inside_spans(original, spans))
+                                  else marker
+                                  for original, marker in zip(times(), snapped)])
+        replace_times("onset_snap", snapped, moving=True, drop_zero=True)
     if candidates and "start_end_fill" not in skip:
         volume, onset, _ = legacy_features()
         replace_times("start_end_fill", _start_end_times(times(), volume, onset))

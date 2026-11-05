@@ -68,6 +68,9 @@ def test_moved_near_events_merge_without_summing_counts(song, timing_defaults, m
 
 
 def test_rejected_onset_zero_does_not_absorb_a_valid_early_onset(song, timing_defaults, monkeypatch):
+    # pins the legacy drop-all behavior this test was written to document;
+    # the "non_silent" default would restore the unmatched event instead
+    monkeypatch.setattr(config, "v2_onset_snap_unmatched_policy", "always")
     monkeypatch.setattr(post, "sanity_check_timing2", lambda _, times, **kwargs: np.asarray([0., .015]))
     candidates, _ = post.postprocess_timing(song, beats([.4, .8], [2, 1]), "unused.egg", skip=("bpm_alignment",))
     assert [(item["time"], item["count"]) for item in candidates] == [(.015, 1)]
@@ -195,6 +198,49 @@ def test_silence_removal_runs_before_density_fill(song, timing_defaults, monkeyp
                                         "unused.egg", skip=("bpm_alignment",))
     stages = [op["stage"] for op in report["operations"]]
     assert stages.index("silence_removal") < stages.index("density_fill_0")
+
+
+def test_onset_snap_unmatched_non_silent_keeps_event(song, timing_defaults, monkeypatch):
+    monkeypatch.setattr(config, "add_silence_flag", True)
+    monkeypatch.setattr(config, "v2_onset_snap_unmatched_policy", "non_silent")
+    # silent span at 8.5 keeps >0.03 s distance to every event, so the later
+    # silence_removal step cannot eat the snapped 8.01 (the brief's 8.0 would)
+    monkeypatch.setattr(post, "_legacy_timing_features",
+                        lambda _: (np.zeros((100, 24)), np.zeros((100, 24)), [8.5]))
+    # second event unmatched (0); t=4.0 not inside silent span -> restored to original
+    monkeypatch.setattr(post, "sanity_check_timing2", lambda _, times, **kw: np.asarray([1.02, 0., 8.01]))
+    candidates, _ = post.postprocess_timing(song, beats([1., 4., 8.], [1, 1, 1]),
+                                            "unused.egg", skip=("bpm_alignment",))
+    assert [item["time"] for item in candidates] == [1.02, 4., 8.01]
+
+
+def test_onset_snap_unmatched_non_silent_drops_in_silence(song, timing_defaults, monkeypatch):
+    # same setup but silent span covers 4.0 -> event still dropped
+    monkeypatch.setattr(config, "add_silence_flag", True)
+    monkeypatch.setattr(config, "v2_onset_snap_unmatched_policy", "non_silent")
+    frames = np.asarray([4.0 + i * (config.hop_size / config.samplerate_music) for i in range(30)])
+    monkeypatch.setattr(post, "_legacy_timing_features",
+                        lambda _: (np.zeros((100, 24)), np.zeros((100, 24)), frames))
+    monkeypatch.setattr(post, "sanity_check_timing2", lambda _, times, **kw: np.asarray([1.02, 0., 8.01]))
+    candidates, _ = post.postprocess_timing(song, beats([1., 4., 8.], [1, 1, 1]),
+                                            "unused.egg", skip=("bpm_alignment",))
+    assert [item["time"] for item in candidates] == [1.02, 8.01]
+
+
+def test_onset_snap_unmatched_always_is_legacy(song, timing_defaults, monkeypatch):
+    monkeypatch.setattr(config, "v2_onset_snap_unmatched_policy", "always")
+    monkeypatch.setattr(post, "sanity_check_timing2", lambda _, times, **kw: np.asarray([1.02, 0., 8.01]))
+    candidates, _ = post.postprocess_timing(song, beats([1., 4., 8.], [1, 1, 1]),
+                                            "unused.egg", skip=("bpm_alignment",))
+    assert [item["time"] for item in candidates] == [1.02, 8.01]
+
+
+def test_onset_snap_unmatched_unknown_policy_raises(song, timing_defaults, monkeypatch):
+    monkeypatch.setattr(config, "v2_onset_snap_unmatched_policy", "bogus")
+    monkeypatch.setattr(post, "sanity_check_timing2", lambda _, times, **kw: np.asarray([1.02, 0., 8.01]))
+    with pytest.raises(ValueError, match="v2_onset_snap_unmatched_policy"):
+        post.postprocess_timing(song, beats([1., 4., 8.], [1, 1, 1]),
+                                "unused.egg", skip=("bpm_alignment",))
 
 
 def test_training_first_cut_selects_anchor_after_heuristic_cleanup(monkeypatch):

@@ -226,6 +226,12 @@ v2_fill_entry_delay_seconds = 1.0  # subdivision-fill blackout after each entry 
 v2_fill_entry_pause_beats = 4.0    # note-free gap counting as a new section entry (beats)
 v2_fill_respect_silence = True     # keep subdivision fills out of detected silent spans
 
+# Onset-snap unmatched policy (2026-11-04): the timing onset snap zeroes model
+# events with no detected onset inside its window. "always" is the legacy
+# drop-all, which gutted quiet sections; "non_silent" restores unmatched events
+# unless they sit inside a detected silent span; "never" restores them all.
+v2_onset_snap_unmatched_policy = "non_silent"
+
 add_waveform_pattern_flag = 0   # [0: off, 1: on, 2: double on]
 waveform_pattern = [
     [0, 1, 2, 3, 2, 1],
