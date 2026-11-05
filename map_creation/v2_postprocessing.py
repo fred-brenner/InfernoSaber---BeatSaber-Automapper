@@ -117,6 +117,32 @@ def _merge_candidates(candidates, duration):
     return merged
 
 
+def _section_entries(times, pause_seconds):
+    """Map start plus every time that follows a note-free gap of ``pause_seconds``."""
+    times = np.sort(np.asarray(times, np.float64))
+    if not len(times):
+        return times
+    return times[np.r_[True, np.diff(times) >= pause_seconds]]
+
+
+def _blocked_intervals(entries, delay):
+    """Post-entry windows where subdivision fills are gated; empty when off."""
+    if delay <= 0:
+        return []
+    return [(float(entry), float(entry) + delay) for entry in entries]
+
+
+def _filter_fill_times(previous, new_times, blocked):
+    """Drop fill insertions inside ``blocked`` windows; model times always pass."""
+    if not blocked:
+        return np.asarray(new_times, np.float64)
+    kept = {float(time) for time in previous}
+    return np.asarray([float(time) for time in new_times
+                       if float(time) in kept
+                       or not any(start <= float(time) < end for start, end in blocked)],
+                      np.float64)
+
+
 _TIMING_STEPS = ("minimum_spacing", "high_difficulty_fill", "bpm_alignment", "onset_snap",
                  "start_end_fill", "density_fill", "silence_removal")
 
@@ -202,11 +228,19 @@ def postprocess_timing(song, beats, audio_path, logger=None, skip=()):
     def times():
         return np.asarray([item["time"] for item in candidates], np.float64)
 
+    def fill_blocked():
+        pause = float(getattr(config, "v2_fill_entry_pause_beats", 4.0) or 0.) * 60. / bpm
+        delay = float(getattr(config, "v2_fill_entry_delay_seconds", 0.) or 0.)
+        entries = _section_entries(times(), pause) if pause > 0 else np.asarray([times()[0]])
+        return _blocked_intervals(entries, delay)
+
     iterations = max(0, int(config.map_filler_iters))
     if "high_difficulty_fill" not in skip:
         for pass_index, (threshold, index) in enumerate(((5.5 * 4, int(iterations / 2) + 1), (8 * 4, iterations - 1))):
             if candidates and iterations and config.max_speed >= threshold:
-                replace_times(f"high_difficulty_fill_{pass_index}", fill_map_times_scale(times(), min(iterations - 1, max(0, index))))
+                replace_times(f"high_difficulty_fill_{pass_index}",
+                              _filter_fill_times(times(), fill_map_times_scale(times(), min(iterations - 1, max(0, index))),
+                                                 fill_blocked()))
     align = "bpm_alignment" not in skip
     if candidates and align:
         replace_times("initial_bpm_alignment", align_beats_on_bpm(times(), bpm), moving=True)
@@ -219,7 +253,8 @@ def postprocess_timing(song, beats, audio_path, logger=None, skip=()):
         for index in range(iterations):
             if not candidates or len(candidates) > config.max_speed * 10 / 40 * candidates[-1]["time"] * config.add_beat_intensity / 100:
                 break
-            replace_times(f"density_fill_{index}", fill_map_times_scale(times(), index))
+            replace_times(f"density_fill_{index}",
+                          _filter_fill_times(times(), fill_map_times_scale(times(), index), fill_blocked()))
     if candidates and config.add_silence_flag and "silence_removal" not in skip:
         *_, silent_times = legacy_features()
         replace_times("silence_removal", remove_silent_times(times(), silent_times))

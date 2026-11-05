@@ -219,6 +219,12 @@ v2_calm_effects_variety = True          # rotate placement themes per gap (False
 v2_map_intro_no_notes_seconds = 2.0    # drop notes before this time (s)
 v2_map_intro_no_hazards_seconds = 1.0  # drop walls/bombs starting before this (s)
 
+# Fill entry ramp (2026-11-04): after map start and after every note-free pause
+# of at least v2_fill_entry_pause_beats beats, subdivision fills are gated for
+# v2_fill_entry_delay_seconds — only whole-beat model events enter there.
+v2_fill_entry_delay_seconds = 1.0  # subdivision-fill blackout after each entry (s); 0 disables
+v2_fill_entry_pause_beats = 4.0    # note-free gap counting as a new section entry (beats)
+
 add_waveform_pattern_flag = 0   # [0: off, 1: on, 2: double on]
 waveform_pattern = [
     [0, 1, 2, 3, 2, 1],

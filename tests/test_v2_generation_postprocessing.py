@@ -106,6 +106,44 @@ def test_zero_density_never_loads_audio_or_fills(song, timing_defaults, monkeypa
     assert report["retained_notes"] == 0
 
 
+def test_entry_ramp_drops_fill_inside_delay_window(song, timing_defaults, monkeypatch):
+    # 120 bpm -> 4 beats = 2.0 s pause threshold; entries: 1.0, 5.0 and 9.0
+    # (song duration is 10 s, so the brief's 10.0 tail is shifted to 9.0)
+    monkeypatch.setattr(config, "map_filler_iters", 1)
+    monkeypatch.setattr(config, "max_speed", 40.)
+    monkeypatch.setattr(config, "v2_fill_entry_delay_seconds", 1.0)
+    monkeypatch.setattr(config, "v2_fill_entry_pause_beats", 4.0)
+    insert = np.asarray([1., 5., 5.5, 6.2, 9.])
+    monkeypatch.setattr(post, "fill_map_times_scale", lambda times, idx: insert)
+    candidates, report = post.postprocess_timing(song, beats([1., 5., 9.], [1, 1, 1]),
+                                                 "unused.egg", skip=("bpm_alignment",))
+    # 5.5 is inside (5.0, 6.0) -> dropped; 6.2 outside -> kept; model times kept
+    assert [item["time"] for item in candidates] == [1., 5., 6.2, 9.]
+
+
+def test_entry_ramp_first_event_is_an_entry(song, timing_defaults, monkeypatch):
+    monkeypatch.setattr(config, "map_filler_iters", 1)
+    monkeypatch.setattr(config, "max_speed", 40.)
+    monkeypatch.setattr(config, "v2_fill_entry_delay_seconds", 1.0)
+    insert = np.asarray([3., 3.4, 8.])
+    monkeypatch.setattr(post, "fill_map_times_scale", lambda times, idx: insert)
+    candidates, _ = post.postprocess_timing(song, beats([3., 8.], [1, 1]),
+                                            "unused.egg", skip=("bpm_alignment",))
+    # 3.4 inside (3.0, 4.0) -> dropped
+    assert [item["time"] for item in candidates] == [3., 8.]
+
+
+def test_entry_ramp_disabled_at_zero_delay(song, timing_defaults, monkeypatch):
+    monkeypatch.setattr(config, "map_filler_iters", 1)
+    monkeypatch.setattr(config, "max_speed", 40.)
+    monkeypatch.setattr(config, "v2_fill_entry_delay_seconds", 0.0)
+    insert = np.asarray([1., 5., 5.5, 9.])
+    monkeypatch.setattr(post, "fill_map_times_scale", lambda times, idx: insert)
+    candidates, _ = post.postprocess_timing(song, beats([1., 5., 9.], [1, 1, 1]),
+                                            "unused.egg", skip=("bpm_alignment",))
+    assert [item["time"] for item in candidates] == [1., 5., 5.5, 9.]
+
+
 def test_training_first_cut_selects_anchor_after_heuristic_cleanup(monkeypatch):
     monkeypatch.setattr(config, "gimme_more_notes_flag", False)
     monkeypatch.setattr(config, "single_notes_only_flag", False)
