@@ -83,6 +83,51 @@ def test_timing_windows_are_target_free_and_batching_preserves_tails():
     assert set(song.arrays) == {"features", "coarse_features", "frame_times", "bin_durations"}
 
 
+def test_timing_event_bias_adds_borderline_events(monkeypatch):
+    # Borderline frames (0.38, 0.32, 0.30) stay silent under pure argmax; a
+    # 0.10 bias on the event classes flips class 1 into an event without
+    # mutating the probabilities kept for diagnostics.
+    song, vocab = audio_song(), vocabulary()
+    predictors = dummy_predictors(vocab)
+
+    class Borderline:
+        status = "dummy"
+
+        def __call__(self, inputs):
+            batch = len(inputs["audio"])
+            values = np.zeros((batch, CORE, 3), np.float32)
+            values[...] = [.38, .32, .30]
+            return {"counts": values}
+
+    predictors["timing"] = Borderline()
+    monkeypatch.setattr(config, "v2_timing_event_bias", 0.)
+    silent = infer_beats(song, 4., predictors)
+    monkeypatch.setattr(config, "v2_timing_event_bias", .1)
+    biased = infer_beats(song, 4., predictors)
+    assert not silent["counts"].any()
+    assert len(silent["event_frames"]) < len(biased["event_frames"]) == 1100
+    np.testing.assert_array_equal(silent["frame_probabilities"], biased["frame_probabilities"])
+    assert (biased["frame_probabilities"].argmax(axis=-1) == 0).all()
+
+
+def test_timing_event_bias_preserves_zero_density(monkeypatch):
+    # conditioning_nps == 0 leaves probabilities at (1, 0, 0): any bias < 1
+    # keeps class 0 ahead, so zero requested NPS still produces no events.
+    monkeypatch.setattr(config, "v2_timing_event_bias", .9)
+    predictors = dummy_predictors(vocabulary())
+    predictors["timing"] = lambda inputs: pytest.fail("zero density must skip timing")
+    beats = infer_beats(audio_song(), 0., predictors)
+    assert beats["conditioning_nps"] == 0
+    assert len(beats["event_frames"]) == 0
+
+
+@pytest.mark.parametrize("bias", [-.01, 1., 1.5, float("nan"), True, "0.1"])
+def test_timing_event_bias_rejects_out_of_range(monkeypatch, bias):
+    monkeypatch.setattr(config, "v2_timing_event_bias", bias)
+    with pytest.raises(ValueError, match="v2_timing_event_bias"):
+        infer_beats(audio_song(), 4., dummy_predictors(vocabulary()))
+
+
 def test_production_pipeline_uses_only_audio_and_keeps_all_output_families(monkeypatch):
     monkeypatch.setattr(config, "single_notes_only_flag", False)
     monkeypatch.setattr(config, "v2_walls_heuristic", False)  # model decode: exercises the hazards stage

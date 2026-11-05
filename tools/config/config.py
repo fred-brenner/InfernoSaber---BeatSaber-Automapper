@@ -68,10 +68,17 @@ v2_arcs_heuristic = True
 v2_note_sample_temperature = 0.9
 
 # V2 intensity postprocessing (generation only; training shares stay unchanged).
-v2_intensity_low_boost = 0.1  # fraction of the deficit below uniform density [0, 1]
+v2_intensity_low_boost = 0.3  # fraction of the deficit below uniform density [0, 1];
+                              # experiment value (was 0.1) — more notes in quiet parts
 v2_intensity_high_reduction = 0.1  # fraction of the excess above uniform density [0, 1]
 v2_intensity_scale = 1.0  # overall target gain; nonnegative, 1 preserves average NPS
 v2_intensity_adjustment_strength = 0.8  # fraction of the target change applied [0, 1]
+
+# Timing event bias (tuning experiment 2026-11-04): flat offset added to the
+# timing model's event classes (single/double) before the per-frame argmax,
+# lifting borderline frames into events. Must stay < 1 so a fully silent
+# frame can never flip; 0 restores pure argmax.
+v2_timing_event_bias = 0.1
 
 # select song metadata search mode
 enable_auto_metadata = True  # if True, tries to get song metadata from song name
