@@ -154,8 +154,14 @@ start and every note-free pause of at least `v2_fill_entry_pause_beats` beats
 (default `4.0`; `0` leaves only the map start as an entry), the subdivision fills (`high_difficulty_fill`,
 `density_fill`) may not insert for `v2_fill_entry_delay_seconds` (default
 `1.0`; `0` disables) — an entry ramp recomputed at each fill site on the
-then-current times; model events already inside the window are kept, and
-`start_end_fill` as an edge fill stays ungated. With
+then-current times, extended since 2026-11-05 until the
+`v2_fill_entry_min_notes`-th kept candidate after the entry (default `4`;
+`0` disables the count gate; map end when fewer remain); model events
+already inside the window are kept. `start_end_fill` stays ungated except
+its start segment — `v2_suppress_start_fill` (default `True`) drops
+inserts before the first event while the `v2_map_intro_no_notes_seconds`
+floor is active. Blocked windows and suppressed inserts are counted under
+`entry_blocked_windows` and `start_fill_suppressed`. With
 `v2_fill_respect_silence` (default `True`) the same fills also skip detected
 silent spans (silent frame times merged into spans, gaps under four hops
 closed). The timing onset snap zeroes events with no onset peak in reach, and
@@ -367,6 +373,32 @@ whose adjacent cardinals are all illegal stays, so the realized fraction may
 exceed the cap. Diagnostics land under `intro_zones` (`notes_dropped`) and
 `diagonal_cap` (`diagonal_before`, `diagonal_after`, `recut`,
 `kept_over_cap`, `fraction_after`).
+
+The 2026-11-05 fast-section update adds two note passes around the same
+boundary. `apply_fast_direction_rules` runs just before the diagonal cap:
+a same-hand pair closer than `v2_fast_gap_seconds` (default `.2`; `<= 0`
+disables both fast rules) forms a fast run, inside which each note's
+allowed directions are its predecessor's plus the 180° reverse, union a
+±45° family admitted per note with probability `min(1, expected/local)`
+— `expected` the map-mean `calc_note_speed`, `local` the pair's own cost
+— made of the reverse's ±45° neighbours (the 135°/225° off-reversals,
+the only ±45° cuts separated strokes may play) plus the predecessor's
+±45° for same-stroke pairs; a note outside its set is recut to a legal
+allowed direction or keeps its own. With `v2_fast_counter_direction =
+"recut"` (`"off"`/`"keep"` disables) run members whose cut opposes their
+row (top-row down-family 1/6/7, bottom-row up-family 0/4/5) are recut
+first, preferring the allowed pool. `apply_speed_cap` then runs after
+multiplier expansion and the post-expansion fixpoint — the v1
+`sanity_check_notes` movement gate v2 otherwise skips: consecutive
+same-hand notes over `max_speed * get_factor_from_max_speed` scaled by
+`v2_speed_cap_scale` (default `1.0`; `<= 0` disables) drop their later
+note, with a linear `v2_speed_cap_start_factor` (default `.35`) → 1 ramp
+over the first `v2_speed_cap_start_notes` (default `30`) combined
+positions; each deletion re-checks the new adjacency for speed and flow
+(recut or drop) to a deletion-only fixpoint. Diagnostics land under
+`fast_directions` (`fast_pairs`, `fast_simplified`, `fast_counter_recuts`)
+and `speed_cap` (`speed_cap_dropped`, `speed_cap_recuts`,
+`speed_cap_value`).
 
 The 2026-10-31 calm-effects stage (`v2_calm_effects = True`) fills note-free
 stretches the model intentionally leaves empty — a requested behaviour — with

@@ -2,8 +2,9 @@
 
 Findings from a manual playtest of v2-generated maps. Each case records the
 observed symptom, the proposed rule, candidate `config.py` knobs, and notes on
-where the change would hook in. Status: **all seven cases discussed and
-decided — nothing implemented yet.** Ready for implementation planning.
+where the change would hook in. Status: **all seven cases implemented** —
+see the 2026-11-04/05 updates in `docs/generation-v2.md` and the plans in
+`docs/superpowers/plans/`.
 
 ## 1. Notes at time zero — start-of-map free zones
 
@@ -358,3 +359,92 @@ stays v2. v1 models are still on HuggingFace.
 - Small doc fix while there: `docs/development.md` still credits
   `gen_beats.main` for the beat benchmark — it's
   `evaluation/legacy_generator.main` now.
+
+---
+
+# Playtest round 2 — v2 fast-section quality (2026-11-05)
+
+Source: playtest of `playtest_maps/v2_expert` + `fav_15` A/B set (8 songs, 5.0 NPS).
+Reference map: `12345_BWB - No Sleep` (v2_expert). All four items are v2-only;
+v1 fav_15 stays untouched. Status: **all four implemented** — `32f1b4c`
+(R2-1), `1e2d6d5` (R2-2), `c7b70f0` + `3147add` (R2-3/R2-4); plan:
+`docs/superpowers/plans/2026-11-05-v2-fast-section-quality.md`.
+
+## R2-1: Opening goes full-speed from note ~3
+
+- Symptom: left-hand stream at ~48 ms gaps (≈1/4 beat at detected BPM 309.6)
+  starting at t=2.03 s — the fill density arrives before the player has a
+  pattern to read.
+- Diagnosis: `start_end_fill` (`add_start_end_beats`, `_start_end_times`)
+  inserts events at audio-frame resolution before the first model event
+  whenever energy exceeds a running threshold. It does NOT consult
+  `fill_blocked()` — the `v2_fill_entry_*` gate only wraps
+  `high_difficulty_fill`/`density_fill`. The 2 s intro floor then clips only
+  the <2 s part of that burst; the remainder survives untouched.
+  `_merge_candidates` merges at `min_time_diff`, not `min_beat_time`, so no
+  stage re-clamps density after fills.
+- Decision: gate fills until 4 consecutive notes exist after an entry
+  (count-based ramp, pauses restart the count) — user-specified.
+- Implemented (`32f1b4c`): `v2_fill_entry_min_notes = 4` — each entry's
+  fill blackout now also runs until the 4th kept candidate after it
+  (`_blocked_intervals`, so `high_difficulty_fill`/`density_fill` are both
+  gated; fewer remaining candidates gates to map end, `0` disables the
+  count gate); `v2_suppress_start_fill = True` — `start_end_fill` drops
+  its pre-first-event inserts while the `v2_map_intro_no_notes_seconds`
+  floor is active (end segment unchanged). Diagnostics:
+  `entry_blocked_windows`, `start_fill_suppressed`.
+
+## R2-2: Fast sections exceed playable movement speed (NPS 5)
+
+- Symptom: the same burst runs 1–2 cells per ~48 ms ≈ 20–40 cells/s.
+- Diagnosis: the movement-cost gate EXISTS — v1 `sanity_check_notes` +
+  `calc_note_speed` (exit→approach distance ÷ dt + reaction buffer; deletes
+  timesteps over `max_speed * get_factor_from_max_speed`, with
+  `decr_speed_val=0.35` ramp over the first `decr_speed_range=30` slots).
+  But it sits inside `legacy_note_flow`, which v2 skips entirely because
+  `v2_cleanup_note_heuristics = False`. v2's own passes
+  (flow legality, diagonal cap, clearance) never check travel/time.
+- Implemented (`1e2d6d5`): `apply_speed_cap` — a standalone pass after
+  multiplier expansion and the post-expansion clearance fixpoint, reusing
+  the v1 cost formula (`calc_note_speed`; cap = `max_speed *
+  get_factor_from_max_speed`) per hand. Over-cap pairs drop the later
+  note (v1 dropped the whole timestep); each deletion re-checks the
+  newly-adjacent pair for speed and `_flow_legal` (recut via
+  `_flow_direction`, else drop) to a deletion-only fixpoint. Knobs:
+  `v2_speed_cap_scale = 1.0` (`<= 0` disables), `v2_speed_cap_start_notes
+  = 30` / `v2_speed_cap_start_factor = .35` — the v1
+  `decr_speed_range`/`decr_speed_val` start ramp over combined
+  chronological positions. Diagnostics under `speed_cap`.
+
+## R2-3: Direction chaos in fast runs
+
+- Symptom: the opening burst cycles d = 3,1,0,6,2,5,2,7,4,0,1 — unreadable
+  at speed. Slow-area variety is wanted; fast runs need simpler patterns
+  (not strictly up/down — a middle ground).
+- Implemented (`c7b70f0` + `3147add`): `apply_fast_direction_rules` — a
+  same-hand pair closer than `v2_fast_gap_seconds = .2` (`<= 0` disables
+  both fast rules) is a fast pair; runs extend transitively. Each run
+  member's allowed set is the predecessor's direction plus its 180°
+  reverse, union a ±45° family admitted per note with probability
+  `min(1, expected/local)` (`expected` = map-mean `calc_note_speed`,
+  `local` = the pair's own cost): the reverse's ±45° neighbours — the
+  135°/225° off-reversals, the only ±45° cuts legal between separated
+  strokes, added by the `3147add` review widening — plus the
+  predecessor's ±45° for same-stroke pairs. Notes outside the set are
+  recut to a legal allowed direction; nothing legal → the direction
+  stays. The planned `v2_fast_dir_pattern` knob did not ship — the
+  speed-adaptive ±45° admission is the middle ground. Runs pre-expansion
+  just before `apply_diagonal_cap`. Diagnostics: `fast_pairs`,
+  `fast_simplified`, `fast_counter_recuts`, `expected_speed`.
+
+## R2-4: Counter-directional placements in fast runs
+
+- Symptom: note in top row with down-cut, or bottom row with up-cut —
+  readable in slow areas, misleading at speed (a brief top-row note reads
+  as "reach up").
+- Implemented (`c7b70f0`): same pass — `v2_fast_counter_direction =
+  "recut"` (`"off"`/`"keep"` disables; no `"drop"` mode shipped) recuts
+  fast-run members whose cut opposes their row (y=2 & d in {1,6,7};
+  y=0 & d in {0,4,5}) before the general simplify rule, preferring the
+  allowed pool then any legal non-counter direction. Slow areas keep the
+  cuts — the rule only applies inside fast runs.
