@@ -144,6 +144,59 @@ def test_entry_ramp_disabled_at_zero_delay(song, timing_defaults, monkeypatch):
     assert [item["time"] for item in candidates] == [1., 5., 5.5, 9.]
 
 
+def test_density_fill_skips_silent_spans(song, timing_defaults, monkeypatch):
+    # the brief's 10.0 tail is shifted to 9.0: duration is 10 s, so 10.0 maps
+    # out of the 1000 frame_times and _merge_candidates drops time >= duration
+    monkeypatch.setattr(config, "add_silence_flag", True)
+    monkeypatch.setattr(config, "map_filler_iters", 1)
+    monkeypatch.setattr(config, "max_speed", 40.)
+    monkeypatch.setattr(config, "v2_fill_respect_silence", True)
+    silent_frames = np.asarray([4.0 + i * (config.hop_size / config.samplerate_music)
+                                for i in range(30)])  # silent span around t=4.0..5.0
+    monkeypatch.setattr(post, "_legacy_timing_features",
+                        lambda _: (np.zeros((100, 24)), np.zeros((100, 24)), silent_frames))
+    insert = np.asarray([1., 4.15, 6., 9.])
+    monkeypatch.setattr(post, "fill_map_times_scale", lambda times, idx: insert)
+    candidates, report = post.postprocess_timing(song, beats([1., 6., 9.], [1, 1, 1]),
+                                                 "unused.egg", skip=("bpm_alignment",))
+    assert [item["time"] for item in candidates] == [1., 6., 9.]  # 4.15 silent -> dropped
+
+
+def test_silent_span_merge_covers_small_frame_gaps(song, timing_defaults, monkeypatch):
+    # A fill inside a <4*hop hole between silent frame runs is still inside the
+    # merged span; nearest-frame removal (0.03 s) cannot reach it there, so this
+    # pins the span merge instead of remove_silent_times' point matching.
+    monkeypatch.setattr(config, "add_silence_flag", True)
+    monkeypatch.setattr(config, "map_filler_iters", 1)
+    monkeypatch.setattr(config, "max_speed", 40.)
+    monkeypatch.setattr(config, "v2_fill_respect_silence", True)
+    hop = config.hop_size / config.samplerate_music
+    silent_frames = np.asarray([4.0 + i * hop for i in range(15)]
+                               + [4.0 + (17 + i) * hop for i in range(15)])  # 3*hop hole ~4.5
+    monkeypatch.setattr(post, "_legacy_timing_features",
+                        lambda _: (np.zeros((100, 24)), np.zeros((100, 24)), silent_frames))
+    insert = np.asarray([1., 4.54, 6., 9.])
+    monkeypatch.setattr(post, "fill_map_times_scale", lambda times, idx: insert)
+    candidates, _ = post.postprocess_timing(song, beats([1., 6., 9.], [1, 1, 1]),
+                                            "unused.egg", skip=("bpm_alignment",))
+    assert [item["time"] for item in candidates] == [1., 6., 9.]  # 4.54 inside merged span -> dropped
+
+
+def test_silence_removal_runs_before_density_fill(song, timing_defaults, monkeypatch):
+    # density_fill_0 needs iterations and a sub-threshold density to run —
+    # mirrors test_filler_uses_strongest_nonzero_class_at_nearest_frame's setup
+    monkeypatch.setattr(config, "add_silence_flag", True)
+    monkeypatch.setattr(config, "map_filler_iters", 1)
+    monkeypatch.setattr(config, "max_speed", 20.)
+    monkeypatch.setattr(config, "add_beat_max_bounds", [.1, .4, 3., 4.])
+    monkeypatch.setattr(post, "_legacy_timing_features",
+                        lambda _: (np.zeros((100, 24)), np.zeros((100, 24)), [2.]))
+    _, report = post.postprocess_timing(song, beats([1., 2., 8.], [1, 1, 1]),
+                                        "unused.egg", skip=("bpm_alignment",))
+    stages = [op["stage"] for op in report["operations"]]
+    assert stages.index("silence_removal") < stages.index("density_fill_0")
+
+
 def test_training_first_cut_selects_anchor_after_heuristic_cleanup(monkeypatch):
     monkeypatch.setattr(config, "gimme_more_notes_flag", False)
     monkeypatch.setattr(config, "single_notes_only_flag", False)

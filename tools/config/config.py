@@ -224,6 +224,7 @@ v2_map_intro_no_hazards_seconds = 1.0  # drop walls/bombs starting before this (
 # v2_fill_entry_delay_seconds — only whole-beat model events enter there.
 v2_fill_entry_delay_seconds = 1.0  # subdivision-fill blackout after each entry (s); 0 disables
 v2_fill_entry_pause_beats = 4.0    # note-free gap counting as a new section entry (beats)
+v2_fill_respect_silence = True     # keep subdivision fills out of detected silent spans
 
 add_waveform_pattern_flag = 0   # [0: off, 1: on, 2: double on]
 waveform_pattern = [
