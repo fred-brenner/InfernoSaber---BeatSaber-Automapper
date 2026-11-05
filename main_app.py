@@ -28,6 +28,18 @@ bs_folder_name2 = "SharedMaps/CustomLevels"
 
 MAPPER_CHOICES = ["v2_expert", *V1_MAPPER_SELECTIONS]
 
+
+def parameter_group_visibility(selection):
+    """Which parameter groups apply to the selected mapper model."""
+    return {"v1_only": selection != "v2_expert", "v2_only": selection == "v2_expert"}
+
+
+def parameter_group_updates(selection):
+    """Map a model selector value to gr.Column visibility updates."""
+    groups = parameter_group_visibility(selection)
+    return gr.update(visible=groups["v1_only"]), gr.update(visible=groups["v2_only"])
+
+
 update_check_response = None
 
 
@@ -755,18 +767,22 @@ def build_app(check_updates=True):
                 )
                 difficulty_5.input(set_difficulty_5, inputs=[difficulty_5], outputs=[])
 
+            # Initial parameter group visibility matches the default model selection.
+            param_groups = parameter_group_visibility("v2_expert")
             with gr.Row():
                 gr.Markdown("""### Further
                             ### Modifications""")
-                # set gimme_more_notes_prob
-                more_notes_prob = gr.Number(label="Left/Right Notes Filling (%)", value=config.gimme_more_notes_prob * 100,
-                                            precision=0, interactive=True, step=5, minimum=0, maximum=100,
-                                            info="Increase to always have notes on both sides.")
-                more_notes_prob.input(set_more_notes_prob, inputs=[more_notes_prob], outputs=[])
-                # emphasize beats on/off
-                emphasize_beats = gr.Checkbox(label="Emphasize Beats", value=config.emphasize_beats_flag,
-                                              info="Emphasize beats with double/triple notes.")
-                emphasize_beats.input(set_emphasize_mode, inputs=[emphasize_beats], outputs=[])
+                with gr.Column(visible=param_groups["v1_only"]) as v1_col:
+                    gr.Markdown("Applies to legacy v1 models")
+                    # set gimme_more_notes_prob
+                    more_notes_prob = gr.Number(label="Left/Right Notes Filling (%)", value=config.gimme_more_notes_prob * 100,
+                                                precision=0, interactive=True, step=5, minimum=0, maximum=100,
+                                                info="Increase to always have notes on both sides.")
+                    more_notes_prob.input(set_more_notes_prob, inputs=[more_notes_prob], outputs=[])
+                    # emphasize beats on/off
+                    emphasize_beats = gr.Checkbox(label="Emphasize Beats", value=config.emphasize_beats_flag,
+                                                  info="Emphasize beats with double/triple notes.")
+                    emphasize_beats.input(set_emphasize_mode, inputs=[emphasize_beats], outputs=[])
                 # single mode on/off
                 single_mode = gr.Checkbox(label="Single Mode", value=config.single_notes_only_flag,
                                           info="Generate maximum one note per beat.")
@@ -815,13 +831,15 @@ def build_app(check_updates=True):
                                              info="Varies the lighting choices on each iteration. "
                                                   "0 deactivates the feature.")
                 random_behaviour.input(set_random_behaviour, inputs=[random_behaviour], outputs=[])
-                # set v2 note sample temperature
-                note_sample_temperature = gr.Number(label="Note Sample Temperature",
-                                                    value=config.v2_note_sample_temperature, precision=1,
-                                                    interactive=True, step=0.1, minimum=0, maximum=2,
-                                                    info="Note variety: 0 repeats the same deterministic map, "
-                                                         "higher values sample more varied placements.")
-                note_sample_temperature.input(set_note_sample_temperature, inputs=[note_sample_temperature], outputs=[])
+                with gr.Column(visible=param_groups["v2_only"]) as v2_col:
+                    gr.Markdown("Applies to v2 only")
+                    # set v2 note sample temperature
+                    note_sample_temperature = gr.Number(label="Note Sample Temperature",
+                                                        value=config.v2_note_sample_temperature, precision=1,
+                                                        interactive=True, step=0.1, minimum=0, maximum=2,
+                                                        info="Note variety: 0 repeats the same deterministic map, "
+                                                             "higher values sample more varied placements.")
+                    note_sample_temperature.input(set_note_sample_temperature, inputs=[note_sample_temperature], outputs=[])
 
             with gr.Row():
                 # Set arc stats
@@ -853,6 +871,10 @@ def build_app(check_updates=True):
                                              interactive=True, step=0.5, minimum=0, maximum=5,
                                              info="Note distance required to allow arcs.")
                 arc_movement_min.input(set_arc_movement_min, inputs=[arc_movement_min], outputs=[])
+
+            # Toggle v1-only / v2-only parameter groups with the model selection.
+            model_selector.change(parameter_group_updates, inputs=[model_selector],
+                                  outputs=[v1_col, v2_col])
 
 
         ################################

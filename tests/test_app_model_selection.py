@@ -23,6 +23,11 @@ def test_mapper_choices_lists_v2_first_then_all_v1_presets():
     assert main_app.MAPPER_CHOICES == ["v2_expert", *V1_MAPPER_SELECTIONS]
 
 
+def test_parameter_group_visibility():
+    assert main_app.parameter_group_visibility("v2_expert") == {"v1_only": False, "v2_only": True}
+    assert main_app.parameter_group_visibility("fav_15") == {"v1_only": True, "v2_only": False}
+
+
 def test_run_process_passes_selected_model(monkeypatch):
     captured = {}
     _stub_run(monkeypatch, captured)
