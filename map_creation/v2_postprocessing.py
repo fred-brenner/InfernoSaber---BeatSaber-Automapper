@@ -256,13 +256,18 @@ def postprocess_timing(song, beats, audio_path, logger=None, skip=()):
 
     detected_silence = None
 
-    def silent_spans():
-        """Detected silent spans, decoded once and only when fills/snap gate on them."""
+    def silent_spans(force=False):
+        """Detected silent spans, decoded once and only when fills/snap gate on them.
+
+        The cached detection keys on ``add_silence_flag`` alone so call order
+        cannot leak the gate state; ``v2_fill_respect_silence`` applies per
+        call. ``force`` bypasses that fill gate — the onset-snap unmatched
+        policy must still cull events inside detected silence."""
         nonlocal detected_silence
         if detected_silence is None:
             detected_silence = (_silent_spans(legacy_features()[2])
-                                if config.add_silence_flag and config.v2_fill_respect_silence else [])
-        return detected_silence
+                                if config.add_silence_flag else [])
+        return detected_silence if force or config.v2_fill_respect_silence else []
 
     iterations = max(0, int(config.map_filler_iters))
     if "high_difficulty_fill" not in skip:
@@ -280,7 +285,7 @@ def postprocess_timing(song, beats, audio_path, logger=None, skip=()):
         if policy not in ("always", "non_silent", "never"):
             raise ValueError(f"Unknown v2_onset_snap_unmatched_policy: {policy!r}")
         if policy != "always":
-            spans = silent_spans() if policy == "non_silent" else ()
+            spans = silent_spans(force=True) if policy == "non_silent" else ()
             snapped = np.asarray([original if marker <= 0 and (policy == "never" or not _inside_spans(original, spans))
                                   else marker
                                   for original, marker in zip(times(), snapped)])

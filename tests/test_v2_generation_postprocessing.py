@@ -243,6 +243,25 @@ def test_onset_snap_unmatched_unknown_policy_raises(song, timing_defaults, monke
                                 "unused.egg", skip=("bpm_alignment",))
 
 
+def test_onset_snap_non_silent_ignores_fill_silence_gate(song, timing_defaults, monkeypatch):
+    # v2_fill_respect_silence gates fills only; the non_silent onset policy
+    # detects silence via add_silence_flag alone. The unmatched event sits in a
+    # merged-span hole >0.03 s from any silent frame, so silence_removal cannot
+    # cull it downstream — only the onset-snap policy itself can.
+    monkeypatch.setattr(config, "add_silence_flag", True)
+    monkeypatch.setattr(config, "v2_fill_respect_silence", False)
+    monkeypatch.setattr(config, "v2_onset_snap_unmatched_policy", "non_silent")
+    hop = config.hop_size / config.samplerate_music
+    frames = np.asarray([4.0 + i * hop for i in range(15)]
+                        + [4.0 + (17 + i) * hop for i in range(15)])  # 3*hop hole ~4.5
+    monkeypatch.setattr(post, "_legacy_timing_features",
+                        lambda _: (np.zeros((100, 24)), np.zeros((100, 24)), frames))
+    monkeypatch.setattr(post, "sanity_check_timing2", lambda _, times, **kw: np.asarray([1.02, 0., 8.01]))
+    candidates, _ = post.postprocess_timing(song, beats([1., 4.54, 8.], [1, 1, 1]),
+                                            "unused.egg", skip=("bpm_alignment",))
+    assert [item["time"] for item in candidates] == [1.02, 8.01]
+
+
 def test_training_first_cut_selects_anchor_after_heuristic_cleanup(monkeypatch):
     monkeypatch.setattr(config, "gimme_more_notes_flag", False)
     monkeypatch.setattr(config, "single_notes_only_flag", False)
