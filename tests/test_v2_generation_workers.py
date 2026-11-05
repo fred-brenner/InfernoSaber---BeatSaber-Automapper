@@ -255,7 +255,7 @@ def test_sequential_run_emits_eta_and_only_milestones_to_app(capsys, tmp_path, m
     monkeypatch.setattr(main_multi, 'process_song', lambda group, total: [
         {'status': 'ok', 'song': Path(song).stem, 'internal_difficulty': difficulty, 'path': str(tmp_path)}
         for song, difficulty in group])
-    monkeypatch.setattr(main_multi, '_combine_maps', lambda *args: [{'song': args[0]}])
+    monkeypatch.setattr(main_multi, '_combine_maps', lambda *args, **kwargs: [{'song': args[0]}])
     monkeypatch.setattr(main_multi, 'save_report', lambda report, root=None: 'report.json')
     app = []
     result = main_multi._run(1, [3], False, app.append, parallel=False)
@@ -319,3 +319,42 @@ def test_combine_maps_zips_v1_folders_without_combining(tmp_path, monkeypatch):
     assert zips == [(str(folder), f"{tmp_path}/20.0_song.zip")]
     assert copies == ['20.0_song']
     assert result == [{'song': 'song', 'variants': [{'path': str(folder), 'zip': zips[0][1]}]}]
+
+
+def test_combine_maps_v1_requires_all_requested_difficulties(tmp_path, monkeypatch):
+    """Same gate as v2: partial successes stay in place for retry."""
+    monkeypatch.setattr(paths, 'new_map_path', str(tmp_path) + '/')
+    monkeypatch.setattr(config, 'auto_move_song_afterwards', True)
+    monkeypatch.setattr(config, 'use_mapper_selection', 'fav_15')
+    songs = tmp_path / 'input'
+    songs.mkdir()
+    for name in ('full.egg', 'partial.egg'):
+        (songs / name).write_bytes(b'x')
+    monkeypatch.setattr(paths, 'songs_pred', str(songs) + '/')
+    records = []
+    for name, difficulties in [('full', (12., 20.)), ('partial', (20.,))]:
+        for difficulty in difficulties:
+            folder = tmp_path / f'1234_{difficulty:.1f}_{name}'
+            folder.mkdir()
+            records.append({'song': name, 'status': 'ok',
+                            'internal_difficulty': difficulty, 'path': str(folder)})
+    records.append({'song': 'partial', 'status': 'failed', 'internal_difficulty': 12.})
+    zips = []
+    monkeypatch.setattr(main_multi, 'write_zip', lambda source, target: zips.append(target) or target)
+    result = main_multi.combine_maps(['full.egg', 'partial.egg'], records, [12., 20.], False)
+    assert [package['song'] for package in result] == ['full']
+    assert len(zips) == 2  # both requested difficulties of the complete song
+    assert (songs / 'y_done' / 'full.egg').exists()
+    assert (songs / 'partial.egg').exists()  # partial success stays for retry
+
+
+def test_run_normalizes_mapper_selection_case(tmp_path, monkeypatch):
+    seen = []
+    monkeypatch.setattr(paths, 'songs_pred', str(tmp_path) + '/')
+    monkeypatch.setattr(paths, 'temp_path', str(tmp_path) + '/')
+    monkeypatch.setattr(main_multi, 'ensure_v1_bundle', lambda sel: seen.append(sel))
+    monkeypatch.setattr(main_multi, 'validate_production_bundle',
+                        lambda *a, **kw: seen.append('v2_bundle'))
+    monkeypatch.setattr(main_multi, 'check_music_files', lambda files, path: [])
+    main_multi._run(1, [6.0], False, None, parallel=False, model_selection='FAV_15')
+    assert seen == ['fav_15']  # config convention lowercases selections

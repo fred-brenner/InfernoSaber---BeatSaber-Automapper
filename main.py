@@ -96,7 +96,8 @@ def main(use_model=None, diff=None, export_results_to_bs=True,
                 if config.use_mapper_selection == "v2_expert":
                     result = generate_song(song_name, logger=logger_callback)
                 else:
-                    result = generate_song_v1(song_name, config.max_speed)
+                    result = generate_song_v1(song_name, config.max_speed_orig,
+                                              logger=logger_callback)
                 # Count a completed song only after its archive is available.
                 result["zip_path"] = write_zip(result["path"],
                     f'{paths.new_map_path}{config.max_speed_orig:.1f}_{song_name}.zip')

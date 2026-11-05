@@ -35,7 +35,7 @@ def _missing_v1_assets():
 
 def ensure_v1_bundle(selection: str) -> None:
     """Download the v1 preset's model folder on demand, then validate it."""
-    selection = str(selection)
+    selection = str(selection).lower()  # config convention lowercases selections
     if selection not in V1_MAPPER_SELECTIONS:
         raise ValueError(f"Unknown v1 mapper selection: {selection}")
     config.use_mapper_selection = selection

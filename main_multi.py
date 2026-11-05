@@ -1,4 +1,8 @@
-"""Generate v2 maps with resident CPU workers and explicit completion records."""
+"""Generate maps with resident CPU workers and explicit completion records.
+
+v2_expert is the production generator; legacy v1 mapper selections route
+each song through the wrapped v1 generator and per-difficulty ZIP export.
+"""
 
 import json
 import math
@@ -90,32 +94,43 @@ def _difficulties(values):
     return result
 
 
-def combine_maps(song_list_potential, song_list_run, diff_list, export_results_to_bs):
+def combine_maps(song_list_potential, song_list_run, diff_list, export_results_to_bs,
+                 logger=None):
     """Combine only successful records supplied by this run, never scan old folders.
 
     The second argument now contains completion records from ``process_song``.
     The other arguments retain their existing signature and internal speed units.
     """
     return _combine_maps(song_list_potential, song_list_run, diff_list,
-                         export_results_to_bs, settings_snapshot())
+                         export_results_to_bs, settings_snapshot(), logger=logger)
 
 
-def _combine_v1_packages(song_list_potential, song_list_run, export_results_to_bs, run_config, run_paths):
-    """Zip each 1234_<speed>_<name> v1 folder directly, never a combined 12345_* package."""
+def _combine_v1_packages(song_list_potential, song_list_run, diff_list,
+                         export_results_to_bs, run_config, run_paths, logger=None):
+    """Zip each 1234_<speed>_<name> v1 folder directly, never a combined 12345_* package.
+
+    Same gate as _combine_maps: a song is packaged and archived only when
+    every requested difficulty succeeded; partial successes stay in place
+    for retry (their records remain in the run report).
+    """
     packages = []
     for filename in song_list_potential:
         name = Path(filename).stem
-        records = [record for record in song_list_run if record["song"] == name and record["status"] == "ok"]
-        if not records:
+        by_difficulty = {record["internal_difficulty"]: record
+                         for record in song_list_run
+                         if record["song"] == name and record["status"] == "ok"}
+        if any(difficulty not in by_difficulty for difficulty in diff_list):
             continue
         variants = []
-        for record in records:
+        for difficulty in diff_list:
+            record = by_difficulty[difficulty]
             zip_path = write_zip(record["path"],
                                  f"{run_paths['new_map_path']}{record['internal_difficulty']:.1f}_{name}.zip")
             variants.append({"path": record["path"], "zip": zip_path})
-            if export_results_to_bs:
-                shutil_copy_maps(f"{record['internal_difficulty']:.1f}_{name}")
+            if export_results_to_bs and shutil_copy_maps(f"{record['internal_difficulty']:.1f}_{name}"):
+                _emit("Copied map(s) to BeatSaber directory.", logger)
         packages.append({"song": name, "variants": variants})
+        _emit(f"Packaged {name}: {len(variants)} v1 map archive(s)", logger, important=True)
         if run_config["auto_move_song_afterwards"]:
             done = Path(run_paths["songs_pred"]) / "y_done"
             done.mkdir(exist_ok=True)
@@ -123,11 +138,13 @@ def _combine_v1_packages(song_list_potential, song_list_run, export_results_to_b
     return packages
 
 
-def _combine_maps(song_list_potential, song_list_run, diff_list, export_results_to_bs, snapshot):
+def _combine_maps(song_list_potential, song_list_run, diff_list, export_results_to_bs,
+                  snapshot, logger=None):
     run_config, run_paths = snapshot["config"], snapshot["paths"]
     if run_config.get("use_mapper_selection", "v2_expert") != "v2_expert":
-        return _combine_v1_packages(song_list_potential, song_list_run, export_results_to_bs,
-                                    run_config, run_paths)
+        return _combine_v1_packages(song_list_potential, song_list_run, diff_list,
+                                    export_results_to_bs, run_config, run_paths,
+                                    logger=logger)
     packages = []
     for filename in song_list_potential:
         name = Path(filename).stem
@@ -176,7 +193,7 @@ def _run(n_workers, diff_list, export_results_to_bs, logger_callback, parallel, 
     difficulties = _difficulties(diff_list)
     # Invalid bootstrap settings must fail here, not cause endless Pool respawns.
     configure_inference()
-    selection = model_selection or "v2_expert"
+    selection = str(model_selection or "v2_expert").lower()
     if selection != "v2_expert" and selection not in V1_MAPPER_SELECTIONS:
         raise ValueError(f"Unknown mapper selection: {selection}")
     if selection == "v2_expert":
@@ -245,7 +262,8 @@ def _run(n_workers, diff_list, export_results_to_bs, logger_callback, parallel, 
     # Handle packaging failures individually and keep completed variants for retry.
     for song in songs:
         try:
-            packages.extend(_combine_maps([song], records, difficulties, export_results_to_bs, snapshot))
+            packages.extend(_combine_maps([song], records, difficulties, export_results_to_bs,
+                                          snapshot, logger=logger_callback))
         except Exception as error:
             failures.append({"status": "failed", "song": Path(song).stem,
                              "error": f"Package failed: {type(error).__name__}: {error}"})
@@ -272,5 +290,7 @@ if __name__ == "__main__":
     mp.freeze_support()
     diff_list = json.loads(os.environ.get("diff_list", "[6, 8, 10]"))
     n_workers = 7 if paths.main_path.startswith("/mnt/") else 3
-    result = main_multi_par(n_workers, diff_list, export_results_to_bs=True)
+    use_model = os.environ.get("inferno_model")  # None routes to v2_expert
+    result = main_multi_par(n_workers, diff_list, export_results_to_bs=True,
+                            model_selection=use_model)
     raise SystemExit(1 if result["failures"] else 0)

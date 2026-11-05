@@ -30,6 +30,25 @@ def test_generate_song_v1_failure_becomes_error(monkeypatch, tmp_path):
         generate_song_v1("song", 20.0)
 
 
+def test_generate_song_v1_strips_egg_suffix(monkeypatch, tmp_path):
+    calls = []
+    fake = SimpleNamespace(main=lambda names: calls.append(names) or False)
+    monkeypatch.setitem(sys.modules, "evaluation.legacy_generator", fake)
+    monkeypatch.setattr(paths, "new_map_path", str(tmp_path) + "/")
+    (tmp_path / "1234_20.0_song").mkdir()
+    result = generate_song_v1("song.egg", 20.0)
+    assert calls == [["song"]]  # worker records keep the .egg filename
+    assert result["path"].endswith("1234_20.0_song")
+
+
+def test_generate_song_v1_requires_output_folder_even_on_success(monkeypatch, tmp_path):
+    fake = SimpleNamespace(main=lambda names: False)  # status ok, but no folder written
+    monkeypatch.setitem(sys.modules, "evaluation.legacy_generator", fake)
+    monkeypatch.setattr(paths, "new_map_path", str(tmp_path) + "/")
+    with pytest.raises(RuntimeError, match="status=False"):
+        generate_song_v1("song", 20.0)
+
+
 def test_generate_song_v1_restores_config(monkeypatch, tmp_path):
     original = config.max_speed_orig
     fake = SimpleNamespace(main=lambda names: setattr(config, "max_speed", -1.) or False)
@@ -107,3 +126,12 @@ def test_ensure_v1_bundle_rejects_unknown_selection():
     assert "v2_expert" not in V1_MAPPER_SELECTIONS
     with pytest.raises(ValueError):
         ensure_v1_bundle("v2_expert")
+
+
+def test_ensure_v1_bundle_normalizes_selection_case(monkeypatch):
+    monkeypatch.setattr(config, "use_mapper_selection", "v2_expert")
+    monkeypatch.setattr(v1_generation, "update_model_file_paths",
+                        lambda check_model_exists=True: None)
+    monkeypatch.setattr(v1_generation, "_missing_v1_assets", lambda: [])
+    ensure_v1_bundle("FAV_15")  # inferno_model env vars arrive unnormalized
+    assert config.use_mapper_selection == "fav_15"

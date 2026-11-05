@@ -30,14 +30,19 @@ MAPPER_CHOICES = ["v2_expert", *V1_MAPPER_SELECTIONS]
 
 
 def parameter_group_visibility(selection):
-    """Which parameter groups apply to the selected mapper model."""
-    return {"v1_only": selection != "v2_expert", "v2_only": selection == "v2_expert"}
+    """Which parameter groups apply to the selected mapper model.
+
+    Left/Right Notes Filling and Emphasize Beats affect v2 output too
+    (mirroring probability, beat-intensity/flow-check semantics), so only
+    the v2-only group toggles; shared controls stay ungrouped.
+    """
+    return {"v2_only": selection == "v2_expert"}
 
 
 def parameter_group_updates(selection):
-    """Map a model selector value to gr.Column visibility updates."""
+    """Map a model selector value to a gr.Column visibility update."""
     groups = parameter_group_visibility(selection)
-    return gr.update(visible=groups["v1_only"]), gr.update(visible=groups["v2_only"])
+    return gr.update(visible=groups["v2_only"])
 
 
 update_check_response = None
@@ -767,22 +772,20 @@ def build_app(check_updates=True):
                 )
                 difficulty_5.input(set_difficulty_5, inputs=[difficulty_5], outputs=[])
 
-            # Initial parameter group visibility matches the default model selection.
-            param_groups = parameter_group_visibility("v2_expert")
+            # Initial parameter group visibility matches the actual selection.
+            param_groups = parameter_group_visibility(model_selector.value)
             with gr.Row():
                 gr.Markdown("""### Further
                             ### Modifications""")
-                with gr.Column(visible=param_groups["v1_only"]) as v1_col:
-                    gr.Markdown("Applies to legacy v1 models")
-                    # set gimme_more_notes_prob
-                    more_notes_prob = gr.Number(label="Left/Right Notes Filling (%)", value=config.gimme_more_notes_prob * 100,
-                                                precision=0, interactive=True, step=5, minimum=0, maximum=100,
-                                                info="Increase to always have notes on both sides.")
-                    more_notes_prob.input(set_more_notes_prob, inputs=[more_notes_prob], outputs=[])
-                    # emphasize beats on/off
-                    emphasize_beats = gr.Checkbox(label="Emphasize Beats", value=config.emphasize_beats_flag,
-                                                  info="Emphasize beats with double/triple notes.")
-                    emphasize_beats.input(set_emphasize_mode, inputs=[emphasize_beats], outputs=[])
+                # set gimme_more_notes_prob (applies to both model generations)
+                more_notes_prob = gr.Number(label="Left/Right Notes Filling (%)", value=config.gimme_more_notes_prob * 100,
+                                            precision=0, interactive=True, step=5, minimum=0, maximum=100,
+                                            info="Increase to always have notes on both sides.")
+                more_notes_prob.input(set_more_notes_prob, inputs=[more_notes_prob], outputs=[])
+                # emphasize beats on/off (applies to both model generations)
+                emphasize_beats = gr.Checkbox(label="Emphasize Beats", value=config.emphasize_beats_flag,
+                                              info="Emphasize beats with double/triple notes.")
+                emphasize_beats.input(set_emphasize_mode, inputs=[emphasize_beats], outputs=[])
                 # single mode on/off
                 single_mode = gr.Checkbox(label="Single Mode", value=config.single_notes_only_flag,
                                           info="Generate maximum one note per beat.")
@@ -872,9 +875,9 @@ def build_app(check_updates=True):
                                              info="Note distance required to allow arcs.")
                 arc_movement_min.input(set_arc_movement_min, inputs=[arc_movement_min], outputs=[])
 
-            # Toggle v1-only / v2-only parameter groups with the model selection.
+            # Toggle the v2-only parameter group with the model selection.
             model_selector.change(parameter_group_updates, inputs=[model_selector],
-                                  outputs=[v1_col, v2_col])
+                                  outputs=[v2_col])
 
 
         ################################

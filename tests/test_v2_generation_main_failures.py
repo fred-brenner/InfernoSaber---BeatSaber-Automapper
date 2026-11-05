@@ -149,7 +149,8 @@ def test_run_freezes_preparation_paths_bundle_and_report_destination(tmp_path, m
 
     monkeypatch.setattr(main_multi, "check_music_files", prepare)
     monkeypatch.setattr(main_multi, "process_song", lambda *args: [])
-    monkeypatch.setattr(main_multi, "_combine_maps", lambda *args: captured.append(args[-1]) or [])
+    monkeypatch.setattr(main_multi, "_combine_maps",
+                        lambda *args, **kwargs: captured.append(args[-1]) or [])
     monkeypatch.setattr(main_multi, "save_report", lambda report, root: reports.append(root) or "saved.json")
     main_multi.main_multi([5.], False)
     assert bundles == ["original-bundle"]
