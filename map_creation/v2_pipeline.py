@@ -557,6 +557,13 @@ def generate(song, requested_nps, predictors, encoder, settings, vocabularies, *
     diag_cap = float(getattr(config, "v2_diagonal_max_fraction", 1.) or 0.)
     if diag_fn is not None and state["notes"] and 0 <= diag_cap < 1:
         result.diagnostics["diagonal_cap"] = diag_fn(state["notes"], state["chains"], rng=rng)
+    speed_cap = getattr(postprocessors, "apply_speed_cap", None)
+    speed_scale = float(getattr(config, "v2_speed_cap_scale", 1.) or 0.)
+    if speed_cap is not None and state["notes"] and speed_scale > 0:
+        # Primary pass while every note is still mutable; the retained
+        # snapshot below records the capped set.
+        result.diagnostics["speed_cap"] = speed_cap(state["notes"], state["chains"],
+                                                    rng=rng, logger=logger)
     started = perf_counter()
     retained = deepcopy([note for note in state["notes"] if note.get("kind") == "retained"])
     upstream = index_state({**state, "notes": retained, "chains": []})
@@ -601,11 +608,13 @@ def generate(song, requested_nps, predictors, encoder, settings, vocabularies, *
         clearance = enforce_flow(state["notes"], state["chains"])
         result.diagnostics["same_direction_notes_flipped"] = clearance["flow_recuts"]
         result.diagnostics["note_clearance"] = clearance
-    speed_cap = getattr(postprocessors, "apply_speed_cap", None)
-    if speed_cap is not None and state["notes"] \
-            and float(getattr(config, "v2_speed_cap_scale", 1.) or 0.) > 0:
-        result.diagnostics["speed_cap"] = speed_cap(state["notes"], state["chains"],
-                                                    rng=rng, logger=logger)
+    if speed_cap is not None and state["notes"] and speed_scale > 0:
+        # Post-expansion pass: retained notes must stay dict-equal to the
+        # snapshot until the end-of-run check, so only copies and heuristic
+        # notes may still drop or recut.
+        result.diagnostics["speed_cap_post_expansion"] = speed_cap(
+            state["notes"], state["chains"], rng=rng, logger=logger,
+            drop_retained=False)
     started = perf_counter()
     index_state(state)
     if getattr(config, "v2_walls_heuristic", False):

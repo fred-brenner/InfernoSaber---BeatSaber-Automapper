@@ -10,9 +10,10 @@ simplifier collapses chaotic same-hand bursts to ping-pong with optional
 counter-direction recuts (``apply_fast_direction_rules``), and a best-effort
 diagonal cap recuts excess diagonal cuts toward flow-legal adjacent cardinals
 — all run after note cleanup and onset snap, before the retained snapshot.
-A movement-speed cap (``apply_speed_cap``) runs after expansion and the
-clearance fixpoint; the v1 gate it restores lived inside the skipped legacy
-flow pass.
+A movement-speed cap (``apply_speed_cap``) runs once before the retained
+snapshot, while every note is still mutable, and again after expansion and
+the clearance fixpoint with retained notes frozen; the v1 gate it restores
+lived inside the skipped legacy flow pass.
 
 Cut-direction convention: ``get_cut_dir_xy`` yields the approach vector — the
 hand enters from ``pos + step`` and exits through ``pos - step``. Both adjacent
@@ -1301,7 +1302,7 @@ def apply_diagonal_cap(notes, chains=None, rng=None):
     return stats
 
 
-def apply_speed_cap(notes, chains=None, rng=None, logger=None):
+def apply_speed_cap(notes, chains=None, rng=None, logger=None, drop_retained=True):
     """Drop the later note of any same-hand pair above the v1 movement cap.
 
     The legacy ``correct_notes`` gate lives inside ``legacy_note_flow``, which
@@ -1318,12 +1319,19 @@ def apply_speed_cap(notes, chains=None, rng=None, logger=None):
     newly-adjacent pair for speed and ``_flow_legal`` — an illegal successor
     is recut via ``_flow_direction`` or dropped when no legal recut exists —
     iterating to a fixpoint bounded at twice the note count (deletion-only,
-    so it always converges). Returns run statistics; ``speed_cap_value`` is
-    the effective base cap before the start ramp."""
+    so it always converges). ``drop_retained=False`` freezes retained notes —
+    production snapshots them before multiplier expansion and verifies them
+    at the end of ``generate``: a violating pair whose later note is retained
+    is instead counted once as ``speed_cap_retained_skipped`` and the walk
+    moves on, so the note still becomes the predecessor for the next check.
+    Copies and heuristic notes still drop or recut normally. Returns run
+    statistics; ``speed_cap_value`` is the effective base cap before the
+    start ramp."""
     scale = float(getattr(config, "v2_speed_cap_scale", 1.) or 0.)
     value = config.max_speed * get_factor_from_max_speed(config.max_speed, .5, 1) * scale
     stats = {"speed_cap_dropped": 0, "speed_cap_chains_dropped": 0,
-             "speed_cap_recuts": 0, "speed_cap_value": value}
+             "speed_cap_recuts": 0, "speed_cap_retained_skipped": 0,
+             "speed_cap_value": value}
     if scale <= 0 or len(notes) < 2:
         return stats
     ordered = sorted(notes, key=lambda item: (item["time"], item["id"]))
@@ -1340,6 +1348,7 @@ def apply_speed_cap(notes, chains=None, rng=None, logger=None):
     eps = float(getattr(config, "min_time_diff", .02))
     window = max(eps, float(getattr(config, "v2_cleanup_swing_window", .15) or 0.))
     alive = {note["id"] for note in ordered}
+    spared = set()  # retained notes already spared under drop_retained=False
     copies_of = {}
     for note in ordered:
         if note.get("kind") == "copy" and note.get("anchor_id") is not None:
@@ -1392,6 +1401,16 @@ def apply_speed_cap(notes, chains=None, rng=None, logger=None):
                     stats["speed_cap_dropped"] += 1
                     mark_followers(victim)
 
+            def frozen(note):
+                # True when the note must survive untouched: a retained later
+                # note under drop_retained=False. Counted once per note.
+                if drop_retained or note.get("kind") != "retained":
+                    return False
+                if note["id"] not in spared:
+                    spared.add(note["id"])
+                    stats["speed_cap_retained_skipped"] += 1
+                return True
+
             index = 0
             while index < len(seq):
                 if seq[index]["id"] not in alive:
@@ -1413,6 +1432,9 @@ def apply_speed_cap(notes, chains=None, rng=None, logger=None):
                                         [current[key] for key in ("x", "y", "hand", "d")],
                                         current["time"] - previous["time"])
                 if speed > cap(current):
+                    if frozen(current):
+                        index = following
+                        continue
                     drop(current)
                     changed = True
                     continue
@@ -1423,6 +1445,9 @@ def apply_speed_cap(notes, chains=None, rng=None, logger=None):
                     if current["d"] != 8 and not _flow_legal(
                             current["d"], prior, current["x"], current["y"],
                             current["time"], gap):
+                        if frozen(current):
+                            index = following
+                            continue
                         recut = _flow_direction(current["d"], implied,
                                                 swing_from=(current["x"], current["y"]),
                                                 forbidden_cells=cells.get(current["id"]))
@@ -1447,9 +1472,11 @@ def apply_speed_cap(notes, chains=None, rng=None, logger=None):
         anchor = anchors.get(chain.get("anchor_id"))
         if anchor is not None:
             chain["d"] = anchor["d"]
+    spared_note = (f", {stats['speed_cap_retained_skipped']} retained skipped"
+                   if stats["speed_cap_retained_skipped"] else "")
     _report(logger, f"Speed cap: {stats['speed_cap_dropped']} notes and "
                     f"{stats['speed_cap_chains_dropped']} chains dropped, "
-                    f"{stats['speed_cap_recuts']} recuts (cap {value:.1f})")
+                    f"{stats['speed_cap_recuts']} recuts{spared_note} (cap {value:.1f})")
     return stats
 
 

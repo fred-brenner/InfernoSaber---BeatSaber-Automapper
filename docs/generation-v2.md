@@ -387,18 +387,22 @@ the only ±45° cuts separated strokes may play) plus the predecessor's
 allowed direction or keeps its own. With `v2_fast_counter_direction =
 "recut"` (`"off"`/`"keep"` disables) run members whose cut opposes their
 row (top-row down-family 1/6/7, bottom-row up-family 0/4/5) are recut
-first, preferring the allowed pool. `apply_speed_cap` then runs after
-multiplier expansion and the post-expansion fixpoint — the v1
-`sanity_check_notes` movement gate v2 otherwise skips: consecutive
-same-hand notes over `max_speed * get_factor_from_max_speed` scaled by
+first, preferring the allowed pool. `apply_speed_cap` — the v1
+`sanity_check_notes` movement gate v2 otherwise skips — then runs twice:
+once just before the retained snapshot while every note is still mutable,
+and again after multiplier expansion and the post-expansion fixpoint with
+`drop_retained=False`, so copies and heuristic notes still drop while a
+violating retained note is only counted. Consecutive same-hand notes over
+`max_speed * get_factor_from_max_speed` scaled by
 `v2_speed_cap_scale` (default `1.0`; `<= 0` disables) drop their later
 note, with a linear `v2_speed_cap_start_factor` (default `.35`) → 1 ramp
 over the first `v2_speed_cap_start_notes` (default `30`) combined
 positions; each deletion re-checks the new adjacency for speed and flow
 (recut or drop) to a deletion-only fixpoint. Diagnostics land under
-`fast_directions` (`fast_pairs`, `fast_simplified`, `fast_counter_recuts`)
-and `speed_cap` (`speed_cap_dropped`, `speed_cap_recuts`,
-`speed_cap_value`).
+`fast_directions` (`fast_pairs`, `fast_simplified`, `fast_counter_recuts`),
+`speed_cap` (`speed_cap_dropped`, `speed_cap_recuts`, `speed_cap_value`)
+and `speed_cap_post_expansion` (same counters plus
+`speed_cap_retained_skipped`).
 
 The 2026-10-31 calm-effects stage (`v2_calm_effects = True`) fills note-free
 stretches the model intentionally leaves empty — a requested behaviour — with
