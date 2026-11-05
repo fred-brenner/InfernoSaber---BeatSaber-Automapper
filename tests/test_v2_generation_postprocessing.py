@@ -128,6 +128,7 @@ def test_entry_ramp_first_event_is_an_entry(song, timing_defaults, monkeypatch):
     monkeypatch.setattr(config, "map_filler_iters", 1)
     monkeypatch.setattr(config, "max_speed", 40.)
     monkeypatch.setattr(config, "v2_fill_entry_delay_seconds", 1.0)
+    monkeypatch.setattr(config, "v2_max_note_gap_seconds", 0.)  # isolate the ramp gate
     insert = np.asarray([3., 3.4, 8.])
     monkeypatch.setattr(post, "fill_map_times_scale", lambda times, idx: insert)
     candidates, _ = post.postprocess_timing(song, beats([3., 8.], [1, 1]),
@@ -154,6 +155,7 @@ def test_density_fill_skips_silent_spans(song, timing_defaults, monkeypatch):
     monkeypatch.setattr(config, "map_filler_iters", 1)
     monkeypatch.setattr(config, "max_speed", 40.)
     monkeypatch.setattr(config, "v2_fill_respect_silence", True)
+    monkeypatch.setattr(config, "v2_max_note_gap_seconds", 0.)  # isolate the density fill
     silent_frames = np.asarray([4.0 + i * (config.hop_size / config.samplerate_music)
                                 for i in range(30)])  # silent span around t=4.0..5.0
     monkeypatch.setattr(post, "_legacy_timing_features",
@@ -173,6 +175,7 @@ def test_silent_span_merge_covers_small_frame_gaps(song, timing_defaults, monkey
     monkeypatch.setattr(config, "map_filler_iters", 1)
     monkeypatch.setattr(config, "max_speed", 40.)
     monkeypatch.setattr(config, "v2_fill_respect_silence", True)
+    monkeypatch.setattr(config, "v2_max_note_gap_seconds", 0.)  # isolate the density fill
     hop = config.hop_size / config.samplerate_music
     silent_frames = np.asarray([4.0 + i * hop for i in range(15)]
                                + [4.0 + (17 + i) * hop for i in range(15)])  # 3*hop hole ~4.5
@@ -192,6 +195,7 @@ def test_silence_removal_runs_before_density_fill(song, timing_defaults, monkeyp
     monkeypatch.setattr(config, "map_filler_iters", 1)
     monkeypatch.setattr(config, "max_speed", 20.)
     monkeypatch.setattr(config, "add_beat_max_bounds", [.1, .4, 3., 4.])
+    monkeypatch.setattr(config, "v2_max_note_gap_seconds", 0.)  # isolate the step order
     monkeypatch.setattr(post, "_legacy_timing_features",
                         lambda _: (np.zeros((100, 24)), np.zeros((100, 24)), [2.]))
     _, report = post.postprocess_timing(song, beats([1., 2., 8.], [1, 1, 1]),
@@ -203,6 +207,7 @@ def test_silence_removal_runs_before_density_fill(song, timing_defaults, monkeyp
 def test_onset_snap_unmatched_non_silent_keeps_event(song, timing_defaults, monkeypatch):
     monkeypatch.setattr(config, "add_silence_flag", True)
     monkeypatch.setattr(config, "v2_onset_snap_unmatched_policy", "non_silent")
+    monkeypatch.setattr(config, "v2_max_note_gap_seconds", 0.)  # isolate the snap policy
     # silent span at 8.5 keeps >0.03 s distance to every event, so the later
     # silence_removal step cannot eat the snapped 8.01 (the brief's 8.0 would)
     monkeypatch.setattr(post, "_legacy_timing_features",
@@ -218,6 +223,7 @@ def test_onset_snap_unmatched_non_silent_drops_in_silence(song, timing_defaults,
     # same setup but silent span covers 4.0 -> event still dropped
     monkeypatch.setattr(config, "add_silence_flag", True)
     monkeypatch.setattr(config, "v2_onset_snap_unmatched_policy", "non_silent")
+    monkeypatch.setattr(config, "v2_max_note_gap_seconds", 0.)  # isolate the snap policy
     frames = np.asarray([4.0 + i * (config.hop_size / config.samplerate_music) for i in range(30)])
     monkeypatch.setattr(post, "_legacy_timing_features",
                         lambda _: (np.zeros((100, 24)), np.zeros((100, 24)), frames))
@@ -229,6 +235,7 @@ def test_onset_snap_unmatched_non_silent_drops_in_silence(song, timing_defaults,
 
 def test_onset_snap_unmatched_always_is_legacy(song, timing_defaults, monkeypatch):
     monkeypatch.setattr(config, "v2_onset_snap_unmatched_policy", "always")
+    monkeypatch.setattr(config, "v2_max_note_gap_seconds", 0.)  # isolate the snap policy
     monkeypatch.setattr(post, "sanity_check_timing2", lambda _, times, **kw: np.asarray([1.02, 0., 8.01]))
     candidates, _ = post.postprocess_timing(song, beats([1., 4., 8.], [1, 1, 1]),
                                             "unused.egg", skip=("bpm_alignment",))
@@ -251,6 +258,7 @@ def test_onset_snap_non_silent_ignores_fill_silence_gate(song, timing_defaults, 
     monkeypatch.setattr(config, "add_silence_flag", True)
     monkeypatch.setattr(config, "v2_fill_respect_silence", False)
     monkeypatch.setattr(config, "v2_onset_snap_unmatched_policy", "non_silent")
+    monkeypatch.setattr(config, "v2_max_note_gap_seconds", 0.)  # isolate the snap policy
     hop = config.hop_size / config.samplerate_music
     frames = np.asarray([4.0 + i * hop for i in range(15)]
                         + [4.0 + (17 + i) * hop for i in range(15)])  # 3*hop hole ~4.5
@@ -260,6 +268,39 @@ def test_onset_snap_non_silent_ignores_fill_silence_gate(song, timing_defaults, 
     candidates, _ = post.postprocess_timing(song, beats([1., 4.54, 8.], [1, 1, 1]),
                                             "unused.egg", skip=("bpm_alignment",))
     assert [item["time"] for item in candidates] == [1.02, 8.01]
+
+
+def test_max_gap_fill_inserts_onset_times(song, timing_defaults, monkeypatch):
+    monkeypatch.setattr(config, "v2_max_note_gap_seconds", 4.0)
+    monkeypatch.setattr(config, "v2_gap_fill_edge_seconds", 0.5)
+    monkeypatch.setattr(post, "_detect_onsets", lambda _: np.asarray([2.6, 3.3, 4.9, 7.2]))
+    candidates, report = post.postprocess_timing(song, beats([1., 8.], [1, 1]),
+                                                 "unused.egg", skip=("bpm_alignment",))
+    # gap 1->8 exceeds 4 s: onsets in (1.5, 7.5) inserted -> 2.6, 3.3, 4.9, 7.2
+    assert [item["time"] for item in candidates] == [1., 2.6, 3.3, 4.9, 7.2, 8.]
+
+
+def test_max_gap_fill_respects_silence_and_edge(song, timing_defaults, monkeypatch):
+    monkeypatch.setattr(config, "add_silence_flag", True)
+    monkeypatch.setattr(config, "v2_max_note_gap_seconds", 4.0)
+    monkeypatch.setattr(config, "v2_gap_fill_edge_seconds", 1.0)
+    frames = np.asarray([3. + i * (config.hop_size / config.samplerate_music) for i in range(30)])
+    monkeypatch.setattr(post, "_legacy_timing_features",
+                        lambda _: (np.zeros((100, 24)), np.zeros((100, 24)), frames))
+    monkeypatch.setattr(post, "_detect_onsets", lambda _: np.asarray([1.6, 3.1, 7.8]))
+    candidates, _ = post.postprocess_timing(song, beats([1., 9.], [1, 1]),
+                                            "unused.egg", skip=("bpm_alignment",))
+    # interior (2.0, 8.0): 1.6 outside edge, 3.1 silent, 7.8 kept
+    assert [item["time"] for item in candidates] == [1., 7.8, 9.]
+
+
+def test_max_gap_fill_bpm_grid_source(song, timing_defaults, monkeypatch):
+    monkeypatch.setattr(config, "v2_max_note_gap_seconds", 4.0)
+    monkeypatch.setattr(config, "v2_gap_fill_source", "bpm_grid")
+    candidates, _ = post.postprocess_timing(song, beats([1., 8.], [1, 1]),
+                                            "unused.egg", skip=("bpm_alignment",))
+    # 120 bpm -> 0.5 s grid inside (1.5, 7.5)
+    assert [item["time"] for item in candidates] == [1., 2., 2.5, 3., 3.5, 4., 4.5, 5., 5.5, 6., 6.5, 7., 8.]
 
 
 def test_training_first_cut_selects_anchor_after_heuristic_cleanup(monkeypatch):
@@ -744,6 +785,7 @@ def test_generate_wires_intro_floor_and_diagonal_cap(monkeypatch):
     for key, value in {"v2_map_intro_no_notes_seconds": 2.,
                        "v2_map_intro_no_hazards_seconds": 1.,
                        "v2_diagonal_max_fraction": .1,
+                       "v2_max_note_gap_seconds": 0.,   # audio_path=None: keep the net off
                        "v2_cleanup_note_heuristics": False}.items():
         monkeypatch.setattr(config, key, value)
     song = Song("wiring", {"duration": 11., "bpm": 120.},

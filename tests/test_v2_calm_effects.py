@@ -273,6 +273,9 @@ def _generate(song, monkeypatch):
     # have dedicated tests in test_v2_generation_postprocessing.py.
     monkeypatch.setattr(config, "v2_map_intro_no_notes_seconds", 0.)
     monkeypatch.setattr(config, "v2_map_intro_no_hazards_seconds", 0.)
+    # The max-gap safety net targets the same note-free spans calm effects
+    # decorate; these tests assert the decoration layer only.
+    monkeypatch.setattr(config, "v2_max_note_gap_seconds", 0.)
     song, vocab = song, _vocab()
     predictors = dummy_predictors(vocab)
     predictors["timing"] = _Timing()

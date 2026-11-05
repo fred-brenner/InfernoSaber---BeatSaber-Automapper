@@ -164,7 +164,7 @@ def _filter_fill_times(previous, new_times, blocked, silent_spans=()):
 
 
 _TIMING_STEPS = ("minimum_spacing", "high_difficulty_fill", "bpm_alignment", "onset_snap",
-                 "start_end_fill", "silence_removal", "density_fill")
+                 "start_end_fill", "silence_removal", "density_fill", "max_gap_fill")
 
 
 def postprocess_timing(song, beats, audio_path, logger=None, skip=()):
@@ -303,6 +303,25 @@ def postprocess_timing(song, beats, audio_path, logger=None, skip=()):
             replace_times(f"density_fill_{index}",
                           _filter_fill_times(times(), fill_map_times_scale(times(), index), fill_blocked(),
                                              silent_spans=silent_spans()))
+    if candidates and "max_gap_fill" not in skip:
+        max_gap = float(getattr(config, "v2_max_note_gap_seconds", 0.) or 0.)
+        if max_gap > 0:
+            edge = float(getattr(config, "v2_gap_fill_edge_seconds", .5) or 0.)
+            source = getattr(config, "v2_gap_fill_source", "onsets")
+            current, inserted, pool, spans = times(), [], None, ()
+            for a, b in zip(current, current[1:]):
+                if b - a <= max_gap:
+                    continue
+                if pool is None:
+                    # decode candidates and silence only when a dead zone exists
+                    pool = _gap_candidate_times(source, audio_path, bpm, duration)
+                    spans = silent_spans()
+                for t in pool[(pool > a + edge) & (pool < b - edge)]:
+                    if _inside_spans(t, spans) or (inserted and t - inserted[-1] < config.min_beat_time):
+                        continue
+                    inserted.append(float(t))
+            if inserted:
+                replace_times("max_gap_fill", np.sort(np.r_[current, inserted]))
     if candidates and align:
         replace_times("final_bpm_alignment", align_beats_on_bpm(times(), bpm), moving=True)
     diagnostics.update(events=len(candidates), retained_notes=sum(item["count"] for item in candidates),
@@ -810,6 +829,23 @@ def _detect_onsets(audio_path):
                                         delta=config.thresh_onbeat,
                                         wait=frames(int(getattr(config, "v2_notes_onset_snap_wait", 4))))
     return np.asarray(librosa.frames_to_time(onsets, sr=rate, hop_length=512), np.float64)
+
+
+def _gap_candidate_times(source, audio_path, bpm, duration):
+    """Insertion-time pool for the max-gap safety net, selected by ``source``.
+
+    ``"onsets"`` reuses the librosa spectral-flux peaks and ``"bpm_grid"`` the
+    whole-beat lattice; ``"v1_beat"`` is the slot for the trained v1 beat-TCN
+    provider — until that bridge lands it falls back to detected onsets.
+    """
+    if source == "onsets":
+        return _detect_onsets(audio_path)
+    if source == "bpm_grid":
+        step = 60. / bpm
+        return np.arange(step, duration, step)
+    if source == "v1_beat":
+        return _detect_onsets(audio_path)
+    raise ValueError(f"Unknown v2_gap_fill_source: {source!r}")
 
 
 def _snap_violated(note, t_new, near, siblings, index, effective, eps, window, gap):

@@ -235,6 +235,8 @@ def _generate_with_production_postprocessors(monkeypatch):
     from map_creation.v2_pipeline import generate
 
     _patch_timing_externals(monkeypatch)
+    # no audio_path in these runs — keep the max-gap safety net off
+    monkeypatch.setattr(config, "v2_max_note_gap_seconds", 0.)
     song, vocab = audio_song(), vocabulary()
     predictors = dummy_predictors(vocab)
     predictors["timing"] = Timing()

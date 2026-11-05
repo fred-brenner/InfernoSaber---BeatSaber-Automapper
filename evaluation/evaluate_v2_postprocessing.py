@@ -26,7 +26,8 @@ import numpy as np
 
 # Step names match v2_postprocessing._TIMING_STEPS / _NOTE_STEPS.
 TIMING_HEURISTIC_STEPS = ("high_difficulty_fill", "bpm_alignment", "onset_snap",
-                        "start_end_fill", "density_fill", "silence_removal")
+                        "start_end_fill", "density_fill", "silence_removal",
+                        "max_gap_fill")
 NOTE_HEURISTIC_STEPS = ("mirroring", "legacy_note_flow")
 NOTE_FIX_STEPS = ("same_direction_recut",)
 NOTE_MINIMAL = NOTE_HEURISTIC_STEPS + NOTE_FIX_STEPS
@@ -38,7 +39,7 @@ ARMS = {
                        "multiplier": True,
                        "summary": "raw model timing; only the minimum-spacing merge"},
     "timing_no_fill": {"timing_skip": ("high_difficulty_fill", "start_end_fill",
-                                       "density_fill"),
+                                       "density_fill", "max_gap_fill"),
                        "notes_skip": (), "multiplier": True,
                        "summary": "no legacy density fills; alignment/snap/silence kept"},
     "timing_no_alignment": {"timing_skip": ("bpm_alignment", "onset_snap"),

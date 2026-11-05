@@ -239,6 +239,16 @@ v2_fill_respect_silence = True     # keep subdivision fills out of detected sile
 # unless they sit inside a detected silent span; "never" restores them all.
 v2_onset_snap_unmatched_policy = "non_silent"
 
+# Max-gap safety net (2026-11-04): after all timing fills/removals, any
+# remaining note-free gap beyond v2_max_note_gap_seconds gets candidates
+# inserted from v2_gap_fill_source, inset v2_gap_fill_edge_seconds from the
+# gap's bounding events and still gated by detected silent spans; inserted
+# times flow through the normal note decode like model events.
+v2_max_note_gap_seconds = 4.0    # largest tolerated note-free gap (s); 0 disables
+v2_gap_fill_edge_seconds = 0.5   # clearance kept next to the events bounding a gap
+v2_gap_fill_source = "onsets"    # candidate pool: "onsets" | "bpm_grid" | "v1_beat"
+v2_gap_fill_v1_bundle = "fav_15" # v1 beat-TCN bundle supplying the "v1_beat" source
+
 add_waveform_pattern_flag = 0   # [0: off, 1: on, 2: double on]
 waveform_pattern = [
     [0, 1, 2, 3, 2, 1],
