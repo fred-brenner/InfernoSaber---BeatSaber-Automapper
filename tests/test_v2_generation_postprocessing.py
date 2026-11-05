@@ -962,6 +962,115 @@ def test_diagonal_cap_disabled_at_one(monkeypatch):
     assert [n["d"] for n in notes] == [5 if (i // 2) % 2 == 0 else 6 for i in range(20)]
 
 
+@pytest.fixture
+def speed_defaults(monkeypatch):
+    # pin the legacy speed cost and the cap knobs so expectations are exact
+    for key, value in {"max_speed": 32., "reaction_time": 1.15,
+                       "reaction_time_fact": .013, "cdf": 1.2, "cdf_lr": 1.15,
+                       "min_time_diff": .02, "v2_speed_cap_scale": 1.,
+                       "v2_speed_cap_start_notes": 0, "v2_speed_cap_start_factor": .35,
+                       "v2_cleanup_same_dir_gap": .1, "v2_cleanup_swing_window": .15,
+                       "v2_flow_min_turn_steps": 3}.items():
+        monkeypatch.setattr(config, key, value)
+
+
+def test_speed_cap_drops_later_note_of_overspeed_pair(speed_defaults):
+    notes = [note(0, 1., x=0, y=1, direction=1),
+             note(1, 1.05, x=3, y=1, direction=1),               # ~148 cells/s at cap ~24.5
+             note(2, 1.05, hand=1, x=1, y=1, direction=8)]      # other hand untouched
+    stats = post.apply_speed_cap(notes)
+    assert [item["id"] for item in notes] == [0, 2]
+    assert stats["speed_cap_dropped"] == 1
+    assert stats["speed_cap_value"] == pytest.approx(
+        32. * post.get_factor_from_max_speed(32., .5, 1))
+
+
+def test_speed_cap_keeps_a_playable_pair(speed_defaults):
+    notes = [note(0, 1., x=0, y=1, direction=1),
+             note(1, 1.5, x=0, y=1, direction=0)]                # same cell, .5 s: ~3 cells/s
+    stats = post.apply_speed_cap(notes)
+    assert [item["id"] for item in notes] == [0, 1]
+    assert stats["speed_cap_dropped"] == 0
+
+
+def test_speed_cap_start_ramp_tightens_early_pairs(speed_defaults, monkeypatch):
+    # a 3-cell jump in .4 s (~18.5 cells/s) is legal past the ramp but over the
+    # ~35 % cap applied to the second combined note position
+    monkeypatch.setattr(config, "v2_speed_cap_start_notes", 30)
+    early = [note(0, 1., x=0, y=1, direction=1), note(1, 1.4, x=3, y=1, direction=1)]
+    post.apply_speed_cap(early)
+    assert [item["id"] for item in early] == [0]
+    fillers = [note(10 + i, .5 + .6 * i, hand=1, x=1, y=1, direction=8) for i in range(30)]
+    late = fillers + [note(0, 19., x=0, y=1, direction=1), note(1, 19.4, x=3, y=1, direction=1)]
+    post.apply_speed_cap(late)
+    assert [item["id"] for item in late[-2:]] == [0, 1]
+
+
+def test_speed_cap_scale_scales_the_cap(speed_defaults, monkeypatch):
+    build = lambda: [note(0, 1., x=0, y=1, direction=1), note(1, 1.4, x=3, y=1, direction=1)]
+    monkeypatch.setattr(config, "v2_speed_cap_scale", .5)
+    notes = build()
+    post.apply_speed_cap(notes)
+    assert [item["id"] for item in notes] == [0]
+    monkeypatch.setattr(config, "v2_speed_cap_scale", 2.)
+    notes = build()
+    post.apply_speed_cap(notes)
+    assert [item["id"] for item in notes] == [0, 1]
+
+
+def test_speed_cap_disabled_at_zero_scale(speed_defaults, monkeypatch):
+    monkeypatch.setattr(config, "v2_speed_cap_scale", 0.)
+    notes = [note(0, 1., x=0, y=1, direction=1), note(1, 1.05, x=3, y=1, direction=1)]
+    stats = post.apply_speed_cap(notes)
+    assert [item["id"] for item in notes] == [0, 1]
+    assert stats["speed_cap_dropped"] == 0 and stats["speed_cap_value"] == 0.
+
+
+def test_speed_cap_drops_chain_and_copies_with_their_anchor(speed_defaults):
+    notes = [note(0, 1., x=0, y=1, direction=1),
+             note(1, 1.05, x=3, y=1, direction=1),
+             {**note(2, 3., x=2, y=2, direction=4), "kind": "copy", "anchor_id": 1}]
+    chains = [{**chain(), "id": 0, "anchor_id": 1}, {**chain(), "id": 1, "anchor_id": 0}]
+    stats = post.apply_speed_cap(notes, chains)
+    assert [item["id"] for item in notes] == [0]
+    assert [item["anchor_id"] for item in chains] == [0]
+    assert stats["speed_cap_dropped"] == 2 and stats["speed_cap_chains_dropped"] == 1
+
+
+def test_speed_cap_recuts_flow_violation_after_deletion(speed_defaults):
+    # B dies to the cap; the revealed A->C pair repeats direction 0 -> recut
+    notes = [note(0, 1., x=0, y=1, direction=0),
+             note(1, 1.05, x=3, y=2, direction=1),               # overspeed vs A
+             note(2, 2., x=1, y=1, direction=0)]
+    stats = post.apply_speed_cap(notes)
+    assert [item["id"] for item in notes] == [0, 2]
+    assert notes[1]["d"] != 0 and post._step_distance(notes[1]["d"], 0) >= 3
+    assert stats["speed_cap_recuts"] == 1
+
+
+def test_speed_cap_drops_when_no_flow_legal_recut(speed_defaults, monkeypatch):
+    # no legal recut for the revealed pair -> the successor is dropped too
+    monkeypatch.setattr(post, "_flow_direction", lambda *args, **kwargs: 8)
+    notes = [note(0, 1., x=0, y=1, direction=0),
+             note(1, 1.05, x=3, y=2, direction=1),
+             note(2, 2., x=1, y=1, direction=0)]
+    stats = post.apply_speed_cap(notes)
+    assert [item["id"] for item in notes] == [0]
+    assert stats["speed_cap_dropped"] == 2
+
+
+def test_speed_cap_iterates_a_chain_of_violations(speed_defaults):
+    # every consecutive same-hand pair is over the cap: each deletion reveals
+    # the next pair -> the fixpoint strips back to the first note
+    notes = [note(0, 1., x=0, y=1, direction=1),
+             note(1, 1.06, x=3, y=1, direction=1),
+             note(2, 1.12, x=0, y=1, direction=1),
+             note(3, 1.18, x=3, y=1, direction=1)]
+    stats = post.apply_speed_cap(notes)
+    assert [item["id"] for item in notes] == [0]
+    assert stats["speed_cap_dropped"] == 3
+
+
 def test_generate_wires_intro_floor_and_diagonal_cap(monkeypatch):
     """generate() runs the intro floor and diagonal cap with floors enabled —
     stub predictors and stubbed legacy audio helpers, no model assets."""
@@ -984,6 +1093,7 @@ def test_generate_wires_intro_floor_and_diagonal_cap(monkeypatch):
     for key, value in {"v2_map_intro_no_notes_seconds": 2.,
                        "v2_map_intro_no_hazards_seconds": 1.,
                        "v2_diagonal_max_fraction": .1,
+                       "v2_speed_cap_scale": 1.,
                        "v2_max_note_gap_seconds": 0.,   # audio_path=None: keep the net off
                        "v2_cleanup_note_heuristics": False}.items():
         monkeypatch.setattr(config, key, value)
@@ -1023,4 +1133,5 @@ def test_generate_wires_intro_floor_and_diagonal_cap(monkeypatch):
                                   random_factor=0, logger=lambda message: None)
     assert result.diagnostics["intro_zones"]["notes_dropped"] >= 1
     assert "diagonal_cap" in result.diagnostics
+    assert "speed_cap" in result.diagnostics
     assert min(note["time"] for note in result.state["notes"]) >= 2.0

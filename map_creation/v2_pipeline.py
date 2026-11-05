@@ -414,6 +414,7 @@ def generate(song, requested_nps, predictors, encoder, settings, vocabularies, *
                 snap_note_times=base.snap_note_times,
                 apply_intro_floor=base.apply_intro_floor,
                 apply_diagonal_cap=base.apply_diagonal_cap,
+                apply_speed_cap=base.apply_speed_cap,
                 calm_area_pulses=base.calm_area_pulses,
                 add_calm_effects=base.add_calm_effects,
                 add_calm_lighting=base.add_calm_lighting)
@@ -594,6 +595,11 @@ def generate(song, requested_nps, predictors, encoder, settings, vocabularies, *
         clearance = enforce_flow(state["notes"], state["chains"])
         result.diagnostics["same_direction_notes_flipped"] = clearance["flow_recuts"]
         result.diagnostics["note_clearance"] = clearance
+    speed_cap = getattr(postprocessors, "apply_speed_cap", None)
+    if speed_cap is not None and state["notes"] \
+            and float(getattr(config, "v2_speed_cap_scale", 1.) or 0.) > 0:
+        result.diagnostics["speed_cap"] = speed_cap(state["notes"], state["chains"],
+                                                    rng=rng, logger=logger)
     started = perf_counter()
     index_state(state)
     if getattr(config, "v2_walls_heuristic", False):

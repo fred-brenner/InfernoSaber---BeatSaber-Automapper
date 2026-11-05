@@ -187,6 +187,13 @@ v2_diagonal_max_fraction = 0.10    # cap diagonal cuts (d 4-7) at this fraction 
                                    # (dots counted); excess diagonals are recut to the cheapest
                                    # flow-legal adjacent cardinal, vertical wins ties, a diagonal
                                    # stays when no cardinal is legal; >= 1 disables
+v2_speed_cap_scale = 1.0           # multiplier on the v1 movement-speed cap
+                                   # (max_speed * get_factor_from_max_speed distance/s between
+                                   # consecutive same-hand notes); <= 0 disables the pass
+v2_speed_cap_start_notes = 30      # first N combined chronological note positions ramp the
+                                   # cap in (v1 decr_speed_range); 0 disables the ramp
+v2_speed_cap_start_factor = .35    # cap multiplier at the first note position, rising
+                                   # linearly to 1 (v1 decr_speed_val)
 v2_cleanup_note_heuristics = False  # run the legacy v1 note mutators (mirroring + flow pass
                                    # incl. emphasis/break/dot additions); False keeps model
                                    # notes — structural dedup, same-direction recut and the

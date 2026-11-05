@@ -8,6 +8,9 @@ the conflict. A start-of-map floor drops early notes (``apply_intro_floor``;
 hazards get their own floor inside ``validate_hazards``) and a best-effort
 diagonal cap recuts excess diagonal cuts toward flow-legal adjacent cardinals
 — both run after note cleanup and onset snap, before the retained snapshot.
+A movement-speed cap (``apply_speed_cap``) runs after expansion and the
+clearance fixpoint; the v1 gate it restores lived inside the skipped legacy
+flow pass.
 
 Cut-direction convention: ``get_cut_dir_xy`` yields the approach vector — the
 hand enters from ``pos + step`` and exits through ``pos - step``. Both adjacent
@@ -22,6 +25,7 @@ from collections import Counter
 import numpy as np
 
 from tools.config import config
+from tools.utils.numpy_shorts import get_factor_from_max_speed
 from map_creation.bpm_optimizer import align_beats_on_bpm
 from map_creation.note_postprocessing import remove_double_notes
 from map_creation.sanity_check import (calc_note_pos, calc_note_speed,
@@ -1170,6 +1174,158 @@ def apply_diagonal_cap(notes, chains=None, rng=None):
         anchor = anchors.get(chain.get("anchor_id"))
         if anchor is not None:
             chain["d"] = anchor["d"]
+    return stats
+
+
+def apply_speed_cap(notes, chains=None, rng=None, logger=None):
+    """Drop the later note of any same-hand pair above the v1 movement cap.
+
+    The legacy ``correct_notes`` gate lives inside ``legacy_note_flow``, which
+    ``v2_cleanup_note_heuristics = False`` skips, so nothing else bounds
+    travel per second. The pair cost is ``calc_note_speed`` on consecutive
+    kept same-hand notes; the cap is ``max_speed * get_factor_from_max_speed(
+    max_speed, .5, 1)`` scaled by ``v2_speed_cap_scale`` (nonpositive disables
+    the pass) and, for the first ``v2_speed_cap_start_notes`` combined
+    chronological positions, a linear ``v2_speed_cap_start_factor`` → 1 ramp
+    keyed on the later note — v1's ``decr_speed_val``/``decr_speed_range``
+    start ramp without its end half. Dropping the later note (v1 dropped the
+    whole timestep) keeps the other hand's; anchored copies and chains go
+    with it so no expansion is orphaned. Each deletion re-checks the
+    newly-adjacent pair for speed and ``_flow_legal`` — an illegal successor
+    is recut via ``_flow_direction`` or dropped when no legal recut exists —
+    iterating to a fixpoint bounded at twice the note count (deletion-only,
+    so it always converges). Returns run statistics; ``speed_cap_value`` is
+    the effective base cap before the start ramp."""
+    scale = float(getattr(config, "v2_speed_cap_scale", 1.) or 0.)
+    value = config.max_speed * get_factor_from_max_speed(config.max_speed, .5, 1) * scale
+    stats = {"speed_cap_dropped": 0, "speed_cap_chains_dropped": 0,
+             "speed_cap_recuts": 0, "speed_cap_value": value}
+    if scale <= 0 or len(notes) < 2:
+        return stats
+    ordered = sorted(notes, key=lambda item: (item["time"], item["id"]))
+    position = {note["id"]: index for index, note in enumerate(ordered)}
+    start_notes = max(int(getattr(config, "v2_speed_cap_start_notes", 30) or 0), 0)
+    start_factor = float(getattr(config, "v2_speed_cap_start_factor", .35) or 0.)
+    ramp = np.linspace(start_factor, 1., start_notes) if start_notes else ()
+
+    def cap(note):
+        index = position[note["id"]]
+        return value * (ramp[index] if index < start_notes else 1.)
+
+    gap = float(getattr(config, "v2_cleanup_same_dir_gap", .1) or 0.)
+    eps = float(getattr(config, "min_time_diff", .02))
+    window = max(eps, float(getattr(config, "v2_cleanup_swing_window", .15) or 0.))
+    alive = {note["id"] for note in ordered}
+    copies_of = {}
+    for note in ordered:
+        if note.get("kind") == "copy" and note.get("anchor_id") is not None:
+            copies_of.setdefault(note["anchor_id"], []).append(note["id"])
+    needs_flow = set()
+    for _ in range(max(1, 2 * len(ordered))):
+        changed = False
+        for hand in (0, 1):
+            seq = [note for note in ordered if note["hand"] == hand and note["id"] in alive]
+            cells = _other_hand_cells([note for note in ordered if note["id"] in alive],
+                                    eps, window)
+            seq_pos = {note["id"]: index for index, note in enumerate(seq)}
+
+            def effective(index):
+                note = seq[index]
+                if note["d"] != 8:
+                    return note["d"]
+                previous = index - 1
+                while previous >= 0 and seq[previous]["id"] not in alive:
+                    previous -= 1
+                if previous < 0:
+                    return None
+                implied = effective(previous)
+                return (None if implied is None
+                        else _dot_virtual_direction(implied, seq[previous]["x"], seq[previous]["y"],
+                                                    note["x"], note["y"]))
+
+            def mark_followers(identity):
+                # a deletion or recut changes the implied direction of a dot
+                # run, so flag the following alive notes through its dots
+                index = seq_pos.get(identity)
+                if index is None:
+                    return
+                index += 1
+                while index < len(seq) and seq[index]["id"] not in alive:
+                    index += 1
+                while index < len(seq):
+                    needs_flow.add(seq[index]["id"])
+                    if seq[index]["d"] != 8:
+                        break
+                    index += 1
+                    while index < len(seq) and seq[index]["id"] not in alive:
+                        index += 1
+
+            def drop(note):
+                for victim in (note["id"], *copies_of.get(note["id"], ())):
+                    if victim not in alive:
+                        continue
+                    alive.discard(victim)
+                    stats["speed_cap_dropped"] += 1
+                    mark_followers(victim)
+
+            index = 0
+            while index < len(seq):
+                if seq[index]["id"] not in alive:
+                    index -= 1
+                    while index >= 0 and seq[index]["id"] not in alive:
+                        index -= 1
+                    if index < 0:
+                        index = 0
+                        while index < len(seq) and seq[index]["id"] not in alive:
+                            index += 1
+                    continue
+                following = index + 1
+                while following < len(seq) and seq[following]["id"] not in alive:
+                    following += 1
+                if following >= len(seq):
+                    break
+                previous, current = seq[index], seq[following]
+                speed = calc_note_speed([previous[key] for key in ("x", "y", "hand", "d")],
+                                        [current[key] for key in ("x", "y", "hand", "d")],
+                                        current["time"] - previous["time"])
+                if speed > cap(current):
+                    drop(current)
+                    changed = True
+                    continue
+                if current["id"] in needs_flow:
+                    needs_flow.discard(current["id"])
+                    implied = effective(index)
+                    prior = (previous["time"], previous["x"], previous["y"], implied)
+                    if current["d"] != 8 and not _flow_legal(
+                            current["d"], prior, current["x"], current["y"],
+                            current["time"], gap):
+                        recut = _flow_direction(current["d"], implied,
+                                                swing_from=(current["x"], current["y"]),
+                                                forbidden_cells=cells.get(current["id"]))
+                        changed = True
+                        if recut == 8:
+                            drop(current)
+                        else:
+                            current["d"] = recut
+                            stats["speed_cap_recuts"] += 1
+                            mark_followers(current["id"])
+                        continue
+                index = following
+        if not changed:
+            break
+    notes[:] = [note for note in notes if note["id"] in alive]
+    if chains:
+        kept = len(chains)
+        chains[:] = [chain for chain in chains if chain["anchor_id"] in alive]
+        stats["speed_cap_chains_dropped"] = kept - len(chains)
+    anchors = {note["id"]: note for note in notes}
+    for chain in chains or []:
+        anchor = anchors.get(chain.get("anchor_id"))
+        if anchor is not None:
+            chain["d"] = anchor["d"]
+    _report(logger, f"Speed cap: {stats['speed_cap_dropped']} notes and "
+                    f"{stats['speed_cap_chains_dropped']} chains dropped, "
+                    f"{stats['speed_cap_recuts']} recuts (cap {value:.1f})")
     return stats
 
 
