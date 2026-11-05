@@ -194,6 +194,15 @@ v2_speed_cap_start_notes = 30      # first N combined chronological note positio
                                    # cap in (v1 decr_speed_range); 0 disables the ramp
 v2_speed_cap_start_factor = .35    # cap multiplier at the first note position, rising
                                    # linearly to 1 (v1 decr_speed_val)
+v2_fast_gap_seconds = .2           # same-hand gap below which consecutive notes form a
+                                   # fast run: each note's direction is restricted to
+                                   # its predecessor's, the 180° reverse and (admitted
+                                   # at min(1, expected/local pair speed)) the ±45°
+                                   # neighbours; <= 0 disables both fast rules
+v2_fast_counter_direction = "recut"  # inside fast runs, recut cuts opposing their row
+                                   # first (top-row down-family 1/6/7, bottom-row
+                                   # up-family 0/4/5), preferring the allowed pool;
+                                   # "off"/"keep" disables
 v2_cleanup_note_heuristics = False  # run the legacy v1 note mutators (mirroring + flow pass
                                    # incl. emphasis/break/dot additions); False keeps model
                                    # notes — structural dedup, same-direction recut and the

@@ -413,6 +413,7 @@ def generate(song, requested_nps, predictors, encoder, settings, vocabularies, *
                 enforce_note_flow_and_clearance=base.enforce_note_flow_and_clearance,
                 snap_note_times=base.snap_note_times,
                 apply_intro_floor=base.apply_intro_floor,
+                apply_fast_direction_rules=base.apply_fast_direction_rules,
                 apply_diagonal_cap=base.apply_diagonal_cap,
                 apply_speed_cap=base.apply_speed_cap,
                 calm_area_pulses=base.calm_area_pulses,
@@ -547,6 +548,11 @@ def generate(song, requested_nps, predictors, encoder, settings, vocabularies, *
         result.diagnostics["intro_zones"] = {
             "no_notes_seconds": intro_floor,
             "notes_dropped": intro_fn(state["notes"], intro_floor)}
+    fast_dir = getattr(postprocessors, "apply_fast_direction_rules", None)
+    if fast_dir is not None and state["notes"] \
+            and float(getattr(config, "v2_fast_gap_seconds", .2) or 0.) > 0:
+        result.diagnostics["fast_directions"] = fast_dir(state["notes"], rng=rng,
+                                                         logger=logger)
     diag_fn = getattr(postprocessors, "apply_diagonal_cap", None)
     diag_cap = float(getattr(config, "v2_diagonal_max_fraction", 1.) or 0.)
     if diag_fn is not None and state["notes"] and 0 <= diag_cap < 1:

@@ -5,9 +5,11 @@ stable note IDs and expansion relationships are assigned. Clearance resolves
 same-time same-cell and swing-path conflicts; it prefers mutating heuristic or
 copied notes and only touches retained model notes when nothing else resolves
 the conflict. A start-of-map floor drops early notes (``apply_intro_floor``;
-hazards get their own floor inside ``validate_hazards``) and a best-effort
+hazards get their own floor inside ``validate_hazards``), a fast-run direction
+simplifier collapses chaotic same-hand bursts to ping-pong with optional
+counter-direction recuts (``apply_fast_direction_rules``), and a best-effort
 diagonal cap recuts excess diagonal cuts toward flow-legal adjacent cardinals
-— both run after note cleanup and onset snap, before the retained snapshot.
+— all run after note cleanup and onset snap, before the retained snapshot.
 A movement-speed cap (``apply_speed_cap``) runs after expansion and the
 clearance fixpoint; the v1 gate it restores lived inside the skipped legacy
 flow pass.
@@ -403,6 +405,7 @@ def postprocess_timing(song, beats, audio_path, logger=None, skip=()):
 _REVERSE_DIRECTION = {0: 1, 1: 0, 2: 3, 3: 2, 4: 7, 5: 6, 6: 5, 7: 4}
 # Direction index → 45°-step angle (right=0, counterclockwise).
 _DIRECTION_ANGLE = {3: 0, 5: 1, 0: 2, 4: 3, 2: 4, 6: 5, 1: 6, 7: 7}
+_ANGLE_DIRECTION = {angle: direction for direction, angle in _DIRECTION_ANGLE.items()}
 # Direction index → axis group; recuts prefer staying inside the original's
 # group so the fix does not reshape the model's direction marginals.
 _DIRECTION_GROUP = {0: 0, 1: 0, 2: 1, 3: 1, 4: 2, 5: 2, 6: 2, 7: 2, 8: 3}
@@ -1058,6 +1061,123 @@ def apply_intro_floor(notes, cutoff_seconds):
     before = len(notes)
     notes[:] = [note for note in notes if note["time"] >= cutoff_seconds]
     return before - len(notes)
+
+
+# Row → cut families fighting the note's own position: a top-row down-cut or
+# bottom-row up-cut reads as "reach the other way" at speed.
+_COUNTER_FAMILY = {0: (0, 4, 5), 2: (1, 6, 7)}
+
+
+def apply_fast_direction_rules(notes, rng=None, logger=None):
+    """Collapse chaotic directions inside fast same-hand runs to ping-pong.
+
+    A same-hand consecutive pair closer than ``v2_fast_gap_seconds`` (<= 0
+    disables both rules) is a fast pair; runs extend transitively through
+    consecutive fast pairs. Inside a run, each note's allowed direction set is
+    its predecessor's direction plus the 180° reverse, union the ±45°
+    neighbours admitted per note with probability
+    ``min(1, expected / local)`` — ``expected`` is the mean ``calc_note_speed``
+    over *every* same-hand pair in the map (the per-map average at this NPS)
+    and ``local`` the pair's own cost, so a pair moving at the map average
+    keeps ±45° almost always while an extreme burst converges to strict
+    ping-pong. A note outside its set is recut to an allowed direction that
+    stays ``_flow_legal`` against both same-hand neighbours and
+    ``_swing_clear`` of simultaneous other-hand cells; when nothing is legal
+    the note keeps its direction (legality-first, like the diagonal cap).
+    With ``v2_fast_counter_direction = "recut"`` ("off"/"keep" disables), run
+    members whose cut opposes their row (top-row down-family d 1/6/7,
+    bottom-row up-family d 0/4/5) are recut first — preferring the allowed
+    pool, then any legal non-counter direction. Dots are untouched and pass
+    their geometry-implied direction on, the convention of
+    ``_recut_same_direction_repeats``. Neighbours are read with their current
+    direction, so earlier recuts constrain later ones. Returns run stats."""
+    rng = np.random.default_rng() if rng is None else rng
+    stats = {"fast_pairs": 0, "fast_simplified": 0,
+             "fast_counter_recuts": 0, "expected_speed": 0.}
+    threshold = float(getattr(config, "v2_fast_gap_seconds", .2) or 0.)
+    if threshold <= 0 or len(notes) < 2:
+        return stats
+    ordered = sorted(notes, key=lambda item: (item["time"], item["id"]))
+    per_hand = {hand: [note for note in ordered if note["hand"] == hand]
+                for hand in (0, 1)}
+    speeds, fast, runs = [], {}, set()
+    for seq in per_hand.values():
+        for previous, current in zip(seq, seq[1:]):
+            speed = calc_note_speed([previous[key] for key in ("x", "y", "hand", "d")],
+                                    [current[key] for key in ("x", "y", "hand", "d")],
+                                    current["time"] - previous["time"])
+            speeds.append(speed)
+            if current["time"] - previous["time"] < threshold:
+                fast[current["id"]] = speed
+                runs.update((previous["id"], current["id"]))
+    expected = float(np.mean(speeds)) if speeds else 0.
+    stats["expected_speed"] = expected
+    stats["fast_pairs"] = len(fast)
+    if expected <= 0 or not fast:
+        return stats
+    eps = float(getattr(config, "min_time_diff", .02))
+    window = max(eps, float(getattr(config, "v2_cleanup_swing_window", .15) or 0.))
+    gap = float(getattr(config, "v2_cleanup_same_dir_gap", .1) or 0.)
+    cells = _other_hand_cells(ordered, eps, window)
+    counter_mode = getattr(config, "v2_fast_counter_direction", "recut") == "recut"
+
+    for seq in per_hand.values():
+        previous = None  # (time, x, y, effective direction through dots)
+        for index, note in enumerate(seq):
+            time, x, y = note["time"], note["x"], note["y"]
+            pred_d = previous[3] if previous is not None else None
+            allowed = None
+            local = fast.get(note["id"])
+            if local is not None and pred_d is not None and note["d"] != 8:
+                allowed = {pred_d, _REVERSE_DIRECTION[pred_d]}
+                if rng.uniform() < (min(1., expected / local) if local > 0 else 1.):
+                    angle = _DIRECTION_ANGLE[pred_d]
+                    allowed |= {_ANGLE_DIRECTION[(angle - 1) % 8],
+                                _ANGLE_DIRECTION[(angle + 1) % 8]}
+            counter = (counter_mode and note["id"] in runs
+                       and note["d"] in _COUNTER_FAMILY.get(y, ()))
+            if counter or (allowed is not None and note["d"] != 8
+                           and note["d"] not in allowed):
+                successor = seq[index + 1] if index + 1 < len(seq) else None
+
+                def legal(candidate):
+                    if not _flow_legal(candidate, previous, x, y, time, gap):
+                        return False
+                    if successor is not None:
+                        next_d = successor["d"] if successor["d"] != 8 else \
+                            _dot_virtual_direction(candidate, x, y,
+                                                   successor["x"], successor["y"])
+                        if next_d is not None and not _flow_legal(
+                                next_d, (time, x, y, candidate),
+                                successor["x"], successor["y"], successor["time"], gap):
+                            return False
+                    return _swing_clear((x, y), cells.get(note["id"]), candidate)
+
+                def recut(pool):
+                    candidates = [d for d in pool if legal(d)]
+                    if not candidates:
+                        return False
+                    note["d"] = _rank_flow_candidates(
+                        note["d"], candidates, () if pred_d is None else (pred_d,))
+                    return True
+
+                if counter:
+                    pool = [d for d in range(8) if d not in _COUNTER_FAMILY[y]]
+                    preferred = [d for d in (allowed or pool) if d in pool]
+                    if recut(preferred) or recut(pool):
+                        stats["fast_counter_recuts"] += 1
+                elif recut(sorted(allowed)):
+                    stats["fast_simplified"] += 1
+            # dots get their implied direction from geometry, alternating the pendulum
+            effective = note["d"] if note["d"] != 8 else (
+                _dot_virtual_direction(previous[3], previous[1], previous[2], x, y)
+                if previous is not None else None)
+            previous = (time, x, y, effective)
+    _report(logger, f"Fast directions: {stats['fast_pairs']} pairs, "
+                    f"{stats['fast_simplified']} simplified, "
+                    f"{stats['fast_counter_recuts']} counter recuts "
+                    f"(expected speed {expected:.1f})")
+    return stats
 
 
 # Diagonal direction → its two adjacent cardinals; recuts stay inside the

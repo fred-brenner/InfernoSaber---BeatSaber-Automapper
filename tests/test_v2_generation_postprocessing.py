@@ -1132,6 +1132,143 @@ def test_generate_wires_intro_floor_and_diagonal_cap(monkeypatch):
                                   settings, vocab, lighting_generator=lighting,
                                   random_factor=0, logger=lambda message: None)
     assert result.diagnostics["intro_zones"]["notes_dropped"] >= 1
+    assert "fast_directions" in result.diagnostics
     assert "diagonal_cap" in result.diagnostics
     assert "speed_cap" in result.diagnostics
     assert min(note["time"] for note in result.state["notes"]) >= 2.0
+
+
+@pytest.fixture
+def fast_defaults(monkeypatch):
+    # pin the legacy speed cost and the fast-direction knobs for exact ratios
+    for key, value in {"max_speed": 32., "reaction_time": 1.15,
+                       "reaction_time_fact": .013, "cdf": 1.2, "cdf_lr": 1.15,
+                       "min_time_diff": .02, "v2_fast_gap_seconds": .2,
+                       "v2_fast_counter_direction": "recut",
+                       "v2_cleanup_same_dir_gap": .1, "v2_cleanup_swing_window": .15,
+                       "v2_flow_min_turn_steps": 3}.items():
+        monkeypatch.setattr(config, key, value)
+
+
+def test_fast_run_collapses_to_ping_pong(fast_defaults):
+    # .15 s same-hand chain: every direction is >=135°-legal input but outside
+    # the ping-pong set; each recut lands on the predecessor's 180° reverse
+    notes = [note(0, 1.0, x=0, y=1, direction=1),
+             note(1, 1.15, x=1, y=1, direction=5),
+             note(2, 1.30, x=2, y=1, direction=6),
+             note(3, 1.45, x=3, y=1, direction=5)]
+    stats = post.apply_fast_direction_rules(notes, rng=np.random.default_rng(0))
+    assert [item["d"] for item in notes] == [1, 0, 1, 0]
+    assert stats["fast_pairs"] == 3 and stats["fast_simplified"] == 3
+
+
+def test_fast_run_slow_pairs_untouched(fast_defaults):
+    notes = [note(0, 1.0, x=0, y=1, direction=1),
+             note(1, 1.65, x=1, y=1, direction=5),
+             note(2, 2.30, x=2, y=1, direction=6)]
+    stats = post.apply_fast_direction_rules(notes, rng=np.random.default_rng(0))
+    assert [item["d"] for item in notes] == [1, 5, 6]
+    assert stats["fast_pairs"] == 0 and stats["fast_simplified"] == 0
+    assert stats["expected_speed"] > 0
+
+
+def test_fast_run_admits_45_when_local_is_average(fast_defaults):
+    # a lone pair has expected == local -> the ±45° option is always admitted
+    # (y=1: outside both counter-direction rows)
+    notes = [note(0, 1.0, x=0, y=0, direction=2),
+             note(1, 1.05, x=1, y=1, direction=4)]   # up-left = left-45°, same-stroke legal
+    stats = post.apply_fast_direction_rules(notes, rng=np.random.default_rng(0))
+    assert notes[1]["d"] == 4
+    assert stats["expected_speed"] == pytest.approx(
+        post.calc_note_speed([0, 0, 0, 2], [1, 1, 0, 4], .05))
+
+
+def test_fast_run_denies_45_at_extreme_local_speed(fast_defaults):
+    # expected/local ~= .34: a low draw admits the ±45° keep, a high draw
+    # strips it and the recut falls back to the 180° reverse
+    build = lambda: [note(0, 1.0, hand=0, x=0, y=0, direction=2),
+                     note(1, 1.04, hand=0, x=3, y=2, direction=4),
+                     note(10, 2.0, hand=1, x=1, y=1, direction=1),
+                     note(11, 4.0, hand=1, x=1, y=1, direction=0),
+                     note(12, 5.0, hand=1, x=1, y=1, direction=1),
+                     note(13, 7.0, hand=1, x=1, y=1, direction=0)]
+    notes = build()
+    post.apply_fast_direction_rules(notes, rng=SimpleNamespace(uniform=lambda: .99))
+    assert notes[1]["d"] == 3
+    notes = build()
+    post.apply_fast_direction_rules(notes, rng=SimpleNamespace(uniform=lambda: .01))
+    assert notes[1]["d"] == 4
+
+
+def test_fast_run_counter_direction_recut(fast_defaults):
+    # top-row down-right following an up-left cut: legal input, counter family
+    # (the up-left predecessor sits on the top row and is not counter itself)
+    notes = [note(0, 1.0, x=0, y=2, direction=4),
+             note(1, 1.15, x=0, y=2, direction=7)]
+    stats = post.apply_fast_direction_rules(notes, rng=np.random.default_rng(0))
+    assert notes[1]["d"] == 3
+    assert stats["fast_counter_recuts"] == 1 and stats["fast_simplified"] == 0
+
+
+def test_fast_run_counter_direction_kept_when_slow(fast_defaults):
+    notes = [note(0, 1.0, x=0, y=2, direction=4),
+             note(1, 1.6, x=0, y=2, direction=7)]
+    stats = post.apply_fast_direction_rules(notes, rng=np.random.default_rng(0))
+    assert notes[1]["d"] == 7 and stats["fast_counter_recuts"] == 0
+
+
+@pytest.mark.parametrize("mode", ["off", "keep"])
+def test_fast_run_counter_off_keeps_counter_directions(fast_defaults, monkeypatch, mode):
+    monkeypatch.setattr(config, "v2_fast_counter_direction", mode)
+    notes = [note(0, 1.0, x=0, y=2, direction=4),
+             note(1, 1.15, x=0, y=2, direction=7)]
+    stats = post.apply_fast_direction_rules(notes, rng=np.random.default_rng(0))
+    # no allowed direction is legal against the up-left cut, so the note stays
+    assert notes[1]["d"] == 7
+    assert stats["fast_counter_recuts"] == 0 and stats["fast_simplified"] == 0
+
+
+def test_fast_run_disabled_at_zero_gap(fast_defaults, monkeypatch):
+    monkeypatch.setattr(config, "v2_fast_gap_seconds", 0.)
+    notes = [note(0, 1.0, x=0, y=1, direction=1),
+             note(1, 1.15, x=1, y=1, direction=5)]
+    stats = post.apply_fast_direction_rules(notes, rng=np.random.default_rng(0))
+    assert [item["d"] for item in notes] == [1, 5]
+    assert stats == {"fast_pairs": 0, "fast_simplified": 0,
+                     "fast_counter_recuts": 0, "expected_speed": 0.}
+
+
+def test_fast_run_keeps_direction_when_no_legal_candidate(fast_defaults):
+    # note1's only allowed recut (up) would sit 90° from note2's right cut and
+    # note2's (down-right) 90° from note3's down-left cut, so both keep their
+    # chaotic-but-legal directions; note3 recuts to the reverse of right
+    notes = [note(0, 1.0, x=0, y=1, direction=1),
+             note(1, 1.15, x=1, y=1, direction=4),
+             note(2, 1.30, x=2, y=1, direction=3),
+             note(3, 1.45, x=3, y=1, direction=6)]
+    stats = post.apply_fast_direction_rules(notes, rng=np.random.default_rng(0))
+    assert [item["d"] for item in notes] == [1, 4, 3, 2]
+    assert stats["fast_pairs"] == 3 and stats["fast_simplified"] == 1
+
+
+def test_fast_run_dot_predecessor_feeds_implied_direction(fast_defaults):
+    # a dot after a right cut on the opposite side inherits the left reversal;
+    # the chaotic successor is recut against left's allowed set
+    notes = [note(0, 1.0, x=3, y=1, direction=3),
+             note(1, 1.1, x=0, y=1, direction=8),
+             note(2, 1.25, x=2, y=1, direction=5)]
+    stats = post.apply_fast_direction_rules(notes, rng=np.random.default_rng(0))
+    assert [item["d"] for item in notes] == [3, 8, 3]
+    assert stats["fast_simplified"] == 1
+
+
+def test_fast_run_deterministic_per_seed(fast_defaults):
+    build = lambda: [note(0, 1.0, x=0, y=0, direction=2),
+                     note(1, 1.04, x=3, y=2, direction=4),
+                     note(2, 1.08, x=0, y=2, direction=7),
+                     note(10, 2.0, hand=1, x=1, y=1, direction=1),
+                     note(11, 4.0, hand=1, x=1, y=1, direction=0)]
+    a, b = build(), build()
+    post.apply_fast_direction_rules(a, rng=np.random.default_rng(42))
+    post.apply_fast_direction_rules(b, rng=np.random.default_rng(42))
+    assert [(n["x"], n["y"], n["d"]) for n in a] == [(n["x"], n["y"], n["d"]) for n in b]
