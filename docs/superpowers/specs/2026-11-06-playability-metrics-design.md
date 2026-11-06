@@ -166,9 +166,17 @@ rate×severity distribution vs corpus, not from zero.
 - Console output mirrors `pattern_analysis` style: human quantile table per
   band, per-map rows (`M1..M4 + percentile`), and a worst-incidents section
   for flagged maps. `--json` writes machine-readable output.
-- Include the existing `clearance_violations` residual counts as a sanity row
-  when scoring generated packages (hard invariants stay visible next to the
-  soft metrics).
+- ~~Include the existing `clearance_violations` residual counts as a sanity row
+  when scoring generated packages~~ **Deviation (resolved during
+  implementation):** `clearance_violations` lives in `v2_postprocessing`,
+  whose import chain pulls aubio/librosa — forbidden by this module's
+  dependency-light constraint. Re-implementing it would duplicate
+  generation-rule constants (`v2_cleanup_swing_window` et al.) that must
+  stay single-sourced in `tools.config`, and the residual counts are ~0 by
+  construction for any package that passed
+  `enforce_note_flow_and_clearance` at generation time. M4 already measures
+  the same physical phenomenon (swing-volume overlap) in calibrated form,
+  so the row is dropped rather than re-implemented.
 
 ## Files
 

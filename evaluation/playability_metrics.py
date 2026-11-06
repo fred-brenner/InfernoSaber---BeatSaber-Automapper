@@ -399,9 +399,10 @@ def m4_interference(prepared, minutes):
     zero-length stream has no meaningful rate); ``units`` holds the
     positive severities (the pooled-percentile input); ``incidents`` is
     the ``INCIDENT_TOP_K``-capped list of
-    ``{"t","a","b","cells","severity","crossover"}`` dicts sorted by
+    ``{"t","dt","a","b","cells","severity","crossover"}`` dicts sorted by
     severity desc, where ``t`` is the later note's time (the moment the
-    interference completes) and ``cells`` the sorted shared cells."""
+    interference completes), ``dt`` the pair's time separation, and
+    ``cells`` the sorted shared cells."""
     volumes = [swing_volume(note) for note in prepared]
     total, units, incidents = 0.0, [], []
     for index, a in enumerate(prepared):
@@ -420,6 +421,7 @@ def m4_interference(prepared, minutes):
                 continue
             units.append(severity)
             incidents.append({"t": max(a["t"], b["t"]),
+                              "dt": abs(a["t"] - b["t"]),
                               "a": (a["x"], a["y"], a["d"]),
                               "b": (b["x"], b["y"], b["d"]),
                               "cells": sorted(shared),

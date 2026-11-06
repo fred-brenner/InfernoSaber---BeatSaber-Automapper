@@ -340,8 +340,9 @@ beat-only results are recorded in [the baseline](baseline.md).
 `evaluation.playability_report` scores note-pattern playability — it does not
 require audio or model outputs. Four metrics compare a map against the curated
 human baseline: M1 lateral/diagonal load at speed, M2 predecessor occlusion
-(notes hidden behind higher earlier notes), M3 divergent bimanual motion axes,
-and M4 cross-hand swing-path interference. Each generated map gets a percentile
+(higher notes hidden behind earlier lower predecessors — the bottom-up
+visibility direction), M3 divergent bimanual motion axes, and M4 cross-hand
+swing-path interference. Each generated map gets a percentile
 within its matched NPS band plus a pooled incident rate versus the human p95;
 flags mark `percentile >= 95` or `rate >= 3x human`. Occasional incidents are
 expected in human maps too — compare rates, not single events.
