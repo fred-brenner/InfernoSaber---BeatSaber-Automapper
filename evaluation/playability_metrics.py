@@ -260,3 +260,77 @@ def m2_occlusion(prepared):
             if prepared else 0.0,
             "units": np.asarray(units, dtype=float),
             "incidents": incidents}
+
+
+def _event_segments(prepared):
+    """Split the time-sorted note stream into activity segments.
+
+    Events are the unique note times; same-time notes have zero gap, so
+    splitting the note list wherever consecutive notes sit more than
+    ``T_SEG`` apart yields the same segmentation as splitting the unique
+    event times at gaps > ``T_SEG``."""
+    segments, current, previous_t = [], [], None
+    for note in prepared:
+        if previous_t is not None and note["t"] - previous_t > T_SEG:
+            segments.append(current)
+            current = []
+        current.append(note)
+        previous_t = note["t"]
+    if current:
+        segments.append(current)
+    return segments
+
+
+def _hand_vectors(segment, hand):
+    """Displacement vectors between consecutive same-hand notes inside one
+    segment — the note pairs never cross a segment boundary."""
+    coords = [(note["x"], note["y"]) for note in segment
+              if note["hand"] == hand]
+    return [(b[0] - a[0], b[1] - a[1])
+            for a, b in zip(coords, coords[1:])]
+
+
+def _dominant_axis(vectors):
+    """A hand's dominant motion axis: top eigenvector of the 2x2 scatter
+    ``Σvvᵀ``. ``None`` when the hand has fewer than 2 vectors, when the
+    scatter is all-zero (stationary hand, eigenvalues sum to 0), or when
+    the motion is near-isotropic (``λ1/(λ1+λ2) < ISO_MIN``)."""
+    if len(vectors) < 2:
+        return None
+    v = np.asarray(vectors, dtype=float)
+    eigenvalues, eigenvectors = np.linalg.eigh(v.T @ v)
+    total = float(eigenvalues.sum())
+    if total <= 0.0 or eigenvalues[1] / total < ISO_MIN:
+        return None
+    return eigenvectors[:, 1]
+
+
+def m3_divergence(prepared):
+    """M3 bimanual divergence — how far the two hands' dominant motion axes
+    rotate away from each other within activity segments (design §M3).
+
+    The event stream segments at gaps > ``T_SEG`` (``_event_segments``).
+    Per segment each hand's consecutive same-hand displacements
+    (``_hand_vectors``) define a dominant axis (``_dominant_axis``); the
+    segment counts only when both hands resolve one. Its divergence is the
+    2D cross magnitude ``|u_L.x·u_R.y − u_L.y·u_R.x|`` = ``|sin θ|`` —
+    unoriented, so eigenvector sign is irrelevant: same-axis or mirrored
+    hands → 0, orthogonal → 1. ``value`` is the weighted mean by
+    ``min(nvec_L, nvec_R)``; ``units`` holds the per-segment divergences
+    (the pooled-percentile input); ``segments`` counts valid segments."""
+    units, weights = [], []
+    for segment in _event_segments(prepared):
+        vectors_l, vectors_r = (_hand_vectors(segment, hand)
+                                for hand in (0, 1))
+        axis_l, axis_r = (_dominant_axis(vectors)
+                          for vectors in (vectors_l, vectors_r))
+        if axis_l is None or axis_r is None:
+            continue
+        units.append(float(abs(axis_l[0] * axis_r[1]
+                               - axis_l[1] * axis_r[0])))
+        weights.append(min(len(vectors_l), len(vectors_r)))
+    total_weight = sum(weights)
+    return {"value": float(np.dot(units, weights) / total_weight)
+            if total_weight else 0.0,
+            "units": np.asarray(units, dtype=float),
+            "segments": len(units)}

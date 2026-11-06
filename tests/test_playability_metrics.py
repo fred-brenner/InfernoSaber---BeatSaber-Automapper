@@ -9,7 +9,8 @@ if str(ROOT_DIR) not in sys.path:
 
 from evaluation.playability_metrics import (MIRROR_DIR, STEP, corridor,
                                             m1_lateral, m2_occlusion,
-                                            prepare_notes, swept_cells)
+                                            m3_divergence, prepare_notes,
+                                            swept_cells)
 
 
 def test_step_table_matches_get_cut_dir_xy():
@@ -148,3 +149,64 @@ def test_m2_column_gate():
     assert result["value"] == 0.0
     assert len(result["units"]) == 0
     assert result["incidents"] == []
+
+
+def test_m3_parallel_vertical():
+    # Both hands ride a 2s vertical wave (y 0<->2) on their own side: every
+    # displacement vector is purely (0,+-2), so each dominant axis points
+    # along y and |sin theta| between them is 0.
+    times = [0.25 * i for i in range(9)]  # t = 0..2.0, one segment
+    notes = [(t, 0, 0, (i % 2) * 2, 8) for i, t in enumerate(times)]
+    notes += [(t, 1, 3, (i % 2) * 2, 8) for i, t in enumerate(times)]
+    result = m3_divergence(prepare_notes(notes))
+    assert result["segments"] == 1
+    assert result["units"] == pytest.approx([0.0])
+    assert result["value"] == pytest.approx(0.0)
+
+
+def test_m3_orthogonal():
+    # Same window, left hand on a vertical wave while the right hand sweeps
+    # horizontally (x 2<->3): perpendicular axes -> |sin theta| = 1.
+    times = [0.25 * i for i in range(9)]
+    left = [(t, 0, 0, (i % 2) * 2, 8) for i, t in enumerate(times)]
+    right = [(t, 1, 2 + i % 2, 1, 8) for i, t in enumerate(times)]
+    result = m3_divergence(prepare_notes(left + right))
+    assert result["segments"] == 1
+    assert result["units"] == pytest.approx([1.0])
+    assert result["value"] == pytest.approx(1.0)
+
+
+def test_m3_isotropic_skipped():
+    # Segment 1 (t = 0..1.0): both hands vertical -> valid. Segment 2 (after
+    # a 1.0s gap): left stays vertical but the right hand walks a square,
+    # scatter = 2*I, lambda share 0.5 < ISO_MIN -> no dominant axis, so the
+    # segment is excluded from units, weights and the segment count.
+    times1 = [0.25 * i for i in range(5)]
+    notes = [(t, 0, 0, (i % 2) * 2, 8) for i, t in enumerate(times1)]
+    notes += [(t, 1, 3, (i % 2) * 2, 8) for i, t in enumerate(times1)]
+    times2 = [2.0 + 0.25 * i for i in range(5)]
+    notes += [(t, 0, 0, (i % 2) * 2, 8) for i, t in enumerate(times2)]
+    square = [(2, 0), (3, 0), (3, 1), (2, 1), (2, 0)]
+    notes += [(t, 1, x, y, 8) for t, (x, y) in zip(times2, square)]
+    result = m3_divergence(prepare_notes(notes))
+    assert result["segments"] == 1
+    assert result["units"] == pytest.approx([0.0])
+    assert result["value"] == pytest.approx(0.0)
+
+
+def test_m3_idle_hand_ignored():
+    # A left-hand-only segment has no right-hand axis, so it contributes
+    # nothing; the second segment (V vs H) is the only one counted.
+    times1 = [0.25 * i for i in range(5)]
+    notes = [(t, 0, 0, (i % 2) * 2, 8) for i, t in enumerate(times1)]
+    times2 = [2.0 + 0.25 * i for i in range(5)]
+    notes += [(t, 0, 0, (i % 2) * 2, 8) for i, t in enumerate(times2)]
+    notes += [(t, 1, 2 + i % 2, 1, 8) for i, t in enumerate(times2)]
+    result = m3_divergence(prepare_notes(notes))
+    assert result["segments"] == 1
+    assert result["units"] == pytest.approx([1.0])
+    assert result["value"] == pytest.approx(1.0)
+    solo = m3_divergence(prepare_notes(notes[:5]))  # the idle segment alone
+    assert solo["segments"] == 0
+    assert len(solo["units"]) == 0
+    assert solo["value"] == 0.0
