@@ -814,7 +814,7 @@ def build_app(check_updates=True):
                 js_offset.input(set_js_offset, inputs=[js_offset], outputs=[])
                 # set intensity
                 intensity = gr.Number(label="Beat Intensity (%)", value=config.add_beat_intensity, precision=0,
-                                      interactive=True, step=5, minimum=70, maximum=125,
+                                      interactive=True, step=5, minimum=40, maximum=125,
                                       info="Acts as multiplier to the difficulty target. "
                                            "High values enforce more notes in calm sections "
                                            "and allow faster same-hand movement (v2 speed cap).")
@@ -836,7 +836,7 @@ def build_app(check_updates=True):
                                                   "0 deactivates the feature.")
                 random_behaviour.input(set_random_behaviour, inputs=[random_behaviour], outputs=[])
                 with gr.Column(visible=param_groups["v2_only"]) as v2_col:
-                    gr.Markdown("Applies to v2 only")
+                    gr.Markdown("Applies to v2 Model only")
                     # set v2 note sample temperature
                     note_sample_temperature = gr.Number(label="Note Sample Temperature",
                                                         value=config.v2_note_sample_temperature, precision=1,

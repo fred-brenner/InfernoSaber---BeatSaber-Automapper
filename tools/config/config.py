@@ -103,7 +103,7 @@ max_speed = 4 * 8.0  # set around 5-40 (normal-expert++)
 # Beat Intensity (%) is the app's difficulty dial: it scales the density-fill
 # budget (v1 + v2) and, since 2026-11-06, the v2 speed cap via
 # v2_speed_cap_scale (100% = the configured reference, others scale linearly).
-add_beat_intensity = 100  # try to match bps by x% [80, 125]
+add_beat_intensity = 90  # try to match bps by x% [40, 125]
 gimme_more_notes_flag = True   # try to always use notes on both sides
 gimme_more_notes_prob = 0.25     # probability to activate [0.0-1.0]
 cdf = 1.2  # cut director factor (to calculate speed, [0.5, 1.5])
@@ -200,7 +200,8 @@ v2_speed_cap_scale = 2.0           # multiplier on the v1 movement-speed cap
                                    # (max_speed * get_factor_from_max_speed distance/s between
                                    # consecutive same-hand notes); <= 0 disables the pass.
                                    # Reference value at add_beat_intensity 100 — the app field
-                                   # scales the effective cap linearly (95% -> 1.9x, 125% -> 2.5x).
+                                   # scales the effective cap linearly (default 90% -> 1.8x,
+                                   # 95% -> 1.9x, 125% -> 2.5x).
                                    # 2026-11-06: playtested at 2.0 for NPS 5
 v2_speed_cap_start_notes = 30      # first N combined chronological note positions ramp
                                    # max_speed in (v1 decr_speed_range); 0 disables the ramp
