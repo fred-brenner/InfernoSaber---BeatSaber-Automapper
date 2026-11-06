@@ -79,6 +79,10 @@ platforms before implementing them unless the task already authorizes them.
   exclude `favorites_bs_input` and report skipped packages individually.
   Favorites remain valid *training* input: `--source-root` can be repeated to
   ingest several package folders, with automatic beatmap+audio deduplication.
+- For note-pattern playability scoring (lateral load, occlusion, bimanual
+  divergence, cross-hand path interference versus the human baseline), read
+  [docs/development.md](docs/development.md#playability-metrics); it is an
+  evaluation-only comparison, not a generation gate.
 - For the existing user workflow, read [Readme.md](Readme.md).
 - For the new intensity/timing/note framework, training commands, data contracts,
   and verification limits, read [docs/beat-model-training.md](docs/beat-model-training.md).

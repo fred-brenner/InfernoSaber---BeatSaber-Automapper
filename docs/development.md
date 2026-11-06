@@ -335,6 +335,32 @@ The old model's training overlap remains unknown. Agreement on these seven human
 maps is not a measure of playability or general musical quality. Trained
 beat-only results are recorded in [the baseline](baseline.md).
 
+### Playability metrics
+
+`evaluation.playability_report` scores note-pattern playability — it does not
+require audio or model outputs. Four metrics compare a map against the curated
+human baseline: M1 lateral/diagonal load at speed, M2 predecessor occlusion
+(notes hidden behind higher earlier notes), M3 divergent bimanual motion axes,
+and M4 cross-hand swing-path interference. Each generated map gets a percentile
+within its matched NPS band plus a pooled incident rate versus the human p95;
+flags mark `percentile >= 95` or `rate >= 3x human`. Occasional incidents are
+expected in human maps too — compare rates, not single events.
+
+```bash
+python -m evaluation.playability_report \
+  --human-root "../Data/training/evaluate_beats" \
+  --generated "../Data/prediction/new_map" \
+  --json report.json --top-k 5
+```
+
+`--human-root` resolves a contained `bs_map_input` folder automatically; the
+human baseline decodes only the highest Standard difficulty per package.
+`--generated` scores every listed Standard difficulty of each package folder.
+Invalid packages are skipped and listed with reasons. `--dataset` optionally
+adds a prepared pipeline-v2 manifest as extra human baseline; `--difficulty`
+and `--split` filter the generated/dataset sides. `--json` writes the full
+report including per-map metric values and top incidents.
+
 ## New beat-learning framework
 
 Use [the new training guide](beat-model-training.md) for dataset preparation,
