@@ -157,3 +157,54 @@ def prepare_notes(notes):
         prepared.append(note)
         predecessor[hand] = note
     return prepared
+
+
+# M1 cut stress w(d): vertical cuts (0,1) and dots (8) carry no lateral
+# stress, diagonals (4-7) half, horizontal cuts (2,3) full — dots are
+# free-direction relief, so the raw ``d`` counts, not ``eff``.
+M1_STRESS = {0: 0.0, 1: 0.0, 2: 1.0, 3: 1.0,
+             4: 0.5, 5: 0.5, 6: 0.5, 7: 0.5, 8: 0.0}
+M1_GAP_BANDS = ("<=0.2", "0.2-0.35", ">0.35")
+
+
+def _gap_band(gap):
+    """M1 reporting band for a same-hand gap, in seconds."""
+    if gap <= 0.2:
+        return "<=0.2"
+    if gap <= 0.35:
+        return "0.2-0.35"
+    return ">0.35"
+
+
+def m1_lateral(prepared):
+    """M1 lateral load — the share of fast same-hand work on non-vertical
+    axes (design §M1).
+
+    Each same-hand transition (``pred`` chain) contributes the arriving
+    note's cut stress ``w(d)`` weighted by speed ``s(g) = max(0, 1 -
+    g/T_FAST)``; ``value = Σ w·s / Σ s`` in [0,1] — 0 when no transition is
+    fast enough. ``units`` holds the positive ``w·s`` contributions (the
+    pooled-percentile input); ``bands`` reports mean stress per gap band to
+    expose "only bad when fast" (0.0 for empty bands). ``transitions`` is
+    the number of same-hand transitions seen."""
+    numerator = denominator = 0.0
+    units, transitions = [], 0
+    band_stress = {band: [] for band in M1_GAP_BANDS}
+    for note in prepared:
+        pred = note["pred"]
+        if pred is None:
+            continue
+        transitions += 1
+        gap = note["t"] - pred["t"]
+        stress, speed = M1_STRESS[note["d"]], max(0.0, 1.0 - gap / T_FAST)
+        contribution = stress * speed
+        numerator += contribution
+        denominator += speed
+        if contribution > 0:
+            units.append(contribution)
+        band_stress[_gap_band(gap)].append(stress)
+    return {"value": numerator / denominator if denominator else 0.0,
+            "units": np.asarray(units, dtype=float),
+            "bands": {band: float(np.mean(stresses)) if stresses else 0.0
+                      for band, stresses in band_stress.items()},
+            "transitions": transitions}
