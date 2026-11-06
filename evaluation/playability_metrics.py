@@ -238,9 +238,10 @@ def m2_occlusion(prepared):
     ``occl = max(0, y_j - y_i)·(1 - |Δx|/3)·(1 - Δt/T_VIS)`` — taller
     occluders closer to j's lane and to j's cut time hide more.
     ``value = Σ occl / N_notes``; ``units`` holds the positive occl values
-    (the pooled-percentile input); ``incidents`` lists ``occl >= 0.5``
-    events as ``{"t", "note", "occluder", "dt", "occl"}`` for top-k
-    reporting."""
+    (the pooled-percentile input); ``incidents`` is the
+    ``INCIDENT_TOP_K``-capped list of ``occl >= 0.5`` events
+    ``{"t", "note", "occluder", "dt", "occl"}`` sorted by occl desc —
+    the same top-k contract as M4."""
     occlusions, units, incidents = [], [], []
     for index, note in enumerate(prepared):
         occluder, dt = _nearest_occluder(prepared, index)
@@ -257,10 +258,11 @@ def m2_occlusion(prepared):
                               "note": (note["x"], note["y"]),
                               "occluder": (occluder["x"], occluder["y"]),
                               "dt": dt, "occl": occl})
+    incidents.sort(key=lambda event: event["occl"], reverse=True)
     return {"value": float(np.sum(occlusions) / len(prepared))
             if prepared else 0.0,
             "units": np.asarray(units, dtype=float),
-            "incidents": incidents}
+            "incidents": incidents[:INCIDENT_TOP_K]}
 
 
 def _event_segments(prepared):

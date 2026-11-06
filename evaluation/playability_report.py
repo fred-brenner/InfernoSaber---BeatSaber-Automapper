@@ -220,7 +220,9 @@ def score_rows(packages, per_difficulty):
                              "difficulty": decoded["difficulty"],
                              "scores": _scores_from_notes(decoded["notes"])})
             except Exception as error:
-                skipped.append({"package": package.name, "error": str(error)})
+                label = f"{difficulty}: " if per_difficulty else ""
+                skipped.append({"package": package.name,
+                                "error": f"{label}{error}"})
     return rows, skipped
 
 
@@ -468,7 +470,13 @@ def main(argv=None):
         _package_dirs(human_root), per_difficulty=False)
     dataset_skipped = []
     if args.dataset is not None:
-        extra_rows, dataset_skipped = _dataset_rows(args.dataset, args.split)
+        manifest = args.dataset / "manifest.json"
+        if not manifest.is_file():
+            command.error(f"Dataset manifest not found: {manifest}")
+        try:
+            extra_rows, dataset_skipped = _dataset_rows(args.dataset, args.split)
+        except Exception as error:
+            command.error(f"Could not read dataset manifest: {error}")
         human_rows += extra_rows
 
     gen_rows, gen_skipped = [], []

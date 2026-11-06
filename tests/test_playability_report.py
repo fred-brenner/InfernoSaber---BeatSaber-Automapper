@@ -235,6 +235,23 @@ def test_score_rows_skip(tmp_path):
     assert [row["difficulty"] for row in rows] == ["Hard", "ExpertPlus"]
     assert skipped == []
 
+    # a partially broken package still scores the healthy difficulty, and
+    # the skip error names the failed one.
+    partial = write_package(tmp_path / "partial_pkg", beatmaps={
+        "Hard": {"version": "3.2.0",
+                 "colorNotes": [{"b": 2, "x": 0, "y": 0, "c": 0, "d": 0},
+                                {"b": 8, "x": 2, "y": 1, "c": 1, "d": 1}]},
+        "ExpertPlus": {"version": "3.2.0",
+                       "colorNotes": [{"b": 4, "x": 1, "y": 1, "c": 1, "d": 1},
+                                      {"b": 12, "x": 2, "y": 1, "c": 0, "d": 0}]},
+    })
+    (partial / "ExpertPlus.dat").unlink()
+    rows, skipped = score_rows([partial], per_difficulty=True)
+    assert [row["difficulty"] for row in rows] == ["Hard"]
+    assert len(skipped) == 1
+    assert skipped[0]["package"] == "partial_pkg"
+    assert skipped[0]["error"].startswith("ExpertPlus: ")
+
 
 def test_score_rows_skips_tiny_maps(tmp_path):
     tiny = write_package(tmp_path / "tiny_pkg", beatmaps={"ExpertPlus": {

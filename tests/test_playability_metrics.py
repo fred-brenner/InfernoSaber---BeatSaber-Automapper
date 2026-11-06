@@ -155,6 +155,16 @@ def test_m2_column_gate():
     assert result["incidents"] == []
 
 
+def test_m2_incidents_severity_sorted():
+    # Two occlusions: the later, stronger one (occl 1.5 at t=2.1, dt=0.1)
+    # must lead the incident list — same top-k contract as M4.
+    prepared = prepare_notes([(1.0, 0, 1, 0, 0), (1.2, 1, 1, 2, 0),
+                            (2.0, 0, 2, 0, 0), (2.1, 1, 2, 2, 0)])
+    result = m2_occlusion(prepared)
+    assert [event["occl"] for event in result["incidents"]] == \
+        pytest.approx([1.5, 1.0])
+
+
 def test_m3_parallel_vertical():
     # Both hands ride a 2s vertical wave (y 0<->2) on their own side: every
     # displacement vector is purely (0,+-2), so each dominant axis points
