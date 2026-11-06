@@ -42,7 +42,7 @@ max_speed=5 inferno_model=fav_15 python main.py
 `pp3_15`, `easy_15`, `hard_15`, `expert_15`). A v1 preset downloads its model
 folder from Hugging Face on first use and runs the unchanged legacy generator —
 no v2 postprocessing — writing per-difficulty `1234_<speed>_<name>` folders
-instead of combined `12345_*` v2 packages. `max_speed=5` on the command line
+that combine into `12345_*` packages exactly like the v2 path. `max_speed=5` on the command line
 requests 5 retained colored notes per second under v2 (the legacy difficulty
 scale under v1). The Python function's `diff` argument and internal
 `config.max_speed` retain the historical factor of four: `diff=20`
@@ -63,8 +63,9 @@ from main_multi import main_multi_par
 result = main_multi_par(2, [3, 5], export_results_to_bs=False)
 ```
 
-A v1 preset runs the same call with `model_selection="fav_15"`; each per-difficulty
-v1 folder is zipped directly, never combined into a `12345_*` package.
+A v1 preset runs the same call with `model_selection="fav_15"`; its per-difficulty
+`1234_*` folders combine into the same `12345_<song>` folder + ZIP layout as v2
+(the intermediates are removed after publication).
 
 Call multiprocessing from a guarded `if __name__ == '__main__':` entry point.
 The app, `main_multi`, and `main_multi_par` signatures remain available;
@@ -596,7 +597,8 @@ Omissions are counted. Seconds and durations convert to beats once at export.
 Metadata, cover/audio names, difficulty labels, NJS, jump offsets and ZIP layout
 remain compatible. Multi-difficulty metadata is assembled as JSON. Per-variant
 folders keep `1234_<internal difficulty>_<song>`; combined folders/ZIPs keep
-`12345_<song>`. Ascending requested difficulties retain the Easy/Normal/Hard/
+`12345_<song>` and the `1234_*` intermediates are deleted after combining.
+Ascending requested difficulties retain the Easy/Normal/Hard/
 Expert/ExpertPlus labels. Optional automatic Expert uses a separate reduced-density
 pass. Packages and ZIPs publish through temporary destinations only after success.
 

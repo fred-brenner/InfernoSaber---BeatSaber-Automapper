@@ -23,7 +23,8 @@ encoder, and exclusive v1 `fav_15` lighting; GPU remains the training runtime.
 The five v1 presets remain selectable legacy options in the app and CLI
 (`fav_15`, `pp3_15`, `easy_15`, `hard_15`, `expert_15`); a v1 selection
 downloads its model folder on demand and runs the unchanged legacy pipeline
-to per-difficulty `1234_*` folders.
+to per-difficulty `1234_*` folders, which combine into `12345_*` packages
+(folder + ZIP) like the v2 path.
 WSL/Linux is the primary development environment; preserve Windows app
 compatibility. Complete the requested task, including small supporting 
 refactors when they simplify the change. Keep unrelated cleanup separate. 

@@ -1,7 +1,8 @@
 """Generate maps with resident CPU workers and explicit completion records.
 
 v2_expert is the production generator; legacy v1 mapper selections route
-each song through the wrapped v1 generator and per-difficulty ZIP export.
+each song through the wrapped v1 generator and the same combined
+``12345_<song>`` package export (folder plus ZIP).
 """
 
 import json
@@ -21,7 +22,7 @@ from map_creation.v1_generation import V1_MAPPER_SELECTIONS, ensure_v1_bundle
 from map_creation.v2_generation import (apply_snapshot, configure_inference, generate_song,
                                        save_report, scoped_settings, settings_snapshot)
 from map_creation.v2_runtime import validate_production_bundle
-from map_creation.v2_export import combine_packages, write_zip
+from map_creation.v2_export import combine_packages
 
 
 _PROGRESS = None
@@ -107,11 +108,12 @@ def combine_maps(song_list_potential, song_list_run, diff_list, export_results_t
 
 def _combine_v1_packages(song_list_potential, song_list_run, diff_list,
                          export_results_to_bs, run_config, run_paths, logger=None):
-    """Zip each 1234_<speed>_<name> v1 folder directly, never a combined 12345_* package.
+    """Assemble v1's per-speed ``1234_<speed>_<name>`` folders into ``12345_<name>`` packages.
 
     Same gate as _combine_maps: a song is packaged and archived only when
     every requested difficulty succeeded; partial successes stay in place
-    for retry (their records remain in the run report).
+    for retry (their records remain in the run report). The intermediate
+    1234_* folders are deleted once the combined folder and ZIP exist.
     """
     packages = []
     for filename in song_list_potential:
@@ -121,16 +123,26 @@ def _combine_v1_packages(song_list_potential, song_list_run, diff_list,
                          if record["song"] == name and record["status"] == "ok"}
         if any(difficulty not in by_difficulty for difficulty in diff_list):
             continue
-        variants = []
+        variants = [{"difficulty": _LABELS[index], "rank": 2 * index + 1,
+                     "path": by_difficulty[difficulty]["path"],
+                     "filename": f"{run_config['general_diff']}.dat"}
+                    for index, difficulty in enumerate(diff_list)]
+        if len(diff_list) == 1:
+            # Keep v1's automatic Expert twin inside the package like v2 does.
+            source = Path(variants[0]["path"])
+            if variants[0]["filename"] != "Expert.dat" and (source / "Expert.dat").is_file():
+                variants.append({"difficulty": "Expert", "rank": 7, "path": str(source),
+                                 "filename": "Expert.dat"})
+        folder = Path(run_paths["new_map_path"]) / f"12345_{name}"
+        report = combine_packages(name, variants, folder, Path(str(folder) + ".zip"))
+        report["song"] = name
+        packages.append(report)
+        if export_results_to_bs and shutil_copy_maps(name, index="12345_"):
+            _emit("Copied map(s) to BeatSaber directory.", logger)
         for difficulty in diff_list:
-            record = by_difficulty[difficulty]
-            zip_path = write_zip(record["path"],
-                                 f"{run_paths['new_map_path']}{record['internal_difficulty']:.1f}_{name}.zip")
-            variants.append({"path": record["path"], "zip": zip_path})
-            if export_results_to_bs and shutil_copy_maps(f"{record['internal_difficulty']:.1f}_{name}"):
-                _emit("Copied map(s) to BeatSaber directory.", logger)
-        packages.append({"song": name, "variants": variants})
-        _emit(f"Packaged {name}: {len(variants)} v1 map archive(s)", logger, important=True)
+            shutil.rmtree(by_difficulty[difficulty]["path"])
+        _emit(f"Packaged {name}: {folder.name} ({len(variants)} v1 map(s))",
+              logger, important=True)
         if run_config["auto_move_song_afterwards"]:
             done = Path(run_paths["songs_pred"]) / "y_done"
             done.mkdir(exist_ok=True)

@@ -302,23 +302,52 @@ def test_run_keeps_v2_validation_by_default(tmp_path, monkeypatch):
     assert seen == ["v2_bundle"]
 
 
-def test_combine_maps_zips_v1_folders_without_combining(tmp_path, monkeypatch):
+def _v1_folder(root, speed, name, bpm=154.0):
+    """Minimal v1 ``1234_<speed>_<name>`` folder with both .dats, info, audio, cover."""
+    folder = root / f'1234_{speed:.1f}_{name}'
+    folder.mkdir()
+    info = {"_version": "2.0.0", "_songName": name, "_beatsPerMinute": bpm,
+            "_songFilename": f"{name}.egg", "_coverImageFilename": "cover.jpg",
+            "_difficultyBeatmapSets": [{"_beatmapCharacteristicName": "Standard",
+                                        "_difficultyBeatmaps": [
+                {"_difficulty": "Expert", "_difficultyRank": 7,
+                 "_beatmapFilename": "Expert.dat",
+                 "_noteJumpMovementSpeed": 16.0, "_noteJumpStartBeatOffset": -0.7},
+                {"_difficulty": "ExpertPlus", "_difficultyRank": 9,
+                 "_beatmapFilename": "ExpertPlus.dat",
+                 "_noteJumpMovementSpeed": 18.0, "_noteJumpStartBeatOffset": -1.1}]}]}
+    (folder / 'info.dat').write_text(json.dumps(info), encoding='utf-8')
+    (folder / 'Expert.dat').write_text('{"twin": true}', encoding='utf-8')
+    (folder / 'ExpertPlus.dat').write_text(f'{{"speed": {speed}}}', encoding='utf-8')
+    (folder / f'{name}.egg').write_bytes(b'identical-audio')
+    (folder / 'cover.jpg').write_bytes(b'cover')
+    return folder
+
+
+def test_combine_maps_combines_v1_folders(tmp_path, monkeypatch):
+    """v1 packaging matches v2: one 12345_<name> folder + ZIP, no per-difficulty zips."""
     monkeypatch.setattr(paths, 'new_map_path', str(tmp_path) + '/')
     monkeypatch.setattr(config, 'auto_move_song_afterwards', False)
     monkeypatch.setattr(config, 'use_mapper_selection', 'fav_15')
-    folder = tmp_path / '1234_20.0_song'
-    folder.mkdir()
-    zips, copies = [], []
-    monkeypatch.setattr(main_multi, 'write_zip',
-                        lambda source, target: zips.append((source, target)) or target)
-    monkeypatch.setattr(main_multi, 'shutil_copy_maps', lambda name: copies.append(name) or True)
-    monkeypatch.setattr(main_multi, 'combine_packages',
-                        lambda *a, **k: pytest.fail('v1 folders must not be combined'))
+    library = tmp_path / 'library'
+    library.mkdir()
+    monkeypatch.setattr(paths, 'bs_song_path', str(library) + '/')
+    folder = _v1_folder(tmp_path, 20., 'song')
     record = {'song': 'song', 'status': 'ok', 'internal_difficulty': 20., 'path': str(folder)}
     result = main_multi.combine_maps(['song.egg'], [record], [20.], True)
-    assert zips == [(str(folder), f"{tmp_path}/20.0_song.zip")]
-    assert copies == ['20.0_song']
-    assert result == [{'song': 'song', 'variants': [{'path': str(folder), 'zip': zips[0][1]}]}]
+    package = tmp_path / '12345_song'
+    assert package.is_dir() and (tmp_path / '12345_song.zip').is_file()
+    assert not list(tmp_path.glob('20.0_*.zip'))
+    info = json.loads((package / 'info.dat').read_text(encoding='utf-8-sig'))
+    entries = info['_difficultyBeatmapSets'][0]['_difficultyBeatmaps']
+    assert [(entry['_difficulty'], entry['_difficultyRank'], entry['_beatmapFilename'])
+            for entry in entries] == [('Easy', 1, 'Easy.dat'), ('Expert', 7, 'Expert.dat')]
+    assert (package / 'Easy.dat').read_text() == '{"speed": 20.0}'  # requested variant
+    assert (package / 'Expert.dat').read_text() == '{"twin": true}'  # v1's auto Expert
+    assert (package / 'song.egg').is_file() and (package / 'cover.jpg').is_file()
+    assert not folder.exists()  # intermediate 1234_* folder removed
+    assert (library / '12345_song' / 'info.dat').is_file()
+    assert result[0]['song'] == 'song' and result[0]['zip_path'].endswith('12345_song.zip')
 
 
 def test_combine_maps_v1_requires_all_requested_difficulties(tmp_path, monkeypatch):
@@ -334,16 +363,23 @@ def test_combine_maps_v1_requires_all_requested_difficulties(tmp_path, monkeypat
     records = []
     for name, difficulties in [('full', (12., 20.)), ('partial', (20.,))]:
         for difficulty in difficulties:
-            folder = tmp_path / f'1234_{difficulty:.1f}_{name}'
-            folder.mkdir()
+            folder = _v1_folder(tmp_path, difficulty, name)
             records.append({'song': name, 'status': 'ok',
                             'internal_difficulty': difficulty, 'path': str(folder)})
     records.append({'song': 'partial', 'status': 'failed', 'internal_difficulty': 12.})
-    zips = []
-    monkeypatch.setattr(main_multi, 'write_zip', lambda source, target: zips.append(target) or target)
     result = main_multi.combine_maps(['full.egg', 'partial.egg'], records, [12., 20.], False)
     assert [package['song'] for package in result] == ['full']
-    assert len(zips) == 2  # both requested difficulties of the complete song
+    package = tmp_path / '12345_full'
+    info = json.loads((package / 'info.dat').read_text(encoding='utf-8-sig'))
+    entries = info['_difficultyBeatmapSets'][0]['_difficultyBeatmaps']
+    assert [entry['_difficulty'] for entry in entries] == ['Easy', 'Normal']
+    assert (package / 'Easy.dat').read_text() == '{"speed": 12.0}'
+    assert (package / 'Normal.dat').read_text() == '{"speed": 20.0}'
+    assert (tmp_path / '12345_full.zip').is_file()
+    assert not (tmp_path / '1234_12.0_full').exists()  # intermediates for full are gone...
+    assert not (tmp_path / '1234_20.0_full').exists()
+    assert (tmp_path / '1234_20.0_partial').is_dir()  # ...while partial stays for retry
+    assert not list(tmp_path.glob('*.*_*.zip'))  # no per-difficulty zips anywhere
     assert (songs / 'y_done' / 'full.egg').exists()
     assert (songs / 'partial.egg').exists()  # partial success stays for retry
 
