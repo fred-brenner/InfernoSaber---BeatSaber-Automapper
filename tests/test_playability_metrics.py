@@ -8,8 +8,8 @@ if str(ROOT_DIR) not in sys.path:
     sys.path.insert(0, str(ROOT_DIR))
 
 from evaluation.playability_metrics import (MIRROR_DIR, STEP, corridor,
-                                            m1_lateral, prepare_notes,
-                                            swept_cells)
+                                            m1_lateral, m2_occlusion,
+                                            prepare_notes, swept_cells)
 
 
 def test_step_table_matches_get_cut_dir_xy():
@@ -99,3 +99,52 @@ def test_corridor():
     assert corridor((0, 0), (3, 0)) == {(0, 0), (1, 0), (2, 0), (3, 0)}
     # off-grid endpoint (4,1) clamps to (3,1)
     assert corridor((0, 1), (4, 1)) == {(0, 1), (1, 1), (2, 1), (3, 1)}
+
+
+def test_m2_rising_same_column():
+    # Bottom note at t=1.0, top note same column at t=1.2 (other hand):
+    # occl = max(0, 2-0)·(1-0/3)·(1-0.2/0.4) = 2·1·0.5 = 1.0 → one incident.
+    prepared = prepare_notes([(1.0, 0, 1, 0, 0), (1.2, 1, 1, 2, 0)])
+    result = m2_occlusion(prepared)
+    assert result["units"] == pytest.approx([1.0])
+    assert result["value"] == pytest.approx(0.5)  # Σ occl / N_notes = 1.0/2
+    assert len(result["incidents"]) == 1
+    incident = result["incidents"][0]
+    assert incident["t"] == pytest.approx(1.2)
+    assert incident["note"] == (1, 2)
+    assert incident["occluder"] == (1, 0)
+    assert incident["dt"] == pytest.approx(0.2)
+    assert incident["occl"] == pytest.approx(1.0)
+
+
+def test_m2_simultaneous_not_occluder():
+    # Same-time bottom/top pair in one column: simultaneous partners share
+    # the note's depth and are excluded by the strict Δt > EPS gate.
+    prepared = prepare_notes([(1.0, 0, 1, 0, 0), (1.0, 1, 1, 2, 0)])
+    result = m2_occlusion(prepared)
+    assert result["value"] == 0.0
+    assert len(result["units"]) == 0
+    assert result["incidents"] == []
+
+
+def test_m2_nearest_occluder_only():
+    # j at (x=1, y=1), t=1.25 has two in-window candidates: a high note
+    # (x=2, y=2) at Δt=0.05 (occl 0 — above j) and a low note (x=0, y=0) at
+    # Δt=0.3 (would occl >0). The nearest occluder wins → occl == 0.
+    # The candidates sit |Δx| = 2 apart, so they don't occlude each other.
+    prepared = prepare_notes([(0.95, 0, 0, 0, 0), (1.2, 1, 2, 2, 0),
+                            (1.25, 0, 1, 1, 0)])
+    result = m2_occlusion(prepared)
+    assert result["value"] == 0.0
+    assert len(result["units"]) == 0
+    assert result["incidents"] == []
+
+
+def test_m2_column_gate():
+    # Rising pair within T_VIS but |Δx| = 2 exceeds the ±1-lane sightline
+    # gate → no occluder.
+    prepared = prepare_notes([(1.0, 0, 0, 0, 0), (1.2, 1, 2, 2, 0)])
+    result = m2_occlusion(prepared)
+    assert result["value"] == 0.0
+    assert len(result["units"]) == 0
+    assert result["incidents"] == []

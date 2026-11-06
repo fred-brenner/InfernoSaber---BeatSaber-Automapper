@@ -208,3 +208,55 @@ def m1_lateral(prepared):
             "bands": {band: float(np.mean(stresses)) if stresses else 0.0
                       for band, stresses in band_stress.items()},
             "transitions": transitions}
+
+
+def _nearest_occluder(prepared, index):
+    """M2 occluder for ``prepared[index]`` (design §M2).
+
+    The strictly earlier (``Δt > EPS``) note nearest by ``Δt`` within
+    ``T_VIS`` and ``|Δx| <= 1`` — any hand; color is irrelevant to
+    sightlines. Simultaneous partners share j's depth and are excluded by
+    the strict gate. Scanning the time-sorted list backwards, the first
+    candidate is the nearest; once it is cut the sightline is clear, so
+    older notes behind it never stack penalties."""
+    note = prepared[index]
+    for earlier in range(index - 1, -1, -1):
+        other = prepared[earlier]
+        dt = note["t"] - other["t"]
+        if dt > T_VIS:
+            break
+        if dt > EPS and abs(note["x"] - other["x"]) <= 1:
+            return other, dt
+    return None, 0.0
+
+
+def m2_occlusion(prepared):
+    """M2 occlusion — mean sightline obstruction per note (design §M2).
+
+    Each note's occluder (``_nearest_occluder``) contributes
+    ``occl = max(0, y_j - y_i)·(1 - |Δx|/3)·(1 - Δt/T_VIS)`` — taller
+    occluders closer to j's lane and to j's cut time hide more.
+    ``value = Σ occl / N_notes``; ``units`` holds the positive occl values
+    (the pooled-percentile input); ``incidents`` lists ``occl >= 0.5``
+    events as ``{"t", "note", "occluder", "dt", "occl"}`` for top-k
+    reporting."""
+    occlusions, units, incidents = [], [], []
+    for index, note in enumerate(prepared):
+        occluder, dt = _nearest_occluder(prepared, index)
+        occl = 0.0
+        if occluder is not None:
+            occl = (max(0.0, note["y"] - occluder["y"])
+                    * (1.0 - abs(note["x"] - occluder["x"]) / 3.0)
+                    * (1.0 - dt / T_VIS))
+        occlusions.append(occl)
+        if occl > 0:
+            units.append(occl)
+        if occl >= 0.5 - 1e-9:  # ε absorbs float noise at the threshold
+            incidents.append({"t": note["t"],
+                              "note": (note["x"], note["y"]),
+                              "occluder": (occluder["x"], occluder["y"]),
+                              "dt": dt, "occl": occl})
+    return {"value": float(np.sum(occlusions) / len(prepared))
+            if prepared else 0.0,
+            "units": np.asarray(units, dtype=float),
+            "incidents": incidents}
