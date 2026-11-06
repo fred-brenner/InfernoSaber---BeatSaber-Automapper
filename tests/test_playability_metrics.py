@@ -9,8 +9,9 @@ if str(ROOT_DIR) not in sys.path:
 
 from evaluation.playability_metrics import (MIRROR_DIR, STEP, corridor,
                                             m1_lateral, m2_occlusion,
-                                            m3_divergence, prepare_notes,
-                                            swept_cells)
+                                            m3_divergence, m4_interference,
+                                            prepare_notes, score_map,
+                                            swept_cells, swing_volume)
 
 
 def test_step_table_matches_get_cut_dir_xy():
@@ -100,6 +101,9 @@ def test_corridor():
     assert corridor((0, 0), (3, 0)) == {(0, 0), (1, 0), (2, 0), (3, 0)}
     # off-grid endpoint (4,1) clamps to (3,1)
     assert corridor((0, 1), (4, 1)) == {(0, 1), (1, 1), (2, 1), (3, 1)}
+    # exact diagonal corner crossings touch both flanking cells (supercover)
+    assert corridor((0, 0), (2, 2)) == {(0, 0), (1, 0), (0, 1), (1, 1),
+                                       (2, 1), (1, 2), (2, 2)}
 
 
 def test_m2_rising_same_column():
@@ -210,3 +214,106 @@ def test_m3_idle_hand_ignored():
     assert solo["segments"] == 0
     assert len(solo["units"]) == 0
     assert solo["value"] == 0.0
+
+
+def test_prepare_collapse_float_tolerance():
+    # 0.30 - 0.28 == 0.020000000000000004 in IEEE float — the EPS+epsilon
+    # window keeps one physical stack from splitting on float noise
+    # (v2_postprocessing uses the same epsilon-adjusted comparisons).
+    assert len(prepare_notes([(0.28, 0, 1, 1, 0), (0.30, 0, 2, 1, 0)])) == 1
+
+
+def test_m1_diagonal_stream():
+    # d=5 stream at 0.2s gaps: every transition carries diagonal stress
+    # w=0.5 at identical speed -> value = 0.5 (pins the diagonal class).
+    notes = [(0.2 * i, 0, i % 2, 1, 5) for i in range(10)]
+    assert m1_lateral(prepare_notes(notes))["value"] == pytest.approx(0.5)
+
+
+def test_m4_mirrored_double_zero():
+    # Canonical outward double: left (1,1) cut d=2 + right (2,1) cut d=3.
+    # x_a+x_b==3, same row, mirrored directions, simultaneous -> severity 0
+    # even though the swing volumes overlap on (1,1) and (2,1).
+    prepared = prepare_notes([(1.0, 0, 1, 1, 2), (1.0, 1, 2, 1, 3)])
+    result = m4_interference(prepared, minutes=1.0)
+    assert result["value"] == 0.0
+    assert len(result["units"]) == 0
+    assert result["incidents"] == []
+
+
+def test_m4_inward_clash():
+    # Deliberately non-mirrored simultaneous pair: the left hand's right
+    # cut sweeps (2,1) -- the right note's own cell. An exact inward pair
+    # (right cutting d=2, the mirror of d=3) would be discounted to 0, so
+    # the right note cuts d=0 here.
+    prepared = prepare_notes([(1.0, 0, 1, 1, 3), (1.0, 1, 2, 1, 0)])
+    result = m4_interference(prepared, minutes=1.0)
+    assert result["units"] == pytest.approx([1.0])
+    assert result["value"] == pytest.approx(1.0)
+    incident = result["incidents"][0]
+    assert incident["cells"] == [(2, 1)]
+    assert incident["severity"] == pytest.approx(1.0)
+
+
+def test_m4_unresolved_dot_own_cell_only():
+    # A first-note dot has no predecessor -> eff=None -> the swing volume
+    # is just its own cell, and M4 scores the pair without crashing.
+    prepared = prepare_notes([(0.0, 0, 1, 1, 8), (0.0, 1, 3, 0, 8)])
+    assert prepared[0]["eff"] is None
+    assert swing_volume(prepared[0]) == {(1, 1)}
+    result = m4_interference(prepared, minutes=1.0)
+    assert result["value"] == 0.0  # disjoint single cells
+
+
+def test_m4_left_cuts_right_into_active_right():
+    # Flagship example: left (1,1) d=3 sweeps (2,1) while the right hand
+    # plays (2,1)->(2,2) around it. The second right note's travel
+    # corridor (pred exit (1,1) -> approach (3,2)) contributes its whole
+    # overlap: without it the volumes would be disjoint.
+    prepared = prepare_notes([(0.9, 1, 2, 1, 2), (1.0, 0, 1, 1, 3),
+                            (1.1, 1, 2, 2, 2)])
+    result = m4_interference(prepared, minutes=1.0)
+    # each pair shares {(1,1),(2,1)} -> 2 * (1 - 0.1/0.25) = 1.2
+    assert sorted(result["units"]) == pytest.approx([1.2, 1.2])
+    assert result["value"] == pytest.approx(2.4)
+    assert len(result["incidents"]) == 2
+    assert result["incidents"][0]["cells"] == [(1, 1), (2, 1)]
+    assert result["incidents"][0]["severity"] == pytest.approx(1.2)
+
+
+def test_m4_crossover():
+    # Left note lands right of the right-hand note (x_a=2 > x_b=1) at
+    # dt=0.1: zero shared cells, pure wrist-crossover term
+    # (2-1) * (1 - 0.1/0.25) = 0.6.
+    prepared = prepare_notes([(1.0, 0, 2, 1, 0), (1.1, 1, 1, 1, 0)])
+    result = m4_interference(prepared, minutes=1.0)
+    assert result["units"] == pytest.approx([0.6])
+    assert result["value"] == pytest.approx(0.6)
+    incident = result["incidents"][0]
+    assert incident["cells"] == []
+    assert incident["crossover"] == pytest.approx(0.6)
+    assert incident["severity"] == pytest.approx(0.6)
+
+
+def test_m4_corridor_reset():
+    # Flagship setup with the right-hand gap stretched to 1.0s > T_RESET:
+    # the hand reset -> b2 has no travel corridor (volume = own + swept),
+    # and b1 sits outside TAU_X so no pair scores at all.
+    prepared = prepare_notes([(0.1, 1, 2, 1, 2), (1.0, 0, 1, 1, 3),
+                            (1.1, 1, 2, 2, 2)])
+    assert swing_volume(prepared[2]) == {(1, 2), (2, 2), (3, 2)}
+    result = m4_interference(prepared, minutes=1.0)
+    assert result["value"] == 0.0
+    assert len(result["units"]) == 0
+
+
+def test_score_map_shape():
+    notes = [(0.0, 0, 1, 1, 0), (0.5, 1, 2, 1, 1), (1.0, 0, 2, 1, 0)]
+    result = score_map(notes)
+    assert set(result) == {"notes", "span_seconds", "nps",
+                           "m1", "m2", "m3", "m4"}
+    assert result["notes"] == 3
+    assert result["span_seconds"] == pytest.approx(1.0)
+    assert result["nps"] == pytest.approx(result["notes"]
+                                        / result["span_seconds"])
+    assert result["m4"]["value"] == 0.0  # pairs 0.5s apart, outside TAU_X

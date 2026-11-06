@@ -27,6 +27,7 @@ TAU_X = 0.25        # cross-hand interference window for M4, seconds
 T_RESET = 0.4       # same-hand idle gap beyond which no travel corridor, seconds
 ISO_MIN = 0.6       # dominant-axis eigenvalue share floor for M3
 NPS_BANDS = ((0, 3), (3, 5), (5, 7), (7, float("inf")))
+INCIDENT_TOP_K = 10  # cap on M4 severity-sorted incident reports
 
 GRID_W, GRID_H = 4, 3  # lanes x rows
 
@@ -137,7 +138,7 @@ def prepare_notes(notes):
     kept, last_t = [], {}
     for t, hand, x, y, d in sorted(notes, key=lambda note: note[0]):
         anchor = last_t.get(hand)
-        if anchor is not None and t - anchor <= EPS:
+        if anchor is not None and t - anchor <= EPS + 1e-9:
             continue
         last_t[hand] = t
         kept.append((t, hand, x, y, d))
@@ -334,3 +335,114 @@ def m3_divergence(prepared):
             if total_weight else 0.0,
             "units": np.asarray(units, dtype=float),
             "segments": len(units)}
+
+
+def swing_volume(note):
+    """M4 swing volume — grid cells the saber occupies for this note.
+
+    Own cell ∪ ``swept_cells`` on ``eff`` (approach + exit) ∪ the travel
+    corridor: supercover cells between the same-hand predecessor's exit
+    cell (its own cell when unresolved) and this note's approach cell (its
+    own cell when ``eff`` is ``None``). The corridor applies only while the
+    same-hand gap stays within ``T_RESET`` — after an idle beat the hand
+    resets and reaches in fresh. ``corridor`` clamps off-grid endpoints."""
+    x, y = note["x"], note["y"]
+    volume = {(x, y)} | swept_cells(x, y, note["eff"])
+    pred = note["pred"]
+    if pred is not None and note["t"] - pred["t"] <= T_RESET + 1e-9:
+        step = STEP.get(note["eff"])
+        approach = (x + step[0], y + step[1]) if step else (x, y)
+        start = pred["exit_cell"] or (pred["x"], pred["y"])
+        volume |= corridor(start, approach)
+    return volume
+
+
+def _cross_hand_partners(prepared, index):
+    """Yield indices of opposite-hand notes within ``TAU_X`` of
+    ``prepared[index]``. ``prepared`` is time-sorted, so partners form a
+    contiguous window — scan outward both ways and stop at its edge."""
+    t = prepared[index]["t"]
+    j = index - 1
+    while j >= 0 and t - prepared[j]["t"] <= TAU_X:
+        if prepared[j]["hand"] != prepared[index]["hand"]:
+            yield j
+        j -= 1
+    j = index + 1
+    while j < len(prepared) and prepared[j]["t"] - t <= TAU_X:
+        if prepared[j]["hand"] != prepared[index]["hand"]:
+            yield j
+        j += 1
+
+
+def _is_mirrored_double(a, b):
+    """Exact mirrored simultaneous pair (design §M4): symmetric cells
+    ``x_a + x_b == 3``, same row, mirrored cut directions within ``EPS`` —
+    the canonical human double is intentional, not an interference defect."""
+    return (abs(a["t"] - b["t"]) <= EPS + 1e-9
+            and a["x"] + b["x"] == GRID_W - 1
+            and a["y"] == b["y"]
+            and b["d"] == MIRROR_DIR.get(a["d"]))
+
+
+def m4_interference(prepared, minutes):
+    """M4 path interference — cross-hand swing-volume clashes per minute
+    (design §M4).
+
+    Every hand-0/hand-1 pair within ``TAU_X`` scores
+    ``severity = |V_a ∩ V_b|·(1 − |Δt|/TAU_X)
+    + max(0, x_a − x_b)·(1 − |Δt|/TAU_X)`` — shared swing cells plus a
+    wrist-crossover term when the left note lands right of the right-hand
+    note. Exact mirrored doubles (``_is_mirrored_double``) score 0.
+    ``value`` = Σ severity / ``minutes`` (0.0 when the span is zero — a
+    zero-length stream has no meaningful rate); ``units`` holds the
+    positive severities (the pooled-percentile input); ``incidents`` is
+    the ``INCIDENT_TOP_K``-capped list of
+    ``{"t","a","b","cells","severity","crossover"}`` dicts sorted by
+    severity desc, where ``t`` is the later note's time (the moment the
+    interference completes) and ``cells`` the sorted shared cells."""
+    volumes = [swing_volume(note) for note in prepared]
+    total, units, incidents = 0.0, [], []
+    for index, a in enumerate(prepared):
+        if a["hand"] != 0:
+            continue
+        for j in _cross_hand_partners(prepared, index):
+            b = prepared[j]
+            if _is_mirrored_double(a, b):
+                continue  # severity 0: no unit, no incident, no total
+            weight = max(0.0, 1.0 - abs(a["t"] - b["t"]) / TAU_X)
+            shared = volumes[index] & volumes[j]
+            crossover = max(0.0, (a["x"] - b["x"]) * weight)
+            severity = len(shared) * weight + crossover
+            total += severity
+            if severity <= 0.0:
+                continue
+            units.append(severity)
+            incidents.append({"t": max(a["t"], b["t"]),
+                              "a": (a["x"], a["y"], a["d"]),
+                              "b": (b["x"], b["y"], b["d"]),
+                              "cells": sorted(shared),
+                              "severity": severity,
+                              "crossover": crossover})
+    incidents.sort(key=lambda event: event["severity"], reverse=True)
+    return {"value": total / minutes if minutes > 0 else 0.0,
+            "units": np.asarray(units, dtype=float),
+            "incidents": incidents[:INCIDENT_TOP_K]}
+
+
+def score_map(notes):
+    """Score one map on all four playability metrics (design calibration).
+
+    Runs ``prepare_notes`` once and shares the result across M1–M4.
+    ``notes`` is the kept note count (same-hand stacks within ``EPS`` are
+    one physical stroke); ``span_seconds`` = last − first kept note time;
+    ``nps`` = notes/span, 0.0 when the span is 0 — a zero-length stream
+    has no meaningful rate. ``m4`` receives ``minutes = span/60``."""
+    prepared = prepare_notes(notes)
+    span = prepared[-1]["t"] - prepared[0]["t"] if prepared else 0.0
+    return {"notes": len(prepared),
+            "span_seconds": span,
+            "nps": len(prepared) / span if span > 0 else 0.0,
+            "m1": m1_lateral(prepared),
+            "m2": m2_occlusion(prepared),
+            "m3": m3_divergence(prepared),
+            "m4": m4_interference(prepared, span / 60.0)}
