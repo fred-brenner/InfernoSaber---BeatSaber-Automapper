@@ -122,6 +122,19 @@ def test_decode_nonstandard_skipped(tmp_path):
         decode_package_notes(tmp_path)
 
 
+@pytest.mark.parametrize("filename", [None, "", 4])
+def test_rejects_missing_beatmap_filename(tmp_path, filename):
+    entry = {"_difficulty": "ExpertPlus"}
+    if filename is not None:
+        entry["_beatmapFilename"] = filename
+    groups = [{"_beatmapCharacteristicName": "Standard", "_difficultyBeatmaps": [entry]}]
+    write_package(tmp_path, info_changes={"_difficultyBeatmapSets": groups})
+    with pytest.raises(ValueError, match="filename"):
+        decode_package_notes(tmp_path)
+    with pytest.raises(ValueError, match="filename"):
+        list_standard_difficulties(tmp_path)
+
+
 def test_decode_tempo_change_rejected(tmp_path):
     write_package(tmp_path, beatmaps={"ExpertPlus": {
         "version": "3.2.0", "bpmEvents": [{"b": 4, "m": 150}],

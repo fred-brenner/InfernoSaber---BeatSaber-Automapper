@@ -3,11 +3,14 @@
 Foundation for the playability corpus report: reads a v2 ``Info.dat``
 package, selects Standard-characteristic difficulties, and converts v2
 ``_notes`` or v3 ``colorNotes`` entries into ``(t_seconds, hand, x, y,
-d)`` tuples for ``playability_metrics.prepare_notes``. Validation —
-Info/beatmap versions, positive constant BPM, no offsets or shuffle,
-in-package file paths — reuses ``evaluation.human_maps`` internals so
-the report accepts exactly the packages the reference loader accepts;
-any failure raises and the caller records the package as skipped.
+d)`` tuples for ``playability_metrics.prepare_notes``. Validation reuses
+``evaluation.human_maps`` internals to mirror the reference loader's
+Info/timing rules (v2 Info.dat, positive constant BPM, no offsets or
+shuffle, in-package paths), then adds its own checks: grid coordinates,
+canonical difficulty names, and per-difficulty decode. Unlike the
+reference loader it does not require the audio file, and skipped v2
+bombs never reach the seconds check. Any failure raises and the caller
+records the package as skipped.
 """
 
 from __future__ import annotations
@@ -71,7 +74,10 @@ def _standard_beatmaps(info):
                     f"Unsupported {_CHARACTERISTIC} difficulty: {difficulty!r}")
             if difficulty in entries:
                 raise ValueError(f"Duplicate {_CHARACTERISTIC}/{difficulty} beatmap")
-            entries[difficulty] = beatmap.get("_beatmapFilename")
+            filename = beatmap.get("_beatmapFilename")
+            if not isinstance(filename, str) or not filename:
+                raise ValueError("Expected a nonempty filename in Info.dat")
+            entries[difficulty] = filename
     return entries
 
 
