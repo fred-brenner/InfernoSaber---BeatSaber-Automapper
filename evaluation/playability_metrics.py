@@ -315,12 +315,16 @@ def m3_divergence(prepared):
     The event stream segments at gaps > ``T_SEG`` (``_event_segments``).
     Per segment each hand's consecutive same-hand displacements
     (``_hand_vectors``) define a dominant axis (``_dominant_axis``); the
-    segment counts only when both hands resolve one. Its divergence is the
-    2D cross magnitude ``|u_L.x·u_R.y − u_L.y·u_R.x|`` = ``|sin θ|`` —
-    unoriented, so eigenvector sign is irrelevant: same-axis or mirrored
-    hands → 0, orthogonal → 1. ``value`` is the weighted mean by
-    ``min(nvec_L, nvec_R)``; ``units`` holds the per-segment divergences
-    (the pooled-percentile input); ``segments`` counts valid segments."""
+    segment counts only when both hands resolve one. Divergence is
+    ``min(|sin θ|, |sin θ_mirror|)`` — the 2D cross magnitude between the
+    axes OR between one axis and the vertical mirror of the other.
+    Mirrored-diagonal waves (axes (1,1) vs (−1,1)) are perpendicular
+    geometrically but mirror-symmetric physically — the easiest bimanual
+    pattern there is — so they score 0 alongside parallel axes; only
+    genuinely unrelated axes (e.g. vertical vs horizontal) approach 1.
+    ``value`` is the weighted mean by ``min(nvec_L, nvec_R)``; ``units``
+    holds the per-segment divergences (the pooled-percentile input);
+    ``segments`` counts valid segments."""
     units, weights = [], []
     for segment in _event_segments(prepared):
         vectors_l, vectors_r = (_hand_vectors(segment, hand)
@@ -329,8 +333,9 @@ def m3_divergence(prepared):
                           for vectors in (vectors_l, vectors_r))
         if axis_l is None or axis_r is None:
             continue
-        units.append(float(abs(axis_l[0] * axis_r[1]
-                               - axis_l[1] * axis_r[0])))
+        direct = abs(axis_l[0] * axis_r[1] - axis_l[1] * axis_r[0])
+        mirrored = abs(axis_l[0] * axis_r[1] + axis_l[1] * axis_r[0])
+        units.append(float(min(direct, mirrored)))
         weights.append(min(len(vectors_l), len(vectors_r)))
     total_weight = sum(weights)
     return {"value": float(np.dot(units, weights) / total_weight)

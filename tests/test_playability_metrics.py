@@ -190,6 +190,21 @@ def test_m3_orthogonal():
     assert result["value"] == pytest.approx(1.0)
 
 
+def test_m3_mirrored_diagonal_flow():
+    # The canonical human wave: left hand rides the up-right/down-left
+    # diagonal, right hand mirrors it on the up-left/down-right diagonal
+    # (axes (1,1) and (-1,1)). Geometrically those axes are perpendicular,
+    # but the motion is mirror-symmetric — the easiest bimanual pattern
+    # there is — so corrected divergence must be ~0, not |sin 90°| = 1.
+    times = [0.25 * i for i in range(9)]
+    left = [(t, 0, i % 2, 1 + i % 2, 8) for i, t in enumerate(times)]
+    right = [(t, 1, 3 - i % 2, 1 + i % 2, 8) for i, t in enumerate(times)]
+    result = m3_divergence(prepare_notes(left + right))
+    assert result["segments"] == 1
+    assert result["units"] == pytest.approx([0.0], abs=1e-9)
+    assert result["value"] == pytest.approx(0.0, abs=1e-9)
+
+
 def test_m3_isotropic_skipped():
     # Segment 1 (t = 0..1.0): both hands vertical -> valid. Segment 2 (after
     # a 1.0s gap): left stays vertical but the right hand walks a square,

@@ -116,9 +116,18 @@ displacement vectors between consecutive same-hand notes; dominant axis =
 top eigenvector of the 2×2 scatter `Σ vvᵀ`. Skip a hand with <2 vectors or
 near-isotropic motion (`λ1/(λ1+λ2) < 0.6`).
 
-`divergence(segment) = |sin θ|` between the two hands' axes (unoriented):
-same-axis or mirrored-symmetric → 0; orthogonal (V vs H) → 1.
+`divergence(segment) = min(|sin θ|, |sin θ_mirror|)` between the two
+hands' axes (unoriented) — the cross magnitude taken against both the
+right-hand axis and its vertical mirror `(x,y) → (−x,y)`. Same-axis or
+mirrored-symmetric → 0 (including mirrored *diagonal* waves, axes (1,1)
+vs (−1,1), which raw `|sin θ|` misjudges as fully divergent — 49% of
+human segments in the 60-package baseline); orthogonal (V vs H) → 1.
 `M3` = mean divergence weighted by `min(nvec_L, nvec_R)`.
+
+Correction recorded 2026-11-07 after live-baseline analysis: raw `|sin θ|`
+scored human M3 ≈ 0.80 vs generated ≈ 0.60 because humans mirror far more
+than generated maps; corrected values are human ≈ 0.12, generated ≈ 0.18 —
+and generated stays flat at high NPS where humans converge to ~0.07.
 
 ### M4 — path interference (flagship)
 
