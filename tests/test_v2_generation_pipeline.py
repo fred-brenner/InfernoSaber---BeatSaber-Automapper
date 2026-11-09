@@ -713,6 +713,7 @@ def test_processors_without_emphasis_hook_still_generate():
 def test_default_wrapper_exposes_emphasis_when_legacy_mutators_skipped(monkeypatch):
     from map_creation import v2_postprocessing as base
     monkeypatch.setattr(config, "v2_cleanup_note_heuristics", False)
+    monkeypatch.setattr(config, "v2_note_postprocessing_mode", "search")
     monkeypatch.setattr(base, "sanity_check_timing2",
                         lambda name, times, audio_path=None: np.asarray(times))
     monkeypatch.setattr(base, "align_beats_on_bpm", lambda times, bpm: np.asarray(times))

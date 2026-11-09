@@ -256,7 +256,8 @@ def _generate_with_production_postprocessors(monkeypatch, **overrides):
 def test_production_default_skips_legacy_note_mutators(monkeypatch):
     monkeypatch.setattr(config, "v2_cleanup_note_heuristics", False)
     post = _generate_with_production_postprocessors(monkeypatch).diagnostics["note_postprocessing"]
-    assert post["skipped_steps"] == ["legacy_note_flow", "mirroring"]
+    assert post["skipped_steps"] == ["clearance", "flow_additions", "legacy_note_flow",
+                                     "mirroring", "same_direction_recut"]
     assert all(operation["stage"] != "legacy_note_flow" for operation in post["operations"])
 
 

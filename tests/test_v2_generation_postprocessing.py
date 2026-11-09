@@ -1226,6 +1226,7 @@ def test_generate_wires_intro_floor_and_diagonal_cap(monkeypatch):
                        "v2_speed_cap_scale": 1.,
                        "v2_max_note_gap_seconds": 0.,   # audio_path=None: keep the net off
                        "v2_cleanup_note_heuristics": False,
+                       "v2_note_postprocessing_mode": "search",
                        "emphasize_beats_flag": False}.items():
         monkeypatch.setattr(config, key, value)
     song = Song("wiring", {"duration": 11., "bpm": 120.},
@@ -1298,6 +1299,7 @@ def test_generate_speed_cap_runs_around_expansion(monkeypatch):
                        "v2_speed_cap_scale": 1.,
                        "v2_max_note_gap_seconds": 0.,   # audio_path=None: keep the net off
                        "v2_cleanup_note_heuristics": False,
+                       "v2_note_postprocessing_mode": "search",
                        "emphasize_beats_flag": False}.items():
         monkeypatch.setattr(config, key, value)
     song = Song("wiring", {"duration": 11., "bpm": 120.},

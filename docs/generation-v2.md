@@ -274,8 +274,36 @@ remove existing notes or chains and create no new onset times; every
 candidate must clear the same frozen-baseline gates the stream enforces —
 occupancy/clearance, the diagonal-fraction bound, the ramped speed cap, the
 fast counter-direction rule, and the enabled playability policies — with
-unsafe candidates rejected rather than repaired. Final counts report
+unsafe candidates rejected rather than repaired. Those frozen-baseline gates
+describe the strict search path (below); the forward path uses the local
+guards described in the next paragraph. Final counts report
 `emphasis_copies` separately from learned `learned_copies`.
+
+The default note postprocessing is now `v2_note_postprocessing_mode = "forward"`:
+`map_creation/v2_forward_postprocessing.py` runs small chronological
+best-effort passes (direction, reach/speed, collision, repeated position,
+the existing upper-center rule and the independent center-view move) with at
+most eight proposals per note per pass. The center rule applies only to left-hand
+notes at `x=1` and right-hand notes at `x=2`: one seeded `rng.random()` draw per eligible note shifts it
+outward one column (left x1→0, right x2→3) with an 80% middle-row, 20%
+top-row, never bottom-row gate — a blocked move consumes the draw and leaves
+the note; time, arrow, id, hand and metadata are untouched.
+`map_creation/v2_forward_clearance.py`
+provides the shared local collision index and
+`map_creation/v2_forward_expansion.py` atomically accepts or rejects new
+learned copies/chains and emphasis stacks against it. Base-note movement
+finishes before the retained snapshot and expansion; accepted additions are
+never moved or recut. Remaining reach/path/flow findings are reported in
+`diagnostics["playability_findings"]` instead of failing generation —
+`playability_policy`/`playability_strict_validated` distinguish the actual
+adapter — while structural contract errors still raise. Learned and emphasis
+copies still must not create the forbidden far-opposite inward cut or a
+same-cell or cut-path collision; emphasis copies additionally must not worsen
+the diagonal bound (the base-note diagonal pass is best-effort). Setting
+`v2_note_postprocessing_mode = "search"` restores the previous strict
+optimizer; the forward path does not run its calibrated budgets, joint
+searches or decoder-recovery alternatives. Custom/historical postprocessor
+adapters keep strict validation regardless of the global default.
 
 Repair-time note evaluation reuses bounded memoization for latency only:
 same-hand arrival speeds (`_cached_speed` behind `SpeedGroups`) and segment

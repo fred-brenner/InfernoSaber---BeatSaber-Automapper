@@ -99,14 +99,24 @@ platforms before implementing them unless the task already authorizes them.
   M2 stays soft: final-only residuals may exceed their unchanged base allowance
   by at most one onset group's occupancy, at <=3% eligible events per hand.
   Record exceptions separately; never inflate original limits or relax the
-  reach/path hard bans or primary guards to pass them.
+  reach/path hard bans or primary guards to pass them. Those hard-audit and
+  quota contracts apply to the strict search/historical path: the
+  [November 9 approved design](docs/superpowers/specs/2026-11-09-forward-postprocessing-design.md)
+  makes the bounded best-effort forward postprocessing the
+  production default (v2_note_postprocessing_mode = "forward") with
+  residual playability findings reported as diagnostics; "search" restores
+  the audited optimizer.
   Final delivery is five ordinary song packages at settings 5/6/7/8, without
   further A/B rounds; current validation evidence is recorded in the task ledger.
   The November 9 repeated-position pass makes guarded one-cell cut-direction
   moves after calibrated repair; see [repeat separation](docs/generation-v2.md#exact-repeated-position-separation).
   Repair-time evaluation memoizes arrival-speed and segment-geometry results in
   bounded caches and orders cheap conjunction guards before expensive checks;
-  all safety semantics are unchanged.
+  all safety semantics are unchanged. Production note repair defaults to
+  v2_note_postprocessing_mode = forward: bounded best-effort passes plus an
+  independent center-view move and append-only expansion/emphasis guards;
+  residual playability findings are diagnostics. search restores the strict
+  optimizer; see docs/generation-v2.md.
 - For the five note-pattern playability metrics, including M5 same-hand direction
   variety, fast reversals and time between changes, read
   [docs/development.md](docs/development.md#playability-metrics).

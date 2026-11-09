@@ -239,10 +239,13 @@ v2_playability_recovery_ratio = 0.
 v2_playability_recovery_balanced = False  # complete policy: bounded local hand recovery
 v2_cleanup_note_heuristics = False  # run the legacy v1 note mutators (mirroring + flow pass
                                    # incl. emphasis/break/dot additions); False keeps model
-                                   # notes — structural dedup, same-direction recut and the
-                                   # clearance fixpoint still apply (docs/generation-v2.md)
+                                   # notes — in "search" mode structural dedup, same-direction recut
+                                   # and the clearance fixpoint still apply; the "forward" mode
+                                   # replaces them with bounded best-effort passes
+                                   # (docs/generation-v2.md)
+v2_note_postprocessing_mode = "forward"  # "forward" bounded best-effort passes; "search" strict optimizer
 v2_notes_onset_snap = True          # snap each note onto its nearest detected onset peak after
-                                   # the clearance fixpoint; bounded per note/hand, no model
+                                   # structural cleanup; bounded per note/hand, no model
 v2_notes_onset_snap_ioi_ratio = 0.15  # max shift as fraction of the note's own same-hand IOI
                                    # (min of prev/next gap) — a note can never reach another
                                    # note's clearance zone; 0 disables the snap effectively

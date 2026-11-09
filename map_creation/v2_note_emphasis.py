@@ -269,7 +269,7 @@ class _EmphasisGate:
         return None
 
 
-def apply_note_emphasis(state, song, *, rng=None, logger=None):
+def apply_note_emphasis(state, song, *, rng=None, logger=None, gate_factory=None):
     """Append v1-style same-time stacks to isolated slow swings in place."""
     diagnostics = {"applied": False, "eligible_anchors": 0, "added_notes": 0,
                    "doubles": 0, "triples": 0, "rejected": {}}
@@ -288,7 +288,8 @@ def apply_note_emphasis(state, song, *, rng=None, logger=None):
     group_times = np.asarray([group[0]["time"] for group in groups])
     gaps = np.r_[1., np.diff(group_times)]
     wait = float(np.quantile(gaps, float(getattr(config, "emphasize_beats_quantile", .65)))) + .05
-    gate = _EmphasisGate(state, song, eps)
+    gate = (gate_factory(state, song, eps) if gate_factory is not None
+            else _EmphasisGate(state, song, eps))
     diagnostics["applied"] = True
     next_id = max([note["id"] for note in notes]
                   + [chain["id"] for chain in state.get("chains", [])], default=-1) + 1

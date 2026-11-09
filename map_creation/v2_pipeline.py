@@ -402,7 +402,7 @@ def _candidates(song, values):
     return result
 
 
-def _validate_state(state, duration):
+def _validate_state(state, duration, *, playability_mode="search"):
     """Check the final object contract after all mutating postprocessors."""
     identities = {}
     all_ids = {note["id"] for note in state["notes"]}
@@ -417,18 +417,25 @@ def _validate_state(state, duration):
         identities[note["id"]] = note
         if note.get("kind") == "copy" and note.get("anchor_id") not in all_ids:
             raise ValueError("A copied note has no existing anchor")
+    findings = {}
     if (getattr(config, "v2_playability_enabled", False)
             and getattr(config, "v2_playability_reach", False)):
         from .v2_playability_reach import forbidden_cut
         forbidden = [note["id"] for note in state["notes"] if forbidden_cut(note)]
         if forbidden:
-            raise ValueError(f"Final reach policy contains forbidden cuts: {forbidden[:10]}")
+            if playability_mode != "forward":
+                raise ValueError(f"Final reach policy contains forbidden cuts: {forbidden[:10]}")
+            findings["forbidden_cut_ids"] = forbidden
     if (getattr(config, "v2_playability_enabled", False)
             and getattr(config, "v2_playability_priority", False)):
         from .v2_playability_priority import audit_priority
         audit = audit_priority(state["notes"])
         if audit["preparation"]["hard"] or audit["crossing"]["hard"]:
-            raise ValueError("Final priority policy contains hard preparation or crossing violations")
+            if playability_mode != "forward":
+                raise ValueError("Final priority policy contains hard preparation or crossing violations")
+            findings["priority_hard"] = {
+                "preparation": audit["preparation"]["hard"],
+                "crossing": audit["crossing"]["hard"]}
     for chain in state["chains"]:
         if (chain["anchor_id"] not in identities or not 0 <= chain["time"] < chain["end_time"] < duration
                 or not 0 <= chain["tx"] < 4 or not 0 <= chain["ty"] < 3
@@ -467,6 +474,10 @@ def _validate_state(state, duration):
     for event in state["lighting"]:
         if not 0 <= event["time"] < duration or not np.isfinite([event["type"], event["value"]]).all():
             raise ValueError("Invalid final v2 lighting event")
+    if playability_mode == "forward":
+        from .v2_postprocessing import clearance_violations
+        findings["clearance"] = clearance_violations(state["notes"])
+    return findings
 
 
 def _scope_playability_flow(generate_map):
@@ -487,9 +498,37 @@ def generate(song, requested_nps, predictors, encoder, settings, vocabularies, *
     """Compose seven v2 stages, retained v1 lighting, and application validators."""
     if isinstance(requested_nps, bool) or not np.isfinite(requested_nps) or requested_nps < 0:
         raise ValueError("Requested retained NPS must be finite and nonnegative")
+    playability_mode = "search"
     if postprocessors is None:
         from . import v2_postprocessing as postprocessors
-        if not getattr(config, "v2_cleanup_note_heuristics", True):
+        mode = getattr(config, "v2_note_postprocessing_mode", "search")
+        if mode not in ("forward", "search"):
+            raise ValueError(f"Unknown v2_note_postprocessing_mode: {mode}")
+        forward = (mode == "forward"
+                   and not getattr(config, "v2_cleanup_note_heuristics", True)
+                   and getattr(config, "v2_playability_enabled", False)
+                   and (getattr(config, "v2_playability_priority", False)
+                        or getattr(config, "v2_playability_reach", False)))
+        if forward:
+            playability_mode = "forward"
+            from . import v2_forward_postprocessing as forward_core
+            from . import v2_forward_expansion as forward_late
+            base = postprocessors
+            postprocessors = SimpleNamespace(
+                postprocess_timing=base.postprocess_timing,
+                postprocess_notes=forward_core.normalize_notes,
+                repair_notes=forward_core.repair_notes,
+                validate_expansions=forward_late.validate_expansions,
+                drop_guard=forward_late.drop_guard,
+                validate_hazards=base.validate_hazards,
+                validate_arcs=base.validate_arcs,
+                snap_note_times=base.snap_note_times,
+                apply_intro_floor=base.apply_intro_floor,
+                apply_note_emphasis=forward_late.apply_note_emphasis,
+                calm_area_pulses=base.calm_area_pulses,
+                add_calm_effects=base.add_calm_effects,
+                add_calm_lighting=base.add_calm_lighting)
+        elif not getattr(config, "v2_cleanup_note_heuristics", True):
             # Skip the legacy v1 note mutators; structural dedup, the
             # same-direction recut and the clearance fixpoint still run.
             base = postprocessors
@@ -655,10 +694,13 @@ def generate(song, requested_nps, predictors, encoder, settings, vocabularies, *
     state["notes"], diagnostics = postprocessors.postprocess_notes(state["notes"],
                                              [candidate["time"] for candidate in candidates], logger=logger)
     if recovery_alternatives:
-        for note in state["notes"]:
-            alternatives = recovery_alternatives.get(tuple(note[k] for k in ("time", "hand", "x", "y")))
-            if alternatives:
-                note["_recovery_alternatives"] = deepcopy(alternatives)
+        if playability_mode == "forward":
+            result.diagnostics["decoder_recovery"] = {"ran": False}
+        else:
+            for note in state["notes"]:
+                alternatives = recovery_alternatives.get(tuple(note[k] for k in ("time", "hand", "x", "y")))
+                if alternatives:
+                    note["_recovery_alternatives"] = deepcopy(alternatives)
     result.diagnostics["note_postprocessing"] = diagnostics
     result.stages["arrows"]["elapsed_seconds"] = perf_counter() - started
     snap_times = getattr(postprocessors, "snap_note_times", None)
@@ -677,6 +719,11 @@ def generate(song, requested_nps, predictors, encoder, settings, vocabularies, *
         result.diagnostics["intro_zones"] = {
             "no_notes_seconds": intro_floor,
             "notes_dropped": intro_fn(state["notes"], intro_floor)}
+    if playability_mode == "forward":
+        repair = getattr(postprocessors, "repair_notes", None)
+        if repair is not None and state["notes"]:
+            result.diagnostics["forward_postprocessing"] = repair(
+                state["notes"], rng=rng, logger=logger)
     fast_dir = getattr(postprocessors, "apply_fast_direction_rules", None)
     if fast_dir is not None and state["notes"] \
             and float(getattr(config, "v2_fast_gap_seconds", .2) or 0.) > 0:
@@ -771,6 +818,9 @@ def generate(song, requested_nps, predictors, encoder, settings, vocabularies, *
         result.stages["emphasis"] = {
             "added_notes": result.diagnostics["note_emphasis"].get("added_notes", 0),
             "elapsed_seconds": perf_counter() - emphasis_started}
+    drop_guard = getattr(postprocessors, "drop_guard", None)
+    if playability_mode == "forward" and drop_guard is not None:
+        drop_guard(state)
     started = perf_counter()
     index_state(state)
     if getattr(config, "v2_walls_heuristic", False):
@@ -903,7 +953,16 @@ def generate(song, requested_nps, predictors, encoder, settings, vocabularies, *
                                  "elapsed_seconds": perf_counter() - started}
     if [note for note in state["notes"] if note.get("kind") == "retained"] != retained:
         raise ValueError("A downstream stage changed retained notes")
-    _validate_state(state, duration)
+    playability_findings = _validate_state(
+        state, duration, playability_mode=playability_mode)
+    result.diagnostics["playability_policy"] = playability_mode
+    result.diagnostics["playability_strict_validated"] = (
+        playability_mode == "search"
+        and getattr(config, "v2_playability_enabled", False)
+        and (getattr(config, "v2_playability_reach", False)
+             or getattr(config, "v2_playability_priority", False)))
+    if playability_mode == "forward":
+        result.diagnostics["playability_findings"] = playability_findings or {}
     result.diagnostics["final_counts"] = {
         "colored_notes": len(state["notes"]),
         "retained_notes": sum(note.get("kind") == "retained" for note in state["notes"]),
