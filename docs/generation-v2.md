@@ -277,6 +277,16 @@ fast counter-direction rule, and the enabled playability policies — with
 unsafe candidates rejected rather than repaired. Final counts report
 `emphasis_copies` separately from learned `learned_copies`.
 
+Repair-time note evaluation reuses bounded memoization for latency only:
+same-hand arrival speeds (`_cached_speed` behind `SpeedGroups`) and segment
+geometry (`_cached_segment_distance`) are cached on full input tuples plus
+the live speed-backend/config signatures, so edited coordinates,
+directions, times, parameters or backends recompute transparently; the
+four candidate `_soft_score` call sites skip primary totals they discard
+(`include_primary=False`), and `_Search.legal` runs the cheap
+flow/forbidden/occupancy conjunction before the speed arrival check. Every
+safety guard, threshold and outcome is unchanged.
+
 Because production skips that legacy pass, `allow_dot_notes = False` is
 enforced in the v2 structuring loop instead: a candidate dot whose siblings
 all offer legal cuts takes the best non-dot option, and a surviving dot is

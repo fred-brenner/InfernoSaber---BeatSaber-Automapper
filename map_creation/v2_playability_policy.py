@@ -6,6 +6,14 @@ The live dictionaries are shared with all repair modules; snapshots are private.
 """
 
 from bisect import bisect_left, bisect_right
+from functools import lru_cache
+
+from tools.config import config
+
+
+@lru_cache(maxsize=32768)
+def _cached_speed(previous, current, gap, calculate, parameters):
+    return calculate(list(previous), list(current), gap)
 
 
 class SpeedGroups:
@@ -32,6 +40,8 @@ class SpeedGroups:
 
     def violations(self, changed):
         from map_creation.v2_postprocessing import calc_note_speed
+        parameters = (config.max_speed, config.reaction_time,
+                      config.reaction_time_fact, config.cdf, config.cdf_lr)
         arrivals = {j for i in changed for j in self.partners[i]+self.following[i]}
         violations = set()
         for i in arrivals:
@@ -39,9 +49,10 @@ class SpeedGroups:
             if not previous:
                 continue
             n = self.notes[i]
-            speed = min(calc_note_speed([self.notes[p][k] for k in ('x', 'y', 'hand', 'd')],
-                                       [n[k] for k in ('x', 'y', 'hand', 'd')],
-                                       n['time']-self.notes[p]['time']) for p in previous)
+            current = tuple(n[k] for k in ('x', 'y', 'hand', 'd'))
+            speed = min(_cached_speed(tuple(self.notes[p][k] for k in ('x', 'y', 'hand', 'd')),
+                                     current, n['time']-self.notes[p]['time'],
+                                     calc_note_speed, parameters) for p in previous)
             if speed > self.cap(n)+1e-9:
                 violations.add(n['id'])
         return violations

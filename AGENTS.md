@@ -104,6 +104,9 @@ platforms before implementing them unless the task already authorizes them.
   further A/B rounds; current validation evidence is recorded in the task ledger.
   The November 9 repeated-position pass makes guarded one-cell cut-direction
   moves after calibrated repair; see [repeat separation](docs/generation-v2.md#exact-repeated-position-separation).
+  Repair-time evaluation memoizes arrival-speed and segment-geometry results in
+  bounded caches and orders cheap conjunction guards before expensive checks;
+  all safety semantics are unchanged.
 - For the five note-pattern playability metrics, including M5 same-hand direction
   variety, fast reversals and time between changes, read
   [docs/development.md](docs/development.md#playability-metrics).

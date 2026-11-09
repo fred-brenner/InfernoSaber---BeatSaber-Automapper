@@ -498,14 +498,17 @@ class _PrioritySearch:
             changed += 1
         return changed
 
-    def _soft_score(self, fragment, pair_keys, updates=None):
+    def _soft_score(self, fragment, pair_keys, updates=None, *, include_primary=True):
         from map_creation.v2_playability_placement import local_placement_cost
         from map_creation.v2_playability_costs import occlusion_severity, calibrated_limits
         from map_creation.v2_playability_reach import _travel, calibrated_cutoff
-        prep = sum(e['total'] for e in metrics.preparation_events(fragment))
-        axis = sum(e['total'] for e in metrics.axis_change_events(fragment))
+        prep = (sum(e['total'] for e in metrics.preparation_events(fragment))
+                if include_primary else 0.)
+        axis = (sum(e['total'] for e in metrics.axis_change_events(fragment))
+                if include_primary else 0.)
         updates = updates or {}
-        near = sum(updates.get(k, self.pairs[k])['total'] for k in pair_keys)
+        near = (sum(updates.get(k, self.pairs[k])['total'] for k in pair_keys)
+                if include_primary else 0.)
         placement = local_placement_cost(fragment, self.nps)
         cutoff = calibrated_limits(self.nps)['m2']
         m2 = travel = 0.
@@ -583,7 +586,7 @@ class _PrioritySearch:
                             continue
                         self.state.install(edits)
                         try:
-                            local = self._soft_score(fragment, keys, trial[1])
+                            local = self._soft_score(fragment, keys, trial[1], include_primary=False)
                             score = tuple(baseline[k] + sum(new-old for old, new in deltas[name].values())
                                           for k, name in enumerate(('preparation', 'axis', 'crossing'))) + local[3:]
                         finally:
@@ -641,7 +644,7 @@ class _PrioritySearch:
                         continue
                     self.state.install(edits)
                     try:
-                        local = self._soft_score(fragment, keys, trial[1])
+                        local = self._soft_score(fragment, keys, trial[1], include_primary=False)
                         score = tuple(baseline[k] + sum(new-old for old, new in deltas[name].values())
                                       for k, name in enumerate(('preparation', 'axis', 'crossing'))) + local[3:]
                     finally:
@@ -718,7 +721,7 @@ class _PrioritySearch:
                     continue
                 self.state.install(edits)
                 try:
-                    local_score = self._soft_score(fragment, pair_keys, trial[1])
+                    local_score = self._soft_score(fragment, pair_keys, trial[1], include_primary=False)
                     score = tuple(baseline_score[k] + sum(new-old for old, new in deltas[name].values())
                                   for k, name in enumerate(('preparation', 'axis', 'crossing'))) + local_score[3:]
                 finally:
@@ -761,7 +764,7 @@ class _PrioritySearch:
                         continue
                     self.state.install(edits)
                     try:
-                        local_score = self._soft_score(fragment, keys, trial[1])
+                        local_score = self._soft_score(fragment, keys, trial[1], include_primary=False)
                         score = tuple(baseline_score[k] + sum(new-old for old, new in deltas[name].values())
                                       for k, name in enumerate(('preparation', 'axis', 'crossing'))) + local_score[3:]
                     finally:

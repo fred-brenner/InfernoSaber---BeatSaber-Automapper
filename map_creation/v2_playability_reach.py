@@ -308,8 +308,6 @@ class _Search:
         for i in sorted(affected):
             n,p = self.notes[i],self.flow_previous.get(i)
             effective[i] = n["d"] if n["d"] != 8 else self._dot(i,p,effective)
-        if not self.speed_groups.legal(changed):
-            return False
         for i in affected:
             n,p = self.notes[i],self.flow_previous.get(i)
             prior = None if p is None else (self.times[p], self.notes[p]["x"], self.notes[p]["y"], effective[p])
@@ -336,6 +334,8 @@ class _Search:
                 if -self.swing <= dt <= self.eps:
                     if (n["x"],n["y"]) in post._swept_cells(other["x"],other["y"],effective[j]) or (same and -dt > self.eps):
                         return False
+        if not self.speed_groups.legal(changed):
+            return False
         return True
 
     def options(self, i, *, broad=False):

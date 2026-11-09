@@ -4,6 +4,7 @@ Elapsed times are seconds. Human-reference thresholds are fitted separately;
 the explicit hard preparation and crossing rules do not use those thresholds.
 """
 from bisect import bisect_right
+from functools import lru_cache
 import math
 
 VERSION = 'priority-events-v2-segments-20261108'
@@ -164,6 +165,13 @@ def _point_segment_distance(p, a, b):
 
 
 def _segment_distance(first, second):
+    return _cached_segment_distance(tuple(tuple(p) for p in first),
+                                    tuple(tuple(p) for p in second),
+                                    GEOMETRY_TOLERANCE)
+
+
+@lru_cache(maxsize=32768)
+def _cached_segment_distance(first, second, tolerance):
     a, b = first
     c, d = second
     if _intersects(a, b, c, d):
