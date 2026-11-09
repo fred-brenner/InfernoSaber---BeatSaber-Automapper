@@ -1,0 +1,90 @@
+{
+  "global": {
+    "cutoff": 0.4,
+    "eligible": 37713,
+    "flagged": 1035,
+    "raw_positive": 16692,
+    "maps": 51,
+    "supported": true,
+    "pooled_rate": 0.02744411741309363,
+    "equal_map_rate": 0.026988115439551146,
+    "budget": 0.03
+  },
+  "reference_version": "visibility-human-events-v1-20261108",
+  "event_version": "visibility-upper-center-v1-20261108",
+  "budget": 0.03,
+  "comparison": ">",
+  "human_maps": 51,
+  "bands": {
+    "<3": {
+      "cutoff": 0.4,
+      "eligible": 1431,
+      "flagged": 10,
+      "raw_positive": 396,
+      "maps": 7,
+      "supported": true,
+      "pooled_rate": 0.0069881201956673656,
+      "equal_map_rate": 0.005810168693396131,
+      "budget": 0.03,
+      "fallback": false,
+      "band_eligible_maps": 7,
+      "band_maps": 7
+    },
+    "3-5": {
+      "cutoff": 0.5,
+      "eligible": 13811,
+      "flagged": 69,
+      "raw_positive": 4851,
+      "maps": 27,
+      "supported": true,
+      "pooled_rate": 0.004996017667076968,
+      "equal_map_rate": 0.004475690921023583,
+      "budget": 0.03,
+      "fallback": false,
+      "band_eligible_maps": 27,
+      "band_maps": 27
+    },
+    "5-7": {
+      "cutoff": 0.42857142857142855,
+      "eligible": 7161,
+      "flagged": 186,
+      "raw_positive": 3692,
+      "maps": 7,
+      "supported": true,
+      "pooled_rate": 0.025974025974025976,
+      "equal_map_rate": 0.025264428144803758,
+      "budget": 0.03,
+      "fallback": false,
+      "band_eligible_maps": 7,
+      "band_maps": 7
+    },
+    "7+": {
+      "cutoff": 0.375,
+      "eligible": 15310,
+      "flagged": 378,
+      "raw_positive": 7753,
+      "maps": 10,
+      "supported": true,
+      "pooled_rate": 0.024689745264532985,
+      "equal_map_rate": 0.02435107541620894,
+      "budget": 0.03,
+      "fallback": false,
+      "band_eligible_maps": 10,
+      "band_maps": 10
+    }
+  },
+  "group_seconds": 0.02,
+  "window_seconds": 1.5,
+  "window_onsets": 8,
+  "minimum_onsets": 4,
+  "denominator": "One event per same-hand 20ms-anchored onset with at least four onsets in the trailing 1.5 seconds, capped at eight. All zero-exposure phrases included; stacks share one onset weight.",
+  "severity": "Mean top-row inner-column occupancy across the eligible onset groups. Each note contributes 1/(onsets*stack_size) if y=2 and x is 1 or 2.",
+  "calibration_scope": "In-sample fit only; no held-out or player-quality claim. Strict severity > cutoff; specific 3% pooled and equal-map budgets.",
+  "limitations": [
+    "Placement proxy, not a headset trajectory measurement or a global top-row quota.",
+    "Overlapping phrase endpoints are not independent samples.",
+    "Fewer than five eligible maps falls back to the all-band fit; unsupported global fits remain unavailable."
+  ],
+  "human_root": "/mnt/c/users/frede/desktop/bs_automapper/Data/training/evaluate_beats/bs_map_input",
+  "population_sha256": "e433ed7887bff841ab2f106d3d931efe2738683638e833d5546a570b41a9b8cd"
+}

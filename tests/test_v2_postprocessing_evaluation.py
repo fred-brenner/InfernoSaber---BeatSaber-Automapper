@@ -236,7 +236,7 @@ def _patch_timing_externals(monkeypatch):
                         lambda times, volume, onset: np.asarray(times))
 
 
-def _generate_with_production_postprocessors(monkeypatch):
+def _generate_with_production_postprocessors(monkeypatch, **overrides):
     from map_creation.v2_pipeline import generate
 
     _patch_timing_externals(monkeypatch)
@@ -250,7 +250,7 @@ def _generate_with_production_postprocessors(monkeypatch):
     settings["schedule"]["arc_max_gap_seconds"] = 6.
     return generate(song, 4., predictors, lambda times: np.zeros((len(times), 16), np.float32),
                     settings, vocab, lighting_generator=lighting,
-                    random_factor=0, logger=lambda message: None)
+                    random_factor=0, logger=lambda message: None, **overrides)
 
 
 def test_production_default_skips_legacy_note_mutators(monkeypatch):
@@ -265,3 +265,21 @@ def test_flag_true_restores_full_legacy_note_cleanup(monkeypatch):
     post = _generate_with_production_postprocessors(monkeypatch).diagnostics["note_postprocessing"]
     assert post["skipped_steps"] == []
     assert any(operation["stage"] == "legacy_note_flow" for operation in post["operations"])
+
+
+def test_app1_control_matches_explicit_legacy_notes_geometry_and_rng(monkeypatch):
+    from evaluation.evaluate_v2_postprocessing import _arm_processors
+    from evaluation.playability_experiments import experiment_policy
+
+    first_rng, second_rng = (np.random.default_rng(71) for _ in range(2))
+    with experiment_policy('app1_control'):
+        direct = _generate_with_production_postprocessors(monkeypatch, rng=first_rng)
+    with experiment_policy('app1_control'):
+        control = _generate_with_production_postprocessors(
+            monkeypatch, rng=second_rng, postprocessors=_arm_processors('app1_control', ARMS['app1_control']))
+    assert first_rng.bit_generator.state == second_rng.bit_generator.state
+    np.testing.assert_array_equal(direct.state['raw_model_notes'], control.state['raw_model_notes'])
+    for key in ('notes', 'chains', 'walls', 'bombs', 'arcs', 'lighting'):
+        assert direct.state[key] == control.state[key]
+    for key in ('speed_cap', 'speed_cap_post_expansion', 'diagonal_cap', 'note_clearance', 'intro_zones'):
+        assert direct.diagnostics.get(key) == control.diagnostics.get(key)

@@ -11,7 +11,8 @@ note safe area (`v2_bomb_note_cell_gap`/`v2_bomb_note_time_gap`) by
 bounded onset-peak snap post-cleanup
 (`v2_notes_onset_snap`), a configurable start-of-map safety zone
 (`v2_map_intro_no_notes_seconds`/`v2_map_intro_no_hazards_seconds`), strict
-≥135° same-hand flow (`v2_flow_min_turn_steps`), a diagonal-direction cap
+≥135° same-hand flow at fast gaps, with eligible slow turns in the final
+priority policy (`v2_flow_min_turn_steps` / `v2_playability_late_turns`), a diagonal-direction cap
 (`v2_diagonal_max_fraction`), post-pause entry-ramped, silence-aware timing
 fills plus a pluggable max-gap safety net
 (`v2_fill_entry_delay_seconds`/`v2_fill_respect_silence`/
@@ -79,10 +80,47 @@ platforms before implementing them unless the task already authorizes them.
   exclude `favorites_bs_input` and report skipped packages individually.
   Favorites remain valid *training* input: `--source-root` can be repeated to
   ingest several package folders, with automatic beatmap+audio deduplication.
-- For note-pattern playability scoring (lateral load, occlusion, bimanual
-  divergence, cross-hand path interference versus the human baseline), read
-  [docs/development.md](docs/development.md#playability-metrics); it is an
-  evaluation-only comparison, not a generation gate.
+- Before changing playability rules or optimization priorities, read the latest
+  [player priority review](docs/superpowers/specs/2026-11-08-playability-priority-review.md).
+  It supersedes conflicting goals in earlier experiments; distinguish accepted
+  requirements from implemented behavior.
+  The revised `priority` experiment is separate from historical `combined`; see
+  [priority policy](docs/generation-v2.md#priority-policy-after-the-november-8-player-review)
+  for its shared segment detector, joint repairs and final hard audits.
+  Current CPU validation and the blind playtest are recorded in
+  [baseline.md](docs/baseline.md#2026-11-08--priority-playability-validation-and-playtest).
+  The final v2 default extends this policy with separately versioned local M2
+  upper-center exposure, calibrated against human events and guarded during
+  joint repair. Historical rise-only M2 remains explicit in reports; read
+  [final visibility design](docs/superpowers/specs/2026-11-08-final-visibility-design.md).
+  M2 stays soft: final-only residuals may exceed their unchanged base allowance
+  by at most one onset group's occupancy, at <=3% eligible events per hand.
+  Record exceptions separately; never inflate original limits or relax the
+  reach/path hard bans or primary guards to pass them.
+  Final delivery is five ordinary song packages at settings 5/6/7/8, without
+  further A/B rounds; current validation evidence is recorded in the task ledger.
+  The November 9 repeated-position pass makes guarded one-cell cut-direction
+  moves after calibrated repair; see [repeat separation](docs/generation-v2.md#exact-repeated-position-separation).
+- For the five note-pattern playability metrics, including M5 same-hand direction
+  variety, fast reversals and time between changes, read
+  [docs/development.md](docs/development.md#playability-metrics).
+  The scorer runs offline. The opt-in CPU generation experiments and paired
+  comparison instructions are in [generation-v2.md](docs/generation-v2.md#playability-experiments)
+  and [development.md](docs/development.md#paired-playability-comparisons).
+  `v2_playability_enabled = False` selects the app1 behavior. For the complete
+  combined policy, shared acceptance guards, calibrated placement/M5 tails and
+  bounded decoder recovery, read [generation-v2.md](docs/generation-v2.md#playability-experiments).
+  Calibration budgets apply to eligible flagged events, not raw top-row share;
+  keep historical scorecards and distinguish runtime validation from player approval.
+  The November 8 offline event-calibration profiles use human trigger budgets
+  of 3% for specific measures and up to 10% for coarse proxies; see
+  [event calibration](docs/development.md#event-calibration-from-playtest-feedback).
+  The combined candidate implements the far-opposite inward-cut ban and
+  calibrated reach repair through `v2_playability_reach`. The `combined`
+  experiment enables M1–M4, reach, slow turns and dwell together. It repairs
+  before the retained snapshot, audits mutable expansions and rejects any
+  forbidden final colored cut. Read the combined playtest record in
+  [baseline.md](docs/baseline.md#2026-11-08--combined-reach-generator-and-second-playtest).
 - For the existing user workflow, read [Readme.md](Readme.md).
 - For the new intensity/timing/note framework, training commands, data contracts,
   and verification limits, read [docs/beat-model-training.md](docs/beat-model-training.md).

@@ -4,6 +4,7 @@ Training targets and source beatmaps are never inputs. The concept command keeps
 its independent review stops; this path uses concrete application postprocessors.
 """
 
+from functools import wraps
 from copy import deepcopy
 from numbers import Real
 from time import perf_counter
@@ -143,6 +144,71 @@ def _decode_positions_sampled(outputs, count, temperature, rng):
     weights = np.concatenate([red[1:] * blue[0], red[0] * blue[1:]])
     choice = _sample_category(weights, temperature, rng)
     return (choice + 1, 0) if choice < 12 else (0, choice - 11)
+
+
+def _recover_single_hand(pair, outputs, last_time, time, support_ratio, *,
+                         recent_notes=None, following_event=None, last_recovery_time=-np.inf):
+    """Recover a crowded single using supported opposite-hand positions.
+
+    Supplying ``recent_notes`` selects the complete combined policy: improve
+    two-second hand balance, retain nearby own-side placement, keep 500ms
+    between recoveries, and protect the next scheduled double. Legacy
+    hand_75/90 experiments keep their original behavior without that context.
+    The original event time and count are never changed.
+    """
+    if support_ratio <= 0 or sum(bool(cell) for cell in pair) != 1:
+        return pair
+    hand = 0 if pair[0] else 1
+    other = 1-hand
+    if time-last_time[hand] >= .25 or time-last_time[other] < .25:
+        return pair
+    probabilities = [outputs[color][0] for color in ("red", "blue")]
+    candidates = range(1, 13)
+    if recent_notes is not None:
+        if time-last_recovery_time < .5-1e-9:
+            return pair
+        if (following_event is not None and following_event['count'] == 2
+                and following_event['time']-time < .25-1e-9):
+            return pair
+        recent = [n for n in recent_notes if time-2. <= n['time'] < time]
+        counts = [sum(n['hand'] == h for n in recent) for h in (0, 1)]
+        if counts[hand] < counts[other]+2:
+            return pair
+        prior = max((n for n in recent if n['hand'] == other),
+                    key=lambda n:n['time'], default=None)
+        if prior is None:
+            return pair
+        candidates = [cell for cell in candidates
+                      if ((cell-1) % 4 < 2) == (other == 0)
+                      and ((cell-1) % 4-prior['x'])**2
+                          + ((cell-1) // 4-prior['y'])**2 <= 2]
+        if not candidates:
+            return pair
+    proposed = min(candidates, key=lambda cell:(-probabilities[other][cell], cell))
+    existing_weight = probabilities[hand][pair[hand]]*probabilities[other][0]
+    proposed_weight = probabilities[other][proposed]*probabilities[hand][0]
+    if proposed_weight <= 0 or proposed_weight < support_ratio*existing_weight:
+        return pair
+    return (proposed, 0) if other == 0 else (0, proposed)
+
+
+def _deferred_recovery_alternatives(pair, outputs, support_ratio):
+    """Capture supported own-side alternatives without changing decoder history."""
+    if support_ratio <= 0 or sum(bool(cell) for cell in pair) != 1:
+        return []
+    hand = 0 if pair[0] else 1
+    other = 1-hand
+    probabilities = [outputs[color][0] for color in ('red', 'blue')]
+    existing = float(probabilities[hand][pair[hand]]*probabilities[other][0])
+    alternatives = []
+    for category in range(1, 13):
+        x, y = (category-1) % 4, (category-1) // 4
+        proposed = float(probabilities[other][category]*probabilities[hand][0])
+        if ((x < 2) == (other == 0) and proposed > 0
+                and proposed >= support_ratio*existing):
+            alternatives.append(dict(hand=other, x=x, y=y,
+                                     support=proposed/max(existing, 1e-12)))
+    return sorted(alternatives, key=lambda n:(-n['support'], n['x'], n['y']))[:3]
 
 
 def _inputs(stage, song, state, candidate, history, encoder, settings):
@@ -351,6 +417,18 @@ def _validate_state(state, duration):
         identities[note["id"]] = note
         if note.get("kind") == "copy" and note.get("anchor_id") not in all_ids:
             raise ValueError("A copied note has no existing anchor")
+    if (getattr(config, "v2_playability_enabled", False)
+            and getattr(config, "v2_playability_reach", False)):
+        from .v2_playability_reach import forbidden_cut
+        forbidden = [note["id"] for note in state["notes"] if forbidden_cut(note)]
+        if forbidden:
+            raise ValueError(f"Final reach policy contains forbidden cuts: {forbidden[:10]}")
+    if (getattr(config, "v2_playability_enabled", False)
+            and getattr(config, "v2_playability_priority", False)):
+        from .v2_playability_priority import audit_priority
+        audit = audit_priority(state["notes"])
+        if audit["preparation"]["hard"] or audit["crossing"]["hard"]:
+            raise ValueError("Final priority policy contains hard preparation or crossing violations")
     for chain in state["chains"]:
         if (chain["anchor_id"] not in identities or not 0 <= chain["time"] < chain["end_time"] < duration
                 or not 0 <= chain["tx"] < 4 or not 0 <= chain["ty"] < 3
@@ -391,6 +469,18 @@ def _validate_state(state, duration):
             raise ValueError("Invalid final v2 lighting event")
 
 
+def _scope_playability_flow(generate_map):
+    @wraps(generate_map)
+    def scoped(*args, **kwargs):
+        if config.v2_playability_enabled and config.v2_playability_late_turns:
+            from map_creation.v2_postprocessing import playability_generation_phase
+            with playability_generation_phase():
+                return generate_map(*args, **kwargs)
+        return generate_map(*args, **kwargs)
+    return scoped
+
+
+@_scope_playability_flow
 def generate(song, requested_nps, predictors, encoder, settings, vocabularies, *,
              lighting_generator, audio_path=None, logger=None, postprocessors=None, random_factor=None,
              intensity=None, rng=None):
@@ -418,6 +508,7 @@ def generate(song, requested_nps, predictors, encoder, settings, vocabularies, *
                 apply_diagonal_cap=base.apply_diagonal_cap,
                 apply_speed_cap=base.apply_speed_cap,
                 speed_cap_scale=base.speed_cap_scale,
+                finalize_playability_reach=base.finalize_playability_reach,
                 calm_area_pulses=base.calm_area_pulses,
                 add_calm_effects=base.add_calm_effects,
                 add_calm_lighting=base.add_calm_lighting)
@@ -472,19 +563,48 @@ def generate(song, requested_nps, predictors, encoder, settings, vocabularies, *
     started = perf_counter()
     encoder(np.asarray([candidate["time"] for candidate in candidates], np.float64))
     history, length = [], options["history_length"]
+    last_hand_time = [-np.inf, -np.inf]
+    recovery = config.v2_playability_recovery_ratio if config.v2_playability_enabled else 0.
+    if not np.isfinite(recovery) or not 0 <= recovery <= 1:
+        raise ValueError("v2_playability_recovery_ratio must be in [0, 1]")
+    recovery_swaps = recovery_opportunities = 0
+    recovery_alternatives = {}
+    recovery_balanced = bool(getattr(config, "v2_playability_recovery_balanced", False))
     for index, candidate in enumerate(candidates):
         output = _predict(predictors["positions"], _inputs("positions", song, state, candidate, history, encoder, options))
         if sampling:
             pair = _decode_positions_sampled(_biased(output, 13, 0, rng), candidate["count"], temperature, rng)
         else:
             pair = _decode_positions(_biased(output, 13, factor, rng), candidate["count"])
+        if recovery and candidate["count"] == 1:
+            hand = 0 if pair[0] else 1
+            recovery_opportunities += int(candidate["time"]-last_hand_time[hand] < .25)
+            if recovery_balanced:
+                alternatives = _deferred_recovery_alternatives(pair, output, recovery)
+                if alternatives:
+                    cell = pair[hand]-1
+                    key = candidate["time"], hand, cell % 4, cell // 4
+                    recovery_alternatives[key] = alternatives
+            else:
+                selected = _recover_single_hand(pair, output, last_hand_time, candidate["time"], recovery)
+                if tuple(pair) != tuple(selected):
+                    recovery_swaps += 1
+                pair = selected
         for hand, category in enumerate(pair):
             if category:
+                last_hand_time[hand] = candidate["time"]
                 cell = category - 1
                 state["notes"].append({"id": len(state["notes"]), "time": candidate["time"], "hand": hand,
                                        "x": cell % 4, "y": cell // 4, "kind": "retained"})
         _history(history, {"time": candidate["time"], "value": pair}, length)
         _progress(logger, "positions", index, len(candidates))
+    if recovery:
+        raw["recovery_hand_swaps"] = recovery_swaps
+        raw["recovery_policy"] = "deferred-balanced-v2" if recovery_balanced else "legacy"
+        raw["recovery_crowded_single_candidates"] = recovery_opportunities
+        raw["recovery_unresolved_crowded_singles"] = recovery_opportunities-recovery_swaps
+        raw["recovery_deferred_notes"] = len(recovery_alternatives)
+        raw["recovery_deferred_alternatives"] = sum(len(v) for v in recovery_alternatives.values())
     result.stages["positions"] = {"events": len(candidates), "retained_notes": len(state["notes"]),
                                    "elapsed_seconds": perf_counter() - started}
     raw.update(position_events=len(candidates), position_notes=len(state["notes"]))
@@ -533,6 +653,11 @@ def generate(song, requested_nps, predictors, encoder, settings, vocabularies, *
     result.diagnostics["raw_model_note_columns"] = ["id", "time_seconds", "hand", "x", "y", "direction"]
     state["notes"], diagnostics = postprocessors.postprocess_notes(state["notes"],
                                              [candidate["time"] for candidate in candidates], logger=logger)
+    if recovery_alternatives:
+        for note in state["notes"]:
+            alternatives = recovery_alternatives.get(tuple(note[k] for k in ("time", "hand", "x", "y")))
+            if alternatives:
+                note["_recovery_alternatives"] = deepcopy(alternatives)
     result.diagnostics["note_postprocessing"] = diagnostics
     result.stages["arrows"]["elapsed_seconds"] = perf_counter() - started
     snap_times = getattr(postprocessors, "snap_note_times", None)
@@ -564,7 +689,10 @@ def generate(song, requested_nps, predictors, encoder, settings, vocabularies, *
     scale_fn = getattr(postprocessors, "speed_cap_scale", None)
     speed_scale = scale_fn() if scale_fn is not None \
         else float(getattr(config, "v2_speed_cap_scale", 1.) or 0.)
-    if speed_cap is not None and state["notes"] and speed_scale > 0:
+    combined_reach = (getattr(config, "v2_playability_enabled", False)
+                      and (getattr(config, "v2_playability_reach", False)
+                           or getattr(config, "v2_playability_priority", False)))
+    if speed_cap is not None and state["notes"] and (speed_scale > 0 or combined_reach):
         # Primary pass while every note is still mutable; the retained
         # snapshot below records the capped set.
         result.diagnostics["speed_cap"] = speed_cap(state["notes"], state["chains"],
@@ -630,6 +758,10 @@ def generate(song, requested_nps, predictors, encoder, settings, vocabularies, *
         # retained-snapshot invariant verified at the end of generate().
         result.diagnostics["fast_counter_sweep"] = counter_sweep(
             state["notes"], rng=rng, logger=logger)
+    reach_finalize = getattr(postprocessors, "finalize_playability_reach", None)
+    if combined_reach and reach_finalize is not None:
+        result.diagnostics["reach_post_expansion"] = reach_finalize(
+            state["notes"], state["chains"], protect_retained=True)
     started = perf_counter()
     index_state(state)
     if getattr(config, "v2_walls_heuristic", False):

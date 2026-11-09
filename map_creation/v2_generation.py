@@ -36,11 +36,16 @@ def apply_snapshot(snapshot):
 @contextmanager
 def scoped_settings(snapshot=None):
     previous = settings_snapshot()
+    existing_names = {"config": set(vars(config)), "paths": set(vars(paths))}
     try:
         if snapshot is not None:
             apply_snapshot(snapshot)
         yield
     finally:
+        current = settings_snapshot()
+        for name, module in (("config", config), ("paths", paths)):
+            for key in current[name].keys() - existing_names[name]:
+                delattr(module, key)
         apply_snapshot(previous)
 
 

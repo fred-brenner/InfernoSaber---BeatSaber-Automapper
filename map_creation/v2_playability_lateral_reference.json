@@ -1,0 +1,365 @@
+{
+  "version": "m1-fast-horizontal-run-v1-20261108",
+  "budget": 0.03,
+  "comparison": ">",
+  "component": "Repeated exposure within M1 lateral stress; no new independent metric family.",
+  "population_sha256": "718053c7453edcafeb0dce23b63655656e1896fd217604916a60d840a060bf49",
+  "supported_maps": 51,
+  "event_definition": "At every retained same-hand arrow arrival with a predecessor: consecutive exact horizontal reversals d2<->d3 with gap <=.25 seconds. All zero arrivals included. Dots reset exposure; anchored20ms stacks keep first representative.",
+  "minimum_allowed_reversals": 2,
+  "cutoffs_by_nps_band": {
+    "<3": 2.0,
+    "3-5": 2.0,
+    "5-7": 2.0,
+    "7+": 2.0
+  },
+  "support_by_nps_band": {
+    "<3": {
+      "reference_maps": 7,
+      "source_bands": [
+        "<3"
+      ],
+      "human": {
+        "eligible_maps": 7,
+        "events": 3392,
+        "triggers": 0,
+        "equal_map_rate": 0.0,
+        "pooled_rate": 0.0,
+        "per_map_rate_distribution": {
+          "count": 7,
+          "mean": 0.0,
+          "min": 0.0,
+          "q1": 0.0,
+          "median": 0.0,
+          "q3": 0.0,
+          "p95": 0.0,
+          "max": 0.0
+        },
+        "maps_exceeding_3pct": 0,
+        "top_map_rates": [
+          {
+            "package": "8bc (Blood Sugar - Rustic)",
+            "difficulty": "Expert",
+            "events": 618,
+            "triggers": 0,
+            "rate": 0.0
+          },
+          {
+            "package": "9b6 (Criminal - zombiekilleraa12)",
+            "difficulty": "Normal",
+            "events": 845,
+            "triggers": 0,
+            "rate": 0.0
+          },
+          {
+            "package": "a30b (Amerika - RealFF)",
+            "difficulty": "Expert",
+            "events": 667,
+            "triggers": 0,
+            "rate": 0.0
+          },
+          {
+            "package": "b5 (Purple Lamborghini - Skrillex)",
+            "difficulty": "Expert",
+            "events": 114,
+            "triggers": 0,
+            "rate": 0.0
+          },
+          {
+            "package": "d7 (Lost in the Rhythm - Jamie Berry feat Octavia Rose)",
+            "difficulty": "Hard",
+            "events": 214,
+            "triggers": 0,
+            "rate": 0.0
+          },
+          {
+            "package": "ee6 (Walk on Water - Spades)",
+            "difficulty": "Expert",
+            "events": 447,
+            "triggers": 0,
+            "rate": 0.0
+          },
+          {
+            "package": "f1b (The Sound Of Silence - Majyst)",
+            "difficulty": "Hard",
+            "events": 487,
+            "triggers": 0,
+            "rate": 0.0
+          }
+        ]
+      }
+    },
+    "3-5": {
+      "reference_maps": 27,
+      "source_bands": [
+        "3-5"
+      ],
+      "human": {
+        "eligible_maps": 27,
+        "events": 20057,
+        "triggers": 6,
+        "equal_map_rate": 0.00026520544448831304,
+        "pooled_rate": 0.00029914742982499877,
+        "per_map_rate_distribution": {
+          "count": 27,
+          "mean": 0.00026520544448831304,
+          "min": 0.0,
+          "q1": 0.0,
+          "median": 0.0,
+          "q3": 0.0,
+          "p95": 0.0018592297476759606,
+          "max": 0.0045045045045045045
+        },
+        "maps_exceeding_3pct": 0,
+        "top_map_rates": [
+          {
+            "package": "9c9 (The Final Countdown - reborn)",
+            "difficulty": "Expert",
+            "events": 888,
+            "triggers": 4,
+            "rate": 0.0045045045045045045
+          },
+          {
+            "package": "958 (Born This Way - zack32h)",
+            "difficulty": "ExpertPlus",
+            "events": 753,
+            "triggers": 2,
+            "rate": 0.0026560424966799467
+          },
+          {
+            "package": "2144 (Shut Up and Dance - bennydabeast)",
+            "difficulty": "ExpertPlus",
+            "events": 885,
+            "triggers": 0,
+            "rate": 0.0
+          },
+          {
+            "package": "352dd (Hollow - Dirty Alex & CMP1111)",
+            "difficulty": "ExpertPlus",
+            "events": 968,
+            "triggers": 0,
+            "rate": 0.0
+          },
+          {
+            "package": "35ffb (Black Magic - A Jhintleman & Ph\u00f8enix)",
+            "difficulty": "ExpertPlus",
+            "events": 827,
+            "triggers": 0,
+            "rate": 0.0
+          },
+          {
+            "package": "3711e (Electro Swing Jazz - Andynak)",
+            "difficulty": "ExpertPlus",
+            "events": 553,
+            "triggers": 0,
+            "rate": 0.0
+          },
+          {
+            "package": "379da (Citrus Love - shad & Kinz)",
+            "difficulty": "ExpertPlus",
+            "events": 975,
+            "triggers": 0,
+            "rate": 0.0
+          },
+          {
+            "package": "3bf72 (Insane - Emiru & steeak, )",
+            "difficulty": "ExpertPlus",
+            "events": 701,
+            "triggers": 0,
+            "rate": 0.0
+          },
+          {
+            "package": "4ac1 (Lost In The Echo - heisenbergirl)",
+            "difficulty": "ExpertPlus",
+            "events": 890,
+            "triggers": 0,
+            "rate": 0.0
+          },
+          {
+            "package": "8215 (Better When You're Gone - Halcyon12)",
+            "difficulty": "ExpertPlus",
+            "events": 479,
+            "triggers": 0,
+            "rate": 0.0
+          }
+        ]
+      }
+    },
+    "5-7": {
+      "reference_maps": 7,
+      "source_bands": [
+        "5-7"
+      ],
+      "human": {
+        "eligible_maps": 7,
+        "events": 7420,
+        "triggers": 1,
+        "equal_map_rate": 0.00026068821689259646,
+        "pooled_rate": 0.00013477088948787063,
+        "per_map_rate_distribution": {
+          "count": 7,
+          "mean": 0.00026068821689259646,
+          "min": 0.0,
+          "q1": 0.0,
+          "median": 0.0,
+          "q3": 0.0,
+          "p95": 0.0012773722627737213,
+          "max": 0.0018248175182481751
+        },
+        "maps_exceeding_3pct": 0,
+        "top_map_rates": [
+          {
+            "package": "b60 (She Wants Me Dead - shade)",
+            "difficulty": "Expert",
+            "events": 548,
+            "triggers": 1,
+            "rate": 0.0018248175182481751
+          },
+          {
+            "package": "1ca5d (Sweet Nothing - Kansas)",
+            "difficulty": "ExpertPlus",
+            "events": 1117,
+            "triggers": 0,
+            "rate": 0.0
+          },
+          {
+            "package": "1dcf4 (Bad Hatter - Nixie.Korten)",
+            "difficulty": "ExpertPlus",
+            "events": 906,
+            "triggers": 0,
+            "rate": 0.0
+          },
+          {
+            "package": "b91b (Hammer  - Nuketime)",
+            "difficulty": "ExpertPlus",
+            "events": 991,
+            "triggers": 0,
+            "rate": 0.0
+          },
+          {
+            "package": "ca30 (The Beast - Ramen Noodle)",
+            "difficulty": "ExpertPlus",
+            "events": 991,
+            "triggers": 0,
+            "rate": 0.0
+          },
+          {
+            "package": "caa8 (Sorry - Pixelguy & Teuflum)",
+            "difficulty": "ExpertPlus",
+            "events": 942,
+            "triggers": 0,
+            "rate": 0.0
+          },
+          {
+            "package": "fb05 (Till I Collapse - anonymesgo)",
+            "difficulty": "ExpertPlus",
+            "events": 1925,
+            "triggers": 0,
+            "rate": 0.0
+          }
+        ]
+      }
+    },
+    "7+": {
+      "reference_maps": 10,
+      "source_bands": [
+        "7+"
+      ],
+      "human": {
+        "eligible_maps": 10,
+        "events": 14780,
+        "triggers": 25,
+        "equal_map_rate": 0.0016839154630870277,
+        "pooled_rate": 0.0016914749661705007,
+        "per_map_rate_distribution": {
+          "count": 10,
+          "mean": 0.0016839154630870277,
+          "min": 0.0,
+          "q1": 0.0,
+          "median": 0.0,
+          "q3": 0.0,
+          "p95": 0.008494449970270143,
+          "max": 0.0091683038637852
+        },
+        "maps_exceeding_3pct": 0,
+        "top_map_rates": [
+          {
+            "package": "e2bc (Mushussu - abcbadq & Dr_Marc)",
+            "difficulty": "ExpertPlus",
+            "events": 1527,
+            "triggers": 14,
+            "rate": 0.0091683038637852
+          },
+          {
+            "package": "e2ba (Astronomia - That_Narwhal)",
+            "difficulty": "ExpertPlus",
+            "events": 1434,
+            "triggers": 11,
+            "rate": 0.007670850767085077
+          },
+          {
+            "package": "8955 (Paranoid Mirage - Nuketime)",
+            "difficulty": "ExpertPlus",
+            "events": 1833,
+            "triggers": 0,
+            "rate": 0.0
+          },
+          {
+            "package": "911a (Godzilla - Captain Iceblock)",
+            "difficulty": "ExpertPlus",
+            "events": 1498,
+            "triggers": 0,
+            "rate": 0.0
+          },
+          {
+            "package": "9af7 (Row - Nuketime)",
+            "difficulty": "ExpertPlus",
+            "events": 1317,
+            "triggers": 0,
+            "rate": 0.0
+          },
+          {
+            "package": "b503 (The Drug In Me Is You - DeeJay)",
+            "difficulty": "ExpertPlus",
+            "events": 1496,
+            "triggers": 0,
+            "rate": 0.0
+          },
+          {
+            "package": "dfcb (Hanavision - Nuketime)",
+            "difficulty": "ExpertPlus",
+            "events": 1763,
+            "triggers": 0,
+            "rate": 0.0
+          },
+          {
+            "package": "e0aa (Feel Like This - Teuflum)",
+            "difficulty": "ExpertPlus",
+            "events": 1457,
+            "triggers": 0,
+            "rate": 0.0
+          },
+          {
+            "package": "f124 (Avalanche - That_Narwhal)",
+            "difficulty": "ExpertPlus",
+            "events": 1061,
+            "triggers": 0,
+            "rate": 0.0
+          },
+          {
+            "package": "ff83 (Long Times - Teuflum & xScaramouche)",
+            "difficulty": "ExpertPlus",
+            "events": 1394,
+            "triggers": 0,
+            "rate": 0.0
+          }
+        ]
+      }
+    }
+  },
+  "limitations": [
+    "A directional exposure proxy, not measured arm fatigue. No retiming, note deletion or global horizontal quota.",
+    "The conservative two-reversal allowance can make observed rates much lower than the 3% budget; the budget is a cap, not a target.",
+    "Run arrivals overlap; held-out human uncertainty is recorded separately. Runtime never reads the corpus."
+  ]
+}

@@ -1,0 +1,815 @@
+{
+  "schema_version": 1,
+  "policy": "joint-two-tail-axis-events-v1",
+  "minimum_packages": 5,
+  "budget": 0.1,
+  "strata": {
+    "<3|0|45": {
+      "source_bands": [
+        "<3"
+      ],
+      "packages": 6,
+      "events": 294,
+      "supported": true,
+      "intervals": {
+        "notes": [
+          1.0,
+          15.0
+        ],
+        "seconds": [
+          0.2941176470588118,
+          12.20930232558139
+        ],
+        "incoming_seconds": [
+          0.28032793317522575,
+          2.7906976744186025
+        ]
+      },
+      "budget": 0.1,
+      "empirical_flagged": 14,
+      "empirical_flagged_share": 0.047619047619047616
+    },
+    "<3|0|90": {
+      "source_bands": [
+        "<3"
+      ],
+      "packages": 7,
+      "events": 297,
+      "supported": true,
+      "intervals": {
+        "notes": [
+          1.0,
+          20.0
+        ],
+        "seconds": [
+          0.2941176470588118,
+          11.25
+        ],
+        "incoming_seconds": [
+          0.234375,
+          2.790697674418624
+        ]
+      },
+      "budget": 0.1,
+      "empirical_flagged": 12,
+      "empirical_flagged_share": 0.04040404040404041
+    },
+    "<3|1|45": {
+      "source_bands": [
+        "<3"
+      ],
+      "packages": 7,
+      "events": 292,
+      "supported": true,
+      "intervals": {
+        "notes": [
+          1.0,
+          12.0
+        ],
+        "seconds": [
+          0.2941176470588118,
+          16.767857142857153
+        ],
+        "incoming_seconds": [
+          0.2941176470588118,
+          2.7906976744186025
+        ]
+      },
+      "budget": 0.1,
+      "empirical_flagged": 13,
+      "empirical_flagged_share": 0.04452054794520548
+    },
+    "<3|1|90": {
+      "source_bands": [
+        "<3"
+      ],
+      "packages": 7,
+      "events": 293,
+      "supported": true,
+      "intervals": {
+        "notes": [
+          1.0,
+          14.0
+        ],
+        "seconds": [
+          0.2941176470588118,
+          11.25
+        ],
+        "incoming_seconds": [
+          0.234375,
+          2.47933884297521
+        ]
+      },
+      "budget": 0.1,
+      "empirical_flagged": 12,
+      "empirical_flagged_share": 0.040955631399317405
+    },
+    "3-5|0|45": {
+      "source_bands": [
+        "3-5"
+      ],
+      "packages": 27,
+      "events": 3181,
+      "supported": true,
+      "intervals": {
+        "notes": [
+          1.0,
+          12.0
+        ],
+        "seconds": [
+          0.18294915920353105,
+          6.16278260869565
+        ],
+        "incoming_seconds": [
+          0.1428571428571388,
+          2.0656779661017026
+        ]
+      },
+      "budget": 0.1,
+      "empirical_flagged": 181,
+      "empirical_flagged_share": 0.05690034580320654
+    },
+    "3-5|0|90": {
+      "source_bands": [
+        "3-5"
+      ],
+      "packages": 23,
+      "events": 1074,
+      "supported": true,
+      "intervals": {
+        "notes": [
+          1.0,
+          8.0
+        ],
+        "seconds": [
+          0.24193548387097508,
+          4.7222222222222285
+        ],
+        "incoming_seconds": [
+          0.19999999999998863,
+          2.2222222222222
+        ]
+      },
+      "budget": 0.1,
+      "empirical_flagged": 66,
+      "empirical_flagged_share": 0.061452513966480445
+    },
+    "3-5|1|45": {
+      "source_bands": [
+        "3-5"
+      ],
+      "packages": 27,
+      "events": 3291,
+      "supported": true,
+      "intervals": {
+        "notes": [
+          1.0,
+          11.0
+        ],
+        "seconds": [
+          0.19057142857141685,
+          5.625
+        ],
+        "incoming_seconds": [
+          0.13888888888888573,
+          1.9047619047619033
+        ]
+      },
+      "budget": 0.1,
+      "empirical_flagged": 193,
+      "empirical_flagged_share": 0.05864478881798845
+    },
+    "3-5|1|90": {
+      "source_bands": [
+        "3-5"
+      ],
+      "packages": 24,
+      "events": 1139,
+      "supported": true,
+      "intervals": {
+        "notes": [
+          1.0,
+          9.0
+        ],
+        "seconds": [
+          0.25,
+          4.838709677419352
+        ],
+        "incoming_seconds": [
+          0.1935483870967687,
+          2.2983870967742064
+        ]
+      },
+      "budget": 0.1,
+      "empirical_flagged": 69,
+      "empirical_flagged_share": 0.06057945566286216
+    },
+    "5-7|0|45": {
+      "source_bands": [
+        "5-7"
+      ],
+      "packages": 7,
+      "events": 1179,
+      "supported": true,
+      "intervals": {
+        "notes": [
+          1.0,
+          13.0
+        ],
+        "seconds": [
+          0.1666615804036553,
+          5.199999999999999
+        ],
+        "incoming_seconds": [
+          0.1190476190476204,
+          1.1904761904761898
+        ]
+      },
+      "budget": 0.1,
+      "empirical_flagged": 68,
+      "empirical_flagged_share": 0.05767599660729432
+    },
+    "5-7|0|90": {
+      "source_bands": [
+        "3-5",
+        "5-7"
+      ],
+      "packages": 27,
+      "events": 1146,
+      "supported": true,
+      "intervals": {
+        "notes": [
+          1.0,
+          8.0
+        ],
+        "seconds": [
+          0.2380952380952408,
+          4.800000000000011
+        ],
+        "incoming_seconds": [
+          0.14142938285203854,
+          2.142857142857139
+        ]
+      },
+      "budget": 0.1,
+      "empirical_flagged": 75,
+      "empirical_flagged_share": 0.06544502617801047
+    },
+    "5-7|1|45": {
+      "source_bands": [
+        "5-7"
+      ],
+      "packages": 7,
+      "events": 1233,
+      "supported": true,
+      "intervals": {
+        "notes": [
+          1.0,
+          13.0
+        ],
+        "seconds": [
+          0.1666666666666572,
+          4.833333333333343
+        ],
+        "incoming_seconds": [
+          0.1190476190476204,
+          1.2021497542422708
+        ]
+      },
+      "budget": 0.1,
+      "empirical_flagged": 66,
+      "empirical_flagged_share": 0.0535279805352798
+    },
+    "5-7|1|90": {
+      "source_bands": [
+        "3-5",
+        "5-7"
+      ],
+      "packages": 28,
+      "events": 1208,
+      "supported": true,
+      "intervals": {
+        "notes": [
+          1.0,
+          9.0
+        ],
+        "seconds": [
+          0.2380952380952408,
+          4.838709677419352
+        ],
+        "incoming_seconds": [
+          0.1935483870967687,
+          2.2222222222222285
+        ]
+      },
+      "budget": 0.1,
+      "empirical_flagged": 75,
+      "empirical_flagged_share": 0.062086092715231786
+    },
+    "7+|0|45": {
+      "source_bands": [
+        "7+"
+      ],
+      "packages": 10,
+      "events": 1768,
+      "supported": true,
+      "intervals": {
+        "notes": [
+          1.0,
+          18.0
+        ],
+        "seconds": [
+          0.1153828547551079,
+          4.625
+        ],
+        "incoming_seconds": [
+          0.10000000000000142,
+          1.2692378117487948
+        ]
+      },
+      "budget": 0.1,
+      "empirical_flagged": 105,
+      "empirical_flagged_share": 0.05938914027149321
+    },
+    "7+|0|90": {
+      "source_bands": [
+        "7+"
+      ],
+      "packages": 5,
+      "events": 50,
+      "supported": true,
+      "intervals": {
+        "notes": [
+          1.0,
+          18.0
+        ],
+        "seconds": [
+          0.1339285714285836,
+          6.206896551724142
+        ],
+        "incoming_seconds": [
+          0.1339285714285836,
+          1.941176470588232
+        ]
+      },
+      "budget": 0.1,
+      "empirical_flagged": 0,
+      "empirical_flagged_share": 0.0
+    },
+    "7+|1|45": {
+      "source_bands": [
+        "7+"
+      ],
+      "packages": 10,
+      "events": 2013,
+      "supported": true,
+      "intervals": {
+        "notes": [
+          1.0,
+          15.0
+        ],
+        "seconds": [
+          0.1153564453125,
+          4.764705882352928
+        ],
+        "incoming_seconds": [
+          0.10000000000000142,
+          1.084337349397586
+        ]
+      },
+      "budget": 0.1,
+      "empirical_flagged": 118,
+      "empirical_flagged_share": 0.058618976651763535
+    },
+    "7+|1|90": {
+      "source_bands": [
+        "7+"
+      ],
+      "packages": 5,
+      "events": 44,
+      "supported": true,
+      "intervals": {
+        "notes": [
+          1.0,
+          18.0
+        ],
+        "seconds": [
+          0.125,
+          5.793103448275872
+        ],
+        "incoming_seconds": [
+          0.125,
+          0.8275862068965552
+        ]
+      },
+      "budget": 0.1,
+      "empirical_flagged": 0,
+      "empirical_flagged_share": 0.0
+    }
+  },
+  "source_sha256": "56975bb8be24f8f706d2cdaa33de277cfc77d9886200d080efaa01057bb43212",
+  "source": "curated bs_map_input highest Standard",
+  "accepted": [
+    {
+      "package": "1ca5d (Sweet Nothing - Kansas)",
+      "difficulty": "ExpertPlus",
+      "notes": 1163,
+      "nps": 5.566937041328698,
+      "completed_runs": 442
+    },
+    {
+      "package": "1dcf4 (Bad Hatter - Nixie.Korten)",
+      "difficulty": "ExpertPlus",
+      "notes": 924,
+      "nps": 5.3437530149541725,
+      "completed_runs": 497
+    },
+    {
+      "package": "2144 (Shut Up and Dance - bennydabeast)",
+      "difficulty": "ExpertPlus",
+      "notes": 894,
+      "nps": 4.64359918200409,
+      "completed_runs": 504
+    },
+    {
+      "package": "352dd (Hollow - Dirty Alex & CMP1111)",
+      "difficulty": "ExpertPlus",
+      "notes": 1099,
+      "nps": 4.363017665797857,
+      "completed_runs": 292
+    },
+    {
+      "package": "35ffb (Black Magic - A Jhintleman & Ph\u00f8enix)",
+      "difficulty": "ExpertPlus",
+      "notes": 1287,
+      "nps": 4.399684791174153,
+      "completed_runs": 633
+    },
+    {
+      "package": "3711e (Electro Swing Jazz - Andynak)",
+      "difficulty": "ExpertPlus",
+      "notes": 725,
+      "nps": 4.748883928571428,
+      "completed_runs": 156
+    },
+    {
+      "package": "379da (Citrus Love - shad & Kinz)",
+      "difficulty": "ExpertPlus",
+      "notes": 1060,
+      "nps": 4.107953714237828,
+      "completed_runs": 524
+    },
+    {
+      "package": "3bf72 (Insane - Emiru & steeak, )",
+      "difficulty": "ExpertPlus",
+      "notes": 718,
+      "nps": 4.657347592217923,
+      "completed_runs": 374
+    },
+    {
+      "package": "4ac1 (Lost In The Echo - heisenbergirl)",
+      "difficulty": "ExpertPlus",
+      "notes": 896,
+      "nps": 4.659283503412092,
+      "completed_runs": 412
+    },
+    {
+      "package": "8215 (Better When You're Gone - Halcyon12)",
+      "difficulty": "ExpertPlus",
+      "notes": 483,
+      "nps": 4.764855155117134,
+      "completed_runs": 224
+    },
+    {
+      "package": "8955 (Paranoid Mirage - Nuketime)",
+      "difficulty": "ExpertPlus",
+      "notes": 2172,
+      "nps": 9.67476868938108,
+      "completed_runs": 631
+    },
+    {
+      "package": "8bc (Blood Sugar - Rustic)",
+      "difficulty": "Expert",
+      "notes": 666,
+      "nps": 2.860215053763441,
+      "completed_runs": 149
+    },
+    {
+      "package": "911a (Godzilla - Captain Iceblock)",
+      "difficulty": "ExpertPlus",
+      "notes": 1554,
+      "nps": 7.252075141983399,
+      "completed_runs": 214
+    },
+    {
+      "package": "93 (A Light that Never Comes - jailbird)",
+      "difficulty": "Hard",
+      "notes": 700,
+      "nps": 3.0454727564102564,
+      "completed_runs": 132
+    },
+    {
+      "package": "958 (Born This Way - zack32h)",
+      "difficulty": "ExpertPlus",
+      "notes": 823,
+      "nps": 3.3810039725532683,
+      "completed_runs": 399
+    },
+    {
+      "package": "9a0c (Thnks fr th Mmrs - Hamsta)",
+      "difficulty": "ExpertPlus",
+      "notes": 844,
+      "nps": 4.498746704858196,
+      "completed_runs": 397
+    },
+    {
+      "package": "9af7 (Row - Nuketime)",
+      "difficulty": "ExpertPlus",
+      "notes": 1753,
+      "nps": 7.344043726679462,
+      "completed_runs": 394
+    },
+    {
+      "package": "9b6 (Criminal - zombiekilleraa12)",
+      "difficulty": "Normal",
+      "notes": 1068,
+      "nps": 2.8322641509433963,
+      "completed_runs": 318
+    },
+    {
+      "package": "9c9 (The Final Countdown - reborn)",
+      "difficulty": "Expert",
+      "notes": 1130,
+      "nps": 3.898739411859453,
+      "completed_runs": 365
+    },
+    {
+      "package": "9d0 (Fake Love by BTS (Benny Original\u2122) - bennydabeast)",
+      "difficulty": "Expert",
+      "notes": 904,
+      "nps": 3.8536853685368535,
+      "completed_runs": 484
+    },
+    {
+      "package": "a30b (Amerika - RealFF)",
+      "difficulty": "Expert",
+      "notes": 719,
+      "nps": 2.9908798925953133,
+      "completed_runs": 188
+    },
+    {
+      "package": "ad2d (Alors On Danse - Z-ANESaber)",
+      "difficulty": "Expert",
+      "notes": 603,
+      "nps": 4.258272058823529,
+      "completed_runs": 226
+    },
+    {
+      "package": "b5 (Purple Lamborghini - Skrillex)",
+      "difficulty": "Expert",
+      "notes": 398,
+      "nps": 2.4377499651277073,
+      "completed_runs": 56
+    },
+    {
+      "package": "b503 (The Drug In Me Is You - DeeJay)",
+      "difficulty": "ExpertPlus",
+      "notes": 1498,
+      "nps": 7.240333333333333,
+      "completed_runs": 511
+    },
+    {
+      "package": "b60 (She Wants Me Dead - shade)",
+      "difficulty": "Expert",
+      "notes": 911,
+      "nps": 5.472481146624186,
+      "completed_runs": 151
+    },
+    {
+      "package": "b7aa (Venom of Venus - Cyrix)",
+      "difficulty": "ExpertPlus",
+      "notes": 1079,
+      "nps": 4.9606775559588625,
+      "completed_runs": 320
+    },
+    {
+      "package": "b821 (Godspeed - Epix Fusion)",
+      "difficulty": "ExpertPlus",
+      "notes": 1003,
+      "nps": 4.585142857142857,
+      "completed_runs": 210
+    },
+    {
+      "package": "b91b (Hammer  - Nuketime)",
+      "difficulty": "ExpertPlus",
+      "notes": 1120,
+      "nps": 5.812500178320887,
+      "completed_runs": 279
+    },
+    {
+      "package": "baea (SLUMP - Nuketime)",
+      "difficulty": "Expert",
+      "notes": 610,
+      "nps": 4.318181806482559,
+      "completed_runs": 120
+    },
+    {
+      "package": "ca30 (The Beast - Ramen Noodle)",
+      "difficulty": "ExpertPlus",
+      "notes": 1307,
+      "nps": 5.8154296875,
+      "completed_runs": 297
+    },
+    {
+      "package": "caa8 (Sorry - Pixelguy & Teuflum)",
+      "difficulty": "ExpertPlus",
+      "notes": 1025,
+      "nps": 5.7749999999999995,
+      "completed_runs": 232
+    },
+    {
+      "package": "d4a5 (Shiawase No Monosashi - ETAN)",
+      "difficulty": "ExpertPlus",
+      "notes": 778,
+      "nps": 4.587040935672515,
+      "completed_runs": 257
+    },
+    {
+      "package": "d7 (Lost in the Rhythm - Jamie Berry feat Octavia Rose)",
+      "difficulty": "Hard",
+      "notes": 240,
+      "nps": 1.9710407239819006,
+      "completed_runs": 55
+    },
+    {
+      "package": "d8 (Megalovania (Cement City Remix) - kryptikos)",
+      "difficulty": "Expert",
+      "notes": 566,
+      "nps": 3.515906216989792,
+      "completed_runs": 165
+    },
+    {
+      "package": "da70 (Castle Of Glass - cookie)",
+      "difficulty": "Expert",
+      "notes": 621,
+      "nps": 3.2854368932038835,
+      "completed_runs": 180
+    },
+    {
+      "package": "dfc (You - Galantis (Psychic Type VIP Remix) - heisenbergirl)",
+      "difficulty": "Expert",
+      "notes": 827,
+      "nps": 3.933397777539277,
+      "completed_runs": 358
+    },
+    {
+      "package": "dfcb (Hanavision - Nuketime)",
+      "difficulty": "ExpertPlus",
+      "notes": 2089,
+      "nps": 8.145856902965358,
+      "completed_runs": 512
+    },
+    {
+      "package": "e04 (Alan Walker - All Falls Down [DOPEDROP Remix] - ruckus)",
+      "difficulty": "Expert",
+      "notes": 663,
+      "nps": 3.7808930425752854,
+      "completed_runs": 384
+    },
+    {
+      "package": "e0aa (Feel Like This - Teuflum)",
+      "difficulty": "ExpertPlus",
+      "notes": 1837,
+      "nps": 7.06872852233677,
+      "completed_runs": 266
+    },
+    {
+      "package": "e2ba (Astronomia - That_Narwhal)",
+      "difficulty": "ExpertPlus",
+      "notes": 1695,
+      "nps": 9.165908266361583,
+      "completed_runs": 359
+    },
+    {
+      "package": "e2bc (Mushussu - abcbadq & Dr_Marc)",
+      "difficulty": "ExpertPlus",
+      "notes": 2023,
+      "nps": 7.559931506849315,
+      "completed_runs": 402
+    },
+    {
+      "package": "e4 (Every Time We Touch - Cascada)",
+      "difficulty": "Expert",
+      "notes": 564,
+      "nps": 3.15555549823418,
+      "completed_runs": 373
+    },
+    {
+      "package": "ee6 (Walk on Water - Spades)",
+      "difficulty": "Expert",
+      "notes": 597,
+      "nps": 2.696420400549083,
+      "completed_runs": 126
+    },
+    {
+      "package": "efe (Some Nights - bennydabeast)",
+      "difficulty": "ExpertPlus",
+      "notes": 810,
+      "nps": 3.3760765550239236,
+      "completed_runs": 537
+    },
+    {
+      "package": "f0ea (To Be Beautiful - Rayman9515)",
+      "difficulty": "ExpertPlus",
+      "notes": 746,
+      "nps": 3.685831622176592,
+      "completed_runs": 292
+    },
+    {
+      "package": "f124 (Avalanche - That_Narwhal)",
+      "difficulty": "ExpertPlus",
+      "notes": 1258,
+      "nps": 9.76601540070323,
+      "completed_runs": 256
+    },
+    {
+      "package": "f1b (The Sound Of Silence - Majyst)",
+      "difficulty": "Hard",
+      "notes": 563,
+      "nps": 2.1640100250626566,
+      "completed_runs": 284
+    },
+    {
+      "package": "f91e (Who's Laughing Now - Teuflum)",
+      "difficulty": "ExpertPlus",
+      "notes": 727,
+      "nps": 4.119402985074627,
+      "completed_runs": 281
+    },
+    {
+      "package": "fa33 (Drop That Low (When I Dip) - Uninstaller)",
+      "difficulty": "ExpertPlus",
+      "notes": 706,
+      "nps": 4.793559928443649,
+      "completed_runs": 86
+    },
+    {
+      "package": "fb05 (Till I Collapse - anonymesgo)",
+      "difficulty": "ExpertPlus",
+      "notes": 1957,
+      "nps": 6.23711313567558,
+      "completed_runs": 655
+    },
+    {
+      "package": "ff83 (Long Times - Teuflum & xScaramouche)",
+      "difficulty": "ExpertPlus",
+      "notes": 1803,
+      "nps": 9.223958333333334,
+      "completed_runs": 330
+    }
+  ],
+  "skipped": [
+    {
+      "package": "35062 (Spin Eternally - Pink)",
+      "reason": "Expected one Standard beatmap; found 0"
+    },
+    {
+      "package": "4bf2b (KDA x BLACKPINK - MadChase)",
+      "reason": "Unsupported tempo changes in bpmEvents"
+    },
+    {
+      "package": "b83d (ZiRNiTRA - Nuketime)",
+      "reason": "Unsupported tempo changes in _BPMChanges"
+    },
+    {
+      "package": "ba24 (Cartoon Candy - Rogdude & muffn)",
+      "reason": "Unsupported tempo changes in _BPMChanges"
+    },
+    {
+      "package": "dead (The Deceit - Nuketime)",
+      "reason": "Unsupported tempo changes in _BPMChanges"
+    },
+    {
+      "package": "f1e3 (KillerBeast - muffn & Rogdude)",
+      "reason": "Unsupported tempo changes in _BPMChanges"
+    },
+    {
+      "package": "f88c (Nuclear Compilation - hibit)",
+      "reason": "Unsupported tempo changes in _BPMChanges"
+    },
+    {
+      "package": "ff55 (Flamewall - Nuketime)",
+      "reason": "Unsupported tempo changes in _BPMChanges"
+    },
+    {
+      "package": "ffa5 (Ragnarok - Rune & Oddloop)",
+      "reason": "Unsupported tempo changes in _BPMChanges"
+    }
+  ],
+  "interval_fields": [
+    "notes",
+    "seconds",
+    "incoming_seconds"
+  ],
+  "note": "Strict outside intervals; joint notes/duration/incoming two-tail budget. Censored runs test upper bounds only; next-change time is the next completed run duration."
+}

@@ -882,7 +882,8 @@ def test_heuristic_bomb_candidates_skip_fully_covered_times(monkeypatch):
     assert _heuristic_bomb_candidates(state, np.random.default_rng(0)) == []
 
 
-def test_flow_legal_requires_135_degrees_by_default(monkeypatch):
+def test_flow_legal_requires_135_degrees_when_legacy_flow_configured(monkeypatch):
+    monkeypatch.setattr(config, "v2_playability_enabled", False)
     monkeypatch.setattr(config, "v2_flow_min_turn_steps", 3)
     # middle down-right -> left up-right: 90° over a 2-cell travel (was legal)
     assert not post._flow_legal(5, (0., 2, 1, 7), 0, 1, .5, .1)
@@ -895,13 +896,15 @@ def test_flow_legal_requires_135_degrees_by_default(monkeypatch):
 
 
 def test_flow_min_turn_two_restores_travel_exemption(monkeypatch):
+    monkeypatch.setattr(config, "v2_playability_enabled", False)
     monkeypatch.setattr(config, "v2_flow_min_turn_steps", 2)
     assert post._flow_legal(5, (0., 2, 1, 7), 0, 1, .5, .1)       # 90° + 2 cells: legacy legal
     assert not post._flow_legal(5, (0., 2, 1, 7), 1, 1, .5, .1)   # 90° + 1 cell: still illegal
 
 
 def test_dedup_survivor_keeps_a_135_degree_turn(monkeypatch):
-    for key, value in {"allow_dot_notes": True, "gimme_more_notes_flag": False,
+    for key, value in {"v2_playability_enabled": False,
+                       "allow_dot_notes": True, "gimme_more_notes_flag": False,
                        "single_notes_only_flag": False, "v2_cleanup_same_dir_recut": 0.,
                        "v2_flow_min_turn_steps": 3}.items():
         monkeypatch.setattr(config, key, value)

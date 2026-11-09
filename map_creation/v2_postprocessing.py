@@ -27,6 +27,8 @@ import bisect
 import math
 import random
 from collections import Counter
+from contextlib import contextmanager
+from contextvars import ContextVar
 
 import numpy as np
 
@@ -586,18 +588,87 @@ def _rank_flow_candidates(original, candidates, others):
                                     _step_distance(d, original), d))
 
 
+_LATE_TURNS_READY = ContextVar("v2_late_turns_ready", default=True)
+
+
+@contextmanager
+def playability_generation_phase():
+    """Keep early selection strict; restore the caller's audit phase on exit."""
+    token = _LATE_TURNS_READY.set(False)
+    try:
+        yield
+    finally:
+        _LATE_TURNS_READY.reset(token)
+
+
+def _slow_flow_enabled():
+    return (getattr(config, "v2_playability_enabled", False)
+            and (not getattr(config, "v2_playability_late_turns", False) or _LATE_TURNS_READY.get())
+            and (float(getattr(config, "v2_playability_slow90_seconds", 0.) or 0.) > 0
+                 or float(getattr(config, "v2_playability_slow45_seconds", 0.) or 0.) > 0))
+
+
+def _slow_turn_legal(direction, previous, x, y, time, steps):
+    """Eligibility comes from the current incoming gap and swing geometry."""
+    if not _slow_flow_enabled() or previous is None or previous[3] in (None, 8):
+        return False
+    ptime, px, py, pdirection = previous
+    threshold = float(getattr(config, "v2_playability_slow90_seconds" if steps == 2
+                              else "v2_playability_slow45_seconds", 0.) or 0.)
+    if steps not in (1, 2) or threshold <= 0 or time - ptime + 1e-9 < threshold:
+        return False
+    if steps == 2:
+        return abs(x - px) + abs(y - py) >= 2
+    # Hand travel begins at the previous cut's exit. A positive projection
+    # onto the proposed cut's travel vector excludes an approach against it.
+    pdx, pdy = _DIRECTION_STEP[pdirection]
+    dx, dy = _DIRECTION_STEP[direction]
+    return (x - px + pdx) * -dx + (y - py + pdy) * -dy > 0
+
+
+def _flow_successors(seq, start, alive=None):
+    """Only the dot run and its next arrow can depend on a recut."""
+    for index in range(start, len(seq)):
+        note = seq[index]
+        if alive is not None and note["id"] not in alive:
+            continue
+        yield note
+        if note["d"] != 8:
+            break
+
+
+def _flow_edges_legal(direction, note, previous=None, following=(), gap=None):
+    """Validate a recut's incoming and outgoing context, including dot runs."""
+    gap = float(getattr(config, "v2_cleanup_same_dir_gap", .1) or 0.) if gap is None else gap
+    if not _flow_legal(direction, previous, note["x"], note["y"], note["time"], gap):
+        return False
+    prior = (note["time"], note["x"], note["y"], direction)
+    successors = (following,) if isinstance(following, dict) else following
+    for successor in successors:
+        if successor["d"] != 8:
+            return _flow_legal(successor["d"], prior, successor["x"], successor["y"],
+                               successor["time"], gap)
+        implied = _dot_virtual_direction(prior[3], prior[1], prior[2], successor["x"], successor["y"])
+        prior = (successor["time"], successor["x"], successor["y"], implied)
+    return True
+
+
 def _flow_legal(direction, previous, x, y, time, same_stroke_gap):
-    """Strict ≥135° rule against a (time, x, y, effective direction) predecessor.
+    """Shared edge rule against a (time, x, y, effective direction) predecessor.
 
     Near-simultaneous pairs share one stroke and are exempt. With
     ``v2_flow_min_turn_steps`` ≤ 2 the legacy rule returns: ≥135°, or 90°
-    when the hand physically travels at least two cells."""
+    when the hand physically travels at least two cells. Opt-in slow-turn
+    experiments use the current incoming gap and physical approach, with
+    strict flow retained below their threshold. No note stores permission."""
     if previous is None:
         return True
     ptime, px, py, pdirection = previous
     if pdirection is None or time - ptime <= same_stroke_gap:
         return True
     steps = _step_distance(direction, pdirection)
+    if _slow_turn_legal(direction, previous, x, y, time, steps):
+        return True
     if steps <= 1:
         return False
     # Missing/None selects the strict default; an explicit 0 already means
@@ -610,7 +681,8 @@ def _flow_legal(direction, previous, x, y, time, same_stroke_gap):
 
 
 def _flow_direction(original, previous_direction, blocked=(), swing_from=None,
-                    forbidden_cells=None, exclude=()):
+                    forbidden_cells=None, exclude=(), *, note=None, previous=None,
+                    following=(), same_stroke_gap=None):
     """Nearest reversal of ``original`` that keeps ≥135° from ``previous_direction``.
 
     Human flow resolves repeats with a swing back (~180°), so the candidate
@@ -622,10 +694,14 @@ def _flow_direction(original, previous_direction, blocked=(), swing_from=None,
     ``exclude`` removes directions outright (e.g. the counter family inside a
     fast pair). With ``swing_from``/``forbidden_cells`` a candidate is
     rejected when one of its swept cells is occupied by a simultaneous
-    other-hand note."""
+    other-hand note. With contextual slow flow enabled, ``note``, ``previous``
+    and ``following`` validate the complete affected incoming/outgoing edges
+    using the same predicate as snaps, audits and cap feasibility."""
     others = (previous_direction, *blocked)
     candidates = [d for d in range(8) if d not in exclude
-                  and all(_step_distance(d, other) >= 3 for other in others)
+                  and (_flow_edges_legal(d, note, previous, following, same_stroke_gap)
+                       if note is not None and _slow_flow_enabled() else
+                       all(_step_distance(d, other) >= 3 for other in others))
                   and _swing_clear(swing_from, forbidden_cells, d)]
     return _rank_flow_candidates(original, candidates, others)
 
@@ -652,7 +728,9 @@ def _recut_same_direction_repeats(flattened, times, same_stroke_gap, flipped=Non
                     forbidden = ({(int(group[o]), int(group[o + 1])) for o in range(0, len(group), 4)
                                   if int(group[o + 2]) != hand} if avoid_swept else None)
                     direction = _flow_direction(direction, pdirection,
-                                                swing_from=(x, y), forbidden_cells=forbidden)
+                                                swing_from=(x, y), forbidden_cells=forbidden,
+                                                note={"time": time, "x": x, "y": y},
+                                                previous=previous, same_stroke_gap=same_stroke_gap)
                     group[offset + 3] = direction
                     if flipped is not None:
                         flipped["n"] += 1
@@ -681,7 +759,13 @@ def recut_same_direction_notes(notes, chains=None, protect_retained=True):
         other_cells = _other_hand_cells(ordered, eps, window)
     else:
         other_cells = {}
+    slow_context = _slow_flow_enabled()
+    per_hand = ({hand: [note for note in ordered if note["hand"] == hand] for hand in (0, 1)}
+                if slow_context else {})
+    sequence_position = {note["id"]: index for seq in per_hand.values() for index, note in enumerate(seq)}
     for note in ordered:
+        following_notes = (tuple(_flow_successors(per_hand[note["hand"]], sequence_position[note["id"]] + 1))
+                           if slow_context else ())
         history = last.setdefault(note["hand"], [None, None])
         previous = history[1]
         prior = ((previous["time"], previous["x"], previous["y"], previous["d"])
@@ -695,11 +779,15 @@ def recut_same_direction_notes(notes, chains=None, protect_retained=True):
                 blocked = (before["d"],) if before is not None and before["d"] != 8 else ()
                 previous["d"] = _flow_direction(previous["d"], note["d"], blocked,
                                                 swing_from=(previous["x"], previous["y"]),
-                                                forbidden_cells=other_cells.get(previous["id"]))
+                                                forbidden_cells=other_cells.get(previous["id"]),
+                                                note=previous, previous=((before["time"], before["x"], before["y"], before["d"])
+                                                                         if before is not None else None),
+                                                following=(note, *following_notes))
                 flipped += 1
             elif not protect_retained or note.get("kind") != "retained":
                 note["d"] = _flow_direction(note["d"], previous["d"], swing_from=(note["x"], note["y"]),
-                                            forbidden_cells=other_cells.get(note["id"]))
+                                            forbidden_cells=other_cells.get(note["id"]),
+                                            note=note, previous=prior, following=following_notes)
                 flipped += 1
         # dots get their implied direction from geometry for the next pair;
         # the wrapper is virtual-only and must never become a recut target
@@ -1399,7 +1487,8 @@ def apply_diagonal_cap(notes, chains=None, rng=None):
              "recut": 0, "kept_over_cap": 0,
              "fraction_after": len(diagonals) / len(ordered) if ordered else 0.}
     cap = max(float(getattr(config, "v2_diagonal_max_fraction", 1.) or 0.), 0.)
-    excess = max(0, len(diagonals) - int(cap * len(notes)))
+    count = len(notes)
+    excess = max(0, len(diagonals) - int(cap * count))
     if ordered and cap < 1 and excess:
         eps = float(getattr(config, "min_time_diff", .02))
         window = max(eps, float(getattr(config, "v2_cleanup_swing_window", .15) or 0.))
@@ -1502,6 +1591,129 @@ def speed_cap_scale():
     return scale
 
 
+def repair_playability_directions(notes, cap, **kwargs):
+    """Explicit arrow-only experiment, also usable on portable archived passages."""
+    from map_creation.v2_playability_directions import repair_directions
+    return repair_directions(notes, cap, **kwargs)
+
+
+def finalize_playability_reach(notes, chains=None, *, protect_retained=True, cap=None, hard_only=False, guard=None):
+    """Apply the opt-in reach policy and keep retained expansion anchors intact."""
+    if not (getattr(config, "v2_playability_enabled", False)
+            and (getattr(config, "v2_playability_reach", False)
+                 or getattr(config, "v2_playability_priority", False))):
+        return {}
+    from map_creation.v2_playability_reach import repair_reach
+    if cap is None:
+        scale = speed_cap_scale()
+        ordered = sorted(notes, key=lambda note: (note["time"], note["id"]))
+        count = max(int(getattr(config, "v2_speed_cap_start_notes", 30) or 0), 0)
+        first = float(getattr(config, "v2_speed_cap_start_factor", .35) or 0.)
+        ramp = np.linspace(first, 1., count) if count else ()
+        limits = {}
+        for index, note in enumerate(ordered):
+            speed = config.max_speed * (ramp[index] if index < count else 1.)
+            limits[note["id"]] = (speed * get_factor_from_max_speed(speed, .5, 1) * scale
+                                  if scale > 0 else float("inf"))
+        cap = lambda note: limits[note["id"]]
+    if getattr(config, "v2_playability_priority", False):
+        from map_creation.v2_playability_priority import repair_priority
+        stats = repair_priority(notes, cap, protect_retained=protect_retained)
+    else:
+        stats = repair_reach(notes, cap, protect_retained=protect_retained, hard_only=hard_only, guard=guard)
+    anchors = {note["id"]: note for note in notes}
+    for chain in chains or []:
+        anchor = anchors.get(chain.get("anchor_id"))
+        if anchor is not None:
+            chain["x"], chain["y"], chain["d"] = anchor["x"], anchor["y"], anchor["d"]
+    return stats
+
+
+def _commit_decoder_recovery(notes, cap, stats):
+    """Commit supported decoder alternatives locally, without model-history ripple."""
+    if getattr(config, "v2_playability_priority", False):
+        return
+    if not (getattr(config, "v2_playability_enabled", False)
+            and getattr(config, "v2_playability_reach", False)
+            and getattr(config, "v2_playability_recovery_balanced", False)):
+        return
+    from map_creation.v2_playability_policy import PatternGuard
+    from map_creation.v2_playability_recovery import repair_recovery
+    guard = PatternGuard(notes)
+    stats.update(repair_recovery(notes, cap, guard=guard))
+    stats["recovery_pattern_guard"] = guard.report()
+
+
+def _apply_playability_experiments(notes, cap, stats, isolated_ids=()):
+    if not getattr(config, "v2_playability_enabled", False):
+        return
+    if getattr(config, "v2_playability_late_turns", False):
+        _LATE_TURNS_READY.set(True)
+    identity = sorted((n["id"], n["time"], n["hand"]) for n in notes)
+    if getattr(config, "v2_playability_priority", False):
+        import hashlib
+        import json
+        from map_creation.v2_playability_priority import repair_priority
+        native = sorted(tuple(n[k] for k in ("id", "time", "hand", "x", "y", "d")) for n in notes)
+        stats["priority_input_signature_sha256"] = hashlib.sha256(
+            json.dumps(native, separators=(",", ":")).encode()).hexdigest()
+        stats.update(repair_priority(notes, cap, protect_retained=False))
+        stats["playability_preserved"] = identity == sorted((n["id"], n["time"], n["hand"]) for n in notes)
+        if not stats["playability_preserved"]:
+            raise RuntimeError("Priority policy changed note identity or rhythm")
+        return
+    guard = None
+    if getattr(config, "v2_playability_reach", False):
+        mandatory = finalize_playability_reach(notes, protect_retained=False, cap=cap, hard_only=True)
+        stats.update({"mandatory_"+key: value for key, value in mandatory.items()})
+        from map_creation.v2_playability_policy import PatternGuard
+        guard = PatternGuard(notes)
+    geometry = (getattr(config, "v2_playability_m2", False),
+                getattr(config, "v2_playability_m3", False),
+                getattr(config, "v2_playability_m4", False))
+    if any(geometry):
+        from map_creation.v2_playability_geometry import repair_geometry
+        stats.update(repair_geometry(notes, cap, sightline=geometry[0],
+                                     coordination=geometry[1], interference=geometry[2], guard=guard))
+    initial_diagonals = sum(n["d"] in (4, 5, 6, 7) for n in notes)
+    diagonal_limit = initial_diagonals + math.floor(len(notes) * .01 + 1e-9)
+    if getattr(config, "v2_playability_reach", False):
+        from map_creation.v2_playability_reach import diagonal_fraction_limit, note_span_nps
+        arrow_count = sum(note["d"] != 8 for note in notes)
+        diagonal_limit = max(initial_diagonals,
+            min(initial_diagonals + math.floor(len(notes)*.01 + 1e-9),
+                math.floor(arrow_count * diagonal_fraction_limit(note_span_nps(notes)) + 1e-9)))
+
+    def budget():
+        return (diagonal_limit - sum(n["d"] in (4, 5, 6, 7) for n in notes)
+                if getattr(config, "v2_playability_m1", False) else None)
+
+    if getattr(config, "v2_playability_m1", False):
+        stats.update(repair_playability_directions(notes, cap, diagonal_budget=budget(), guard=guard))
+    if getattr(config, "v2_playability_isolated", False):
+        from map_creation.v2_playability_directions import repair_isolated
+        stats.update(repair_isolated(notes, cap, eligible_ids=isolated_ids, diagonal_budget=budget(), guard=guard))
+    if getattr(config, "v2_playability_late_turns", False):
+        from map_creation.v2_playability_directions import repair_late_turns
+        stats.update(repair_late_turns(notes, cap, diagonal_budget=budget(), guard=guard))
+    if getattr(config, "v2_playability_dwell", False):
+        from map_creation.v2_playability_directions import repair_dwell
+        stats.update(repair_dwell(notes, cap, diagonal_budget=budget(), guard=guard))
+    if getattr(config, "v2_playability_reach", False):
+        stats.update(finalize_playability_reach(notes, protect_retained=False, cap=cap, guard=guard))
+        if any(geometry):
+            # Joint arrow/cell repair changes travel axes and visibility.
+            # One bounded, reach-safe refinement uses the settled arrows.
+            settled = repair_geometry(notes, cap, sightline=geometry[0],
+                                      coordination=geometry[1], interference=geometry[2], guard=guard)
+            stats.update({"settled_" + name: value for name, value in settled.items()})
+    if guard is not None:
+        stats.update(guard.report())
+    stats["playability_preserved"] = identity == sorted((n["id"], n["time"], n["hand"]) for n in notes)
+    if not stats["playability_preserved"]:
+        raise RuntimeError("Playability experiment changed note identity or rhythm")
+
+
 def apply_speed_cap(notes, chains=None, rng=None, logger=None, drop_retained=True):
     """Drop a note of any same-hand pair above the v1 movement cap.
 
@@ -1542,7 +1754,17 @@ def apply_speed_cap(notes, chains=None, rng=None, logger=None, drop_retained=Tru
     stats = {"speed_cap_dropped": 0, "speed_cap_chains_dropped": 0,
              "speed_cap_recuts": 0, "speed_cap_retained_skipped": 0,
              "speed_cap_flow_skipped": 0, "speed_cap_value": value}
+    if drop_retained and getattr(config, "v2_playability_enabled", False):
+        stats["speed_cap_enabled"] = scale > 0
     if scale <= 0 or len(notes) < 2:
+        if drop_retained:
+            _commit_decoder_recovery(notes, lambda note: float("inf"), stats)
+            _apply_playability_experiments(notes, lambda note: float("inf"), stats)
+            anchors = {note["id"]: note for note in notes}
+            for chain in chains or []:
+                anchor = anchors.get(chain.get("anchor_id"))
+                if anchor is not None:
+                    chain["x"], chain["y"], chain["d"] = anchor["x"], anchor["y"], anchor["d"]
         return stats
     ordered = sorted(notes, key=lambda item: (item["time"], item["id"]))
     position = {note["id"]: index for index, note in enumerate(ordered)}
@@ -1550,12 +1772,14 @@ def apply_speed_cap(notes, chains=None, rng=None, logger=None, drop_retained=Tru
     start_factor = float(getattr(config, "v2_speed_cap_start_factor", .35) or 0.)
     ramp = np.linspace(start_factor, 1., start_notes) if start_notes else ()
 
-    def cap(note):
+    def cap_at_position(index):
         # v1 composition: the ramp scales max_speed before the factor is
         # evaluated, so early positions tighten beyond a scaled base cap.
-        index = position[note["id"]]
         ramped = config.max_speed * (ramp[index] if index < start_notes else 1.)
         return ramped * get_factor_from_max_speed(ramped, .5, 1) * scale
+
+    def cap(note):
+        return cap_at_position(position[note["id"]])
 
     gap = float(getattr(config, "v2_cleanup_same_dir_gap", .1) or 0.)
     eps = float(getattr(config, "min_time_diff", .02))
@@ -1577,6 +1801,7 @@ def apply_speed_cap(notes, chains=None, rng=None, logger=None, drop_retained=Tru
                 if second["time"] - first["time"] < fast_gap:
                     fast_ids.update((first["id"], second["id"]))
     needs_flow = set()
+    isolated_ids = set()
     for _ in range(max(1, 2 * len(ordered))):
         changed = False
         for hand in (0, 1):
@@ -1706,11 +1931,15 @@ def apply_speed_cap(notes, chains=None, rng=None, logger=None, drop_retained=Tru
                                 previous["d"], current["d"], blocked,
                                 swing_from=(previous["x"], previous["y"]),
                                 forbidden_cells=cells.get(previous["id"]),
-                                exclude=counter_excluded(previous))
+                                exclude=counter_excluded(previous), note=previous,
+                                previous=((seq[earlier]["time"], seq[earlier]["x"], seq[earlier]["y"], effective(earlier))
+                                          if earlier >= 0 else None),
+                                following=(_flow_successors(seq, following, alive) if _slow_flow_enabled() else ()))
                             if recut == 8:
                                 drop(previous)
                             else:
                                 previous["d"] = recut
+                                isolated_ids.add(previous["id"])
                                 stats["speed_cap_recuts"] += 1
                                 mark_followers(previous["id"])
                             continue
@@ -1718,12 +1947,14 @@ def apply_speed_cap(notes, chains=None, rng=None, logger=None, drop_retained=Tru
                         recut = _flow_direction(current["d"], implied,
                                                 swing_from=(current["x"], current["y"]),
                                                 forbidden_cells=cells.get(current["id"]),
-                                                exclude=counter_excluded(current))
+                                                exclude=counter_excluded(current), note=current, previous=prior,
+                                                following=(_flow_successors(seq, following + 1, alive) if _slow_flow_enabled() else ()))
                         changed = True
                         if recut == 8:
                             drop(current)
                         else:
                             current["d"] = recut
+                            isolated_ids.add(current["id"])
                             stats["speed_cap_recuts"] += 1
                             mark_followers(current["id"])
                         continue
@@ -1736,11 +1967,32 @@ def apply_speed_cap(notes, chains=None, rng=None, logger=None, drop_retained=Tru
         kept = len(chains)
         chains[:] = [chain for chain in chains if chain["anchor_id"] in alive]
         stats["speed_cap_chains_dropped"] = kept - len(chains)
+    if drop_retained:
+        repair_cap = cap
+        if getattr(config, "v2_playability_enabled", False):
+            # The frozen pass builds a fresh ramp after primary deletions.
+            # Only retained predecessors are guaranteed to survive until it;
+            # mutable heuristics may disappear and copies may add later slots.
+            # Their retained-only index is therefore a conservative lower
+            # bound for a rising ramp. Include the base cap for a custom
+            # decreasing ramp, and retain each original per-ID budget too.
+            frozen_position, retained_before = {}, 0
+            for note in ordered:
+                if note["id"] not in alive:
+                    continue
+                frozen_position[note["id"]] = retained_before
+                retained_before += note.get("kind") == "retained"
+
+            def repair_cap(note):
+                return min(cap(note), cap_at_position(frozen_position[note["id"]]), value)
+
+        _commit_decoder_recovery(notes, repair_cap, stats)
+        _apply_playability_experiments(notes, repair_cap, stats, isolated_ids)
     anchors = {note["id"]: note for note in notes}
     for chain in chains or []:
         anchor = anchors.get(chain.get("anchor_id"))
         if anchor is not None:
-            chain["d"] = anchor["d"]
+            chain["x"], chain["y"], chain["d"] = anchor["x"], anchor["y"], anchor["d"]
     skipped = []
     if stats["speed_cap_retained_skipped"]:
         skipped.append(f"{stats['speed_cap_retained_skipped']} retained overspeed")
@@ -1780,6 +2032,10 @@ def postprocess_notes(notes, event_times, logger=None, skip=()):
     from training.beat_models.data import reduce_notes
 
     operations = []
+    decoded_directions = ({(float(n["time"]), n["hand"], n["x"], n["y"]): n["d"] for n in notes}
+                          if getattr(config, "v2_playability_enabled", False)
+                          and (getattr(config, "v2_playability_dwell", False)
+                               or getattr(config, "v2_playability_late_turns", False)) else {})
 
     def differences(current):
         def counts(items, fields):
@@ -1910,6 +2166,9 @@ def postprocess_notes(notes, event_times, logger=None, skip=()):
             identity = len(structured)
             structured.append({"id": identity, "time": float(time), "hand": hand, "x": x, "y": y,
                                "d": direction, "kind": "heuristic"})
+            decoded = decoded_directions.get((float(time), hand, x, y))
+            if decoded is not None:
+                structured[-1]["_decoded_d"] = decoded
             source.append([identity, 0, time, hand, x, y, direction, 0])
     record_operation("duplicate_removal", grouped_counts(flattened),
                      Counter((item["time"], item["hand"]) for item in structured))

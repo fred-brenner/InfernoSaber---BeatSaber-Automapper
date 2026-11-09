@@ -1,0 +1,160 @@
+{
+  "version": "2026-11-08-reach-runtime-v1",
+  "source_version": "2026-11-08-event-calibration-v1",
+  "human_maps": 51,
+  "nps_bands": [
+    "<3",
+    "3-5",
+    "5-7",
+    "7+"
+  ],
+  "tau_seconds": 0.3571428571428612,
+  "comparison": "strictly_greater_than",
+  "hard_ban": {
+    "name": "far_opposite_inward_cut",
+    "allowed_occurrences": 0,
+    "left": {
+      "hand": 0,
+      "x": 3,
+      "directions": [
+        2,
+        4,
+        6
+      ]
+    },
+    "right": {
+      "hand": 1,
+      "x": 0,
+      "directions": [
+        3,
+        5,
+        7
+      ]
+    },
+    "includes_diagonals": true,
+    "dots": "No prescribed cut direction; report position separately."
+  },
+  "metrics": {
+    "m1": {
+      "budget": 0.03,
+      "cutoffs_by_nps_band": {
+        "<3": 0.20588235294117396,
+        "3-5": 0.4285714285714164,
+        "5-7": 0.3809523809523796,
+        "7+": 0.3846153846153868
+      }
+    },
+    "m2": {
+      "budget": 0.1,
+      "cutoffs_by_nps_band": {
+        "<3": 0.0,
+        "3-5": 0.23188405797101555,
+        "5-7": 0.5413333333333413,
+        "7+": 0.846153846153868
+      }
+    },
+    "m3": {
+      "budget": 0.1,
+      "cutoffs_by_nps_band": {
+        "<3": 0.41785680953170523,
+        "3-5": 0.6576042865077321,
+        "5-7": 0.3826834323650897,
+        "7+": 0.4596385968199325
+      }
+    },
+    "m4": {
+      "budget": 0.03,
+      "cutoffs_by_nps_band": {
+        "<3": 0.18367346938777018,
+        "3-5": 1.8582857142855005,
+        "5-7": 1.9999149714285522,
+        "7+": 2.0
+      }
+    },
+    "nominal_approach_excursion": {
+      "budget": 0.03,
+      "cutoffs_by_nps_band": {
+        "<3": 0.0,
+        "3-5": 1.4063604240282719,
+        "5-7": 1.3262032085561524,
+        "7+": 1.155393053016455
+      }
+    },
+    "vertical_preparation_excursion": {
+      "budget": 0.03,
+      "cutoffs_by_nps_band": {
+        "<3": 1.5483870967742064,
+        "3-5": 1.6,
+        "5-7": 1.6037735849056631,
+        "7+": 1.675675675675679
+      }
+    },
+    "nominal_followthrough_excursion": {
+      "budget": 0.1,
+      "cutoffs_by_nps_band": {
+        "<3": 1.3777777777777784,
+        "3-5": 1.577889447236171,
+        "5-7": 1.6273512308660498,
+        "7+": 1.681823478298499
+      }
+    },
+    "vertical_followthrough_excursion": {
+      "budget": 0.1,
+      "cutoffs_by_nps_band": {
+        "<3": 1.5039370078740186,
+        "3-5": 1.5778894472361844,
+        "5-7": 1.6757291495932345,
+        "7+": 1.740740740740743
+      }
+    },
+    "nominal_center_reach": {
+      "budget": 0.1,
+      "cutoffs_by_nps_band": {
+        "<3": 0.0,
+        "3-5": 0.0,
+        "5-7": 0.0,
+        "7+": 0.0
+      }
+    },
+    "recovery_adjusted_travel": {
+      "budget": 0.03,
+      "cutoffs_by_nps_band": {
+        "<3": 3.760045554558754,
+        "3-5": 4.553447517817735,
+        "5-7": 5.345156488580066,
+        "7+": 5.9857411244628445
+      }
+    },
+    "repeated_excursion_exposure": {
+      "budget": 0.1,
+      "cutoffs_by_nps_band": {
+        "<3": 1.6107324544926294,
+        "3-5": 2.0083401681105952,
+        "5-7": 2.4370292794724433,
+        "7+": 2.997395905246587
+      }
+    }
+  },
+  "sources": {
+    "calibration_profile.json": "da16249db0a463b5417019fc1cd2242a185b7c85de84e57cd8c79aa33f99fbde",
+    "reach_thresholds_human_only.json": "21e535dfff7ceac1e79616fb3544e3f4cc1da8c0a40c6e0c51a8ecc0e2553d25",
+    "calibrate_reach.py": "671abc4a110dd6b6b11160ca68a3a76ce0c27b8a948fb41522cb2d9e67478c82",
+    "human-cut-mix.json": "1762913fb4172f9f2852d453b3161494fd0d04c1907c36cb95233afc4378ec17"
+  },
+  "diagonal_mix": {
+    "statistic": "per-map raw-arrow diagonal fraction p95",
+    "population": "51 curated highest-Standard human maps",
+    "band_support": [
+      7,
+      27,
+      7,
+      10
+    ],
+    "p95_by_nps_band": {
+      "<3": 0.2367268536304264,
+      "3-5": 0.5086108594040301,
+      "5-7": 0.5322361898016996,
+      "7+": 0.4627298102339527
+    }
+  }
+}

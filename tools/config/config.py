@@ -222,6 +222,21 @@ v2_fast_counter_direction = "recut"  # inside fast runs, recut cuts opposing the
                                    # first (top-row down-family 1/6/7, bottom-row
                                    # up-family 0/4/5), preferring the allowed pool;
                                    # "off"/"keep" disables
+# Final v2 policy. Turning the master switch off restores historical app1.
+v2_playability_enabled = True
+v2_playability_priority = True  # final reach/path/axis and local visibility policy
+v2_playability_reach = True
+v2_playability_late_turns = True
+v2_playability_m1 = False
+v2_playability_isolated = False
+v2_playability_m2 = False
+v2_playability_m3 = False
+v2_playability_m4 = False
+v2_playability_slow90_seconds = .5
+v2_playability_slow45_seconds = .65
+v2_playability_dwell = False
+v2_playability_recovery_ratio = 0.
+v2_playability_recovery_balanced = False  # complete policy: bounded local hand recovery
 v2_cleanup_note_heuristics = False  # run the legacy v1 note mutators (mirroring + flow pass
                                    # incl. emphasis/break/dot additions); False keeps model
                                    # notes — structural dedup, same-direction recut and the

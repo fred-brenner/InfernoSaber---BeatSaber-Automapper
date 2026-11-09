@@ -3,3 +3,5 @@
 /mnt/
 /tools/config/user_settings.py
 /tools/config/user_paths.py
+__pycache__/
+*.py[cod]

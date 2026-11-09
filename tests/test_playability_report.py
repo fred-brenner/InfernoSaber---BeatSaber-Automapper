@@ -1,5 +1,6 @@
 import json
 from pathlib import Path
+import subprocess
 import sys
 
 import numpy as np
@@ -155,7 +156,10 @@ def fake_scores(nps=4.0, span=60.0, **metrics):
     for name in ("m1", "m2", "m3", "m4"):
         metric = metrics.get(name, {})
         scores[name] = {"value": metric.get("value", 0.0),
-                        "units": np.asarray(metric.get("units", []), dtype=float)}
+                        "units": np.asarray(metric.get("units", []), dtype=float),
+                        "incidents": []}
+    if "m5" in metrics:
+        scores["m5"] = metrics["m5"]
     return scores
 
 
@@ -261,3 +265,207 @@ def test_score_rows_skips_tiny_maps(tmp_path):
     rows, skipped = score_rows([tiny], per_difficulty=False)
     assert rows == []
     assert len(skipped) == 1 and "2 playable notes" in skipped[0]["error"]
+
+
+def m5_scores(share=0.5, fast=1, span=60.0, transitions=10):
+    """Minimal direction-variety summary for corpus comparison tests."""
+    return {"transitions": transitions, "non_reversal_share": share,
+            "fast_reversals": fast,
+            "fast_reversals_per_minute": fast * 60 / span if span else None}
+
+
+def test_m5_verdict_uses_low_share_and_pooled_fast_event_rate():
+    humans = [human_row(f"h{i}", m5=m5_scores(share=share))
+              for i, share in enumerate((0.2, 0.3, 0.4, 0.5, 0.6))]
+    # Five eligible in-band rows exclude this high-rate, out-of-band map.
+    humans.append(human_row("outside", nps=8, m5=m5_scores(fast=100)))
+    result = verdict(fake_scores(m5=m5_scores(share=0.1, fast=3)), humans)["m5"]
+    assert result["percentile"] == 0.0
+    assert result["percentile_direction"] == "lower"
+    assert result["incident_rate_direction"] == "higher"
+    assert result["band_n"] == result["reference_n"] == 5
+    assert result["incident_rate"] == 3.0
+    assert result["human_incident_rate"] == 1.0
+    assert result["non_reversal_share_flag"]
+    assert result["fast_reversal_rate_flag"]
+    assert result["flag"]
+
+
+def test_m5_rate_fallback_uses_counts_and_durations_not_mean_map_rates():
+    humans = [human_row("short", span=30, m5=m5_scores(fast=1, span=30)),
+              human_row("long", nps=8, span=90, m5=m5_scores(fast=1, span=90)),
+              human_row("old_cached")]
+    # Two events / two minutes = one per minute, not mean(2, 2/3).
+    result = verdict(fake_scores(m5=m5_scores(fast=3)), humans)["m5"]
+    assert result["band_n"] == 1
+    assert result["reference_n"] == 2
+    assert result["human_incident_rate"] == 1.0
+    assert result["incident_rate"] == 3.0
+    assert not result["non_reversal_share_flag"]
+    assert result["fast_reversal_rate_flag"]
+    assert result["flag"]
+    calm = verdict(fake_scores(span=61, m5=m5_scores(fast=3, span=61)), humans)["m5"]
+    assert not calm["flag"]
+
+
+@pytest.mark.parametrize("share,fast", [(0.0, 0), (0.5, 0), (0.5, 1)])
+def test_m5_ties_do_not_flag(share, fast):
+    humans = [human_row("same", m5=m5_scores(share=share, fast=fast))]
+    result = verdict(fake_scores(m5=m5_scores(share=share, fast=fast)), humans)["m5"]
+    assert result["percentile"] == 100.0
+    assert not result["flag"]
+
+
+@pytest.mark.parametrize("generated,human", [
+    (None, m5_scores()),
+    (m5_scores(), None),
+    (m5_scores(transitions=0, share=None), m5_scores()),
+    (m5_scores(), m5_scores(transitions=0, share=None)),
+])
+def test_m5_unavailable_scores_do_not_flag(generated, human):
+    gen = fake_scores(**({"m5": generated} if generated is not None else {}))
+    row = human_row("h", **({"m5": human} if human is not None else {}))
+    result = verdict(gen, [row])["m5"]
+    assert result["percentile"] is None
+    assert result["incident_rate"] is None
+    assert result["human_incident_rate"] is None
+    assert not result["flag"]
+
+
+def test_m5_zero_human_fast_rate_flags_positive_generated_events():
+    result = verdict(fake_scores(m5=m5_scores(fast=1)),
+                     [human_row("h", m5=m5_scores(fast=0))])["m5"]
+    assert result["percentile"] == 100.0
+    assert result["human_incident_rate"] == 0.0
+    assert result["fast_reversal_rate_flag"]
+    assert result["flag"]
+
+
+def run_report_cli(tmp_path, human_root, generated_root):
+    output = tmp_path / "report.json"
+    result = subprocess.run(
+        [sys.executable, "-m", "evaluation.playability_report",
+         "--human-root", str(human_root), "--generated", str(generated_root),
+         "--json", str(output)],
+        cwd=ROOT_DIR, capture_output=True, text=True, check=True)
+    return json.loads(output.read_text()), result.stdout
+
+
+def direction_package(root, directions):
+    return write_package(root, beatmaps={"ExpertPlus": {
+        "version": "3.2.0", "colorNotes": [
+            {"b": 2 + i * 0.4, "x": 1, "y": 1, "c": 0, "d": direction}
+            for i, direction in enumerate(directions)],
+    }})
+
+
+def test_cli_m5_json_round_trip_and_direction_labels(tmp_path):
+    humans, generated = tmp_path / "humans", tmp_path / "generated"
+    for i in range(5):
+        direction_package(humans / f"human{i}", [0, 2, 0, 2])
+    direction_package(generated / "repetitive", [0, 1, 0, 1])
+    report, console = run_report_cli(tmp_path, humans, generated)
+    row = report["generated"][0]
+    assert row["scores"]["m5"]["transitions"] == 3
+    assert row["scores"]["m5"]["non_reversal_share"] == 0.0
+    assert row["scores"]["m5"]["fast_reversals"] == 3
+    assert row["scores"]["m5"]["fast_reversals_per_minute"] == pytest.approx(300)
+    assert row["verdict"]["m5"]["flag"]
+    diagnostics = report["human"]["rows"][0]["scores"]["m5"]["diagnostics"]["overall"]
+    assert {angle: summary["count"] for angle, summary in diagnostics["angles"].items()} == {
+        "0": 0, "45": 0, "90": 3, ">=135": 0}
+    assert diagnostics["non_reversal_intervals"]["seconds"]["median"] == pytest.approx(0.2)
+    assert row["flagged"].count("M5") == 1
+    quantiles = report["human"]["quantiles"]["5-7"]["m5"]
+    assert quantiles["maps"] == 5
+    assert quantiles["non_reversal_share"]["p5"] == 1.0
+    assert quantiles["fast_reversals_per_minute"]["p95"] == 0.0
+    assert report["human"]["incident_p95"]["m5"] is None
+    assert report["human"]["incident_rates"]["m5"] == 0.0
+    assert "non-reversal share (low) 0.00%" in console
+    assert "fast reversals/min (high)" in console
+    assert "Cut turns (0/45/90/>=135 deg): 0/0/0/3" in console
+
+
+@pytest.mark.parametrize("baseline", ["empty", "sparse"])
+def test_cli_m5_empty_or_sparse_baseline_is_na(tmp_path, baseline):
+    humans, generated = tmp_path / "humans", tmp_path / "generated"
+    humans.mkdir()
+    if baseline == "sparse":
+        # Both notes score for legacy metrics but neither hand has a transition.
+        write_package(humans / "sparse", beatmaps={"ExpertPlus": {
+            "version": "3.2.0", "colorNotes": [
+                {"b": 2, "x": 0, "y": 1, "c": 0, "d": 0},
+                {"b": 4, "x": 3, "y": 1, "c": 1, "d": 1}],
+        }})
+    direction_package(generated / "repetitive", [0, 1, 0, 1])
+    report, console = run_report_cli(tmp_path, humans, generated)
+    m5 = report["generated"][0]["verdict"]["m5"]
+    assert m5["percentile"] is None
+    assert m5["incident_rate"] is None
+    assert not m5["flag"]
+    assert "M5" not in report["generated"][0]["flagged"]
+    assert "M5" in console and "n/a" in console
+    assert "pn/a" not in console
+
+
+@pytest.mark.parametrize("with_m5", [False, True])
+def test_cli_cached_scores_keep_existing_flags(tmp_path, monkeypatch, capsys, with_m5):
+    from evaluation import playability_report
+
+    humans, generated = tmp_path / "humans", tmp_path / "generated"
+    humans.mkdir()
+    generated.mkdir()
+    human = human_row("old_human", **{name: {"value": 1.0}
+                                      for name in ("m1", "m2", "m3", "m4")})
+    gen = human_row("old_generated", m4={"value": 2.0})
+    if with_m5:
+        human["scores"]["m5"] = m5_scores(fast=0)
+        gen["scores"]["m5"] = m5_scores(share=0.0, fast=1)
+    monkeypatch.setattr(playability_report, "score_rows",
+                        lambda packages, per_difficulty: ([gen if per_difficulty else human], []))
+    output = tmp_path / "cached.json"
+    playability_report.main(["--human-root", str(humans), "--generated", str(generated),
+                             "--json", str(output)])
+    report = json.loads(output.read_text())
+    assert report["generated"][0]["flagged"] == (["M4", "M5"] if with_m5 else ["M4"])
+    assert report["generated"][0]["verdict"]["m5"]["percentile"] == (0.0 if with_m5 else None)
+    console = capsys.readouterr().out
+    assert ("FLAG M4,M5" if with_m5 else "FLAG M4") in console
+
+
+def test_m5_low_share_flag_has_lower_tail_orientation():
+    humans = [human_row("human", m5=m5_scores(share=0.5, fast=0))]
+    low = verdict(fake_scores(m5=m5_scores(share=0.0, fast=0)), humans)["m5"]
+    high = verdict(fake_scores(m5=m5_scores(share=1.0, fast=0)), humans)["m5"]
+    assert low["percentile"] == 0.0
+    assert low["non_reversal_share_flag"] and low["flag"]
+    assert not low["fast_reversal_rate_flag"]
+    assert high["percentile"] == 100.0
+    assert not high["flag"]
+
+
+def test_cli_m5_no_generated_transitions_is_na(tmp_path):
+    humans, generated = tmp_path / "humans", tmp_path / "generated"
+    direction_package(humans / "human", [0, 2, 0, 2])
+    write_package(generated / "sparse", beatmaps={"ExpertPlus": {
+        "version": "3.2.0", "colorNotes": [
+            {"b": 2, "x": 0, "y": 1, "c": 0, "d": 0},
+            {"b": 4, "x": 3, "y": 1, "c": 1, "d": 1}],
+    }})
+    report, console = run_report_cli(tmp_path, humans, generated)
+    row = report["generated"][0]
+    assert row["scores"]["m5"]["transitions"] == 0
+    assert row["scores"]["m5"]["non_reversal_share"] is None
+    assert row["verdict"]["m5"]["percentile"] is None
+    assert row["verdict"]["m5"]["incident_rate"] is None
+    assert "M5" not in row["flagged"]
+    assert "M5 non-reversal share (low) n/a" in console
+
+
+def test_m5_shared_low_minimum_does_not_flag():
+    humans = [human_row(f"h{i}", m5=m5_scores(share=0.0 if i < 2 else 0.5, fast=0))
+              for i in range(20)]
+    result = verdict(fake_scores(m5=m5_scores(share=0.0, fast=0)), humans)["m5"]
+    assert result["percentile"] == 10.0
+    assert not result["flag"]

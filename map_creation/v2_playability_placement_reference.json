@@ -1,0 +1,475 @@
+{
+  "version": "placement-phrases-v1-20261108",
+  "population_sha256": "541d17c8d24315f1cf10384b9f0a6965df5ec0e7b742ddec577f014b4e0774f7",
+  "source": "Curated evaluate_beats/bs_map_input highest Standard difficulty only; favorites excluded.",
+  "supported_maps": 51,
+  "comparison": ">",
+  "group_seconds": 0.02,
+  "window_seconds": 4.0,
+  "window_events": 8,
+  "minimum_events": 4,
+  "denominator": "One event per same-hand onset with at least four 20ms-anchored onsets in the trailing four seconds, capped at eight. Stacks share one onset weight; all zero-exposure phrases included.",
+  "metrics": {
+    "top_row_exposure": {
+      "budget": 0.1,
+      "cutoffs_by_nps_band": {
+        "<3": 0.25,
+        "3-5": 0.375,
+        "5-7": 0.4375,
+        "7+": 0.5
+      },
+      "support_by_nps_band": {
+        "<3": {
+          "reference_maps": 7,
+          "source_bands": [
+            "<3"
+          ],
+          "human": {
+            "eligible_maps": 7,
+            "eligible_events": 3529,
+            "flagged_events": 177,
+            "pooled_rate": 0.0501558515160102,
+            "equal_map_rate": 0.05465770365708243
+          },
+          "in_band": {
+            "eligible_maps": 7,
+            "eligible_events": 3529,
+            "flagged_events": 177,
+            "pooled_rate": 0.0501558515160102,
+            "equal_map_rate": 0.05465770365708243
+          }
+        },
+        "3-5": {
+          "reference_maps": 27,
+          "source_bands": [
+            "3-5"
+          ],
+          "human": {
+            "eligible_maps": 27,
+            "eligible_events": 20293,
+            "flagged_events": 1679,
+            "pooled_rate": 0.0827378899127778,
+            "equal_map_rate": 0.07952885954876387
+          },
+          "in_band": {
+            "eligible_maps": 27,
+            "eligible_events": 20293,
+            "flagged_events": 1679,
+            "pooled_rate": 0.0827378899127778,
+            "equal_map_rate": 0.07952885954876387
+          }
+        },
+        "5-7": {
+          "reference_maps": 7,
+          "source_bands": [
+            "5-7"
+          ],
+          "human": {
+            "eligible_maps": 7,
+            "eligible_events": 7932,
+            "flagged_events": 760,
+            "pooled_rate": 0.09581442259203228,
+            "equal_map_rate": 0.09383008760956942
+          },
+          "in_band": {
+            "eligible_maps": 7,
+            "eligible_events": 7932,
+            "flagged_events": 760,
+            "pooled_rate": 0.09581442259203228,
+            "equal_map_rate": 0.09383008760956942
+          }
+        },
+        "7+": {
+          "reference_maps": 10,
+          "source_bands": [
+            "7+"
+          ],
+          "human": {
+            "eligible_maps": 10,
+            "eligible_events": 16040,
+            "flagged_events": 283,
+            "pooled_rate": 0.017643391521197007,
+            "equal_map_rate": 0.016205529841609286
+          },
+          "in_band": {
+            "eligible_maps": 10,
+            "eligible_events": 16040,
+            "flagged_events": 283,
+            "pooled_rate": 0.017643391521197007,
+            "equal_map_rate": 0.016205529841609286
+          }
+        }
+      }
+    },
+    "outer_lane_exposure": {
+      "budget": 0.1,
+      "cutoffs_by_nps_band": {
+        "<3": 0.625,
+        "3-5": 0.6875,
+        "5-7": 0.625,
+        "7+": 0.75
+      },
+      "support_by_nps_band": {
+        "<3": {
+          "reference_maps": 7,
+          "source_bands": [
+            "<3"
+          ],
+          "human": {
+            "eligible_maps": 7,
+            "eligible_events": 3529,
+            "flagged_events": 278,
+            "pooled_rate": 0.07877585718333806,
+            "equal_map_rate": 0.08169563878269062
+          },
+          "in_band": {
+            "eligible_maps": 7,
+            "eligible_events": 3529,
+            "flagged_events": 278,
+            "pooled_rate": 0.07877585718333806,
+            "equal_map_rate": 0.08169563878269062
+          }
+        },
+        "3-5": {
+          "reference_maps": 27,
+          "source_bands": [
+            "3-5"
+          ],
+          "human": {
+            "eligible_maps": 27,
+            "eligible_events": 20293,
+            "flagged_events": 1840,
+            "pooled_rate": 0.09067166017838664,
+            "equal_map_rate": 0.08658853256434185
+          },
+          "in_band": {
+            "eligible_maps": 27,
+            "eligible_events": 20293,
+            "flagged_events": 1840,
+            "pooled_rate": 0.09067166017838664,
+            "equal_map_rate": 0.08658853256434185
+          }
+        },
+        "5-7": {
+          "reference_maps": 7,
+          "source_bands": [
+            "5-7"
+          ],
+          "human": {
+            "eligible_maps": 7,
+            "eligible_events": 7932,
+            "flagged_events": 641,
+            "pooled_rate": 0.0808119011598588,
+            "equal_map_rate": 0.09373028056496069
+          },
+          "in_band": {
+            "eligible_maps": 7,
+            "eligible_events": 7932,
+            "flagged_events": 641,
+            "pooled_rate": 0.0808119011598588,
+            "equal_map_rate": 0.09373028056496069
+          }
+        },
+        "7+": {
+          "reference_maps": 10,
+          "source_bands": [
+            "7+"
+          ],
+          "human": {
+            "eligible_maps": 10,
+            "eligible_events": 16040,
+            "flagged_events": 620,
+            "pooled_rate": 0.03865336658354115,
+            "equal_map_rate": 0.03899354431674548
+          },
+          "in_band": {
+            "eligible_maps": 10,
+            "eligible_events": 16040,
+            "flagged_events": 620,
+            "pooled_rate": 0.03865336658354115,
+            "equal_map_rate": 0.03899354431674548
+          }
+        }
+      }
+    },
+    "opposite_side_exposure": {
+      "budget": 0.1,
+      "cutoffs_by_nps_band": {
+        "<3": 0.3333333333333333,
+        "3-5": 0.5,
+        "5-7": 0.4,
+        "7+": 0.4
+      },
+      "support_by_nps_band": {
+        "<3": {
+          "reference_maps": 7,
+          "source_bands": [
+            "<3"
+          ],
+          "human": {
+            "eligible_maps": 7,
+            "eligible_events": 3529,
+            "flagged_events": 283,
+            "pooled_rate": 0.08019268914706716,
+            "equal_map_rate": 0.08381225184788665
+          },
+          "in_band": {
+            "eligible_maps": 7,
+            "eligible_events": 3529,
+            "flagged_events": 283,
+            "pooled_rate": 0.08019268914706716,
+            "equal_map_rate": 0.08381225184788665
+          }
+        },
+        "3-5": {
+          "reference_maps": 27,
+          "source_bands": [
+            "3-5"
+          ],
+          "human": {
+            "eligible_maps": 27,
+            "eligible_events": 20293,
+            "flagged_events": 700,
+            "pooled_rate": 0.03449465332873405,
+            "equal_map_rate": 0.03627738536948154
+          },
+          "in_band": {
+            "eligible_maps": 27,
+            "eligible_events": 20293,
+            "flagged_events": 700,
+            "pooled_rate": 0.03449465332873405,
+            "equal_map_rate": 0.03627738536948154
+          }
+        },
+        "5-7": {
+          "reference_maps": 7,
+          "source_bands": [
+            "5-7"
+          ],
+          "human": {
+            "eligible_maps": 7,
+            "eligible_events": 7932,
+            "flagged_events": 756,
+            "pooled_rate": 0.09531013615733737,
+            "equal_map_rate": 0.09731523463634632
+          },
+          "in_band": {
+            "eligible_maps": 7,
+            "eligible_events": 7932,
+            "flagged_events": 756,
+            "pooled_rate": 0.09531013615733737,
+            "equal_map_rate": 0.09731523463634632
+          }
+        },
+        "7+": {
+          "reference_maps": 10,
+          "source_bands": [
+            "7+"
+          ],
+          "human": {
+            "eligible_maps": 10,
+            "eligible_events": 16040,
+            "flagged_events": 1583,
+            "pooled_rate": 0.09869077306733168,
+            "equal_map_rate": 0.0989212153865653
+          },
+          "in_band": {
+            "eligible_maps": 10,
+            "eligible_events": 16040,
+            "flagged_events": 1583,
+            "pooled_rate": 0.09869077306733168,
+            "equal_map_rate": 0.0989212153865653
+          }
+        }
+      }
+    },
+    "lane_concentration": {
+      "budget": 0.1,
+      "cutoffs_by_nps_band": {
+        "<3": 1.0,
+        "3-5": 0.75,
+        "5-7": 0.75,
+        "7+": 0.75
+      },
+      "support_by_nps_band": {
+        "<3": {
+          "reference_maps": 7,
+          "source_bands": [
+            "<3"
+          ],
+          "human": {
+            "eligible_maps": 7,
+            "eligible_events": 3529,
+            "flagged_events": 0,
+            "pooled_rate": 0.0,
+            "equal_map_rate": 0.0
+          },
+          "in_band": {
+            "eligible_maps": 7,
+            "eligible_events": 3529,
+            "flagged_events": 0,
+            "pooled_rate": 0.0,
+            "equal_map_rate": 0.0
+          }
+        },
+        "3-5": {
+          "reference_maps": 27,
+          "source_bands": [
+            "3-5"
+          ],
+          "human": {
+            "eligible_maps": 27,
+            "eligible_events": 20293,
+            "flagged_events": 1045,
+            "pooled_rate": 0.05149558961218154,
+            "equal_map_rate": 0.05822837991414694
+          },
+          "in_band": {
+            "eligible_maps": 27,
+            "eligible_events": 20293,
+            "flagged_events": 1045,
+            "pooled_rate": 0.05149558961218154,
+            "equal_map_rate": 0.05822837991414694
+          }
+        },
+        "5-7": {
+          "reference_maps": 7,
+          "source_bands": [
+            "5-7"
+          ],
+          "human": {
+            "eligible_maps": 7,
+            "eligible_events": 7932,
+            "flagged_events": 631,
+            "pooled_rate": 0.07955118507312153,
+            "equal_map_rate": 0.0992669991311724
+          },
+          "in_band": {
+            "eligible_maps": 7,
+            "eligible_events": 7932,
+            "flagged_events": 631,
+            "pooled_rate": 0.07955118507312153,
+            "equal_map_rate": 0.0992669991311724
+          }
+        },
+        "7+": {
+          "reference_maps": 10,
+          "source_bands": [
+            "7+"
+          ],
+          "human": {
+            "eligible_maps": 10,
+            "eligible_events": 16040,
+            "flagged_events": 1078,
+            "pooled_rate": 0.0672069825436409,
+            "equal_map_rate": 0.06871500071087092
+          },
+          "in_band": {
+            "eligible_maps": 10,
+            "eligible_events": 16040,
+            "flagged_events": 1078,
+            "pooled_rate": 0.0672069825436409,
+            "equal_map_rate": 0.06871500071087092
+          }
+        }
+      }
+    },
+    "row_concentration": {
+      "budget": 0.1,
+      "cutoffs_by_nps_band": {
+        "<3": 1.0,
+        "3-5": 0.875,
+        "5-7": 0.8333333333333334,
+        "7+": 0.8333333333333334
+      },
+      "support_by_nps_band": {
+        "<3": {
+          "reference_maps": 7,
+          "source_bands": [
+            "<3"
+          ],
+          "human": {
+            "eligible_maps": 7,
+            "eligible_events": 3529,
+            "flagged_events": 0,
+            "pooled_rate": 0.0,
+            "equal_map_rate": 0.0
+          },
+          "in_band": {
+            "eligible_maps": 7,
+            "eligible_events": 3529,
+            "flagged_events": 0,
+            "pooled_rate": 0.0,
+            "equal_map_rate": 0.0
+          }
+        },
+        "3-5": {
+          "reference_maps": 27,
+          "source_bands": [
+            "3-5"
+          ],
+          "human": {
+            "eligible_maps": 27,
+            "eligible_events": 20293,
+            "flagged_events": 1237,
+            "pooled_rate": 0.06095698023949145,
+            "equal_map_rate": 0.06556739702884543
+          },
+          "in_band": {
+            "eligible_maps": 27,
+            "eligible_events": 20293,
+            "flagged_events": 1237,
+            "pooled_rate": 0.06095698023949145,
+            "equal_map_rate": 0.06556739702884543
+          }
+        },
+        "5-7": {
+          "reference_maps": 7,
+          "source_bands": [
+            "5-7"
+          ],
+          "human": {
+            "eligible_maps": 7,
+            "eligible_events": 7932,
+            "flagged_events": 692,
+            "pooled_rate": 0.08724155320221887,
+            "equal_map_rate": 0.09968599226210793
+          },
+          "in_band": {
+            "eligible_maps": 7,
+            "eligible_events": 7932,
+            "flagged_events": 692,
+            "pooled_rate": 0.08724155320221887,
+            "equal_map_rate": 0.09968599226210793
+          }
+        },
+        "7+": {
+          "reference_maps": 10,
+          "source_bands": [
+            "7+"
+          ],
+          "human": {
+            "eligible_maps": 10,
+            "eligible_events": 16040,
+            "flagged_events": 1506,
+            "pooled_rate": 0.09389027431421447,
+            "equal_map_rate": 0.09957362858460296
+          },
+          "in_band": {
+            "eligible_maps": 10,
+            "eligible_events": 16040,
+            "flagged_events": 1506,
+            "pooled_rate": 0.09389027431421447,
+            "equal_map_rate": 0.09957362858460296
+          }
+        }
+      }
+    }
+  },
+  "limitations": [
+    "Coarse exposure proxies are not a player discomfort model or global top-row quota.",
+    "Thresholds bound in-sample pooled and equal-map rates; sparse bands pool adjacent bands until five maps support events.",
+    "Lane/row concentration ties may make an entire component inactive in a band. This preserves common human phrases rather than imposing unsupported variation.",
+    "Rolling phrases overlap. Counts are eligible overlapping phrase endpoints, not independent samples."
+  ]
+}

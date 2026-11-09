@@ -15,6 +15,7 @@ production when ``config.v2_cleanup_note_heuristics`` is False (the default);
 
 import argparse
 from collections import Counter
+from contextlib import nullcontext
 import json
 from pathlib import Path
 import random
@@ -62,6 +63,17 @@ ARMS = {
                        "multiplier": True,
                        "summary": "raw model stream plus learned multiplier only"},
 }
+
+
+HISTORICAL_ARMS = tuple(ARMS)
+ARMS["app1_control"] = {"timing_skip": (), "notes_skip": (), "multiplier": True,
+                        "summary": "production app1 pipeline with playability experiments disabled"}
+
+
+def _arm_processors(name, settings):
+    if name == "app1_control":
+        return None
+    return arm_postprocessors(settings["timing_skip"], settings["notes_skip"])
 
 
 def arm_postprocessors(timing_skip=(), notes_skip=()):
@@ -276,6 +288,7 @@ def run_comparison(songs=None, nps_values=(5.,), arm_names=None, seed=0,
                    bundle=None, output=None, max_songs=None, logger=None):
     """Generate every requested (song, difficulty, arm) and collect metrics."""
     from map_creation import v2_pipeline
+    from evaluation.playability_experiments import experiment_policy
     from map_creation.v2_generation import (configure_inference, scoped_settings,
                                             _difficulty_settings)
     from map_creation.v2_runtime import get_runtime
@@ -290,7 +303,7 @@ def run_comparison(songs=None, nps_values=(5.,), arm_names=None, seed=0,
     missing = [name for name in names if not (root / f"{name}.egg").is_file()]
     if missing:
         raise FileNotFoundError(f"Input songs missing under {root}: {missing}")
-    arms = ARMS if arm_names is None else {name: ARMS[name] for name in arm_names}
+    arms = {name: ARMS[name] for name in (HISTORICAL_ARMS if arm_names is None else arm_names)}
     destination = Path(output)
     (destination / "arrays").mkdir(parents=True, exist_ok=True)
 
@@ -320,14 +333,15 @@ def run_comparison(songs=None, nps_values=(5.,), arm_names=None, seed=0,
                         predictors["multiplier"] = _none_multiplier(predictors["multiplier"])
                     random.seed(seed_value)
                     started = perf_counter()
-                    result = v2_pipeline.generate(
-                        prepared.song, float(nps), predictors, prepared.encoder,
-                        runtime.settings, runtime.vocabularies,
-                        lighting_generator=runtime.lighting,
-                        audio_path=prepared.audio_path,
-                        postprocessors=arm_postprocessors(arm["timing_skip"], arm["notes_skip"]),
-                        rng=np.random.default_rng(seed_value),
-                        intensity=prepared.intensity, logger=logger)
+                    with experiment_policy(arm_name) if arm_name == "app1_control" else nullcontext():
+                        result = v2_pipeline.generate(
+                            prepared.song, float(nps), predictors, prepared.encoder,
+                            runtime.settings, runtime.vocabularies,
+                            lighting_generator=runtime.lighting,
+                            audio_path=prepared.audio_path,
+                            postprocessors=_arm_processors(arm_name, arm),
+                            rng=np.random.default_rng(seed_value),
+                            intensity=prepared.intensity, logger=logger)
                     prepared.intensity = result.state["raw_intensity"].copy()
                     metrics = _run_metrics(result, bpm, onsets, duration)
                     record = {"song": name, "bpm": bpm, "duration": duration,
@@ -400,7 +414,7 @@ def main(argv=None):
     if not args.execute:
         plan = {"status": "planned", "songs": args.songs or "all .egg files in paths.songs_pred",
                 "max_songs": args.max_songs, "nps_values": nps_values,
-                "arms": {name: ARMS[name]["summary"] for name in (arm_names or list(ARMS))},
+                "arms": {name: ARMS[name]["summary"] for name in (arm_names or HISTORICAL_ARMS)},
                 "seed": args.seed, "bundle": args.bundle or "config default",
                 "output": args.output, "execution_requested": False,
                 "instruction": "Add --execute only when a controlled comparison run is requested."}

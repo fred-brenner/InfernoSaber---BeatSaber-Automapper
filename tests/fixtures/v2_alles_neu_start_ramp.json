@@ -1,0 +1,296 @@
+{
+  "provenance": {
+    "song": "Peter Fox - Alles Neu",
+    "difficulty": "Normal",
+    "requested_nps": 6.5,
+    "seed": 932934959,
+    "replicate": 11,
+    "audio_sha256": "b865b449d755833b23c1e30acaef058945755e02cdc11da9298068df581f399a",
+    "captured_stage": "first30 primary speed-cap inputs from the production CPU trace; remaining notes replaced by late vertical controls",
+    "observed_control_frozen_overspeeds": 1,
+    "observed_unbounded_m1_frozen_overspeeds": 2
+  },
+  "movement_settings": {
+    "max_speed": 26.0,
+    "v2_speed_cap_start_notes": 30,
+    "v2_speed_cap_start_factor": 0.35,
+    "v2_speed_cap_scale": 2.0,
+    "add_beat_intensity_orig": 90.0,
+    "cdf": 1.2,
+    "cdf_lr": 1.15,
+    "reaction_time": 1.15,
+    "reaction_time_fact": 0.013
+  },
+  "notes": [
+    {
+      "id": 0,
+      "time": 11.284897959183674,
+      "hand": 1,
+      "x": 2,
+      "y": 0,
+      "d": 1,
+      "kind": "retained"
+    },
+    {
+      "id": 1,
+      "time": 12.097596371882085,
+      "hand": 1,
+      "x": 1,
+      "y": 0,
+      "d": 0,
+      "kind": "retained"
+    },
+    {
+      "id": 2,
+      "time": 12.317339454677791,
+      "hand": 1,
+      "x": 2,
+      "y": 0,
+      "d": 1,
+      "kind": "retained"
+    },
+    {
+      "id": 3,
+      "time": 12.541291081126479,
+      "hand": 1,
+      "x": 0,
+      "y": 0,
+      "d": 0,
+      "kind": "retained"
+    },
+    {
+      "id": 4,
+      "time": 12.989194334023853,
+      "hand": 0,
+      "x": 2,
+      "y": 1,
+      "d": 3,
+      "kind": "retained"
+    },
+    {
+      "id": 5,
+      "time": 13.281814058956916,
+      "hand": 0,
+      "x": 1,
+      "y": 0,
+      "d": 2,
+      "kind": "retained"
+    },
+    {
+      "id": 6,
+      "time": 13.437097586921228,
+      "hand": 0,
+      "x": 3,
+      "y": 0,
+      "d": 3,
+      "kind": "retained"
+    },
+    {
+      "id": 7,
+      "time": 13.897142857142857,
+      "hand": 0,
+      "x": 0,
+      "y": 0,
+      "d": 2,
+      "kind": "retained"
+    },
+    {
+      "id": 8,
+      "time": 14.108952466267288,
+      "hand": 1,
+      "x": 3,
+      "y": 2,
+      "d": 1,
+      "kind": "retained"
+    },
+    {
+      "id": 9,
+      "time": 14.332904092715975,
+      "hand": 1,
+      "x": 2,
+      "y": 0,
+      "d": 0,
+      "kind": "retained"
+    },
+    {
+      "id": 10,
+      "time": 14.780807345613349,
+      "hand": 1,
+      "x": 2,
+      "y": 2,
+      "d": 1,
+      "kind": "retained"
+    },
+    {
+      "id": 11,
+      "time": 15.197460317460317,
+      "hand": 0,
+      "x": 0,
+      "y": 0,
+      "d": 3,
+      "kind": "retained"
+    },
+    {
+      "id": 12,
+      "time": 15.452662224959411,
+      "hand": 0,
+      "x": 0,
+      "y": 2,
+      "d": 2,
+      "kind": "retained"
+    },
+    {
+      "id": 13,
+      "time": 15.673469387755102,
+      "hand": 0,
+      "x": 2,
+      "y": 0,
+      "d": 7,
+      "kind": "retained"
+    },
+    {
+      "id": 14,
+      "time": 15.900565477856786,
+      "hand": 0,
+      "x": 1,
+      "y": 2,
+      "d": 0,
+      "kind": "retained"
+    },
+    {
+      "id": 15,
+      "time": 16.149478458049888,
+      "hand": 1,
+      "x": 0,
+      "y": 0,
+      "d": 4,
+      "kind": "retained"
+    },
+    {
+      "id": 16,
+      "time": 16.834467120181404,
+      "hand": 1,
+      "x": 3,
+      "y": 1,
+      "d": 3,
+      "kind": "retained"
+    },
+    {
+      "id": 17,
+      "time": 17.02032361010022,
+      "hand": 0,
+      "x": 2,
+      "y": 0,
+      "d": 7,
+      "kind": "retained"
+    },
+    {
+      "id": 18,
+      "time": 17.4962358276644,
+      "hand": 0,
+      "x": 1,
+      "y": 0,
+      "d": 2,
+      "kind": "retained"
+    },
+    {
+      "id": 19,
+      "time": 17.786485260770974,
+      "hand": 0,
+      "x": 2,
+      "y": 0,
+      "d": 3,
+      "kind": "retained"
+    },
+    {
+      "id": 20,
+      "time": 17.91613011589497,
+      "hand": 0,
+      "x": 0,
+      "y": 1,
+      "d": 4,
+      "kind": "retained"
+    },
+    {
+      "id": 21,
+      "time": 18.44825396825397,
+      "hand": 1,
+      "x": 1,
+      "y": 0,
+      "d": 4,
+      "kind": "retained"
+    },
+    {
+      "id": 22,
+      "time": 18.811936621689718,
+      "hand": 1,
+      "x": 3,
+      "y": 1,
+      "d": 3,
+      "kind": "retained"
+    },
+    {
+      "id": 23,
+      "time": 19.035888248138406,
+      "hand": 1,
+      "x": 1,
+      "y": 0,
+      "d": 2,
+      "kind": "retained"
+    },
+    {
+      "id": 24,
+      "time": 19.25983987458709,
+      "hand": 1,
+      "x": 3,
+      "y": 0,
+      "d": 3,
+      "kind": "retained"
+    },
+    {
+      "id": 25,
+      "time": 19.48379150103578,
+      "hand": 1,
+      "x": 3,
+      "y": 0,
+      "d": 2,
+      "kind": "retained"
+    },
+    {
+      "id": 26,
+      "time": 19.707743127484466,
+      "hand": 1,
+      "x": 3,
+      "y": 1,
+      "d": 3,
+      "kind": "retained"
+    },
+    {
+      "id": 27,
+      "time": 20.603549633279215,
+      "hand": 0,
+      "x": 1,
+      "y": 0,
+      "d": 1,
+      "kind": "retained"
+    },
+    {
+      "id": 28,
+      "time": 21.051452886176587,
+      "hand": 0,
+      "x": 0,
+      "y": 1,
+      "d": 0,
+      "kind": "retained"
+    },
+    {
+      "id": 29,
+      "time": 21.499356139073964,
+      "hand": 1,
+      "x": 2,
+      "y": 0,
+      "d": 2,
+      "kind": "retained"
+    }
+  ]
+}

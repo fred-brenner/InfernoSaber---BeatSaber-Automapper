@@ -337,15 +337,37 @@ beat-only results are recorded in [the baseline](baseline.md).
 
 ### Playability metrics
 
-`evaluation.playability_report` scores note-pattern playability — it does not
-require audio or model outputs. Four metrics compare a map against the curated
-human baseline: M1 lateral/diagonal load at speed, M2 predecessor occlusion
-(higher notes hidden behind earlier lower predecessors — the bottom-up
-visibility direction), M3 divergent bimanual motion axes, and M4 cross-hand
-swing-path interference. Each generated map gets a percentile
-within its matched NPS band plus a pooled incident rate versus the human p95;
-flags mark `percentile >= 95` or `rate >= 3x human`. Occasional incidents are
-expected in human maps too — compare rates, not single events.
+`evaluation.playability_report` reads colored notes from packages and scores five
+aspects of playability against the curated human baseline. M1 measures lateral
+and diagonal load at speed, M2 estimates occlusion behind earlier notes, M3
+measures divergence between the hands' movement axes, and M4 measures cross-hand
+swing-path interference. For M1–M4, a map flags at or above the 95th percentile
+in its NPS band or at three times the pooled human incident rate.
+
+**M5 measures same-hand direction variety using two scores.** The non-reversal
+share is the fraction of consecutive arrow pairs that turn less than 135°,
+including 0°. The fast-reversal rate counts pairs that turn 135° or 180° with
+a gap strictly below 0.25 seconds, divided by the map's first-to-last retained
+note span in minutes. A simultaneous pair across hands creates no transition.
+A dot breaks the cut sequence for its hand. Slow transitions remain eligible.
+
+M5 compares both scores with eligible human maps in the same NPS band, falling
+back to all eligible human maps when fewer than five qualify in-band. A share
+in the bottom 5% or a fast-reversal rate at least three times the pooled reference
+rate flags M5. The low-tail percentile counts human shares at or below the
+generated share. A positive rate against a zero human rate also flags. Maps
+without an eligible arrow pair have no direction-variety verdict.
+
+The per-map M5 JSON breaks cut turns into 0°, 45°, 90°, and ≥135° buckets.
+It records each bucket's count, share and rate per map-minute, the time until
+the next turn of that size or any size, and observed time and
+transition counts between non-reversals. Cut-axis runs treat opposite arrows as
+one axis. For example, left-right-left has two reversals and stays on the
+horizontal cut axis throughout. The movement-axis diagnostic uses displacement
+between note cells, rounded to the nearest 45° and folded to an unoriented axis. Opposite
+movements share an axis, so these changes range from 0° to 90°. Dots still have
+positions, and a stationary step breaks the movement sequence. Dwell summaries
+require an observed ending change. Missing intervals are reported as `null`.
 
 ```bash
 python -m evaluation.playability_report \
@@ -361,6 +383,135 @@ Invalid packages are skipped and listed with reasons. `--dataset` optionally
 adds a prepared pipeline-v2 manifest as extra human baseline; `--difficulty`
 and `--split` filter the generated/dataset sides. `--json` writes the full
 report including per-map metric values and top incidents.
+
+### Paired playability comparisons
+
+Run from the repository root in the configured CPU environment. The experiment
+runner uses the same postprocessors, bundle, retained lighting and difficulty
+scaling as the application. The `app1_control` arm disables all candidate
+settings. Each selected case uses the manifest's archived numerical settings,
+a seed derived from recording hash, requested NPS and replicate, and a
+disposable package directory. The named Break the Horizon reproduction has a
+literal seed of 3. Archived R7 is a separate chart.
+
+The November 7 manifest is in
+`../Data/training/evaluate_beats/results/app1-playability-candidates-20261107/manifest.json`.
+It identifies the original 30 development songs and a second, disjoint
+30-song confirmation draw. Easy, Normal, Hard and Expert are all included.
+The two confirmation seeds use replicate IDs 19 and 43. Use a new output root
+when changing the generator, model assets, manifest or experimental settings.
+For example, to compare the M1 arm on the development panel.
+
+```bash
+r=../Data/training/evaluate_beats/results/app1-playability-candidates-20261107
+out=../Data/training/evaluate_beats/results/my-playability-run
+python -s -m evaluation.playability_experiments run --manifest "$r/manifest.json" --output "$out" --split development --arms app1_control
+python -s -m evaluation.playability_benchmark freeze --manifest "$r/manifest.json" --runs "$out" --human-root ../Data/training/evaluate_beats --split development --output "$out/frozen-dev.json"
+python -s -m evaluation.playability_experiments run --manifest "$r/manifest.json" --output "$out" --split development --arms m1
+python -s -m evaluation.playability_benchmark report --manifest "$r/manifest.json" --runs "$out" --frozen "$out/frozen-dev.json" --split development --candidate m1 --target m1 --output "$out/m1-dev.json"
+```
+
+A combined arm is a comma-separated list of components, such as
+`m1,isolated,m2,m3,m4`. Each scorecard includes the official M1–M5 verdicts,
+distance to the human distribution in the control's realized-NPS band, and
+the 45° and 90° cut-axis dwell distributions for each hand. A bootstrap
+resamples songs, keeping their difficulties and seeds together. Missing
+eligible observations, individual human package skips, provenance, frozen
+speed/flow counts and package-level guardrails are recorded in the results.
+Use the checked-in [milestones and numerical acceptance criteria](superpowers/plans/2026-11-07-v2-human-benchmark-playability.md)
+when selecting a policy to playtest.
+
+For the fixed four-worker comparison, the cohort command
+`python -s -m evaluation.playability_cohort prepare --help` lists the manifest, new output root and component groups. Its
+`run --stage` command supports `development_controls`, `holdout_controls`,
+`development_candidates` and `holdout_candidate`. Freeze the matching control
+scorecard before candidate generation. The reserved comparison also requires a
+selection record binding the chosen development arm, case keys, replicate IDs,
+primary endpoints and reference hash before candidate scores can be read.
+The [selection protocol](../../Data/training/evaluate_beats/results/app1-playability-candidates-20261107/selection-protocol.md)
+records how a missed gate affects the playtest decision.
+
+### Event calibration from playtest feedback
+
+The November 8 calibration uses eligible note/pattern events as its unit.
+Human-only thresholds were fit within the existing retained-NPS bands and
+sealed before the 120 development pairs were read. Specific M1/M4,
+preparation and travel measures use a 3% observed human trigger budget.
+M2/M3 and coarse placement/follow-through/exposure measures use up to 10%.
+Both equal-map and pooled event rates meet the selected fit cap; ties use
+strict `severity > cutoff`. Generated comparisons use the paired control
+NPS band. Leave-one-human-map-out rates and the sparse seven-map bands
+remain visible as uncertainty.
+
+The requested far-opposite inward cut is separately forbidden, including
+left x3 cutting left/up-left/down-left and mirrored right x0 cuts. Dots
+have no prescribed direction. The November 7 candidate contains 574
+such notes. The November 8 combined generator implements the ban through
+joint repair and final validation. The profile supplies the frozen
+thresholds used by that repair. M5 retains direction and
+axis-dwell distribution comparisons because its existing map summaries
+have a different denominator from eligible incident percentages.
+
+[Selected profile](../../Data/training/evaluate_beats/results/playability-calibration-20261108/calibration_profile.json)
+· [Observed rates and limitations](../../Data/training/evaluate_beats/results/playability-calibration-20261108/summary.md)
+· [Approved policy](../../Data/training/evaluate_beats/results/playability-calibration-20261108/policy.json)
+
+### Priority event calibration and reports
+
+The revised priority policy follows the
+[player review](superpowers/specs/2026-11-08-playability-priority-review.md).
+Its pure shared events live in `map_creation/v2_playability_priority_metrics.py`;
+`evaluation.playability_priority` calibrates and reports those events separately
+from historical M1–M5 monitoring. An eligible event with zero severity stays in
+the denominator. Preparation components distinguish arrows from placement-bearing
+dots; slow crossings and near misses have separate populations. Specific measures
+use <=3% observed human tails, and coarse composite/near-miss proxies allow 10%.
+Hard bans are independent of the human soft thresholds.
+
+```bash
+python -s -m evaluation.playability_priority calibrate \
+  --human-root ../Data/training/evaluate_beats/bs_map_input \
+  --json ../Data/training/evaluate_beats/results/priority-playability-20261108/human-calibration.json \
+  --reference map_creation/v2_playability_priority_reference.json
+python -s -m evaluation.playability_priority report \
+  --package /path/to/package --difficulty Expert --json /path/to/report.json
+```
+
+Calibration accepts only the project's curated root (or its parent), records
+individual skips and provenance, and selects strict upper-tail cutoffs satisfying
+both pooled and equal-map budgets. Support and global fallback are per metric,
+requiring five eligible maps; unsupported flags are unavailable rather than zero.
+The fit is in-sample evidence, not held-out validation or player acceptance.
+Reference versions must match the current shared event definition. Keep reference
+and source hashes with generation receipts; changing definitions requires new
+calibration and dependent validation. Repeated calibration should use a fresh
+report destination to preserve the previous run's evidence.
+
+### Final local M2 visibility
+
+The default v2 policy uses a separately versioned sustained upper-center event,
+shared between priority repair and `evaluation.playability_priority` reports.
+The historical rise-only score remains under `monitoring.legacy_m2`; current
+`monitoring.m2` reports calibrated mean sustained excess, with explicit version,
+local maximum and flagged/eligible endpoints. The full `visibility` section keeps
+per-event exposure and context, preventing a song mean from hiding a bad passage.
+
+The new pure API is `visibility_events(notes)` / `visibility_costs(notes, nps)`.
+It uses last-eight same-hand groups in 1.5s, at least four groups, 20ms anchored
+stack weighting, and fixed full-map NPS for matched human tails. Calibration:
+
+```bash
+python -s -m evaluation.playability_visibility calibrate \
+  --human-root ../Data/training/evaluate_beats/bs_map_input \
+  --json /fresh/report.json --reference /fresh/reference.json
+```
+
+Use a fresh destination; do not overwrite historical calibration or generation
+receipts. The checked-in new reference was fitted before candidate inspection,
+using all 51 accepted curated maps and nine named skips; pooled and equal-map
+specific-event rates meet 3%. This fit is in-sample, not headset validation.
+The final sample workflow produces five normal packages at settings 5/6/7/8,
+with exact current-run completion and serialized visibility/cap/hard audits.
 
 ## New beat-learning framework
 

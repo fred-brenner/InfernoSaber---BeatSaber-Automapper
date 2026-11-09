@@ -498,6 +498,8 @@ def test_same_direction_recut_flips_repeat():
 
 def test_same_direction_recut_handles_near_repeats_and_exemptions(monkeypatch):
     from map_creation.v2_postprocessing import recut_same_direction_notes, _step_distance
+    monkeypatch.setattr(config, "v2_playability_enabled", False)
+    monkeypatch.setattr(config, "v2_flow_min_turn_steps", 3)
     # 45° neighbour repeats violate the ≥135° rule for far-apart notes
     notes = [_note(0, 0., 0, 1), _note(1, .5, 0, 6)]
     assert recut_same_direction_notes(notes) == 1

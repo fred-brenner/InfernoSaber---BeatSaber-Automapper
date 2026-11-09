@@ -587,6 +587,204 @@ expansions of ~20-40 proposals per song) but costs ~1s and remains enabled.
 All arms reached zero residual violations — the clearance fixpoint alone
 enforces the hard invariants.
 
+## Playability experiments
+
+The v2 app and CLI use the final priority policy by default. The master,
+`priority`, `reach` and `late_turns` switches are enabled, with slow-turn
+thresholds .5s for 90 degrees and .65s for 45 degrees. Other historical component
+switches remain disabled. Disabling the master selects the original app1 rules,
+including strict flow on separated strokes. Historical experiments explicitly
+reset every switch before selecting their profiles, independently of defaults.
+The diagnostics for the primary speed-cap pass record actual note repairs.
+
+| Setting (prefix `v2_playability_`) | Effect when enabled |
+|---|---|
+| `reach` | Apply the combined calibrated policy, including the hard opposite-edge cut ban and bounded joint cell/arrow repair. Use together with the other switches through the `combined` experiment. |
+| `m1` | Search bounded same-hand windows for legal alternatives to fast horizontal reversals. Keep boundary arrows and use each arrival's own speed cap. |
+| `isolated` | Revisit individual primary speed-cap recuts once their final neighbors are known. |
+| `m2`, `m4`, `m3` | Try one-cell changes to improve sightlines, swing/travel clearance and eligible bimanual segments. Geometry precedes direction repair; the original position wins ties. |
+| `slow90_seconds`, `slow45_seconds` | Permit a supported decoded turn after the specified incoming same-hand gap. A 90° entry requires adequate travel; a 45° entry also needs a compatible approach. Zero disables the angle. |
+| `late_turns` | Keep early cleanup on strict flow. Try restoring eligible slow arrows on the surviving stream beyond the protected opening. Use together with the slow-turn thresholds. |
+| `dwell` | Rank feasible direction windows by hand-specific cut-axis dwell, using fixed human reference summaries and local chart density. |
+| `recovery_ratio` | Allow a single-note event to switch hands when the proposed alternative hand/cell has sufficient relative likelihood and gives the crowded hand time to recover. Zero disables reassignment. |
+
+Direction repair keeps note IDs, timestamps, positions and hands. Placement
+repair keeps IDs, timestamps and hands. The recovery policy acts earlier at
+position decoding, so its final density and hand workload need separate checks.
+Expanded notes, chain anchors, hazards and arc endpoints still pass through the
+normal application validators. The generation path reads its fixed reference
+tables locally. The human packages are only needed for offline comparisons.
+[Paired comparison procedure](development.md#paired-playability-comparisons)
+
+The `combined` experiment enables reach, M1–M4, slow 90°/45° restoration
+at 500/650 ms and hand-specific dwell together. Its frozen reach tables
+are shipped in `map_creation/v2_playability_reach_reference.json`.
+Left-hand far-right cuts toward the left (including diagonals) and the
+mirrored right-hand cases are forbidden. Joint repair keeps note identity,
+hand and timing. It checks both neighboring movement edges, contextual
+flow, opposite-hand clearance and dot-dependent directions. Infeasible
+hard repairs fail with the offending note/window; they never export the
+forbidden stream. Expanded copies have a protected final pass before
+hazards/arcs are generated, followed by an end-of-pipeline ban check.
+
+Combined visibility costs include direction-aware same-height upper-row
+crossings. Mirrored doubles receive the same M4 overlap checks as other pairs;
+there is no blanket exemption in geometry v3.
+The complete combined policy first repairs mandatory cuts in reverse order,
+trying the original arrow at nearby cells before changing directions. Completed
+later time groups stay fixed except for bounded two-note backtracking over at
+most three later groups. A failed hard repair restores the complete invocation.
+
+One shared local acceptance snapshot covers M1, M2, M3, M4, cut-axis dwell and
+reach/placement proposals. Optional edits preserve moderate movement, visibility,
+interference, supported coordination and calibrated component tails. Every
+accepted change becomes the next pass's baseline; whole-pass rollback restores
+that baseline too. A load-reducing horizontal-run repair may use bounded
+diagonal/cell bridges while preserving direction-tail cost. Repeated fast
+horizontal reversals have a separate human-calibrated M1 event tail; ordinary
+one or two reversals remain allowed. The search keeps small edit alternatives,
+checks complete feasibility before selection, and revisits only shorter
+remaining pieces of an improved run. Normal-range patterns
+receive no reward for becoming uniform or centered.
+
+The early diagonal cap retains the app1 setting and survivor selection. Later
+optional repairs have a net diagonal-growth allowance of at most one percentage
+point, also bounded by the frozen human upper fraction. Mandatory physical/hard
+repairs are reported separately. Independent final checks record bans, clearance
+and distinct-time same-hand speed residuals, including simultaneous stacks.
+
+Frozen human tables additionally cover repeated top-row, outer-lane and
+opposite-side exposure, lane/row concentration, and per-hand 45/90-degree cut-axis
+runs in notes, elapsed duration and incoming gap. Placement and the joint M5
+run-tail proxy fit <=10% eligible human events; specific reach and M3 segment
+tails fit <=3%. These are fitted trigger budgets, not limits on the fraction of
+notes allowed in the top row. Nine unsupported human packages remain explicit
+skips, and sparse-band uncertainty is recorded with calibration artifacts.
+
+Combined decoder recovery records model-supported single-note alternatives at
+minimum likelihood ratio .90 while preserving original autoregressive position
+history, arrow predictions and primary survivor selection. A bounded local
+commit runs after the primary cap, before the postprocessing hand snapshot.
+Adjacent supported singles may swap hands and transplant their existing
+per-hand cuts together, preserving alternation without a model-history ripple.
+It checks balance, recovery, own-side placement, cooldown, doubles, both hands'
+physical edges and the shared acceptance policy; every committed assignment
+must strictly reduce actual fast reversals. The original model stream's full
+signature and deferred/committed counts are recorded separately. Doubles,
+event timing and survivor counts remain fixed. Full-map M3 upper/lower excess
+and complete per-hand M5 tails are protected in addition to local windows.
+A rare repeated-M1 tail may trade ordinary M4 variation only when its
+calibrated M4 tail does not increase; comfortable patterns receive no such
+exception. Final M5 residuals remain explicit; recovery does not establish human-equivalent
+rhythm.
+
+The versioned evaluator `evaluation.playability_metrics_v2` shares the new
+M2/M4 costs. Geometry v3 removes the mirrored-double exemption; its inherited
+M4 thresholds await refitting after the metric-definition review. Archived
+scorecards retain their recorded definitions and results.
+[Second playtest guide](../../Data/training/evaluate_beats/results/combined-reach-playtest-20261108/playtest-final/PLAYTEST.md)
+
+### Priority policy after the November 8 player review
+
+The `priority` experiment arm selects the revised rules in the
+[player priority review](superpowers/specs/2026-11-08-playability-priority-review.md).
+It sets `v2_playability_priority` and uses a separate joint position/arrow repair;
+historical `combined` and single-metric arms remain explicit profiles. The final
+app/CLI default now selects the corrected priority profile; ordinary generation
+does not require an experiment runner or an A/B comparison.
+
+The shared definition is `priority-events-v2-segments-20261108`. Intersecting
+straight cut/travel segments at <=250 ms are forbidden; slower intersections
+through 1.5 s and near misses within half a grid cell are soft costs. Travel uses
+the immediate previous same-hand onset through a 1.5 s lookback. Actual segment
+geometry replaces the old shared-grid-region proxy, including unclamped endpoints;
+mirrored arrows have no exemption. This remains a 2D approximation, not measured
+player trajectories. Dots use the documented virtual movement estimate when a
+predecessor exists; otherwise their path is a point.
+
+Preparation uses each hand's 3x3 area and max per-edge excursion: two cells past
+an edge are forbidden; a diagonal one cell outside both edges is one strong soft
+excursion. Speed and recent awkward exposure compound the local penalties.
+Follow-through outside alone has no cost. Axis changes use undirected cut axes:
+a 90-degree base costs twice 45 degrees, isolated changes are small, frequent
+changes strong and irregular frequent changes stronger. Long unchanged runs and
+fast reversal counts never force variety. M1 and M3 remain monitoring outcomes;
+existing placement is active at medium priority, with travel subordinate to the
+primary rules. Local visibility now has its own calibrated acceptance guard.
+The old competing repair stack is bypassed.
+
+The soft search can jointly move and recut adjacent notes or a short outer-lane
+phrase. It permits small isolated axis changes and slower path costs when the
+preparation improvement justifies them, while guarding individual severe
+preparation and axis events using the matched human NPS band. Two bounded local
+rounds retain a legal incumbent; neither a map-wide average nor an easier
+monitoring score can excuse a hard violation. Recovery travel remains a
+subordinate cost, so rare soft travel tradeoffs still require playtesting.
+
+Repairs preserve IDs, onsets, hands, dots and count and check physical flow,
+clearance, arrival caps and affected successor paths. Repairs run before the
+retained snapshot; mutable expansions receive retained-protected repair, chain
+anchor synchronization and a final full-stream hard audit. Search exhaustion
+raises an error and rolls back rather than returning a successful invalid map.
+Existing physical exceptions must be recorded and cannot worsen; hard priority
+violations receive no inherited exception. Numerical soft weights and the half-cell
+near-miss margin are provisional engineering choices, distinct from calibrated
+human flag thresholds and in-game comfort.
+
+### Final local visibility and M2
+
+`visibility-upper-center-v1-20261108` measures the mean central top-row occupancy
+of the last eight same-hand onset groups within 1.5 seconds, requiring four
+groups. Groups use the first onset's 20ms boundary; stacks receive fractional
+weight and all eligible zero events remain in the denominator. The pure shared
+implementation and fixed human reference live in `v2_playability_visibility.py`
+and `v2_playability_visibility_reference.json`. The independently fitted specific
+event tail budget is 3%, with pooled and equal-map checks and named skipped maps.
+
+This catches a sustained flat upper stream even when the historical pairwise
+rise M2 is zero. Current priority reports expose its local flags, maxima and
+calibrated mean excess as the versioned current M2. `legacy_m2` and
+`pairwise_value` retain the previous rise-only score explicitly; these values
+have different definitions and must not be silently compared or added.
+
+Soft search cannot create or worsen an individually severe local visibility
+endpoint. Bounded joint position/arrow repair reduces existing exposure while
+retaining the reach/path/axis and physical constraints. Final no-regression
+allowances derive from original pre-hard exposure and the human cutoff. Protected
+late expansions use retained-only exposure as their reference, so new copies
+cannot create inherited exceptions. Reports retain native group membership and
+limits for independent serialized-map validation. Ordinary human-range upper
+notes remain allowed; there is no blanket top-row ban or quota.
+
+Final-only mild residuals are separately versioned and explicit. After bounded
+repair, an event originally at/below the human cutoff may remain within one
+onset group's occupancy above that cutoff, provided residuals do not exceed
+floor(3% of eligible events) for either hand. Over-rate hands fail entirely;
+existing above-cutoff tails cannot worsen. Original event limits remain
+`max(original, cutoff)`; residual metadata does not inflate them. Shared live
+recomputation and the independent serialized audit verify every exception,
+including its onset count and per-hand denominator. Candidate guards, metric
+thresholds, reach/path hard bans and physical limits remain unchanged.
+
+### Exact repeated-position separation
+
+After calibrated priority and visibility repair, a single chronological pass
+compares each note with the previous same-hand note's current cell. Exact
+position repeats propose one cell in the current arrow's cut direction;
+diagonals use only their vertical component. Left-hand destinations stay in
+columns 0–2, right-hand destinations in 1–3, and all destinations in rows 0–2.
+A legal top-row proposal is applied with 50% probability using Python's existing
+random stream (seeded by the offline case runner). Other legal destinations are
+always applied. There is no speed threshold or extra direction change.
+
+Every proposal uses the existing speed/flow/clearance, hard reach/path and
+calibrated local soft/visibility guards; unsafe proposals stay unchanged. Dot
+notes, simultaneous same-hand onset groups and protected retained notes stay
+intact. This runs before the final independent hard/physical/visibility audits,
+and reports `repeat_position_changed`. It does not alter IDs, onsets, hands,
+arrows or note counts. This November 9 addition does not rewrite the previously
+delivered frozen five-song archive.
+
 ## Packages and diagnostics
 
 Default output remains Beat Saber **3.2.0**: notes, bombs, walls, basic lighting,

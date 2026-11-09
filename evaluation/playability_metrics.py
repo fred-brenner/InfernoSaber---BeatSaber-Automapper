@@ -1,6 +1,6 @@
 """Playability metrics — shared note preparation and swing geometry.
 
-Foundation for the M1-M4 playability metrics. Pure note-list helpers:
+Foundation for the M1-M5 playability metrics. Pure note-list helpers:
 stdlib + numpy only, no ``tools.config``/``map_creation``/audio/model
 imports so the module stays cheap to import in the evaluation harness.
 
@@ -18,6 +18,8 @@ pulls in aubio/librosa transitively through ``sanity_check``.
 """
 
 import numpy as np
+
+from evaluation.playability_directions import m5_direction_variety
 
 EPS = 0.02          # same-hand stack collapse window, seconds
 T_FAST = 0.5        # fast-transition gap scale for M1 speed weight, seconds
@@ -439,13 +441,13 @@ def m4_interference(prepared, minutes):
 
 
 def score_map(notes):
-    """Score one map on all four playability metrics (design calibration).
+    """Score one map on all five playability metrics (design calibration).
 
-    Runs ``prepare_notes`` once and shares the result across M1–M4.
+    Runs ``prepare_notes`` once and shares the result across M1–M5.
     ``notes`` is the kept note count (same-hand stacks within ``EPS`` are
     one physical stroke); ``span_seconds`` = last − first kept note time;
     ``nps`` = notes/span, 0.0 when the span is 0 — a zero-length stream
-    has no meaningful rate. ``m4`` receives ``minutes = span/60``."""
+    has no meaningful rate. ``m4`` and ``m5`` receive ``minutes = span/60``."""
     prepared = prepare_notes(notes)
     span = prepared[-1]["t"] - prepared[0]["t"] if prepared else 0.0
     return {"notes": len(prepared),
@@ -454,4 +456,5 @@ def score_map(notes):
             "m1": m1_lateral(prepared),
             "m2": m2_occlusion(prepared),
             "m3": m3_divergence(prepared),
-            "m4": m4_interference(prepared, span / 60.0)}
+            "m4": m4_interference(prepared, span / 60.0),
+            "m5": m5_direction_variety(prepared, span / 60.0)}

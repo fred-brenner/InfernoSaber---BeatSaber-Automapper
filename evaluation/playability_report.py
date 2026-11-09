@@ -18,6 +18,10 @@ matched NPS band (all-band fallback below five band maps), and the
 incident rate — generated ``units`` at/above the pooled human p95 per
 map-minute versus the human rate. A map flags at percentile >= 95 or
 rate >= 3x human (a zero human rate flags any positive generated rate).
+M5 separately reports low non-reversal share (lower-tail percentile <= 5)
+and high fast-reversal events per minute (>= 3x the pooled human rate).
+Only maps with eligible M5 transitions enter its NPS-matched baseline;
+unavailable M5 comparisons are n/a and tied shares alone never flag.
 
 Run from the repository root:
     python -m evaluation.playability_report \
@@ -172,6 +176,7 @@ def decode_package_notes(package, difficulty=None):
 # ---------------------------------------------------------------------------
 
 METRICS = ("m1", "m2", "m3", "m4")
+VERDICT_METRICS = (*METRICS, "m5")
 BAND_LABELS = ("<3", "3-5", "5-7", "7+")
 BAND_MIN_N = 5          # fewer human maps in-band → all-band scalar fallback
 PERCENTILE_FLAG = 95.0  # scalar percentile flag threshold
@@ -246,6 +251,58 @@ def _incident_rate(units, threshold, minutes):
     return float((np.asarray(units, dtype=float) >= threshold).sum() / minutes)
 
 
+def _m5_eligible(scores):
+    """Usable direction summary; old cached rows and no-transition maps omit it."""
+    metric = scores.get("m5")
+    return bool(metric and metric.get("transitions", 0) > 0
+                and metric.get("non_reversal_share") is not None
+                and metric.get("fast_reversals_per_minute") is not None
+                and metric.get("fast_reversals") is not None
+                and scores["span_seconds"] > 0)
+
+
+def _m5_human_rate(rows):
+    """Fast-reversal events per minute from eligible counts and full map spans."""
+    minutes = sum(row["scores"]["span_seconds"] for row in rows) / 60
+    return (float(sum(row["scores"]["m5"]["fast_reversals"] for row in rows)
+                  / minutes) if minutes > 0 else None)
+
+
+def _m5_verdict(gen_scores, human_rows, gen_band):
+    """Low share and high event rate use the same eligible reference maps."""
+    eligible = [row for row in human_rows if _m5_eligible(row["scores"])]
+    band_rows = [row for row in eligible
+                 if band_label(row["scores"]["nps"]) == gen_band]
+    reference = band_rows if len(band_rows) >= BAND_MIN_N else eligible
+    metric = gen_scores.get("m5") or {}
+    result = {"percentile": None, "band": gen_band, "band_n": len(band_rows),
+              "reference_n": len(reference), "incident_rate": None,
+              "human_incident_rate": None, "flag": False,
+              "percentile_direction": "lower", "incident_rate_direction": "higher",
+              "non_reversal_share": metric.get("non_reversal_share"),
+              "fast_reversals_per_minute": metric.get("fast_reversals_per_minute"),
+              "non_reversal_share_flag": False, "fast_reversal_rate_flag": False}
+    if not reference or not _m5_eligible(gen_scores):
+        return result
+    scalars = np.asarray([row["scores"]["m5"]["non_reversal_share"]
+                          for row in reference], dtype=float)
+    # Count ties as baseline observations: a shared distribution (including
+    # all zeros) gets percentile 100 rather than a false low-tail flag.
+    percentile = float(100 * (scalars <= metric["non_reversal_share"]).sum()
+                       / scalars.size)
+    human_rate = _m5_human_rate(reference)
+    incident_rate = float(metric["fast_reversals_per_minute"])
+    share_flag = percentile <= 100 - PERCENTILE_FLAG
+    rate_flag = (incident_rate > 0 if human_rate == 0
+                 else incident_rate >= RATE_FLAG_RATIO * human_rate)
+    result.update(percentile=percentile, incident_rate=incident_rate,
+                  human_incident_rate=human_rate,
+                  non_reversal_share_flag=bool(share_flag),
+                  fast_reversal_rate_flag=bool(rate_flag),
+                  flag=bool(share_flag or rate_flag))
+    return result
+
+
 def verdict(gen_scores, human_rows):
     """Corpus-relative verdicts for one generated map versus human rows.
 
@@ -257,7 +314,9 @@ def verdict(gen_scores, human_rows):
     generated units at/above the pooled human p95 per map-minute; the
     human rate applies the same formula over all human units and spans.
     Flag: percentile >= 95 or rate >= 3x human — a zero human rate flags
-    any positive generated rate."""
+    any positive generated rate. M5 retains the same verdict keys, with
+    a lower-tail share percentile and fast-event rate from eligible NPS
+    reference rows; unavailable values are None and never flag."""
     gen_band = band_label(gen_scores["nps"])
     band_rows = [row for row in human_rows
                  if band_label(row["scores"]["nps"]) == gen_band]
@@ -285,6 +344,7 @@ def verdict(gen_scores, human_rows):
                           "band_n": band_n, "incident_rate": incident_rate,
                           "human_incident_rate": human_rate,
                           "flag": bool(flag)}
+    result["m5"] = _m5_verdict(gen_scores, human_rows, gen_band)
     return result
 
 
@@ -350,7 +410,7 @@ def _jsonable(value):
 
 
 def _human_quantiles(human_rows):
-    """Per-band scalar p50/p95 for every metric — the human table data."""
+    """Per-band legacy p50/p95 and both named M5 score quantiles."""
     quantiles = {}
     for label in BAND_LABELS:
         subset = [row for row in human_rows
@@ -363,12 +423,19 @@ def _human_quantiles(human_rows):
                                  for row in subset])
             bands[metric] = {"p50": float(np.percentile(values, 50)),
                              "p95": float(np.percentile(values, 95))}
+        eligible = [row for row in subset if _m5_eligible(row["scores"])]
+        bands["m5"] = {"maps": len(eligible)}
+        for name in ("non_reversal_share", "fast_reversals_per_minute"):
+            values = [row["scores"]["m5"][name] for row in eligible]
+            bands["m5"][name] = {
+                f"p{percentile}": float(np.percentile(values, percentile)) if values else None
+                for percentile in (5, 50, 95)}
         quantiles[label] = bands
     return quantiles
 
 
 def _human_rate_summary(human_rows):
-    """Pooled p95 thresholds and human incident rates for every metric."""
+    """Legacy pooled p95/rates plus directly counted M5 fast events/min."""
     minutes = sum(row["scores"]["span_seconds"] for row in human_rows) / 60
     thresholds, rates = {}, {}
     for metric in METRICS:
@@ -376,7 +443,15 @@ def _human_rate_summary(human_rows):
         threshold = float(np.percentile(pooled, 95)) if pooled.size else None
         thresholds[metric] = threshold
         rates[metric] = _incident_rate(pooled, threshold, minutes)
+    # M5 counts named fast events directly; binary units have no p95 threshold.
+    thresholds["m5"] = None
+    rates["m5"] = _m5_human_rate(
+        [row for row in human_rows if _m5_eligible(row["scores"])])
     return thresholds, rates
+
+
+def _display_number(value, fmt=".2f"):
+    return "n/a" if value is None else format(value, fmt)
 
 
 def _print_human(human_root, human_rows, quantiles, thresholds, rates):
@@ -388,12 +463,20 @@ def _print_human(human_root, human_rows, quantiles, thresholds, rates):
         cells = "  ".join(f"{metric.upper()} {bands[metric]['p50']:5.2f}/"
                           f"{bands[metric]['p95']:5.2f}" for metric in METRICS)
         print(f"  {label:>3} n={bands['maps']:<3} {cells}  (scalar p50/p95)")
+        m5 = bands["m5"]
+        share, fast = m5["non_reversal_share"], m5["fast_reversals_per_minute"]
+        print(f"      M5 n={m5['maps']} non-reversal share (low) "
+              f"{_display_number(share['p5'], '.2%')}/{_display_number(share['p50'], '.2%')} "
+              f"(p5/p50) | fast reversals/min (high) "
+              f"{_display_number(fast['p50'])}/{_display_number(fast['p95'])} (p50/p95)")
     cells = []
     for metric in METRICS:
         threshold = thresholds[metric]
         text = f"{threshold:.2f}" if threshold is not None else "n/a"
         cells.append(f"{metric.upper()} {text:>5}/{rates[metric]:.2f}")
     print(f"  pooled p95 / human rate per min: {'  '.join(cells)}")
+    print(f"  M5 pooled fast reversals/min (high): {_display_number(rates['m5'])} "
+          "(events / eligible map-minutes)")
 
 
 def _print_generated(gen_rows, verdicts):
@@ -407,14 +490,36 @@ def _print_generated(gen_rows, verdicts):
                          f"p{entry['percentile']:3.0f}{mark} "
                          f"{entry['incident_rate']:.1f}/"
                          f"{entry['human_incident_rate']:.1f}")
-        flagged = [metric.upper() for metric in METRICS
+        m5 = result["m5"]
+        mark = "*" if m5["band_n"] < BAND_MIN_N else ""
+        percentile = ("n/a" if m5["percentile"] is None
+                      else f"p{m5['percentile']:.0f}{mark}")
+        cells.append(f"M5 non-reversal share (low) "
+                     f"{_display_number(m5['non_reversal_share'], '.2%')} {percentile} | "
+                     f"fast reversals/min (high) "
+                     f"{_display_number(m5['fast_reversals_per_minute'])}/"
+                     f"{_display_number(m5['human_incident_rate'])} "
+                     f"(reference n={m5['reference_n']})")
+        flagged = [metric.upper() for metric in VERDICT_METRICS
                    if result[metric]["flag"]]
         tag = f"  FLAG {','.join(flagged)}" if flagged else ""
         print(f"  {row['package'][:28]:<28} {row['difficulty']:<10} "
               f"nps {scores['nps']:4.1f} | " + " | ".join(cells) + tag)
+        diagnostics = (scores.get("m5") or {}).get("diagnostics")
+        if diagnostics:
+            overall = diagnostics["overall"]
+            counts = "/".join(str(overall["angles"][angle]["count"])
+                              for angle in ("0", "45", "90", ">=135"))
+            dwell = overall["non_reversal_intervals"]
+            print(f"      Cut turns (0/45/90/>=135 deg): {counts}  "
+                  f"median between non-reversals: "
+                  f"{_display_number(dwell['transitions']['median'], '.1f')} transitions / "
+                  f"{_display_number(dwell['seconds']['median'])} s")
     if gen_rows:
-        print(f"  (* = percentile vs all maps: <{BAND_MIN_N} human maps in "
-              f"band; columns are value percentile rate/human-rate)")
+        print(f"  (* = all-band reference: <{BAND_MIN_N} eligible human maps in "
+              f"band; M1-M4 columns are value percentile rate/human-rate)")
+        print("  (M5 flags lower-tail share p<=5 or fast rate >=3x human; "
+              "n/a = missing M5, no eligible transitions or no eligible human baseline)")
 
 
 def _print_incidents(flagged_rows, top_k):
@@ -498,7 +603,7 @@ def main(argv=None):
     generated_report = [
         {"package": row["package"], "difficulty": row["difficulty"],
          "nps": row["scores"]["nps"],
-         "flagged": [metric.upper() for metric in METRICS
+         "flagged": [metric.upper() for metric in VERDICT_METRICS
                      if result[metric]["flag"]],
          "verdict": result, "scores": row["scores"]}
         for row, result in zip(gen_rows, verdicts)]
@@ -511,7 +616,7 @@ def main(argv=None):
         print(f"  [{source}] {item['package']}: {item['error']}")
 
     flagged_rows = [row for row, result in zip(gen_rows, verdicts)
-                    if any(result[metric]["flag"] for metric in METRICS)]
+                    if any(result[metric]["flag"] for metric in VERDICT_METRICS)]
     if flagged_rows:
         _print_incidents(flagged_rows, args.top_k)
 

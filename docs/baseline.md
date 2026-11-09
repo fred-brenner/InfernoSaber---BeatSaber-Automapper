@@ -2078,3 +2078,481 @@ centre containment was already airtight). Coverage in
 - Vendored-lighting app run re-verified: `main_multi.py` produced all 8
   packages with the "V1 lighting" stage decoding through
   `v2_expert/v1_lighting/` (0 failures, ~51 s).
+
+## 2026-11-07 — app1 playability experiments on CPU
+
+The seed-3 Break the Horizon app control reproduced 1,386 colored notes, a
+speed cap of 24 and 58 fast horizontal reversals. Direct generation and the
+explicit control arm matched on notes, chains, walls, bombs, arcs, lighting and
+the final NumPy generator state. The v3 export decoded to the same notes.
+[CPU fingerprint](../../Data/training/evaluate_beats/results/app1-playability-candidates-20261107/fingerprint/control.json)
+
+The archived R7 Easy chart is a separate fixture. On the right-hand phrase at
+1:40.58–1:43.27, the bounded direction repair replaced 12 horizontal arrivals
+with one diagonal bridge and eleven vertical cuts. Both complete archived
+charts have 1,480 colored notes and zero hard clearance residuals. The paired
+packages retain the original audio.
+
+In the initial 30-song, four-difficulty M1-only development run, the 120
+paired charts had 137,971 colored notes per arm. Mean excess M1 incidents per
+minute fell from 24.74 to 19.67 (20.5% closure). The p90 of song-average longest
+fast horizontal runs fell from 7.8 to 5.75. One chart, Peter Fox — Alles Neu
+(Normal, seed 932934959), gained a frozen overspeed during the opening ramp.
+The repair now checks the original arrival cap and the cap at the earliest
+possible surviving index. Replaying that seed produced 1,505 notes in both
+arms and changed the frozen overspeed count from one in control to zero in
+the corrected candidate. These figures describe the diagnostic M1 run.
+[Development map results](../../Data/training/evaluate_beats/results/app1-playability-candidates-20261107/exploratory-m1-full.json)
+
+On the combined panel, the Normal chart of One More Night (seed 2367304112)
+caught an ordering error in path repair. Onset snapping put two surviving IDs
+in reverse chronological order. A time-window lookup then missed an opposite
+hand in the destination cell 134 ms earlier. Geometry repair now orders its
+local view by time and ID and checks full-stream clearance before committing.
+All four exact-seed replays completed with 1,290 notes, intact retained notes
+and zero frozen speed or flow violations. Candidate packages produced before
+this correction were withdrawn from the comparison.
+[Ordering regression and replay](../../Data/training/evaluate_beats/results/app1-playability-candidates-20261107/verification/one-more-night.json)
+
+The application/CLI smoke generated and combined a disposable Break the
+Horizon package with the M1–M4 candidates enabled and library export
+disabled. The generation experiments are opt-in through
+`v2_playability_enabled`. [CLI completion receipt](../../Data/training/evaluate_beats/results/app1-playability-candidates-20261107/cli-smoke/completion.json)
+
+The corrected development run exported all 840 candidates. Development
+selected the M1–M4 combination with late 90°/45° restoration at 500/650 ms
+for experimental confirmation. Removing isolated recuts retained the four
+target improvements. Across 240 reserved chart pairs, M1 excess fell by
+18.97% (20% target), M2 by 71.67%, and M4 by 57.12%. M3 scored zero excess
+above the human median, with 233 of 240 candidate charts below the matched
+human lower quartile. M5 non-reversal-share distance improved 8.18% (15%
+target), the fast-reversal distance was essentially unchanged, and 12
+hand-specific dwell checks exceeded the harm margin. The median note-density
+change was zero for each difficulty. All protected-note, frozen speed/flow,
+anchor, v2/v3 and hard-clearance checks passed. Median CPU time changed by
+−2.2%. No component was promoted.
+
+The final CPU suite passed 1,509 tests with 10 opt-in comparison tests
+deselected. The selected policy also completed ordinary CLI generation with
+library export disabled. The five-pair blind pack is ready for player
+feedback. [Full comparison](../../Data/training/evaluate_beats/results/app1-playability-candidates-20261107/comparison.md)
+· [Playtest guide](../../Data/training/evaluate_beats/results/app1-playability-candidates-20261107/playtest-final/PLAYTEST.md)
+· [Selected CLI receipt](../../Data/training/evaluate_beats/results/app1-playability-candidates-20261107/cli-smoke-selected/completion.json)
+
+## 2026-11-08 — blind playtest feedback and hand reach
+
+The player slightly preferred the candidate on archived Break the Horizon,
+clearly preferred it on fresh Break the Horizon, preferred the app1 control
+on Night raid with a dragon and No Sleep, and rated Angry Too a tie with a
+possible slight candidate preference. Both archived charts still felt poor.
+The candidate remains experimental.
+
+The fresh Break the Horizon notes are identical at 1:50–1:54, including the
+reported top-row crossing around 1:52. Nearby hazards, arcs, lighting and
+jump settings match. Thus the preference for B does not establish a local
+repair at that timestamp. Both Night raid variants retain the leftward
+left-hand note in lane 3 at 1:16.873 after a 156 ms same-hand gap. Its model
+approach lies beyond the opposite edge. Equal-height upper-row patterns
+also expose a coverage limit in M2's rise formula.
+
+An external raw-note diagnostic compared 51 curated human charts with all
+120 development charts per arm, preserving stacks and separating dots.
+Opposite-edge inward horizontal/diagonal cuts occurred at an equal-song
+rate of 0.3932% of candidate arrows against a density-matched human rate
+of 0.0415%. Exact horizontal examples appeared in four human maps (12
+notes), 97 control charts (365 notes), and 98 candidate charts (329 notes).
+The generation repair has no handed reach cost or final-stage veto for
+this pattern. General opposite-side placements, required preparation and
+fast travel need separate measurements. The player proposed banning the
+extreme opposite-edge inward cut as a comfort rule.
+[Feedback, note witnesses and matrix comparison](../../Data/training/evaluate_beats/results/playtest-feedback-20261108/review.md)
+
+This follow-up ran CPU package decoding and analysis with the configured
+Python interpreter and system site packages disabled. Assignment/pack
+hashes, timestamp witnesses, all matrix sums and corpus denominators were
+checked. It changed documentation and external diagnostic artifacts;
+generation and the frozen comparison scorecards retain their prior state.
+
+The player's follow-up broadens reach beyond opposite-edge inward arrows.
+It includes preparation above the top row for down cuts and any hand motion
+outside its usable area. The left nominal range is columns 1–3 from the
+left, with a mirrored columns 2–4 working assumption for the right. The
+follow-up diagnostic separates note position, approach and follow-through,
+normal hand range and global grid extent. Modelled one-cell swing offsets
+remain an approximation to actual physical hand reach.
+
+The expanded diagnostic finds pure downward cuts on the top row at 4.52%
+of candidate arrows versus 0.98% in the matched human reference. Modelled
+preparation outside the nominal per-hand envelope occurs at 24.91% versus
+15.91%. Conversely, the literal one-cell either-endpoint rule flags 87.14%
+of matched human arrows, illustrating that sword-envelope offsets need
+calibration before they define a hard physical hand-reach limit.
+[Expanded reach measurements](../../Data/training/evaluate_beats/results/playtest-feedback-20261108/reach_envelope_results.json)
+
+## 2026-11-08 — human-calibrated event budgets
+
+The user selected eligible notes/pattern events as the rate denominator,
+with a 3% default and permission to use up to 10% for less precise proxies.
+The far-opposite inward cut remains a separate zero-allowance policy.
+Offline calibration fit 3/5/10% sensitivities on the 51 curated human maps,
+using every eligible event, including zero severity. Both equal-map and
+pooled empirical trigger rates meet the selected budget in each NPS band.
+Thresholds were saved before scoring the 120 development chart pairs.
+
+The chosen banded profile uses 3% for M1/M4 and preparation/travel;
+M2/M3 and coarse reach/follow-through/exposure measures use up to 10%.
+Matched human/candidate lateral-preparation rates are 2.85%/7.89%, and
+vertical-preparation rates are 2.74%/6.95%. M3's low high-tail rate still
+coincides with excessive coordination (111 of 120 candidates below their
+matched human Q1). M5 map summaries retain their existing distribution
+comparisons; an event cap requires a separately defined pattern event.
+
+CPU analysis verified formula parity on 291 maps, 120 exact pairs,
+synthetic tie/geometry boundaries, source/reference hashes and all banded
+fit-cap assertions. The fit is empirical; leave-one-map-out results can
+exceed it. The generator repair and a fresh playtest are subsequent work.
+[Calibration results and profile](../../Data/training/evaluate_beats/results/playability-calibration-20261108/summary.md)
+
+## 2026-11-08 — combined reach generator and second playtest
+
+Implemented the zero-allowance far-opposite inward-cut policy, calibrated
+preparation/follow-through/travel costs and bounded joint cell/arrow repair.
+The combined policy also includes the same-height visibility cost,
+hand-ordered mirrored-double exception, bounded joint cell swaps, M3
+normal-range preservation, slow decoded turns and per-hand dwell ranking.
+Human-only v2 M2/M4 fits satisfy the approved 10%/3% observed event budgets.
+The combined diagonal allowance uses the measured human-band p95 to avoid
+forcing near-all-vertical patterns under the old 10% style cap.
+
+All 12 fresh pilot packages completed on CPU, covering the app1 control,
+previous combined arm and new combined arm at original seeds/settings for
+Break the Horizon, Night raid with a dragon, Angry Too and No Sleep. New
+colored-note counts are 1,366/1,593/1,092/719, compared with previous
+1,386/1,596/1,088/708. Per-repair identities, timestamps and hands stayed
+fixed. Whole-pipeline count drift ranges from −1.44% to +1.55% because the
+earlier calibrated diagonal pass affects primary survivors. The new
+frozen-speed/flow counters are zero in all four cases. App1 and previous-arm
+outputs reproduce the prior notes.
+
+The exact archived R7 reference was repaired offline using the same primary
+combined hook and protected final audit. It retains 1,480 notes, times and
+hands. Hazards were revalidated and arcs rebuilt against the repaired
+endpoints; audio and original lighting were retained. Every repaired chart
+in the five-pair pack has zero forbidden cuts. All ten packaged charts pass
+clearance, endpoint/anchor checks and v2/v3 colored-note round trips.
+
+Verification used the CPU environment with user-site packages disabled.
+The complete non-comparison suite passed 1,574 tests, with 10 opt-in tests
+deselected. An independent review found a missed M2 eligibility tail below
+0.5; a red/green regression and calibrated cutoff fixed it before the final
+pilot. The spawned app/CLI path generated and combined a disposable sample
+with library export disabled. In-game feedback on this new pack is pending.
+[Playtest guide](../../Data/training/evaluate_beats/results/combined-reach-playtest-20261108/playtest-final/PLAYTEST.md)
+· [Public validation](../../Data/training/evaluate_beats/results/combined-reach-playtest-20261108/playtest-final/validation.json)
+
+The small combined pilot reduces calibrated full-map M1 tail shares and
+versioned M2/M4 on all five packaged charts, with all new M3 scalars inside
+the matched human band. Raw M1 increases with more diagonal variation;
+local M1/path and M5 regressions remain. The comfortable clip has 23→24
+notes and a higher local path proxy, and Angry Too/No Sleep have more fast
+reversals. Median generation-only CPU time rose about 20% on four cases.
+The result is an opt-in combined test build for player feedback.
+[Combined result and remaining playback questions](../../Data/training/evaluate_beats/results/combined-reach-playtest-20261108/results.md)
+
+## 2026-11-08 — second combined playtest outcome
+
+The player preferred the new repair only on the archived chart (pair01),
+with remaining top-row discomfort. The prior preferred versions won on
+fresh Break the Horizon (02), Night raid (03) and Angry Too (04). No Sleep
+(05) tied with a tendency toward the prior version. The combined candidate
+therefore regressed overall despite its ban compliance and better tail
+scores. The reported right-hand far-left inward cut at1:51.972 is in02's
+baseline; the repair removed that specific violation.
+
+Actual public-ZIP comparisons show48–59% of matched notes changed,
+roughly doubled diagonal counts and substantially more45-degree cut-axis
+changes. The slow focus keeps all14times/cells but changes4arrows and
+raises rawM1 .196→.484 even though both tails scorezero. The comfortable
+focus adds a newM1tail and higher local path cost. An exact archived
+production-hook replay traces substantial new moderate lateral work and
+axis churn to the reach soft pass, with edit count only breaking ties.
+The early human-p95diagonal cap also changes primary survivors.
+[Playtest feedback and deterministic diagnosis](../../Data/training/evaluate_beats/results/combined-reach-feedback-20261108/public-pair-pattern-findings.md)
+
+The player proposed last-to-first editing, retaining each accepted note
+before continuing to its chronological predecessor. A separate controlled
+reverse-order/greedy-freezing replay is being evaluated. Chronological
+neighbor context and both-edge validation remain necessary.
+
+The controlled reverse-order prototype was evaluated on five saved baseline
+note streams, without model inference or package export. Incumbent-first
+hard-ban repair changes29notes for28forbidden cuts, with zero final bans
+and no added checked violations. Four cases require no backtracking; the
+slow case at55.276727s needs one immediately later group released for a
+joint move. Forward incumbent-first repair reaches the same result and is
+faster on that case. Simply reversing the old soft optimizer still edits
+hundreds of notes. This isolates the main benefit as minimal acceptable
+choices, with traversal direction and bounded local backtracking separately
+measured. The experiment does not yet integrate the calibrated soft repair
+policy into production.
+
+
+### Complete combined playability candidate — 2026-11-08
+
+The complete opt-in policy now integrates M1–M5, versioned placement/reach,
+original-first reverse hard repair, shared local/global acceptance, bounded
+joint direction/cell bridges and deferred supported hand-pair recovery. Its
+original model histories and primary survivors match app1; postprocessing
+retains timing/counts and protects comfortable phrases. Earlier immediate
+recovery trials were rejected for autoregressive ripple before any new pack
+was published. Historical attempts are archived in the result directory.
+
+Final CPU validation passed **1,649 tests**, with 10 opt-in comparisons excluded.
+Five saved-chart replays and eight fresh generations passed exported-note,
+clearance, hard-ban, v2/v3 and endpoint/anchor audits. All four fresh candidate
+counts match controls (1,386 / 1,596 / 1,088 / 708), with zero forbidden cuts
+and zero exported clearance violations. One pre-existing opening-ramp speed
+exception remains unchanged and explicit. The actual comfortable 74–84-second
+control remains identical. Candidate CPU time was 18.7–63.3 seconds, observed
+1.80–3.38 times the paired control on the shared runtime.
+
+All components being integrated does not establish human-equivalent quality.
+One Dense joint pair reduces recovery fast reversals only 1,240 to 1,238;
+substantial M5 excess remains. The original R7 fixture improves repeated
+horizontal reversals 12 to 5 (excess 27.5 to 3.0), while fresh Horizon's marked
+app1 phrase improves peak 15 to 9. Some saved preferred patterns retain better
+scores than the fresh candidate; those comparisons and calibration/LOO limits
+remain visible. Player acceptance is pending and production defaults stay app1.
+
+[Complete plan](superpowers/plans/2026-11-08-complete-combined-playability.md) ·
+[Final results](../../Data/training/evaluate_beats/results/complete-combined-playability-20261108/results.md) ·
+[Five-pair playtest guide](../../Data/training/evaluate_beats/results/complete-combined-playability-20261108/playtest-final/PLAYTEST.md)
+
+
+## 2026-11-08 — priority playability validation and playtest
+
+The opt-in `priority` policy implements the player-reviewed preparation, path
+interference and axis-cadence priorities. It uses a shared segment detector,
+human-calibrated event tails and bounded joint cell/arrow repair, while keeping
+M1/M3, fast reversals and long unchanged-axis runs as monitoring outcomes.
+Historical experiment profiles and disabled app1 behavior remain separate.
+
+Validation ran on the recorded WSL CPU environment with system site packages
+disabled: **1,746 tests passed**, with ten opt-in comparisons deselected.
+Independent scoped code and external-harness reviews passed. Human calibration
+accepted 51 curated maps and individually recorded nine skips; fitted specific
+and coarse event budgets are <=3% and <=10%, respectively. These are human
+reference-fit budgets, not a guarantee that every generated passage meets them.
+
+Four fresh app1/priority pairs produced 1,386 / 1,596 / 1,088 / 708 notes in each
+arm. Candidate generation took 139.7 / 178.5 / 163.1 / 73.8 seconds, compared with
+22.4 / 17.1 / 14.5 / 10.6 seconds for controls. All candidates passed independent
+serialized fast-intersection/preparation, clearance, object and captured-cap
+audits; no onset/hand/dot/count or local-density changes occurred between fresh
+paired arms. Existing physical allowances remain recorded; the Night raid
+primary replay preserves one bounded baseline speed exception. The eight fresh
+packages contain no chain bodies; chain-positive coverage remains synthetic.
+
+Compared with the previous complete playtest candidate, full-context composite
+preparation flags in the problem windows changed as follows:
+
+| Passage (elapsed seconds) | Previous | Priority | Eligible notes |
+| --- | ---: | ---: | ---: |
+| Break the Horizon 99.5–109.5 | 14 | 8 | 79 |
+| Break the Horizon 110–114 | 9 | 0 | 28 |
+| Night raid 74–78 | 3 | 1 | 38 |
+| No Sleep 42–52 | 19 | 5 | 82 |
+
+The separate archived R7 postprocessing replay preserves all 1,480 note
+identities/onsets/hands/dots and reduces hard findings from 375 to zero. It uses
+reconstructed surviving-chart-order caps, not recovered decoder IDs. Safety
+filtering removes four walls and two bombs, and rebuilds 107 arcs. In the exact
+100.58–103.27 s complaint window, excursion, outer-placement and axis flags are
+zero; some preparation and slower-path events remain.
+
+These are substantial geometry rewrites. Relative to the rejected intermediate
+R3 policy, raw slower-crossing costs and full-map near-miss flags increase even
+while severe reach/axis flags improve. Rare recovery-travel tradeoffs also remain.
+The pack is ready for player feedback, not established headset comfort. Native
+Windows execution and GPU inference were not tested; no game-library export,
+model training, release or default-policy enablement was performed.
+
+The frozen generation proof is `5b6249ba4d251af4b4e17d4015eb24ca51c8addfcc19c3d49972e0dbfa09080b`.
+The public blind panel has four pairs: one exact saved-chart replay and three
+fresh-generation comparisons against saved charts. Eight playable map folders,
+the guide and blank feedback are inside the CRC-verified archive, SHA-256
+`d862b4063fd6059c30d23eab5c1bdf4de122b635266e7180f6d204c7830b5005`.
+Private assignments remain outside it.
+
+[Playtest folder ZIP](../../Data/training/evaluate_beats/results/priority-playability-20261108-attempt4/playtest-final/Playtest%20map%20folders.zip)
+· [Passage guide](../../Data/training/evaluate_beats/results/priority-playability-20261108-attempt4/playtest-final/PLAYTEST.md)
+· [Implementation and validation ledger](../.superpowers/sdd/2026-11-08-priority-playability/progress.md)
+
+
+### Player feedback on the priority playtest
+
+The player preferred the new priority candidate clearly on 01 (B) and 04 (A).
+The previous chart won narrowly on 02 (B), and won 03 (A) because the new chart's
+top-row notes obscured sight. This is mixed feedback, not overall player approval.
+At the time of this review the policy remained opt-in; the final delivery below
+records its later promotion.
+
+Read-only inspection of the delivered Night raid charts confirms a local
+visibility problem at 74–78 s: central top-row notes increase from 5 to 10 of 38,
+and the longest same-hand top-row run increases from one to seven notes, spanning
+76.045–77.218 s. Whole-song top-row share falls from 24.4% to 19.7%, and the M2
+score falls from .1949 to .1721, so both aggregate measures miss the reported
+local regression. The existing top-row placement metric does register more
+flagged rolling phrases (31→36) and higher excess (4.588→7.100). Visibility
+measurement and its tradeoff in repair both need refinement. No new numerical
+rule or generation change has been applied from this feedback alone.
+
+[Decoded player feedback and visibility diagnosis](../.superpowers/sdd/2026-11-08-priority-playability/player-review-20261108.md)
+
+
+## 2026-11-09 — final local visibility fix and five-song delivery
+
+The corrected priority policy is now the ordinary v2 app/CLI default. It keeps
+preparation/reach, intersecting-path and axis-cadence improvements and adds a
+local upper-center visibility guard and bounded joint cell/arrow repair. M2 now
+measures the last eight same-hand onset groups within 1.5 seconds, requiring
+four groups and weighting stacked notes fractionally. All eligible zero events
+remain in the denominator. Its fixed versioned human reference uses the same
+51 accepted curated maps and nine individually named skips, with <=3% pooled
+and equal-map trigger budgets. The historical rise-only M2 remains explicitly
+separate; its units are not interchangeable with the new score.
+
+Final verification on the WSL CPU environment, with system site packages
+disabled, passed **1,788 tests**, with ten opt-in comparisons deselected.
+Independent metric, solver and delivery-harness reviews passed. All 158 captured
+source/reference/test/tool hashes remained unchanged through the full suite and
+fresh generation. No GPU inference, training, dependency changes or release ran.
+
+Twenty fresh charts were generated from the frozen final source/model inputs:
+five songs, each at app settings **5 / 6 / 7 / 8**. The existing package composer
+labels those charts **Easy / Normal / Hard / Expert**, respectively; these are
+app density settings, not community star ratings. No comparison variants or
+A/B assignments are included.
+
+| Song | Setting 5 notes | Setting 6 notes | Setting 7 notes | Setting 8 notes |
+| --- | ---: | ---: | ---: | ---: |
+| Night raid with a dragon | 917 | 1,059 | 1,381 | 1,567 |
+| BWB - Break the Horizon | 1,383 | 1,699 | 1,994 | 2,312 |
+| BWB - No Sleep | 572 | 705 | 845 | 985 |
+| Lola Blanc - Angry Too | 684 | 789 | 898 | 1,071 |
+| Bunker Machen Laut | 776 | 882 | 1,241 | 1,413 |
+
+The independent serialized audit covers all **23,173 colored notes** and both
+primary/final speed-cap allowances per note. There are zero hard crossing or
+preparation findings, clearance/flow findings, serialized speed violations or
+unchecked speed transitions. Note identities, onset times, hands, dot mask and
+counts are preserved through primary repair. Exported object audits cover
+1,411 arcs, 1,128 walls and 570 bombs, with zero object rejections. These samples
+contain no chains; chain-positive coverage remains synthetic. Per-chart CPU
+generation took 55.3–354.3 seconds on the shared runtime.
+
+All named focus windows have zero new-M2 visibility flags at every setting.
+In particular, Night raid 74–78 s at setting 8 has **0/36 eligible flags**, five
+central-top notes and a maximum consecutive top-row run of one note per hand.
+Break the Horizon 99.5–109.5 s and 110–114 s also have zero local visibility flags
+at settings 5–8. Low-density windows without four recent same-hand onsets have
+no eligible M2 event; zero flags there do not establish general visibility.
+
+Visibility is a soft rule. Final maps retain five original above-cutoff events
+and eight explicitly recorded mild new residuals: Horizon 7 has one, Horizon 8
+two, Angry Too 6 one, and Bunker 6 four. Each new residual began at/below the
+human cutoff, remains within one onset-group occupancy quantum above it, and
+fits the per-hand <=3% eligible-event budget. The largest actual new-residual
+rate is 4/295 (1.36%). Existing above-cutoff tails cannot worsen; no new residual
+is introduced by protected final expansions. Metric cutoffs and base allowances
+remain unchanged. Exact times, baselines, severities, ceilings and denominators
+are recorded in the audit rather than hidden in inflated acceptance limits.
+
+The final source freeze is
+`4fbbd647c42508c4062b755d9154de21a4b2663ab5bda6a6790b3eca99bec2f2`.
+The complete serialized audit SHA-256 is
+`0367c263d8ffe627752c819720cbb7a59918c9ba4ff38855b05357e87d744513`.
+The final CRC-verified folder archive contains 36 members, totals 27,398,410
+bytes and has SHA-256
+`4832af19a4a9fe7f6d020a7de5144c5aac66da1eb6f1f7d0901a3ec976f7e8d1`.
+The accepted run is `final-visibility-maps-20261108-attempt2`; the first failed
+pilot and all historical playtest artifacts remain preserved separately.
+Native Windows execution and headset comfort remain unverified. No maps were
+exported to the user's Beat Saber library.
+
+[Final five-song map ZIP](../../Data/training/evaluate_beats/results/final-visibility-maps-20261108-attempt2/final-maps/InfernoSaber%20final%20maps.zip)
+· [Setting guide](../../Data/training/evaluate_beats/results/final-visibility-maps-20261108-attempt2/final-maps/README.md)
+· [Compact audit summary](../../Data/training/evaluate_beats/results/final-visibility-maps-20261108-attempt2/final-audit-summary.json)
+· [Implementation ledger](../.superpowers/sdd/2026-11-08-final-visibility/progress.md)
+
+
+## 2026-11-09 — exact repeated-position follow-up
+
+The default priority policy now performs one guarded chronological pass after
+calibrated repair. An exact consecutive same-hand cell repeat proposes one cell
+along the current arrow's cut, using vertical motion for diagonal arrows and
+horizontal motion for pure left/right arrows. Destinations stay in that hand's
+3×3 area. A safe top-row destination is accepted with 50% probability. Existing
+speed, flow, clearance, reach, path and calibrated local visibility/priority
+checks may veto the proposal. Dot notes, simultaneous same-hand groups and
+protected retained notes remain intact; arrows, timing and note count stay fixed.
+The pass is reported as `repeat_position_changed`.
+
+Test-first implementation and independent focused review passed. The final CPU
+suite passed **1,814 tests**, with ten opt-in comparisons deselected. The new
+26-case focused module covers all eight arrows, per-hand bounds, the top-row
+coin flip, live predecessors, stack protection, collisions, speed-guard routing,
+real visibility rejection and integration before final audit. The production
+and test hashes remained unchanged throughout final validation.
+
+One fresh single-policy Angry Too generation at setting 8 produced **1,071
+notes** in 118.9 seconds. The primary pass moved **133 notes**; the protected
+final pass moved none. Primary/final audits found zero hard crossing or reach
+findings, zero clearance/flow findings, zero M2 flags or mild M2 exceptions.
+Note identities, onsets, hands and dot masks were preserved. Both v2 and v3
+serializer round trips and endpoint/anchor checks passed. No library export or
+new A/B pack was made. The earlier delivered 20-chart ZIP remains byte-identical;
+this addition applies to subsequent generations. Headset validation is pending.
+
+[Implementation and review](../.superpowers/sdd/2026-11-09-repeat-positions/progress.md)
+· [Fresh generation evidence](../../Data/training/evaluate_beats/results/repeat-positions-20261109-attempt2/repeat-validation.json)
+
+
+## 2026-11-09 — regenerated final five-song maps with repeat separation
+
+At the player's explicit request, all five sample songs were freshly generated
+at app settings **5/6/7/8**, with the repeated-position pass active. This run
+contains **20 charts / 23,173 colored notes** and **3,118 guarded repeat-position
+moves**, with a positive move count in every chart and no protected-final moves.
+The earlier ZIP and generation artifacts remain preserved. The new archive is
+the updated delivery; there are no A/B variants or library exports.
+
+The existing reviewed single-policy harness ran three CPU workers, verified
+current-run completion receipts and audited every serialized chart before
+atomic publication. Root independently parsed all twenty audit rows and checked
+identity/timing/hand/dot/count preservation, zero hard reach/crossing findings,
+zero clearance/flow findings, zero serialized speed violations or unchecked
+transitions, both sets of 23,173 per-note speed allowances, and exact per-hand
+visibility acceptance budgets. Eight explicit mild primary M2 exceptions remain
+within the existing soft policy; protected expansions introduce none. All 24
+named focus windows have zero M2 flags. Object checks cover 1,629 arcs, 1,185
+walls and 572 bombs, with no rejected objects; these samples contain no chains.
+
+Production and repeat-test bytes match the unchanged **1,814-passing-test** CPU
+suite (ten opt-in comparisons excluded). No source, model, reference, framework
+or calibration changes were made for this regeneration. Source freeze SHA-256:
+`e435ba491c24e6e63ff960cc3da11db5dc1fd49938a3db9c96837ac6dab3eac6`.
+Complete serialized audit SHA-256:
+`f06cb27272ca3c21fd9dd8e543e10c24951dbe5f7dfaa42de5bf439789eb222b`.
+
+The CRC-verified updated bundle contains five playable folders and the setting
+guide, totals **27,402,645 bytes**, and has SHA-256
+`8096e2991c50742cf05ba92a65308099e1fad80ab6805b49f7e7c90c09da8577`.
+Easy/Normal/Hard/Expert correspond to requested app settings 5/6/7/8. Native
+Windows runtime and headset comfort remain unverified; CPU export and package
+checks establish the artifact's validity, not player approval.
+
+[Updated five-song ZIP](../../Data/training/evaluate_beats/results/final-repeat-maps-20261109/final-maps/InfernoSaber%20final%20maps.zip)
+· [Setting guide](../../Data/training/evaluate_beats/results/final-repeat-maps-20261109/final-maps/README.md)
+· [Audit summary](../../Data/training/evaluate_beats/results/final-repeat-maps-20261109/final-audit-summary.json)
+· [Regeneration ledger](../.superpowers/sdd/2026-11-09-regenerate-final-maps/progress.md)

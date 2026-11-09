@@ -336,7 +336,7 @@ def test_score_map_shape():
     notes = [(0.0, 0, 1, 1, 0), (0.5, 1, 2, 1, 1), (1.0, 0, 2, 1, 0)]
     result = score_map(notes)
     assert set(result) == {"notes", "span_seconds", "nps",
-                           "m1", "m2", "m3", "m4"}
+                           "m1", "m2", "m3", "m4", "m5"}
     assert result["notes"] == 3
     assert result["span_seconds"] == pytest.approx(1.0)
     assert result["nps"] == pytest.approx(result["notes"]
