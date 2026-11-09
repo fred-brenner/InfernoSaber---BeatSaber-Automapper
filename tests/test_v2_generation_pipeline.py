@@ -679,3 +679,98 @@ def test_dot_bridges_flow_with_implied_direction():
     enforce_note_flow_and_clearance(notes)
     assert notes[3]["d"] == 1
     assert clearance_violations(notes)["flow_repeats"] == 0
+
+
+def test_optional_emphasis_hook_reports_through_generate():
+    song, vocab = audio_song(), vocabulary()
+    predictors = dummy_predictors(vocab)
+    hooks = processors()
+    calls = []
+
+    def emphasis(state, song_arg, *, rng=None, logger=None):
+        calls.append((state, song_arg))
+        return {"applied": True, "added_notes": 0, "doubles": 0, "triples": 0}
+
+    hooks.apply_note_emphasis = emphasis
+    result = generate(song, 4., predictors, lambda times: np.zeros((len(times), 16), np.float32),
+                      preparation_settings(), vocab, lighting_generator=lighting, postprocessors=hooks)
+    assert len(calls) == 1
+    assert result.diagnostics["note_emphasis"]["applied"]
+    assert result.stages["emphasis"]["added_notes"] == 0
+    assert result.diagnostics["final_counts"]["emphasis_copies"] == 0
+
+
+def test_processors_without_emphasis_hook_still_generate():
+    song, vocab = audio_song(), vocabulary()
+    predictors = dummy_predictors(vocab)
+    result = generate(song, 4., predictors, lambda times: np.zeros((len(times), 16), np.float32),
+                      preparation_settings(), vocab, lighting_generator=lighting,
+                      postprocessors=processors())
+    assert "note_emphasis" not in result.diagnostics
+    assert result.diagnostics["final_counts"]["emphasis_copies"] == 0
+
+
+def test_default_wrapper_exposes_emphasis_when_legacy_mutators_skipped(monkeypatch):
+    from map_creation import v2_postprocessing as base
+    monkeypatch.setattr(config, "v2_cleanup_note_heuristics", False)
+    monkeypatch.setattr(base, "sanity_check_timing2",
+                        lambda name, times, audio_path=None: np.asarray(times))
+    monkeypatch.setattr(base, "align_beats_on_bpm", lambda times, bpm: np.asarray(times))
+    monkeypatch.setattr(base, "fill_map_times_scale",
+                        lambda times, index=5: np.asarray(times))
+    monkeypatch.setattr(base, "_legacy_timing_features",
+                        lambda audio_path: (np.zeros((2, 2)), np.zeros((2, 2)), np.empty(0)))
+    monkeypatch.setattr(base, "remove_silent_times",
+                        lambda times, silent: np.asarray(times))
+    monkeypatch.setattr(base, "_start_end_times",
+                        lambda times, volume, onset: np.asarray(times))
+    monkeypatch.setattr(config, "v2_max_note_gap_seconds", 0.)
+    calls = []
+
+    def spy(state, song, *, rng=None, logger=None):
+        calls.append((state, song, rng))
+        return {"applied": False, "added_notes": 0}
+
+    monkeypatch.setattr(base, "apply_note_emphasis", spy)
+    song, vocab = audio_song(), vocabulary()
+    predictors = dummy_predictors(vocab)
+    result = generate(song, 4., predictors, lambda times: np.zeros((len(times), 16), np.float32),
+                      preparation_settings(), vocab, lighting_generator=lighting)
+    assert len(calls) == 1
+    assert calls[0][2] is not None
+    assert result.diagnostics["note_emphasis"]["added_notes"] == 0
+    assert result.diagnostics["final_counts"]["emphasis_copies"] == 0
+
+
+def test_final_counts_separate_emphasis_from_learned_copies():
+    song, vocab = audio_song(), vocabulary()
+    predictors = dummy_predictors(vocab)
+    hooks = processors()
+
+    def emphasis(state, song_arg, *, rng=None, logger=None):
+        identity = max([n["id"] for n in state["notes"]]
+                       + [c["id"] for c in state["chains"]], default=-1) + 1
+        state["notes"].append({"id": identity, "time": 8., "hand": 0, "x": 0, "y": 1,
+                               "d": 0, "kind": "copy", "source": "emphasis", "anchor_id": 0})
+        return {"applied": True, "added_notes": 1}
+
+    hooks.apply_note_emphasis = emphasis
+    result = generate(song, 4., predictors, lambda times: np.zeros((len(times), 16), np.float32),
+                      preparation_settings(), vocab, lighting_generator=lighting, postprocessors=hooks)
+    counts = result.diagnostics["final_counts"]
+    assert counts["emphasis_copies"] == 1
+    assert counts["learned_copies"] == sum(
+        n.get("kind") == "copy" and n.get("source") != "emphasis" for n in result.state["notes"])
+
+
+def test_legacy_cleanup_opt_in_does_not_double_expand(monkeypatch):
+    from map_creation import v2_postprocessing as base
+    monkeypatch.setattr(config, "v2_cleanup_note_heuristics", True)
+    song, vocab = audio_song(), vocabulary()
+    predictors = dummy_predictors(vocab)
+    hooks = processors()
+    hooks.apply_note_emphasis = base.apply_note_emphasis
+    result = generate(song, 4., predictors, lambda times: np.zeros((len(times), 16), np.float32),
+                      preparation_settings(), vocab, lighting_generator=lighting, postprocessors=hooks)
+    assert not result.diagnostics["note_emphasis"]["applied"]
+    assert result.diagnostics["final_counts"]["emphasis_copies"] == 0

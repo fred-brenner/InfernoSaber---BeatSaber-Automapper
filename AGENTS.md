@@ -17,9 +17,12 @@ priority policy (`v2_flow_min_turn_steps` / `v2_playability_late_turns`), a diag
 fills plus a pluggable max-gap safety net
 (`v2_fill_entry_delay_seconds`/`v2_fill_respect_silence`/
 `v2_onset_snap_unmatched_policy`/`v2_max_note_gap_seconds`/
-`v2_gap_fill_source`), and a decorative calm-area pulse pass that adds edge wall
+`v2_gap_fill_source`), a decorative calm-area pulse pass that adds edge wall
 flashes, corner bombs and laser flashes inside intentionally note-free gaps
-without touching notes (`v2_calm_effects`), the retained
+without touching notes (`v2_calm_effects`), and a standalone append-only
+v1-style note emphasis pass restoring slow-swing double/triple stacks after
+learned expansion (`map_creation/v2_note_emphasis.py`, gated by
+`emphasize_beats_flag`/`single_notes_only_flag`), the retained
 encoder, and exclusive v1 `fav_15` lighting; GPU remains the training runtime.
 The five v1 presets remain selectable legacy options in the app and CLI
 (`fav_15`, `pp3_15`, `easy_15`, `hard_15`, `expert_15`); a v1 selection

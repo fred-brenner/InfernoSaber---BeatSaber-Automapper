@@ -509,6 +509,7 @@ def generate(song, requested_nps, predictors, encoder, settings, vocabularies, *
                 apply_speed_cap=base.apply_speed_cap,
                 speed_cap_scale=base.speed_cap_scale,
                 finalize_playability_reach=base.finalize_playability_reach,
+                apply_note_emphasis=base.apply_note_emphasis,
                 calm_area_pulses=base.calm_area_pulses,
                 add_calm_effects=base.add_calm_effects,
                 add_calm_lighting=base.add_calm_lighting)
@@ -762,6 +763,14 @@ def generate(song, requested_nps, predictors, encoder, settings, vocabularies, *
     if combined_reach and reach_finalize is not None:
         result.diagnostics["reach_post_expansion"] = reach_finalize(
             state["notes"], state["chains"], protect_retained=True)
+    emphasis = getattr(postprocessors, "apply_note_emphasis", None)
+    if emphasis is not None:
+        emphasis_started = perf_counter()
+        result.diagnostics["note_emphasis"] = emphasis(
+            state, song, rng=rng, logger=logger)
+        result.stages["emphasis"] = {
+            "added_notes": result.diagnostics["note_emphasis"].get("added_notes", 0),
+            "elapsed_seconds": perf_counter() - emphasis_started}
     started = perf_counter()
     index_state(state)
     if getattr(config, "v2_walls_heuristic", False):
@@ -899,7 +908,10 @@ def generate(song, requested_nps, predictors, encoder, settings, vocabularies, *
         "colored_notes": len(state["notes"]),
         "retained_notes": sum(note.get("kind") == "retained" for note in state["notes"]),
         "heuristic_notes": sum(note.get("kind") == "heuristic" for note in state["notes"]),
-        "learned_copies": sum(note.get("kind") == "copy" for note in state["notes"]),
+        "learned_copies": sum(note.get("kind") == "copy" and note.get("source") != "emphasis"
+                              for note in state["notes"]),
+        "emphasis_copies": sum(note.get("kind") == "copy" and note.get("source") == "emphasis"
+                               for note in state["notes"]),
         "unique_onsets": len({note["time"] for note in state["notes"]}),
         "chains": len(state["chains"]), "chain_slices": sum(chain["slices"] for chain in state["chains"]),
         "walls": len(state["walls"]), "bombs": len(state["bombs"]),

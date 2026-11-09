@@ -1574,6 +1574,12 @@ def apply_diagonal_cap(notes, chains=None, rng=None):
     return stats
 
 
+def apply_note_emphasis(state, song, *, rng=None, logger=None):
+    """Optional v1-style slow-swing stacks; see ``v2_note_emphasis``."""
+    from map_creation.v2_note_emphasis import apply_note_emphasis as _impl
+    return _impl(state, song, rng=rng, logger=logger)
+
+
 def speed_cap_scale():
     """Effective v2 speed-cap scale.
 

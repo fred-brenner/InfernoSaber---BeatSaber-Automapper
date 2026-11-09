@@ -258,6 +258,25 @@ NPS track the request (~0.8–1.2×). Set the flag `True` to restore the legacy
 cleanup for A/B checks. The `v2_cleanup_*` overrides above now only matter
 when the flag is enabled.
 
+The legacy `emphasize_beats` behaviour is restored as a standalone,
+append-only pass (`map_creation/v2_note_emphasis.py`, exposed on the default
+postprocessor namespace and run after the post-expansion reach pass, before
+hazard indexing): retained directed anchors on isolated slow onset groups —
+`emphasize_beats_quantile`-gated incoming gaps, first four onsets skipped —
+may grow into double/triple same-time stacks of axis-contiguous cells with
+the original `emphasize_beats_3`/`emphasize_beats_2` `max_speed`-scaled
+probabilities. `emphasize_beats_flag` and `single_notes_only_flag` still
+apply: disabling emphasis or enabling Single Mode suppresses the pass without consuming RNG draws,
+and opting into the legacy cleanup defers emphasis to the original v1
+pass. Additions are `kind="copy"`
+with `source="emphasis"`, keep the anchor's time/hand/arrow, never move or
+remove existing notes or chains and create no new onset times; every
+candidate must clear the same frozen-baseline gates the stream enforces —
+occupancy/clearance, the diagonal-fraction bound, the ramped speed cap, the
+fast counter-direction rule, and the enabled playability policies — with
+unsafe candidates rejected rather than repaired. Final counts report
+`emphasis_copies` separately from learned `learned_copies`.
+
 Because production skips that legacy pass, `allow_dot_notes = False` is
 enforced in the v2 structuring loop instead: a candidate dot whose siblings
 all offer legal cuts takes the best non-dot option, and a surviving dot is

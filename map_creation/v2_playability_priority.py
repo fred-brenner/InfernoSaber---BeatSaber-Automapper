@@ -101,6 +101,20 @@ def audit_priority(notes):
     return metrics.priority_metrics(notes)
 
 
+def _specific_components(note, event):
+    """The four specific preparation tails for one note/event pair."""
+    components = event['components']
+    raw = components['excursion'] + components['specific']
+    factor = event['total']/raw if raw else 0.
+    dx, dy = metrics.STEP.get(note['d'], (0, 0))
+    inward = int((note['hand'] == 0 and note['x'] == 1 and dx == -1)
+                 or (note['hand'] == 1 and note['x'] == 2 and dx == 1))
+    vertical = int((note['y'] == 2 and dy == 1) or (note['y'] == 0 and dy == -1))
+    return {'preparation_excursion': event['excursion']*factor,
+            'inner_inward': inward*factor, 'vertical_preparation': vertical*factor,
+            'outer_placement': components['placement']*factor}
+
+
 def _clearance_findings(notes):
     """Identity-level counterpart to production clearance_violations."""
     from map_creation import v2_postprocessing as post
@@ -322,18 +336,6 @@ class _PrioritySearch:
                    for old, new in entries.values()):
             return False
 
-        def specific(note, event):
-            components = event['components']
-            raw = components['excursion'] + components['specific']
-            factor = event['total']/raw if raw else 0.
-            dx, dy = metrics.STEP.get(note['d'], (0, 0))
-            inward = int((note['hand'] == 0 and note['x'] == 1 and dx == -1)
-                         or (note['hand'] == 1 and note['x'] == 2 and dx == 1))
-            vertical = int((note['y'] == 2 and dy == 1) or (note['y'] == 0 and dy == -1))
-            return {'preparation_excursion': event['excursion']*factor,
-                    'inner_inward': inward*factor, 'vertical_preparation': vertical*factor,
-                    'outer_placement': components['placement']*factor}
-
         identities = set(deltas['preparation']) | {self.notes[i]['id'] for i in edits}
         for identity in identities:
             i = self.index[identity]
@@ -344,7 +346,8 @@ class _PrioritySearch:
                 candidate.update(zip(('x', 'y', 'd'), edits[i]))
             new_event = metrics.preparation_events([candidate])[0]
             new_event['total'] = deltas['preparation'].get(identity, (0., old_event['total']))[1]
-            old_specific, new_specific = specific(old_note, old_event), specific(candidate, new_event)
+            old_specific = _specific_components(old_note, old_event)
+            new_specific = _specific_components(candidate, new_event)
             if any(new_specific[key] > max(old_specific[key], bounds[key])+1e-9 for key in old_specific):
                 return False
         return True
