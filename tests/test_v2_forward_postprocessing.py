@@ -393,3 +393,135 @@ def test_direction_first_state_uses_final_recut(monkeypatch):
     notes = [_note(0, 0., 0, 1, 1, 4), _note(1, .3, 0, 1, 1, 3)]
     repair_notes(notes, cap=lambda n: 9., rng=_ConstantDraw())
     assert notes[0]["d"] == 0 and notes[1]["d"] != 3
+
+def _shared_audit(notes):
+    from map_creation import v2_postprocessing as post
+    eps = float(getattr(config, "min_time_diff", .02))
+    gap = float(getattr(config, "v2_cleanup_same_dir_gap", .1) or .1)
+    fast = float(getattr(config, "v2_fast_gap_seconds", .2) or .2)
+    ordered = sorted(notes, key=lambda n: (n["time"], n["id"]))
+    pred, _ = post._history_context(ordered, eps)
+    from map_creation.v2_forward_directions import _fast_ids
+    fast_ids = _fast_ids(ordered, eps, fast)
+    flow = [n["id"] for n in ordered if n["d"] != 8
+            and not post._flow_legal(n["d"], pred.get(n["id"]), n["x"], n["y"],
+                                     n["time"], gap)]
+    counter = [n["id"] for n in ordered
+               if n["id"] in fast_ids and post._counter_direction(n)]
+    return flow, counter
+
+
+def test_hard_direction_repairs_saved_pair():
+    from map_creation.v2_forward_postprocessing import repair_notes
+    notes = [_note(9, 13.885532879818594, 1, 3, 1, 1),
+             _note(10, 14.031409390561054, 1, 3, 0, 1)]
+    out = repair_notes(notes, cap=lambda n: 9., rng=_ConstantDraw())
+    second = notes[1]
+    assert second["y"] != 0 and second["d"] == 0
+    assert _shared_audit(notes) == ([], [])
+    assert out["hard_direction"]["changed"] >= 1
+
+
+def test_hard_direction_repairs_mirror_pair():
+    from map_creation.v2_forward_postprocessing import repair_notes
+    notes = [_note(9, 0., 0, 0, 1, 1), _note(10, .145876, 0, 0, 0, 1)]
+    repair_notes(notes, cap=lambda n: 9., rng=_ConstantDraw())
+    assert (notes[1]["x"], notes[1]["y"], notes[1]["d"]) != (0, 0, 1)
+    assert _shared_audit(notes) == ([], [])
+
+
+def test_audit_directions_reports_findings():
+    from map_creation.v2_forward_directions import audit_directions
+    notes = [_note(9, 0., 1, 3, 1, 1), _note(10, .145876, 1, 3, 0, 1)]
+    findings = audit_directions(notes)
+    assert findings["flow"] == [10]
+    notes = [_note(9, 0., 1, 3, 2, 1), _note(10, .15, 1, 3, 0, 0)]
+    findings = audit_directions(notes)
+    assert findings["fast_counter"] == [9, 10]
+
+
+def test_enforce_first_endpoint_of_fast_pair():
+    from map_creation.v2_forward_directions import enforce_directions
+    from map_creation.v2_forward_clearance import LocalNoteIndex
+    notes = [_note(9, 0., 1, 3, 2, 1), _note(10, .15, 1, 3, 1, 0)]
+    stats = enforce_directions(notes, LocalNoteIndex(notes))
+    assert notes[0]["d"] != 1 and stats["changed"] >= 1
+    assert _shared_audit(notes) == ([], [])
+
+
+def test_enforce_saturation_raises_bounded():
+    from map_creation.v2_forward_directions import enforce_directions
+    from map_creation.v2_forward_clearance import LocalNoteIndex
+    block = [_note(i, .1, 0, x, y, 0)
+             for i, (x, y) in enumerate((x, y) for x in (1, 2) for y in range(3))]
+    block += [_note(20, .1, 0, 3, 2, 2)]
+    notes = block + [_note(30, 0., 1, 3, 1, 1), _note(31, .11, 1, 3, 0, 1)]
+    stats = enforce_directions(notes, LocalNoteIndex(notes))
+    assert stats["dropped"] == 1
+    assert stats["dropped_notes"][0]["id"] == 31
+    assert stats["dropped_notes"][0]["proposals"] <= 72
+    assert 31 not in [n["id"] for n in notes]
+    assert _shared_audit(notes) == ([], [])
+
+
+def test_enforce_preserves_conflicts_and_rejects_swap():
+    from map_creation.v2_forward_directions import enforce_directions
+    from map_creation.v2_forward_clearance import LocalNoteIndex
+    notes = [_note(9, 0., 0, 1, 1, 2), _note(10, .15, 0, 1, 1, 2),
+             _note(11, .01, 1, 1, 1, 0)]
+    stats = enforce_directions(notes, LocalNoteIndex(notes))
+    assert notes[1]["d"] != 2
+    assert stats["changed"] >= 1
+
+
+def test_enforce_honors_disabled_and_threshold(monkeypatch):
+    from map_creation.v2_forward_directions import enforce_directions
+    from map_creation.v2_forward_clearance import LocalNoteIndex
+    notes = [_note(9, 0., 1, 3, 1, 0), _note(10, .2, 1, 3, 2, 1)]
+    stats = enforce_directions(notes, LocalNoteIndex(notes))
+    assert notes[1]["d"] == 1 and stats["attempted"] == 0
+    monkeypatch.setattr(config, "v2_cleanup_same_dir_recut", 0)
+    monkeypatch.setattr(config, "v2_fast_gap_seconds", 0.)
+    stats = enforce_directions(notes, LocalNoteIndex(notes))
+    assert stats["attempted"] == 0
+
+
+def test_enforce_dot_run_and_same_onset_stack():
+    from map_creation.v2_forward_directions import enforce_directions, audit_directions
+    from map_creation.v2_forward_clearance import LocalNoteIndex
+    notes = [_note(9, 0., 0, 0, 0, 2), _note(10, .15, 0, 0, 0, 8),
+             _note(11, .3, 0, 2, 0, 2)]
+    enforce_directions(notes, LocalNoteIndex(notes))
+    assert notes[1]["d"] == 8
+    stack = [_note(9, 0., 0, 0, 0, 2), _note(10, 1., 0, 0, 2, 3),
+             _note(11, 1.01, 0, 2, 2, 5)]
+    findings = audit_directions(stack)
+    assert findings["flow"] == []
+
+
+def test_validate_state_forward_raises_residual_direction():
+    from map_creation.v2_pipeline import _validate_state
+    state = {"notes": [_note(0, 1., 0, 1, 1, 2, kind="retained"),
+                       _note(1, 1.15, 0, 1, 1, 2, kind="retained")],
+             "chains": [], "walls": [], "bombs": [], "arcs": [], "lighting": []}
+    with pytest.raises(ValueError, match="direction"):
+        _validate_state(state, 4., playability_mode="forward")
+
+def test_enforce_conflict_id_swap_rejected():
+    from map_creation.v2_forward_directions import enforce_directions
+    from map_creation.v2_forward_clearance import LocalNoteIndex
+    notes = [_note(9, 0., 0, 0, 1, 2), _note(10, .15, 0, 0, 1, 2),
+             _note(11, .01, 1, 1, 0, 0), _note(12, .13, 1, 0, 0, 0)]
+    index = LocalNoteIndex(notes)
+    stats = enforce_directions(notes, index)
+    assert stats["changed"] + stats["dropped"] >= 1
+    moved = notes[1]
+    assert index.conflict_ids(moved) <= index.conflict_ids(
+        {"id": 10, "time": .15, "hand": 0, "x": 0, "y": 1, "d": 2})
+
+
+def test_enforce_empty_reports_drop_fields():
+    from map_creation.v2_forward_directions import enforce_directions
+    from map_creation.v2_forward_clearance import LocalNoteIndex
+    stats = enforce_directions([], LocalNoteIndex([]))
+    assert stats["dropped"] == 0 and stats["dropped_notes"] == []

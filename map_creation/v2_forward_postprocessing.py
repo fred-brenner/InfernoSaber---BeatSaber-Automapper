@@ -14,6 +14,7 @@ from tools.config import config
 from tools.utils.numpy_shorts import get_factor_from_max_speed
 from map_creation import v2_playability_priority_metrics as metrics
 from map_creation.v2_forward_clearance import LocalNoteIndex
+from map_creation.v2_forward_directions import enforce_directions
 
 _TOL = 1e-9
 _MAX_PROPOSALS = 8
@@ -385,5 +386,6 @@ def repair_notes(notes, *, rng=None, cap=None, logger=None):
         report["repeated"] = _repeated_pass(view, index, rng)
         report["visibility"] = _visibility_pass(view, index)
         report["center"] = clear_center_view(notes, rng=rng, index=index)
+        report["hard_direction"] = enforce_directions(notes, index)
     report["seconds"] = clock.monotonic() - start
     return report

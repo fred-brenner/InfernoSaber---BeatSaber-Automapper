@@ -293,10 +293,21 @@ provides the shared local collision index and
 `map_creation/v2_forward_expansion.py` atomically accepts or rejects new
 learned copies/chains and emphasis stacks against it. Base-note movement
 finishes before the retained snapshot and expansion; accepted additions are
-never moved or recut. Remaining reach/path/flow findings are reported in
-`diagnostics["playability_findings"]` instead of failing generation —
-`playability_policy`/`playability_strict_validated` distinguish the actual
-adapter — while structural contract errors still raise. Learned and emphasis
+never moved or recut. After all movement, one chronological hard pass
+(`map_creation/v2_forward_directions.py`) enforces the enabled same-hand
+flow and fast row-counter rules — up to 9 cells x 8 arrows = 72 bounded
+proposals per violating note — when none succeeds, the single offending base
+note is dropped as a bounded last resort and reported under
+`dropped`/`dropped_notes` before the retained snapshot — and the final
+validation audits them once more (`hard_direction_validated`); only internal
+residual findings still raise. The hard pass runs after the cosmetic passes
+and may override center/repeat positions or reduce note density as a last
+resort. New expansion/emphasis additions are guarded
+by the same direction predicates per batch. Remaining reach/path findings
+are reported in `diagnostics["playability_findings"]` instead of failing
+generation — `playability_policy`/`playability_strict_validated`
+distinguish the actual adapter — while structural contract errors still
+raise. Learned and emphasis
 copies still must not create the forbidden far-opposite inward cut or a
 same-cell or cut-path collision; emphasis copies additionally must not worsen
 the diagonal bound (the base-note diagonal pass is best-effort). Setting

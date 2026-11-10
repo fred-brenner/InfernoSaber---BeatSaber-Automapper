@@ -11,6 +11,7 @@ import numpy as np
 
 from tools.config import config
 from map_creation.v2_forward_clearance import LocalNoteIndex
+from map_creation.v2_forward_directions import DirectionGuard
 
 _TOL = 1e-9
 _PRIVATE = "_forward_guard"
@@ -41,7 +42,8 @@ def _guard(state):
         index = LocalNoteIndex(base)
         guard = {"index": index,
                  "accepted_ids": {note["id"] for note in base},
-                 "accepted_chains": set()}
+                 "accepted_chains": set(),
+                 "direction": DirectionGuard(base)}
         state[_PRIVATE] = guard
     return guard
 
@@ -64,7 +66,8 @@ def validate_expansions(state, song, logger=None):
                    or getattr(config, "v2_playability_reach", False)))
     banned = strict and any(_forbidden(note) for note in batch)
     clear = (anchored and not banned
-             and guard["index"].accepts_many([*batch, *samples]))
+             and guard["index"].accepts_many([*batch, *samples])
+             and guard["direction"].check(batch) is None)
     if not clear:
         drop = {note["id"] for note in batch}
         drop_chains = {chain["id"] for chain in new_chains}
@@ -74,6 +77,7 @@ def validate_expansions(state, song, logger=None):
                 "rejected_chains": len(new_chains)}
     if batch:
         guard["index"].add_many(batch)
+        guard["direction"].add_many(batch)
         guard["accepted_ids"].update(note["id"] for note in batch)
     for chain in new_chains:
         guard["accepted_chains"].add(chain["id"])
@@ -95,9 +99,11 @@ class _ForwardGate:
         self.chains = state.get("chains", [])
         guard = _guard(state)
         self.index = guard["index"]
+        self.direction = guard["direction"]
         for note in self.notes:
             if note["id"] not in guard["accepted_ids"]:
                 self.index.add_many([note])
+                self.direction.add_many([note])
                 guard["accepted_ids"].add(note["id"])
         for chain in self.chains:
             if chain["id"] not in guard["accepted_chains"]:
@@ -121,6 +127,7 @@ class _ForwardGate:
         new = [note for note in self.notes if note["id"] not in self.known]
         if new:
             self.index.add_many(new)
+            self.direction.add_many(new)
             self.known.update(note["id"] for note in new)
             guard = self.state.get(_PRIVATE)
             if guard is not None:
@@ -157,6 +164,9 @@ class _ForwardGate:
                 return "counter_direction"
         if not self.index.accepts_many(proposed):
             return "cell_occupied"
+        reason = self.direction.check(proposed)
+        if reason is not None:
+            return reason
         diagonals = sum(note["d"] in (4, 5, 6, 7) for note in self.notes) \
             + sum(note["d"] in (4, 5, 6, 7) for note in proposed)
         if diagonals / (len(self.notes) + len(proposed)) > self.diagonal_bound + _TOL:

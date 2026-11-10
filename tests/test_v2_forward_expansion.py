@@ -49,7 +49,7 @@ def expansion_defaults(monkeypatch):
 
 def _emphasis_state(count=8):
     times = [.4, .6, .8, 1., 1.2, 2.5, 3.8, 5.1]
-    notes = [_retained(i, times[i], 0, 1, 1, 0) for i in range(count)]
+    notes = [_retained(i, times[i], 0, 1, 1, i % 2) for i in range(count)]
     return {"notes": notes, "chains": []}
 
 
@@ -296,7 +296,7 @@ def test_forward_diagnostics_markers_not_strict_success(monkeypatch):
 
 def test_validate_rejects_cross_kind_batch_atomically():
     from map_creation.v2_forward_expansion import validate_expansions
-    state = {"notes": [_retained(0, 0., 0, 0, 1, 2), _retained(1, 2., 1, 3, 2, 0),
+    state = {"notes": [_retained(0, 0., 0, 0, 1, 2), _retained(1, 2., 1, 3, 2, 7),
                        _note(5, .5, 1, 1, 1, 0, kind="copy", anchor_id=1)],
              "chains": [{"id": 20, "anchor_id": 0, "time": 0., "end_time": 1.,
                          "hand": 0, "x": 0, "y": 1, "tx": 2, "ty": 1, "d": 2,
@@ -304,38 +304,38 @@ def test_validate_rejects_cross_kind_batch_atomically():
     out = validate_expansions(state, None)
     assert out["rejected_copies"] == 1 and out["rejected_chains"] == 1
     assert len(state["notes"]) == 2 and state["chains"] == []
-    state["notes"].append(_note(6, .6, 0, 0, 0, 0, kind="copy", anchor_id=0))
+    state["notes"].append(_note(6, .6, 0, 0, 0, 5, kind="copy", anchor_id=0))
     assert validate_expansions(state, None)["rejected_copies"] == 0
     assert [n["id"] for n in state["notes"]] == [0, 1, 6]
 
 
 def test_validate_rejects_dangling_anchor_and_forbidden_copy(monkeypatch):
     from map_creation.v2_forward_expansion import validate_expansions
-    state = {"notes": [_retained(0, 0., 0, 0, 1, 2),
+    state = {"notes": [_retained(0, 0., 0, 0, 1, 0),
                        _note(5, .5, 0, 1, 1, 0, kind="copy", anchor_id=99)],
              "chains": []}
     assert validate_expansions(state, None)["rejected_copies"] == 1
     assert len(state["notes"]) == 1
-    state = {"notes": [_retained(0, 0., 0, 0, 1, 2),
+    state = {"notes": [_retained(0, 0., 0, 0, 1, 0),
                        _note(5, .5, 0, 1, 1, 0, kind="copy")],
              "chains": []}
     assert validate_expansions(state, None)["rejected_copies"] == 1
     assert len(state["notes"]) == 1
-    state = {"notes": [_retained(0, 0., 0, 0, 1, 2),
-                       _note(5, .5, 0, 3, 1, 2, kind="copy", anchor_id=0)],
+    state = {"notes": [_retained(0, 0., 0, 0, 1, 0),
+                       _note(5, .5, 0, 3, 1, 6, kind="copy", anchor_id=0)],
              "chains": []}
     assert validate_expansions(state, None)["rejected_copies"] == 1
     monkeypatch.setattr(config, "v2_playability_reach", False)
     monkeypatch.setattr(config, "v2_playability_priority", False)
-    state = {"notes": [_retained(0, 0., 0, 0, 1, 2),
-                       _note(5, .5, 0, 3, 1, 2, kind="copy", anchor_id=0)],
+    state = {"notes": [_retained(0, 0., 0, 0, 1, 0),
+                       _note(5, .5, 0, 3, 1, 6, kind="copy", anchor_id=0)],
              "chains": []}
     assert validate_expansions(state, None)["rejected_copies"] == 0
 
 
 def test_emphasis_sequential_checks_see_accepted_stack():
     from map_creation.v2_forward_expansion import apply_note_emphasis
-    notes = [_retained(i, .2 * i, 0, 0, 1, 0) for i in range(4)]
+    notes = [_retained(i, .2 * i, 0, 0, 1, 6) for i in range(4)]
     notes += [_retained(4, 3., 0, 0, 0, 3), _retained(5, 3., 1, 3, 2, 0)]
     state = {"notes": notes, "chains": []}
     out = apply_note_emphasis(state, None, rng=_ScriptedDraws(.99, .99))
@@ -457,3 +457,94 @@ def test_accepts_many_bounded_index_work():
         mp.setattr(LocalNoteIndex, "add_many", spy)
         assert index.accepts_many(proposals)
     assert work["count"] <= 3 * len(proposals)
+
+def test_expansion_rejects_staggered_flow_breaking_copy():
+    from map_creation.v2_forward_expansion import validate_expansions
+    state = {"notes": [_retained(0, 0., 0, 0, 1, 2), _retained(1, 1., 0, 0, 2, 2),
+                       _note(5, .5, 0, 1, 1, 2, kind="copy", anchor_id=0)],
+             "chains": []}
+    out = validate_expansions(state, None)
+    assert out["rejected_copies"] == 1
+    assert len(state["notes"]) == 2
+    state["notes"].append(_note(6, .5, 0, 1, 1, 5, kind="copy", anchor_id=0))
+    assert validate_expansions(state, None)["rejected_copies"] == 0
+
+
+def test_expansion_rejects_copy_making_incumbent_counter():
+    from map_creation.v2_forward_expansion import validate_expansions
+    state = {"notes": [_retained(0, 1., 0, 0, 0, 0),
+                       _note(5, .85, 0, 1, 1, 6, kind="copy", anchor_id=0)],
+             "chains": []}
+    out = validate_expansions(state, None)
+    assert out["rejected_copies"] == 1 and len(state["notes"]) == 1
+
+
+def test_expansion_same_time_stack_allowed():
+    from map_creation.v2_forward_expansion import validate_expansions
+    state = {"notes": [_retained(0, 0., 0, 0, 1, 2), _retained(1, 1., 0, 0, 0, 2),
+                       _note(5, 1., 0, 1, 0, 5, kind="copy", anchor_id=1)],
+             "chains": []}
+    assert validate_expansions(state, None)["rejected_copies"] == 0
+
+
+def test_expansion_rejects_outgoing_flow_breaking_copy():
+    from map_creation.v2_forward_expansion import validate_expansions
+    state = {"notes": [_retained(0, 0., 0, 0, 1, 2), _retained(1, 1., 0, 0, 2, 2),
+                       _note(5, .5, 0, 1, 1, 5, kind="copy", anchor_id=0)],
+             "chains": []}
+    assert validate_expansions(state, None)["rejected_copies"] == 0
+    state = {"notes": [_retained(0, 0., 0, 0, 1, 2), _retained(1, .5, 0, 0, 2, 3),
+                       _note(5, .25, 0, 1, 1, 5, kind="copy", anchor_id=0)],
+             "chains": []}
+    out = validate_expansions(state, None)
+    assert out["rejected_copies"] == 1 and len(state["notes"]) == 2
+
+
+def test_expansion_direction_rejection_keeps_indexes_clean():
+    from map_creation.v2_forward_expansion import validate_expansions
+    state = {"notes": [_retained(0, 0., 0, 0, 1, 2), _retained(1, 1., 0, 0, 2, 2),
+                       _note(5, .5, 0, 1, 1, 2, kind="copy", anchor_id=0)],
+             "chains": []}
+    assert validate_expansions(state, None)["rejected_copies"] == 1
+    state["notes"].append(_note(6, .5, 0, 1, 1, 5, kind="copy", anchor_id=0))
+    assert validate_expansions(state, None)["rejected_copies"] == 0
+    assert [n["id"] for n in state["notes"]] == [0, 1, 6]
+
+
+def test_expansion_dot_run_propagation_rejects():
+    from map_creation.v2_forward_expansion import validate_expansions
+    state = {"notes": [_retained(0, 0., 0, 0, 0, 2),
+                       _retained(1, .15, 0, 0, 0, 8),
+                       _retained(2, .3, 0, 2, 0, 2),
+                       _note(5, .45, 0, 1, 0, 2, kind="copy", anchor_id=2)],
+             "chains": []}
+    out = validate_expansions(state, None)
+    assert out["rejected_copies"] == 1
+
+def test_fast_ids_covers_later_stack_members():
+    from map_creation.v2_forward_directions import _fast_ids
+    ordered = [_note(0, 0., 0, 1, 1, 0), _note(1, .15, 0, 1, 1, 0),
+               _note(2, .15, 0, 1, 1, 0)]
+    assert _fast_ids(ordered, .02, .2) == {0, 1, 2}
+
+
+def test_expansion_rejects_same_onset_fast_counter_copy():
+    from map_creation.v2_forward_expansion import validate_expansions
+    state = {"notes": [_retained(0, 0., 0, 1, 1, 1),
+                       _retained(1, .15, 0, 2, 1, 0),
+                       _note(5, .15, 0, 2, 0, 0, kind="copy", anchor_id=1)],
+             "chains": []}
+    assert validate_expansions(state, None)["rejected_copies"] == 1
+    state = {"notes": [_retained(0, 0., 0, 1, 1, 1),
+                       _retained(1, .15, 0, 2, 1, 0),
+                       _note(5, .15, 0, 0, 1, 0, kind="copy", anchor_id=1)],
+             "chains": []}
+    assert validate_expansions(state, None)["rejected_copies"] == 0
+
+
+def test_guard_preserves_incumbent_residual_findings():
+    from map_creation.v2_forward_directions import DirectionGuard
+    incumbents = [_retained(0, 0., 0, 2, 2, 0), _retained(1, .15, 0, 1, 0, 0)]
+    guard = DirectionGuard(incumbents)
+    proposed = [_note(5, .3, 0, 0, 1, 6, kind="copy", anchor_id=1)]
+    assert guard.check(proposed) is None

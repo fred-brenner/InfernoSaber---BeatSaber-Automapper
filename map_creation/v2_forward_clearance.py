@@ -78,7 +78,11 @@ class LocalNoteIndex:
         self._seq = 0
         self.entries = []
         self.times = []
+        self._dropped = set()
         self.add_many(notes)
+
+    def remove_ids(self, ids):
+        self._dropped.update(ids)
 
     def add_many(self, records):
         for note in records:
@@ -97,7 +101,7 @@ class LocalNoteIndex:
     def _conflicts(self, note, other, ignore_ids):
         if other is note or other["id"] == note.get("id"):
             return False
-        if other["id"] in ignore_ids:
+        if other["id"] in ignore_ids or other["id"] in self._dropped:
             return False
         note_sample = note.get("kind") == "chain_sample"
         other_sample = other.get("kind") == "chain_sample"
@@ -132,6 +136,11 @@ class LocalNoteIndex:
         ignore = set(ignore_ids)
         return any(self._conflicts(note, other, ignore)
                    for other in self.nearby(note))
+
+    def conflict_ids(self, note, ignore_ids=()):
+        ignore = set(ignore_ids)
+        return {other["id"] for other in self.nearby(note)
+                if self._conflicts(note, other, ignore)}
 
     def accepts(self, note, ignore_ids=()):
         return _legal_geometry(note) and not self.conflicts(note, ignore_ids)

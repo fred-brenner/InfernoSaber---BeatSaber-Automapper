@@ -475,6 +475,12 @@ def _validate_state(state, duration, *, playability_mode="search"):
         if not 0 <= event["time"] < duration or not np.isfinite([event["type"], event["value"]]).all():
             raise ValueError("Invalid final v2 lighting event")
     if playability_mode == "forward":
+        from .v2_forward_directions import audit_directions
+        direction = audit_directions(state["notes"])
+        if direction["flow"] or direction["fast_counter"]:
+            raise ValueError(
+                "Final forward direction audit contains enabled flow or "
+                "fast-counter violations")
         from .v2_postprocessing import clearance_violations
         findings["clearance"] = clearance_violations(state["notes"])
     return findings
@@ -963,6 +969,7 @@ def generate(song, requested_nps, predictors, encoder, settings, vocabularies, *
              or getattr(config, "v2_playability_priority", False)))
     if playability_mode == "forward":
         result.diagnostics["playability_findings"] = playability_findings or {}
+        result.diagnostics["hard_direction_validated"] = True
     result.diagnostics["final_counts"] = {
         "colored_notes": len(state["notes"]),
         "retained_notes": sum(note.get("kind") == "retained" for note in state["notes"]),

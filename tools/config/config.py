@@ -246,7 +246,10 @@ v2_cleanup_note_heuristics = False  # run the legacy v1 note mutators (mirroring
                                    # and the clearance fixpoint still apply; the "forward" mode
                                    # replaces them with bounded best-effort passes
                                    # (docs/generation-v2.md)
-v2_note_postprocessing_mode = "forward"  # "forward" bounded best-effort passes; "search" strict optimizer
+v2_note_postprocessing_mode = "forward"  # "forward" bounded best-effort passes plus a final hard
+                                        # flow/fast-counter pass (72 proposals per note, then a
+                                        # dropped base note as last resort); reach/path findings stay
+                                        # diagnostics. "search" restores the strict optimizer.
 v2_notes_onset_snap = True          # snap each note onto its nearest detected onset peak after
                                    # structural cleanup; bounded per note/hand, no model
 v2_notes_onset_snap_ioi_ratio = 0.15  # max shift as fraction of the note's own same-hand IOI
