@@ -394,9 +394,11 @@ def test_direction_diag_only_trigger_keeps_incumbent(monkeypatch):
     assert sum(n["d"] not in (4, 5, 6, 7) for n in notes) >= 1
 
 
-def test_generate_keeps_expansion_and_drops_guard(monkeypatch):
+def test_generate_rejects_expansion_flow_violation_and_drops_guard(monkeypatch):
+    """The forced 50 ms same-direction copy is a hard flow violation now."""
     result = _run_generate(monkeypatch, force_expansion=True)
-    assert result.diagnostics["final_counts"]["learned_copies"] > 0
+    assert result.diagnostics["final_counts"]["learned_copies"] == 0
+    assert result.diagnostics["expansion_clearance"]["rejected_copies"] > 0
     assert "_forward_guard" not in result.state
     assert result.diagnostics["playability_policy"] == "forward"
     assert result.diagnostics["production_validated"] is True
@@ -548,3 +550,35 @@ def test_guard_preserves_incumbent_residual_findings():
     guard = DirectionGuard(incumbents)
     proposed = [_note(5, .3, 0, 0, 1, 6, kind="copy", anchor_id=1)]
     assert guard.check(proposed) is None
+
+
+def test_guard_rejects_staggered_same_direction_copy():
+    """A 50 ms-staggered copy repeating the cut is a hard flow violation."""
+    from map_creation.v2_forward_directions import DirectionGuard
+    guard = DirectionGuard([_retained(0, 1., 0, 0, 1, 2)])
+    copy = _note(1, 1.05, 0, 1, 1, 2, kind="copy", anchor_id=0)
+    assert guard.check([copy]) == "direction"
+
+
+def test_guard_overlap_rejects_same_cell_windows_and_batch_pairs():
+    from map_creation.v2_forward_directions import DirectionGuard
+    guard = DirectionGuard([_retained(0, 1., 0, 0, 1, 2)])
+    # same-hand same cell inside the 0.1 s window; the reversal is flow-legal
+    copy = _note(1, 1.05, 0, 0, 1, 3, kind="copy", anchor_id=0)
+    assert guard.check([copy]) == "overlap"
+    # cross-hand member on the cell inside the 0.15 s window
+    cross = _note(2, 1.1, 1, 0, 1, 0, kind="copy", anchor_id=0)
+    assert guard.check([cross]) == "overlap"
+    # proposed-vs-proposed same-cell pairs are caught too
+    batch = [_note(3, 1.3, 0, 1, 1, 3, kind="copy", anchor_id=0),
+             _note(4, 1.35, 0, 1, 1, 2, kind="copy", anchor_id=0)]
+    assert guard.check(batch) == "overlap"
+
+
+def test_guard_accepts_same_time_different_cell_stacks():
+    from map_creation.v2_forward_directions import DirectionGuard
+    guard = DirectionGuard([_retained(0, 1., 0, 0, 1, 2)])
+    copy = _note(1, 1., 0, 1, 1, 2, kind="copy", anchor_id=0)
+    assert guard.check([copy]) is None
+    cross = _note(2, 1., 1, 2, 1, 3, kind="copy", anchor_id=0)
+    assert guard.check([copy, cross]) is None

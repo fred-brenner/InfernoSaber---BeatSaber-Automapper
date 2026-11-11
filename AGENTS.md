@@ -115,9 +115,14 @@ platforms before implementing them unless the task already authorizes them.
   all safety semantics are unchanged. Production note repair defaults to
   v2_note_postprocessing_mode = forward: bounded best-effort passes plus an
   independent center-view move, a final hard same-hand flow/fast-counter pass
-  (9x8=72 proposals per note; an unrepairable base note is dropped as a
-  bounded last resort and reported) and append-only expansion/emphasis
-  guards; residual reach/path findings are diagnostics. search restores the
+  (one vectorized detection pass per hand seeds a chronological flagged-note
+  worklist; 9x8=72 proposals per note, an unrepairable base note is dropped
+  as a bounded last resort and reported, and
+  v2_hard_direction_policy = "drop" removes flagged notes directly; every
+  distinct-onset same-hand pair must turn >=135°) plus a bounded same-cell
+  overlap drop and append-only expansion/emphasis
+  guards; residual reach/path findings are diagnostics and final validation
+  drops stragglers instead of failing. search restores the
   strict optimizer; see docs/generation-v2.md.
 - For the five note-pattern playability metrics, including M5 same-hand direction
   variety, fast reversals and time between changes, read

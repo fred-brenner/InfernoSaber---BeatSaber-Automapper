@@ -295,12 +295,26 @@ learned copies/chains and emphasis stacks against it. Base-note movement
 finishes before the retained snapshot and expansion; accepted additions are
 never moved or recut. After all movement, one chronological hard pass
 (`map_creation/v2_forward_directions.py`) enforces the enabled same-hand
-flow and fast row-counter rules — up to 9 cells x 8 arrows = 72 bounded
-proposals per violating note — when none succeeds, the single offending base
-note is dropped as a bounded last resort and reported under
-`dropped`/`dropped_notes` before the retained snapshot — and the final
-validation audits them once more (`hard_direction_validated`); only internal
-residual findings still raise. The hard pass runs after the cosmetic passes
+flow and fast row-counter rules — detection is a single vectorized pass
+per hand (`_detect`), and only flagged notes enter the repair worklist:
+up to 9 cells x 8 arrows = 72 bounded proposals per violating note — when
+none succeeds, the single offending base note is dropped as a bounded last
+resort and reported under `dropped`/`dropped_notes` before the retained
+snapshot (setting `v2_hard_direction_policy = "drop"` removes flagged notes
+directly, no proposal search) — and the final validation re-audits them
+(`hard_direction_validated`) and removes any stragglers as the last net —
+with the chains/arcs headed by them — instead of failing
+(`hard_dropped_final`); only a still non-empty residual or a structural
+contract failure raises. Only true same-onset stacks (inside
+`min_time_diff`) stay exempt: every distinct-onset same-hand pair must
+satisfy the ≥135° turn — the 100 ms `v2_cleanup_same_dir_gap` same-stroke
+exemption now applies only to the earlier best-effort direction pass. A
+companion same-cell overlap scan (`hard_overlap`/`dropped_notes`, reason
+`"overlap"`) drops the later note when a survivor's cell is still occupied:
+same-hand consecutive within `v2_cleanup_same_dir_gap` (0.1 s) or
+cross-hand within `v2_cleanup_swing_window` (0.15 s) — still bounded and
+search-free, removal only, so drops merge before the direction repair. The
+hard pass runs after the cosmetic passes
 and may override center/repeat positions or reduce note density as a last
 resort. New expansion/emphasis additions are guarded
 by the same direction predicates per batch. Remaining reach/path findings

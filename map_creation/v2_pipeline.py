@@ -403,7 +403,13 @@ def _candidates(song, values):
 
 
 def _validate_state(state, duration, *, playability_mode="search"):
-    """Check the final object contract after all mutating postprocessors."""
+    """Check the final object contract after all mutating postprocessors.
+
+    In forward mode residual flow/fast-counter/overlap stragglers are
+    removed as the last net (with the chains and arcs headed by them and
+    notes anchored on them) instead of failing; the survivors are
+    re-audited and only a still non-empty residual or a structural
+    contract failure raises."""
     identities = {}
     all_ids = {note["id"] for note in state["notes"]}
     for note in state["notes"]:
@@ -475,12 +481,47 @@ def _validate_state(state, duration, *, playability_mode="search"):
         if not 0 <= event["time"] < duration or not np.isfinite([event["type"], event["value"]]).all():
             raise ValueError("Invalid final v2 lighting event")
     if playability_mode == "forward":
-        from .v2_forward_directions import audit_directions
+        from .v2_forward_directions import audit_directions, audit_overlaps
         direction = audit_directions(state["notes"])
-        if direction["flow"] or direction["fast_counter"]:
-            raise ValueError(
-                "Final forward direction audit contains enabled flow or "
-                "fast-counter violations")
+        overlap = audit_overlaps(state["notes"])
+        residual = {*direction["flow"], *direction["fast_counter"],
+                    *overlap["overlap"]}
+        if residual:
+            # Last net: drop the stragglers the bounded passes could not
+            # repair instead of failing the package — plus the chains and
+            # arcs headed by them and any notes anchored on them.
+            dropped_ids = set(residual)
+            expanded = True
+            while expanded:
+                extra = {note["id"] for note in state["notes"]
+                         if note["id"] not in dropped_ids
+                         and note.get("anchor_id") in dropped_ids}
+                expanded = bool(extra)
+                dropped_ids |= extra
+            state["notes"] = [note for note in state["notes"]
+                              if note["id"] not in dropped_ids]
+            state["chains"] = [chain for chain in state["chains"]
+                               if chain["anchor_id"] not in dropped_ids]
+            state["arcs"] = [arc for arc in state["arcs"]
+                             if dropped_ids.isdisjoint(
+                                 arc.get("endpoint_ids", ()))]
+            findings["hard_dropped_final"] = len(dropped_ids)
+            direction = audit_directions(state["notes"])
+            overlap = audit_overlaps(state["notes"])
+            remaining_ids = {note["id"] for note in state["notes"]}
+            dangling = (
+                any(note.get("anchor_id") is not None
+                    and note["anchor_id"] not in remaining_ids
+                    for note in state["notes"])
+                or any(chain["anchor_id"] not in remaining_ids
+                       for chain in state["chains"])
+                or any(not set(arc.get("endpoint_ids", ())) <= remaining_ids
+                       for arc in state["arcs"]))
+            if (direction["flow"] or direction["fast_counter"]
+                    or overlap["overlap"] or dangling):
+                raise ValueError(
+                    "Final forward direction audit contains enabled flow, "
+                    "fast-counter or same-cell overlap violations")
         from .v2_postprocessing import clearance_violations
         findings["clearance"] = clearance_violations(state["notes"])
     return findings
@@ -970,6 +1011,8 @@ def generate(song, requested_nps, predictors, encoder, settings, vocabularies, *
     if playability_mode == "forward":
         result.diagnostics["playability_findings"] = playability_findings or {}
         result.diagnostics["hard_direction_validated"] = True
+        result.diagnostics["hard_dropped_final"] = (
+            playability_findings or {}).get("hard_dropped_final", 0)
     result.diagnostics["final_counts"] = {
         "colored_notes": len(state["notes"]),
         "retained_notes": sum(note.get("kind") == "retained" for note in state["notes"]),
