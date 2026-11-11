@@ -517,14 +517,14 @@ and again after multiplier expansion and the post-expansion fixpoint with
 `drop_retained=False`, so copies and heuristic notes still drop while
 retained notes are never touched. Consecutive same-hand notes over
 `ramped * get_factor_from_max_speed(ramped)` scaled by
-`v2_speed_cap_scale` (default `1.4`; `<= 0` disables) resolve by dropping a
+`v2_speed_cap_scale` (default `1.12`; `<= 0` disables) resolve by dropping a
 note — the scale is the reference at `add_beat_intensity` `100`, multiplied
 linearly by the app's Beat Intensity field via `speed_cap_scale()` (reads
 `add_beat_intensity_orig`, so the per-variant silence/emphasize/sporty
 adjustments shift the fill budget only, not the cap). Since 2026-11-11 the
-reference is 70% of the original `2.0` (interim 85% on 2026-11-10), so Beat
-Intensity `100` reproduces the former `70` while the dial and its
-[40, 125] limits are unchanged: `ramped` is `max_speed` times a linear
+reference is 56% of the original `2.0` (interim 85% and 70% on
+2026-11-10/11), so Beat Intensity `100` reproduces the former `56` while
+the dial and its [40, 125] limits are unchanged: `ramped` is `max_speed` times a linear
 `v2_speed_cap_start_factor` (default `.35`) → 1 ramp over the first
 `v2_speed_cap_start_notes` (default `30`) combined positions, and the
 factor is evaluated on the ramped value exactly like v1; each deletion
