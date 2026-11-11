@@ -1,7 +1,10 @@
 import os
 import shutil
+import subprocess
+from functools import lru_cache
 
 from pydub import AudioSegment, effects
+from pydub.exceptions import CouldntEncodeError
 
 from tools.config import config, paths
 from tools.utils.song_metadata import extract_metadata, metadata_to_tags, save_metadata
@@ -10,14 +13,51 @@ from tools.utils.song_metadata import extract_metadata, metadata_to_tags, save_m
 OGG_EXPORT_PARAMS = ["-ac", "2", "-strict", "-2"]
 
 
+@lru_cache(maxsize=None)
+def _ffmpeg_has_encoder(ffmpeg_binary, codec):
+    try:
+        probe = subprocess.run([ffmpeg_binary, "-hide_banner", "-h", f"encoder={codec}"],
+                               capture_output=True, text=True, timeout=30)
+    except (OSError, subprocess.SubprocessError):
+        return False
+    return f"Encoder {codec} " in probe.stdout + probe.stderr
+
+
+def _extra_ffmpeg_binaries():
+    # Alternative ffmpeg binaries whose encoders are tried after the default.
+    candidates = [paths.ffmpeg_binary] if getattr(paths, "ffmpeg_binary", "") else []
+    try:
+        import imageio_ffmpeg
+        candidates.append(imageio_ffmpeg.get_ffmpeg_exe())
+    except ImportError:
+        pass
+    return [binary for binary in candidates if os.path.isfile(binary)]
+
+
 def export_ogg(audio, output_file, tags=None):
-    audio.export(
-        output_file,
-        format="ogg",
-        codec="vorbis",
-        parameters=OGG_EXPORT_PARAMS,
-        tags=tags,
-    )
+    # ffmpeg's native 'vorbis' encoder is experimental and aborts on some
+    # input (vorbisenc.c assertion); prefer the libvorbis reference encoder
+    # on any available binary and keep the native encoder as last resort.
+    converters = [AudioSegment.converter] + _extra_ffmpeg_binaries()
+    attempts = ([(binary, "libvorbis") for binary in converters]
+                + [(binary, "vorbis") for binary in converters])
+    last_error = None
+    for binary, codec in attempts:
+        if not _ffmpeg_has_encoder(binary, codec):
+            continue
+        try:
+            AudioSegment.converter = binary
+            audio.export(output_file, format="ogg", codec=codec,
+                         parameters=OGG_EXPORT_PARAMS, tags=tags)
+            return
+        except CouldntEncodeError as error:
+            last_error = error
+            print(f"Warning: ogg export failed with {codec} ({binary}); trying next encoder.")
+        finally:
+            AudioSegment.converter = converters[0]
+    if last_error is not None:
+        raise last_error
+    raise RuntimeError("Cannot export ogg: no vorbis encoder found in any ffmpeg binary")
 
 
 def shutil_copy_maps(song_name, index="1234_"):

@@ -19,6 +19,9 @@ dir_path = "/home/frede/.local/share/infernosaber-baseline/gpu/Data/"
 bs_song_path = ""
 bs_input_path = ""
 
+# optional ffmpeg binary used as ogg-encode fallback when the default lacks libvorbis
+ffmpeg_binary = ""
+
 # Persisted app/user overrides (untracked): applied before the derived paths
 # below so a saved dir_path re-derives the whole workspace.
 try:

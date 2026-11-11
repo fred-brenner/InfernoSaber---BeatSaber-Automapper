@@ -183,6 +183,11 @@ labels require verification before becoming current requirements.
   bounded parallelism via `--parallel N`, routing intensity/timing and downstream
   models to their respective datasets/trainers. Menu numbers remain 1–6 and 8
   (arcs); lighting/7 directs callers to the explicit experimental pipeline trainer.
+- Ogg export (`bs_shift/export_map.export_ogg`) prefers the `libvorbis` encoder
+  on the pydub ffmpeg, then `paths.ffmpeg_binary` and the `imageio-ffmpeg`
+  bundled binary; ffmpeg's native `vorbis` encoder stays last resort (it
+  asserts `l != csub` on some input; conda aubio pins ffmpeg<5 in the Pinokio
+  env, so that env's ffmpeg has no libvorbis).
 
 ## Validation
 
