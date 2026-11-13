@@ -49,15 +49,58 @@ def scoped_settings(snapshot=None):
         apply_snapshot(previous)
 
 
-def configure_inference():
-    """Set the CPU worker profile before its first TensorFlow import."""
-    threads = config.v2_inference_threads
-    if isinstance(threads, bool) or not isinstance(threads, int) or threads < 1:
-        raise ValueError("v2_inference_threads must be a positive integer")
+def effective_inference_threads(workers=None):
+    """Resolve the per-process TensorFlow thread count for v2 inference.
+
+    ``config.v2_inference_threads`` of 0 (or None) auto-scales as
+    ``max(1, min(2, cores // workers))``: batch-1 ~1 MB models gain nothing
+    from intraop parallelism, so total TF threads stay at or below the logical
+    core count, while up to 2 threads (the previous fixed default) remain
+    available when few workers leave idle cores. A positive integer pins the
+    count. ``workers`` defaults to ``config.num_workers``.
+    """
+    value = getattr(config, "v2_inference_threads", 0)
+    if value is None:
+        value = 0
+    if isinstance(value, bool) or not isinstance(value, int) or value < 0:
+        raise ValueError("v2_inference_threads must be 0 (auto) or a positive integer")
+    if value:
+        return value
+    if workers is None:
+        workers = getattr(config, "num_workers", 1)
+    try:
+        valid = (not isinstance(workers, bool) and float(workers).is_integer()
+                 and workers >= 1)
+    except (TypeError, ValueError):
+        valid = False
+    if not valid:
+        raise ValueError("Worker count must be a positive integer")
+    return max(1, min(2, (os.cpu_count() or 1) // int(workers)))
+
+
+def configure_inference(workers=None):
+    """Set the CPU inference profile before this process's first TensorFlow import."""
+    threads = effective_inference_threads(workers)
     os.environ["CUDA_VISIBLE_DEVICES"] = "-1"
     os.environ["TF_NUM_INTRAOP_THREADS"] = str(threads)
     os.environ["TF_NUM_INTEROP_THREADS"] = str(threads)
     os.environ.setdefault("TF_CPP_MIN_LOG_LEVEL", "2")
+    return threads
+
+
+# BLAS/OpenMP pools read their env limit lazily at first use, so a spawned
+# worker can still cap them in ``_worker_init`` even though numpy is already
+# imported there. ``setdefault`` keeps explicit user exports authoritative.
+_LIBRARY_THREAD_VARS = ("OMP_NUM_THREADS", "MKL_NUM_THREADS", "OPENBLAS_NUM_THREADS")
+
+
+def cap_library_threads(threads=None):
+    """Cap native library thread pools inside one inference worker process."""
+    threads = str(effective_inference_threads() if threads is None else threads)
+    for name in _LIBRARY_THREAD_VARS:
+        os.environ.setdefault(name, threads)
+    # Park idle OpenMP threads instead of letting them spin under many workers.
+    os.environ.setdefault("OMP_WAIT_POLICY", "PASSIVE")
 
 
 def _difficulty_settings(difficulty):

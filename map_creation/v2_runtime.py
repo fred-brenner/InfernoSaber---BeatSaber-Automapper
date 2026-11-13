@@ -215,9 +215,8 @@ class V2Runtime:
             self.settings["bomb_rate_factor"] = factor
         self.settings["note_sample_temperature"] = float(getattr(config, "v2_note_sample_temperature", 0.) or 0.)
         import tensorflow as tf
-        threads = getattr(config, "v2_inference_threads", 2)
-        if isinstance(threads, bool) or not isinstance(threads, int) or threads < 1:
-            raise ValueError("V2 inference threads must be a positive integer")
+        from map_creation.v2_generation import effective_inference_threads
+        threads = effective_inference_threads()
         try:
             tf.config.set_visible_devices([], "GPU")
         except RuntimeError as error:

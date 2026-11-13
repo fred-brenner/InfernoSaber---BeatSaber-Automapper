@@ -21,7 +21,8 @@ def _observed_worker_settings(_):
             config.v1_lighting_model_path, config.v1_lighting_vocabulary_path,
             (config.v2_intensity_low_boost, config.v2_intensity_high_reduction,
              config.v2_intensity_scale, config.v2_intensity_adjustment_strength),
-            os.environ['CUDA_VISIBLE_DEVICES'], 'tensorflow' in sys.modules)
+            os.environ['CUDA_VISIBLE_DEVICES'], os.environ['TF_NUM_INTRAOP_THREADS'],
+            os.environ.get('OMP_NUM_THREADS'), 'tensorflow' in sys.modules)
 
 
 def test_spawn_transfers_settings_before_tensorflow():
@@ -37,7 +38,81 @@ def test_spawn_transfers_settings_before_tensorflow():
     with context.Pool(1, initializer=main_multi._worker_init, initargs=(snapshot,)) as pool:
         result = pool.map(_observed_worker_settings, [0, 1])
     assert result == [(1, [.17, .39], '/disposable/v2-input/', '/retained/v1.h5',
-                       '/retained/v1-events.pkl', (.2, .3, 1.25, .6), '-1', False)] * 2
+                       '/retained/v1-events.pkl', (.2, .3, 1.25, .6), '-1', '1', '1', False)] * 2
+
+
+@pytest.mark.parametrize('cores,workers,expected', [
+    (16, 1, 2), (16, 2, 2), (16, 4, 2), (16, 8, 2), (16, 16, 1),
+    (32, 16, 2), (8, 8, 1), (8, 16, 1), (4, 4, 1), (2, 1, 2), (1, 1, 1),
+])
+def test_effective_inference_threads_autoscale(cores, workers, expected, monkeypatch):
+    """Auto mode: total TF threads stay <= cores, capped at the old fixed 2."""
+    monkeypatch.setattr(config, 'v2_inference_threads', 0)
+    monkeypatch.setattr(os, 'cpu_count', lambda: cores)
+    assert v2_generation.effective_inference_threads(workers) == expected
+
+
+def test_effective_inference_threads_defaults_to_config_workers(monkeypatch):
+    monkeypatch.setattr(config, 'v2_inference_threads', 0)
+    monkeypatch.setattr(os, 'cpu_count', lambda: 16)
+    monkeypatch.setattr(config, 'num_workers', 16)
+    assert v2_generation.effective_inference_threads() == 1
+    monkeypatch.setattr(config, 'num_workers', 1)
+    assert v2_generation.effective_inference_threads() == 2
+    monkeypatch.setattr(config, 'num_workers', 4.0)  # the app slider can persist floats
+    assert v2_generation.effective_inference_threads() == 2
+
+
+def test_effective_inference_threads_none_means_auto(monkeypatch):
+    monkeypatch.setattr(config, 'v2_inference_threads', None)
+    monkeypatch.setattr(os, 'cpu_count', lambda: 8)
+    assert v2_generation.effective_inference_threads(4) == 2
+
+
+@pytest.mark.parametrize('pinned', [1, 2, 7])
+def test_effective_inference_threads_honors_explicit_pin(pinned, monkeypatch):
+    monkeypatch.setattr(config, 'v2_inference_threads', pinned)
+    monkeypatch.setattr(os, 'cpu_count', lambda: 32)
+    assert v2_generation.effective_inference_threads(16) == pinned
+    assert v2_generation.effective_inference_threads() == pinned
+
+
+@pytest.mark.parametrize('bad', [-1, True, 1.5, '2'])
+def test_effective_inference_threads_rejects_bad_config(bad, monkeypatch):
+    monkeypatch.setattr(config, 'v2_inference_threads', bad)
+    with pytest.raises(ValueError, match='v2_inference_threads'):
+        v2_generation.effective_inference_threads(4)
+
+
+@pytest.mark.parametrize('bad', [0, -1, 1.5, 'x', float('nan'), True])
+def test_effective_inference_threads_rejects_bad_workers(bad, monkeypatch):
+    monkeypatch.setattr(config, 'v2_inference_threads', 0)
+    with pytest.raises(ValueError, match='Worker count'):
+        v2_generation.effective_inference_threads(bad)
+
+
+def test_configure_inference_exports_resolved_threads(monkeypatch):
+    monkeypatch.setattr(config, 'v2_inference_threads', 0)
+    monkeypatch.setattr(config, 'num_workers', 8)
+    monkeypatch.setattr(os, 'cpu_count', lambda: 16)
+    for key in ('CUDA_VISIBLE_DEVICES', 'TF_NUM_INTRAOP_THREADS', 'TF_NUM_INTEROP_THREADS'):
+        monkeypatch.delenv(key, raising=False)
+    assert v2_generation.configure_inference() == 2
+    assert os.environ['CUDA_VISIBLE_DEVICES'] == '-1'
+    assert os.environ['TF_NUM_INTRAOP_THREADS'] == '2'
+    assert os.environ['TF_NUM_INTEROP_THREADS'] == '2'
+
+
+def test_cap_library_threads_respects_existing_env(monkeypatch):
+    monkeypatch.setattr(config, 'v2_inference_threads', 3)
+    for key in ('OMP_NUM_THREADS', 'MKL_NUM_THREADS', 'OPENBLAS_NUM_THREADS', 'OMP_WAIT_POLICY'):
+        monkeypatch.delenv(key, raising=False)
+    monkeypatch.setenv('MKL_NUM_THREADS', '9')
+    v2_generation.cap_library_threads()
+    assert os.environ['OMP_NUM_THREADS'] == '3'
+    assert os.environ['OPENBLAS_NUM_THREADS'] == '3'
+    assert os.environ['MKL_NUM_THREADS'] == '9'  # explicit user export wins
+    assert os.environ['OMP_WAIT_POLICY'] == 'PASSIVE'
 
 
 def test_groups_prefer_song_cache_but_use_idle_workers():
@@ -154,7 +229,7 @@ def test_app_surfaces_worker_failures(monkeypatch):
     assert 'successfully' not in result[-1]
 
 
-@pytest.mark.parametrize('threads', [0, True, 1.5])
+@pytest.mark.parametrize('threads', [-1, True, 1.5])
 def test_bad_worker_bootstrap_fails_before_spawning(monkeypatch, threads):
     monkeypatch.setattr(config, 'v2_inference_threads', threads)
     monkeypatch.setattr(main_multi.mp, 'get_context', lambda *args: pytest.fail('spawned invalid worker'))

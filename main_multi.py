@@ -19,8 +19,9 @@ from functools import partial
 from tools.config import config, paths
 from bs_shift.export_map import check_music_files, shutil_copy_maps
 from map_creation.v1_generation import V1_MAPPER_SELECTIONS, ensure_v1_bundle
-from map_creation.v2_generation import (apply_snapshot, configure_inference, generate_song,
-                                       save_report, scoped_settings, settings_snapshot)
+from map_creation.v2_generation import (apply_snapshot, cap_library_threads, configure_inference,
+                                       effective_inference_threads, generate_song, save_report,
+                                       scoped_settings, settings_snapshot)
 from map_creation.v2_runtime import validate_production_bundle
 from map_creation.v2_export import combine_packages
 
@@ -40,7 +41,7 @@ def _emit(message, callback=None, important=False):
 def _worker_init(snapshot, progress=None):
     global _PROGRESS
     apply_snapshot(snapshot)
-    configure_inference()
+    cap_library_threads(configure_inference())
     _PROGRESS = progress
 
 
@@ -223,6 +224,9 @@ def _run(n_workers, diff_list, export_results_to_bs, logger_callback, parallel, 
     records, packages, failures = [], [], []
     started = time.perf_counter()
     workers = min(n_workers, len(groups))
+    # Resolve the auto thread count once against the real pool size so spawned
+    # workers inherit a concrete value rather than scaling by config.num_workers.
+    snapshot["config"]["v2_inference_threads"] = effective_inference_threads(max(1, workers))
     total_variants = sum(len(group) for group in groups)
     _emit(f"Generating {len(songs)} songs at {len(difficulties)} difficulties with {workers} CPU workers",
           logger_callback, important=True)

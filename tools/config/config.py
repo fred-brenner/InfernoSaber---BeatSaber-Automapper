@@ -35,7 +35,8 @@ v2_model_bundle_path = "../Data/model/v2_expert"
 # Retained v1 lighting assets ship inside the v2 bundle so one branch covers all.
 v1_lighting_model_path = "../Data/model/v2_expert/v1_lighting/tf_event_gen_2_12_5_5__22_18.h5"
 v1_lighting_vocabulary_path = "../Data/model/v2_expert/v1_lighting/onehot_encoder_events.pkl"
-v2_inference_threads = 2
+# CPU threads per inference worker; 0 auto-scales max(1, min(2, cores // workers)).
+v2_inference_threads = 0
 v2_timing_batch_size = 8
 v2_compile_inference = True
 # Experimental: mask hazard decisions to feasible placements before argmax/threshold.
