@@ -72,9 +72,10 @@ def _audio_analysis(audio_path):
         return {"path": audio_path}
     key = (str(path), stat.st_size, stat.st_mtime_ns,
            config.samplerate_music, config.hop_size)
-    if _ANALYSIS is None or _ANALYSIS[0] != key:
-        _ANALYSIS = key, {"path": path}
-    return _ANALYSIS[1]
+    entry = _ANALYSIS
+    if entry is None or entry[0] != key:
+        _ANALYSIS = entry = key, {"path": path}
+    return entry[1]
 
 
 def _legacy_spectrum(audio_path):

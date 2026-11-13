@@ -82,6 +82,8 @@ def spectrogram_patches(samples, times, duration=None):
     spectra = np.log(power.transpose(0, 2, 1).astype(np.float32) + 1e-10)
     spectra -= spectra.min(axis=(1, 2), keepdims=True)
     frames = spectra.reshape(-1, spectra.shape[-1])
+    # Resize keeps the stacked height, so rows resample independently: one
+    # stacked image resamples identically to K per-patch resizes.
     resized = np.asarray(Image.fromarray(frames).resize((24, frames.shape[0])))
     resized = resized.reshape(len(times), spectra.shape[1], -1).transpose(0, 2, 1)
     if resized.shape != (len(times), 24, 20):

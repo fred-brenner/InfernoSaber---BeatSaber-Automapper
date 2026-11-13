@@ -137,7 +137,7 @@ def test_run_freezes_preparation_paths_bundle_and_report_destination(tmp_path, m
     monkeypatch.setattr(paths, "temp_path", str(original_temp) + "/")
     monkeypatch.setattr(config, "v2_model_bundle_path", "original-bundle")
     monkeypatch.setattr(config, "general_diff", "ExpertPlus")
-    monkeypatch.setattr(main_multi, "configure_inference", lambda: None)
+    monkeypatch.setattr(main_multi, "configure_inference", lambda *args, **kwargs: None)
     bundles, prepared, captured, reports = [], [], [], []
     monkeypatch.setattr(main_multi, "validate_production_bundle", lambda path: bundles.append(path))
 

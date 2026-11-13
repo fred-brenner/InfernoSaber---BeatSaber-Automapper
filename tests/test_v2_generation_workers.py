@@ -25,7 +25,11 @@ def _observed_worker_settings(_):
             os.environ.get('OMP_NUM_THREADS'), 'tensorflow' in sys.modules)
 
 
-def test_spawn_transfers_settings_before_tensorflow():
+def test_spawn_transfers_settings_before_tensorflow(monkeypatch):
+    # cap_library_threads uses setdefault: clear host exports so the spawned
+    # worker observes the values _worker_init computes, not inherited ones.
+    for name in ('OMP_NUM_THREADS', 'MKL_NUM_THREADS', 'OPENBLAS_NUM_THREADS', 'OMP_WAIT_POLICY'):
+        monkeypatch.delenv(name, raising=False)
     snapshot = v2_generation.settings_snapshot()
     snapshot['config']['v2_inference_threads'] = 1
     snapshot['config']['slider_time_gap'] = np.array([.17, .39])
@@ -324,7 +328,7 @@ def test_sequential_run_emits_eta_and_only_milestones_to_app(capsys, tmp_path, m
         (tmp_path / name).write_bytes(b'x')
     monkeypatch.setattr(paths, 'songs_pred', str(tmp_path) + '/')
     monkeypatch.setattr(config, 'verbose_level', 1)
-    monkeypatch.setattr(main_multi, 'configure_inference', lambda: None)
+    monkeypatch.setattr(main_multi, 'configure_inference', lambda *args, **kwargs: None)
     monkeypatch.setattr(main_multi, 'validate_production_bundle', lambda *args, **kwargs: {})
     monkeypatch.setattr(main_multi, 'check_music_files', lambda files, root: list(files))
     monkeypatch.setattr(main_multi, 'process_song', lambda group, total: [

@@ -88,9 +88,11 @@ def configure_inference(workers=None):
     return threads
 
 
-# BLAS/OpenMP pools read their env limit lazily at first use, so a spawned
-# worker can still cap them in ``_worker_init`` even though numpy is already
-# imported there. ``setdefault`` keeps explicit user exports authoritative.
+# MKL and libgomp read their env limit lazily at first parallel use, so a
+# spawned worker can still cap them in ``_worker_init`` even though numpy is
+# already imported; PyPI-wheel OpenBLAS latches its count at library load,
+# which can predate the cap. ``setdefault`` keeps explicit user exports
+# authoritative.
 _LIBRARY_THREAD_VARS = ("OMP_NUM_THREADS", "MKL_NUM_THREADS", "OPENBLAS_NUM_THREADS")
 
 

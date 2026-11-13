@@ -85,6 +85,10 @@ unique event centers.
   prefetch inside positions/arrows/multiplier.
 - Parity-checkable against the retained encoder representation contract.
 
+Measured: ~1.25-1.3x on the function (~tens of ms/song), well below the
+1-3 s estimate — scipy already batched the FFT internally, so only per-call
+overhead dropped. Output parity verified bitwise.
+
 ### Task P4 — Auto-scale inference threads vs workers (~10-20% under load)
 
 `v2_inference_threads = 2` × 16 workers → 64 contending TF threads plus

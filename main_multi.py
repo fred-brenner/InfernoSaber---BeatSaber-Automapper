@@ -205,7 +205,7 @@ def _run(n_workers, diff_list, export_results_to_bs, logger_callback, parallel, 
     n_workers = int(n_workers)
     difficulties = _difficulties(diff_list)
     # Invalid bootstrap settings must fail here, not cause endless Pool respawns.
-    configure_inference()
+    configure_inference(n_workers)
     selection = str(model_selection or "v2_expert").lower()
     if selection != "v2_expert" and selection not in V1_MAPPER_SELECTIONS:
         raise ValueError(f"Unknown mapper selection: {selection}")
