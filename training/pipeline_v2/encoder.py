@@ -67,22 +67,26 @@ def spectrogram_patches(samples, times, duration=None):
     if times.ndim != 1 or not np.isfinite(times).all() or np.any(times < 0) or np.any(times >= duration):
         raise ValueError("Encoder queries must lie inside decoded audio")
     result = np.empty((len(times), 24, 20, 1), np.float32)
+    if not len(times):
+        return result
     half = PATCH_SAMPLES // 2
+    patches = np.zeros((len(times), PATCH_SAMPLES), np.float32)
     for index, center in enumerate(np.around(times * SAMPLE_RATE).astype(np.int64)):
-        patch = np.zeros(PATCH_SAMPLES, np.float32)
         start, end = int(center - half), int(center + half)
         lo, hi = max(0, start), min(len(samples), end)
         if hi > lo:
-            patch[lo - start:hi - start] = samples[lo:hi]
-        patch = np.abs(patch) * 100
-        _, _, power = signal.spectrogram(patch, fs=SAMPLE_RATE, window="hann", nperseg=1480,
-                                         noverlap=15, detrend=False)
-        spectrum = np.log(power.T.astype(np.float32) + 1e-10)
-        spectrum -= spectrum.min()
-        resized = np.asarray(Image.fromarray(spectrum).resize((24, spectrum.shape[0]))).T
-        if resized.shape != (24, 20):
-            raise ValueError("Retained encoder spectrogram shape changed")
-        result[index, :, :, 0] = resized
+            patches[index, lo - start:hi - start] = samples[lo:hi]
+    patches = np.abs(patches) * 100
+    _, _, power = signal.spectrogram(patches, fs=SAMPLE_RATE, window="hann", nperseg=1480,
+                                     noverlap=15, detrend=False, axis=1)
+    spectra = np.log(power.transpose(0, 2, 1).astype(np.float32) + 1e-10)
+    spectra -= spectra.min(axis=(1, 2), keepdims=True)
+    frames = spectra.reshape(-1, spectra.shape[-1])
+    resized = np.asarray(Image.fromarray(frames).resize((24, frames.shape[0])))
+    resized = resized.reshape(len(times), spectra.shape[1], -1).transpose(0, 2, 1)
+    if resized.shape != (len(times), 24, 20):
+        raise ValueError("Retained encoder spectrogram shape changed")
+    result[:, :, :, 0] = resized
     return result
 
 

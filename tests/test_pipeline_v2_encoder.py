@@ -3,7 +3,8 @@
 import numpy as np
 import pytest
 
-from training.pipeline_v2.encoder import FixedEncoder, SAMPLE_RATE, spectrogram_patches
+from training.pipeline_v2 import encoder
+from training.pipeline_v2.encoder import FixedEncoder, PATCH_SAMPLES, SAMPLE_RATE, spectrogram_patches
 
 
 def _audio(duration=2.3):
@@ -123,3 +124,58 @@ def test_invalid_explicit_duration_is_rejected(duration):
         FixedEncoder(_audio(.1), _predict, "weights", duration=duration)
     with pytest.raises(ValueError, match="duration"):
         spectrogram_patches(_audio(.1), [0.], duration=duration)
+
+
+def _reference_spectrogram_patches(samples, times, duration=None):
+    # The pre-vectorization per-query loop, retained verbatim for parity checks.
+    from PIL import Image
+    from scipy import signal
+
+    samples = encoder._waveform(samples)
+    duration = encoder._duration(samples, duration)
+    times = np.asarray(times, np.float64)
+    if times.ndim != 1 or not np.isfinite(times).all() or np.any(times < 0) or np.any(times >= duration):
+        raise ValueError("Encoder queries must lie inside decoded audio")
+    result = np.empty((len(times), 24, 20, 1), np.float32)
+    half = PATCH_SAMPLES // 2
+    for index, center in enumerate(np.around(times * SAMPLE_RATE).astype(np.int64)):
+        patch = np.zeros(PATCH_SAMPLES, np.float32)
+        start, end = int(center - half), int(center + half)
+        lo, hi = max(0, start), min(len(samples), end)
+        if hi > lo:
+            patch[lo - start:hi - start] = samples[lo:hi]
+        patch = np.abs(patch) * 100
+        _, _, power = signal.spectrogram(patch, fs=SAMPLE_RATE, window="hann", nperseg=1480,
+                                         noverlap=15, detrend=False)
+        spectrum = np.log(power.T.astype(np.float32) + 1e-10)
+        spectrum -= spectrum.min()
+        resized = np.asarray(Image.fromarray(spectrum).resize((24, spectrum.shape[0]))).T
+        if resized.shape != (24, 20):
+            raise ValueError("Retained encoder spectrogram shape changed")
+        result[index, :, :, 0] = resized
+    return result
+
+
+def test_vectorized_patches_match_the_reference_loop_bitwise():
+    # Stacked signal.spectrogram(axis=1) is bitwise identical to per-patch 1-D
+    # calls on this scipy build, so parity is asserted exactly (rtol=atol=0).
+    rng = np.random.default_rng(11)
+
+    def waveform(seconds):
+        return (.2 * rng.standard_normal(round(seconds * SAMPLE_RATE))).astype(np.float32)
+
+    audio = waveform(4.7)
+    near_end = (len(audio) - 1) / SAMPLE_RATE
+    cases = [
+        (audio, [0., 1e-4, .37, 1., 2.2225, near_end], None),
+        (audio, [.5, 2.999], 3.),                      # explicit shorter duration
+        (waveform(1.2), [.6, .00003], None),           # audio shorter than a patch
+        (waveform(2.), [.02, 3.5], 4.),                # canonical tail, empty overlap
+        (audio, [1.5, 2., 0.], None),                  # order and reuse invariance
+        (audio, [], None),                             # empty query batch
+    ]
+    for samples, times, duration in cases:
+        expected = _reference_spectrogram_patches(samples, times, duration)
+        actual = spectrogram_patches(samples, times, duration)
+        assert actual.shape == expected.shape == (len(times), 24, 20, 1)
+        np.testing.assert_allclose(actual, expected, rtol=0, atol=0)
