@@ -1,7 +1,8 @@
 # Generation speedup proposal
 
-Status: Task P2, Task P3 and Task P4 approved for implementation (2026-11-13);
-P1, P5, P6, P7 remain proposed.
+Status: Task P2, Task P3 and Task P4 implemented (2026-11-13, commits
+4e36119, fe3de57, 318457d, faaad7b on main_app_dev); P1, P5, P6, P7 remain
+proposed.
 
 ## Intent
 
