@@ -114,7 +114,6 @@ def sanity_check_beat(beat):
 def sanity_check_timing2(name, timings, audio_path=None):
     if not len(timings):
         return timings
-    samplerate_music = 44100
     factor = config.thresh_onbeat / config.thresh_onbeat_orig
     pre_max = 1 if int(5 * factor) <= 0 else int(5 * factor)
     post_max = 1 if int(5 * factor) <= 0 else int(5 * factor)
@@ -126,11 +125,9 @@ def sanity_check_timing2(name, timings, audio_path=None):
     max_time_diff = 1.0
 
     file = str(audio_path) if audio_path is not None else paths.songs_pred + name + ".egg"
-    # Load the audio file
-    y, sr = librosa.load(file, sr=samplerate_music)
-
-    # Compute the onset envelope
-    onset_env = librosa.onset.onset_strength(y=y, sr=sr, hop_length=512)
+    # Decode + onset envelope shared per song; detection params stay per call.
+    from map_creation.v2_postprocessing import _onset_analysis
+    _samples, sr, onset_env, _rms = _onset_analysis(file)
 
     # Detect onsets using amplitude thresholding
     try:

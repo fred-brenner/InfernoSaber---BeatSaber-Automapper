@@ -25,6 +25,7 @@ simultaneous other-hand notes (same occupancy model as ``calc_note_pos``).
 
 import bisect
 import math
+from pathlib import Path
 import random
 from collections import Counter
 from contextlib import contextmanager
@@ -50,33 +51,88 @@ def _report(logger, message):
         logger(message)
 
 
-def _legacy_timing_features(audio_path):
-    """Reuse the legacy spectrum and frame conventions without pitch inference."""
+_ANALYSIS = None  # (key, dict): one song's reusable decode per process
+
+
+def _audio_analysis(audio_path):
+    """Difficulty-independent audio artifacts for one song, cached on its stat.
+
+    Keyed like ``V2Runtime._prepared_key`` — resolved path + size + mtime —
+    plus the legacy decode settings; a changed file or decode config cannot
+    hit stale analysis. The dict lazily fills ``"legacy"`` = (spectrum,
+    frame times) and ``"librosa"`` = (samples, rate, onset envelope, rms);
+    cached arrays are read-only. Thresholded detections and the
+    difficulty-scaled silence pick stay with callers. A path that cannot be
+    statted skips caching so the decoder surfaces the real error."""
+    global _ANALYSIS
+    try:
+        path = Path(audio_path).resolve()
+        stat = path.stat()
+    except (OSError, TypeError, ValueError):
+        return {"path": audio_path}
+    key = (str(path), stat.st_size, stat.st_mtime_ns,
+           config.samplerate_music, config.hop_size)
+    if _ANALYSIS is None or _ANALYSIS[0] != key:
+        _ANALYSIS = key, {"path": path}
+    return _ANALYSIS[1]
+
+
+def _legacy_spectrum(audio_path):
+    """aubio decode + resized log-specgram + frame times, cached per song."""
     import aubio
     from PIL import Image
-    from beat_prediction.find_beats import get_silent_times
     from preprocessing.music_processing import log_specgram
     from training.beat_models.audio_logging import filter_vorbis_timestamp_warning
 
-    blocks = []
-    with filter_vorbis_timestamp_warning():
-        source = aubio.source(str(audio_path), channels=1, samplerate=config.samplerate_music)
-        try:
-            while True:
-                samples, read = source()
-                blocks.append(np.asarray(samples).copy())
-                if read < source.hop_size:
-                    break
-        finally:
-            del source
-    audio = np.concatenate(blocks)
-    # The legacy spectrum needs one full window, including for a tiny song.
-    minimum = int(round(35.608 * config.samplerate_music / 1000))
-    if len(audio) < minimum:
-        audio = np.pad(audio, (0, minimum - len(audio)))
-    _, spectrum = log_specgram(audio, config.samplerate_music, 35.608)
-    pitch_frames = len(blocks)
-    spectrum = np.asarray(Image.fromarray(spectrum.T).resize((pitch_frames, spectrum.shape[1])))
+    analysis = _audio_analysis(audio_path)
+    if "legacy" not in analysis:
+        blocks = []
+        with filter_vorbis_timestamp_warning():
+            source = aubio.source(str(analysis["path"]), channels=1, samplerate=config.samplerate_music)
+            try:
+                while True:
+                    samples, read = source()
+                    blocks.append(np.asarray(samples).copy())
+                    if read < source.hop_size:
+                        break
+            finally:
+                del source
+        audio = np.concatenate(blocks)
+        # The legacy spectrum needs one full window, including for a tiny song.
+        minimum = int(round(35.608 * config.samplerate_music / 1000))
+        if len(audio) < minimum:
+            audio = np.pad(audio, (0, minimum - len(audio)))
+        _, spectrum = log_specgram(audio, config.samplerate_music, 35.608)
+        pitch_frames = len(blocks)
+        spectrum = np.asarray(Image.fromarray(spectrum.T).resize((pitch_frames, spectrum.shape[1])))
+        spectrum.setflags(write=False)
+        times = np.arange(pitch_frames) * config.hop_size / config.samplerate_music
+        times.setflags(write=False)
+        analysis["legacy"] = spectrum, times
+    return analysis["legacy"]
+
+
+def _onset_analysis(audio_path):
+    """44.1 kHz mono decode + onset envelope + RMS, cached per song."""
+    import librosa
+
+    analysis = _audio_analysis(audio_path)
+    if "librosa" not in analysis:
+        samples, rate = librosa.load(str(analysis["path"]), sr=44100)
+        envelope = librosa.onset.onset_strength(y=samples, sr=rate, hop_length=512)
+        rms = librosa.feature.rms(y=samples, hop_length=512)[0]
+        for array in (samples, envelope, rms):
+            np.asarray(array).setflags(write=False)
+        analysis["librosa"] = samples, rate, envelope, rms
+    return analysis["librosa"]
+
+
+def _legacy_timing_features(audio_path):
+    """Reuse the legacy spectrum and frame conventions without pitch inference."""
+    from beat_prediction.find_beats import get_silent_times
+
+    spectrum, times = _legacy_spectrum(audio_path)
+    pitch_frames = len(times)
 
     def scaled(values):
         values = np.asarray(values, dtype=np.float64)
@@ -86,7 +142,6 @@ def _legacy_timing_features(audio_path):
 
     volume = scaled(spectrum.sum(axis=0))
     onset = np.r_[0., scaled(np.maximum(np.diff(spectrum.T, axis=0), 0).sum(axis=1))] if pitch_frames > 1 else np.zeros(1)
-    times = np.arange(pitch_frames) * config.hop_size / config.samplerate_music
     silent = get_silent_times(spectrum, times) if config.add_silence_flag else np.empty(0)
     length = config.tcn_len
 
@@ -1076,15 +1131,13 @@ def _detect_onset_peaks(audio_path):
     import librosa
     factor = config.thresh_onbeat / config.thresh_onbeat_orig
     frames = lambda count: max(1, int(count * factor))
-    samples, rate = librosa.load(str(audio_path), sr=44100)
-    envelope = librosa.onset.onset_strength(y=samples, sr=rate, hop_length=512)
+    _samples, rate, envelope, rms = _onset_analysis(audio_path)
     onsets = librosa.onset.onset_detect(onset_envelope=envelope, sr=rate, hop_length=512,
                                         backtrack=False, pre_max=frames(5), post_max=frames(5),
                                         pre_avg=frames(7), post_avg=frames(8),
                                         delta=config.thresh_onbeat,
                                         wait=frames(int(getattr(config, "v2_notes_onset_snap_wait", 4))))
     times = np.asarray(librosa.frames_to_time(onsets, sr=rate, hop_length=512), np.float64)
-    rms = librosa.feature.rms(y=samples, hop_length=512)[0]
     width = max(1, int(float(getattr(config, "v2_onset_fill_loudness_smooth_seconds", 1.) or 1.)
                        * rate / 512))
     smooth = np.convolve(rms, np.ones(width) / width, mode="same")
