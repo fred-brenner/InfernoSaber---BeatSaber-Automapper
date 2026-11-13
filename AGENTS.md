@@ -73,6 +73,9 @@ platforms before implementing them unless the task already authorizes them.
   [docs/model-architecture_old.md](docs/model-architecture_old.md).
 - For feature priorities or planning model and pipeline improvements, read
   [docs/roadmap.md](docs/roadmap.md).
+- For generation runtime speedups (measured profile, cross-variant batched
+  decode, audio/encoder caching, thread scaling, worker scheduling), read the
+  [speedup proposal](docs/superpowers/specs/2026-11-13-generation-speedup-proposal.md).
 - For optional import fixes and small follow-ups, read [TODO.md](TODO.md).
 - For recorded baseline results or comparisons, read
   [docs/baseline.md](docs/baseline.md). It distinguishes verified checks from pending work.
