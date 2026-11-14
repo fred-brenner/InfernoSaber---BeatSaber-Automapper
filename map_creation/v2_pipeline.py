@@ -6,6 +6,7 @@ its independent review stops; this path uses concrete application postprocessors
 
 from functools import wraps
 from copy import deepcopy
+from dataclasses import dataclass, field
 from numbers import Real
 from time import perf_counter
 from types import SimpleNamespace
@@ -402,6 +403,672 @@ def _candidates(song, values):
     return result
 
 
+@dataclass
+class VariantRun:
+    """One generation variant: resolved inputs plus mutable decode state.
+
+    The stage functions below read and mutate this context so identical runs
+    can later advance in lockstep; ``generate`` composes the same steps for
+    a single run.
+    """
+    song: object
+    requested_nps: float
+    predictors: dict
+    encoder: object
+    options: dict
+    vocabularies: dict
+    lighting_generator: object
+    audio_path: object = None
+    logger: object = None
+    intensity: object = None
+    postprocessors: object = None
+    playability_mode: str = "search"
+    factor: float = 0.
+    rng: object = None
+    duration: float = 0.
+    bpm: float = 0.
+    temperature: float = 0.
+    sampling: bool = False
+    schedule: dict = None
+    result: object = None
+    state: dict = None
+    raw: dict = None
+    started: float = 0.
+    candidates: list = field(default_factory=list)
+    history: list = field(default_factory=list)
+    length: int = 0
+    last_hand_time: list = field(default_factory=lambda: [-np.inf, -np.inf])
+    recovery: float = 0.
+    recovery_swaps: int = 0
+    recovery_opportunities: int = 0
+    recovery_alternatives: dict = field(default_factory=dict)
+    recovery_balanced: bool = False
+    kinematics: dict = field(default_factory=dict)
+    approach_prior: float = 0.
+    approach_overrides: int = 0
+    arrows_reference: object = None
+    arrows_variety: float = 0.
+    variety_picks: int = 0
+    speed_cap: object = None
+    speed_scale: float = 0.
+    combined_reach: bool = False
+    retained: list = field(default_factory=list)
+    upstream: dict = None
+    by_time: dict = field(default_factory=dict)
+    multiplier_candidates: list = field(default_factory=list)
+    expansion_rejections: dict = field(default_factory=dict)
+    calm_pulses: list = field(default_factory=list)
+
+
+def variant_run(song, requested_nps, predictors, encoder, settings, vocabularies, *,
+                lighting_generator, audio_path=None, logger=None, postprocessors=None, random_factor=None,
+                intensity=None, rng=None):
+    """Resolve one variant's postprocessors and seed its run context."""
+    if isinstance(requested_nps, bool) or not np.isfinite(requested_nps) or requested_nps < 0:
+        raise ValueError("Requested retained NPS must be finite and nonnegative")
+    playability_mode = "search"
+    if postprocessors is None:
+        from . import v2_postprocessing as postprocessors
+        mode = getattr(config, "v2_note_postprocessing_mode", "search")
+        if mode not in ("forward", "search"):
+            raise ValueError(f"Unknown v2_note_postprocessing_mode: {mode}")
+        forward = (mode == "forward"
+                   and not getattr(config, "v2_cleanup_note_heuristics", True)
+                   and getattr(config, "v2_playability_enabled", False)
+                   and (getattr(config, "v2_playability_priority", False)
+                        or getattr(config, "v2_playability_reach", False)))
+        if forward:
+            playability_mode = "forward"
+            from . import v2_forward_postprocessing as forward_core
+            from . import v2_forward_expansion as forward_late
+            base = postprocessors
+            postprocessors = SimpleNamespace(
+                postprocess_timing=base.postprocess_timing,
+                postprocess_notes=forward_core.normalize_notes,
+                repair_notes=forward_core.repair_notes,
+                validate_expansions=forward_late.validate_expansions,
+                drop_guard=forward_late.drop_guard,
+                validate_hazards=base.validate_hazards,
+                validate_arcs=base.validate_arcs,
+                snap_note_times=base.snap_note_times,
+                apply_intro_floor=base.apply_intro_floor,
+                apply_note_emphasis=forward_late.apply_note_emphasis,
+                calm_area_pulses=base.calm_area_pulses,
+                add_calm_effects=base.add_calm_effects,
+                add_calm_lighting=base.add_calm_lighting)
+        elif not getattr(config, "v2_cleanup_note_heuristics", True):
+            # Skip the legacy v1 note mutators; structural dedup, the
+            # same-direction recut and the clearance fixpoint still run.
+            base = postprocessors
+            postprocessors = SimpleNamespace(
+                postprocess_timing=base.postprocess_timing,
+                postprocess_notes=lambda *args, **kwargs: base.postprocess_notes(
+                    *args, skip=base.LEGACY_NOTE_MUTATORS, **kwargs),
+                validate_expansions=base.validate_expansions,
+                validate_hazards=base.validate_hazards,
+                validate_arcs=base.validate_arcs,
+                enforce_note_flow_and_clearance=base.enforce_note_flow_and_clearance,
+                snap_note_times=base.snap_note_times,
+                apply_intro_floor=base.apply_intro_floor,
+                apply_fast_direction_rules=base.apply_fast_direction_rules,
+                apply_fast_counter_sweep=base.apply_fast_counter_sweep,
+                apply_diagonal_cap=base.apply_diagonal_cap,
+                apply_speed_cap=base.apply_speed_cap,
+                speed_cap_scale=base.speed_cap_scale,
+                finalize_playability_reach=base.finalize_playability_reach,
+                apply_note_emphasis=base.apply_note_emphasis,
+                calm_area_pulses=base.calm_area_pulses,
+                add_calm_effects=base.add_calm_effects,
+                add_calm_lighting=base.add_calm_lighting)
+    factor = getattr(config, "random_note_map_factor", 0.) if random_factor is None else random_factor
+    if isinstance(factor, bool) or not np.isfinite(factor) or factor < 0:
+        raise ValueError("Random factor must be finite and nonnegative")
+    factor = min(float(factor), 1.)
+    rng = np.random.default_rng() if rng is None else rng
+    duration, bpm = float(song.metadata["duration"]), float(song.metadata["bpm"])
+    options = deepcopy(settings)
+    temperature = float(options.get("note_sample_temperature", 0.) or 0.)
+    if not np.isfinite(temperature) or temperature < 0:
+        raise ValueError("Note sample temperature must be finite and nonnegative")
+    sampling = temperature > 0
+    options["vocabularies"] = vocabularies
+    schedule = options["schedule"]
+    status = "dummy" if all(getattr(predictor, "status", "trained") == "dummy"
+                            for stage, predictor in predictors.items() if stage != "lighting") else "trained"
+    result = PipelineResult(status, {key: [] for key in ("notes", "chains", "walls", "bombs", "arcs", "lighting")},
+                            diagnostics={"requested_retained_nps": float(requested_nps),
+                                         "duration_seconds": duration, "bpm": bpm,
+                                         "bpm_detected": float(song.metadata.get("bpm_detected", bpm)),
+                                         "rejected_expansions": [], "export_ready": False,
+                                         "random_factor": factor, "note_sample_temperature": temperature,
+                                         "scheduler": deepcopy(schedule)})
+    raw = result.diagnostics["raw_decisions"] = {
+        "position_events": 0, "position_notes": 0, "arrow_notes": 0,
+        "multiplier_non_none": 0, "wall_proposals": 0, "bomb_proposals": 0,
+        "arc_attachments": 0, "lighting_commands": 0}
+    return VariantRun(song, requested_nps, predictors, encoder, options, vocabularies,
+                      lighting_generator, audio_path=audio_path, logger=logger, intensity=intensity,
+                      postprocessors=postprocessors, playability_mode=playability_mode, factor=factor,
+                      rng=rng, duration=duration, bpm=bpm, temperature=temperature, sampling=sampling,
+                      schedule=schedule, result=result, state=result.state, raw=raw)
+
+
+def _beats_stage(run):
+    """Intensity, timing and postprocessed candidates into ``run.state``."""
+    _log(run.logger, "V2 intensity and timing")
+    beats = infer_beats(run.song, run.requested_nps, run.predictors,
+                       getattr(config, "v2_timing_batch_size", 8), intensity=run.intensity)
+    beat_seconds = beats.pop("_stage_seconds")
+    run.result.diagnostics["intensity_postprocessing"] = beats.pop("_intensity_postprocessing")
+    run.state.update(beats, requested_nps=float(run.requested_nps),
+                     multiplier_classes=len(run.vocabularies["multiplier"]))
+    cleanup_started = perf_counter()
+    candidates, diagnostics = run.postprocessors.postprocess_timing(
+        run.song, beats, run.audio_path, logger=run.logger)
+    run.candidates = _candidates(run.song, candidates)
+    run.state.update(raw_event_times=beats["event_times"], raw_event_frames=beats["event_frames"],
+                     raw_counts=beats["counts"],
+                     event_times=np.asarray([candidate["time"] for candidate in run.candidates], np.float64),
+                     event_frames=np.asarray([candidate["frame"] for candidate in run.candidates], np.int64))
+    run.state["counts"] = np.zeros_like(beats["counts"])
+    for candidate in run.candidates:
+        run.state["counts"][candidate["frame"]] = candidate["count"]
+    run.result.diagnostics["timing_postprocessing"] = diagnostics
+    run.result.stages["intensity"] = {"bins": len(beats["intensity"]), "elapsed_seconds": beat_seconds["intensity"]}
+    run.result.stages["timing"] = {"raw_events": len(beats["event_frames"]), "events": len(run.candidates),
+                                   "raw_retained_notes": int(beats["counts"].sum()),
+                                   "elapsed_seconds": beat_seconds["timing"] + perf_counter() - cleanup_started}
+
+
+def _positions_begin(run):
+    """Prefetch event encodings and reset positions decode state."""
+    run.started = perf_counter()
+    run.encoder(np.asarray([candidate["time"] for candidate in run.candidates], np.float64))
+    run.history, run.length = [], run.options["history_length"]
+    run.last_hand_time = [-np.inf, -np.inf]
+    run.recovery = config.v2_playability_recovery_ratio if config.v2_playability_enabled else 0.
+    if not np.isfinite(run.recovery) or not 0 <= run.recovery <= 1:
+        raise ValueError("v2_playability_recovery_ratio must be in [0, 1]")
+    run.recovery_swaps = run.recovery_opportunities = 0
+    run.recovery_alternatives = {}
+    run.recovery_balanced = bool(getattr(config, "v2_playability_recovery_balanced", False))
+
+
+def _positions_inputs(run, candidate):
+    return _inputs("positions", run.song, run.state, candidate, run.history, run.encoder, run.options)
+
+
+def _positions_apply(run, candidate, output):
+    """Decode one event's cells, apply single-hand recovery, update notes."""
+    if run.sampling:
+        pair = _decode_positions_sampled(_biased(output, 13, 0, run.rng), candidate["count"],
+                                         run.temperature, run.rng)
+    else:
+        pair = _decode_positions(_biased(output, 13, run.factor, run.rng), candidate["count"])
+    if run.recovery and candidate["count"] == 1:
+        hand = 0 if pair[0] else 1
+        run.recovery_opportunities += int(candidate["time"] - run.last_hand_time[hand] < .25)
+        if run.recovery_balanced:
+            alternatives = _deferred_recovery_alternatives(pair, output, run.recovery)
+            if alternatives:
+                cell = pair[hand]-1
+                key = candidate["time"], hand, cell % 4, cell // 4
+                run.recovery_alternatives[key] = alternatives
+        else:
+            selected = _recover_single_hand(pair, output, run.last_hand_time, candidate["time"], run.recovery)
+            if tuple(pair) != tuple(selected):
+                run.recovery_swaps += 1
+            pair = selected
+    for hand, category in enumerate(pair):
+        if category:
+            run.last_hand_time[hand] = candidate["time"]
+            cell = category - 1
+            run.state["notes"].append({"id": len(run.state["notes"]), "time": candidate["time"], "hand": hand,
+                                       "x": cell % 4, "y": cell // 4, "kind": "retained"})
+    _history(run.history, {"time": candidate["time"], "value": pair}, run.length)
+
+
+def _positions_end(run):
+    if run.recovery:
+        run.raw["recovery_hand_swaps"] = run.recovery_swaps
+        run.raw["recovery_policy"] = "deferred-balanced-v2" if run.recovery_balanced else "legacy"
+        run.raw["recovery_crowded_single_candidates"] = run.recovery_opportunities
+        run.raw["recovery_unresolved_crowded_singles"] = run.recovery_opportunities-run.recovery_swaps
+        run.raw["recovery_deferred_notes"] = len(run.recovery_alternatives)
+        run.raw["recovery_deferred_alternatives"] = sum(len(v) for v in run.recovery_alternatives.values())
+    run.result.stages["positions"] = {"events": len(run.candidates), "retained_notes": len(run.state["notes"]),
+                                      "elapsed_seconds": perf_counter() - run.started}
+    run.raw.update(position_events=len(run.candidates), position_notes=len(run.state["notes"]))
+
+
+def _positions_stage(run):
+    _positions_begin(run)
+    for index, candidate in enumerate(run.candidates):
+        output = _predict(run.predictors["positions"], _positions_inputs(run, candidate))
+        _positions_apply(run, candidate, output)
+        _progress(run.logger, "positions", index, len(run.candidates))
+    _positions_end(run)
+
+
+def _arrows_begin(run):
+    """Index decoded notes and reset the kinematics/direction decode state."""
+    run.started = perf_counter()
+    index_state(run.state)
+    run.history, run.kinematics = [], {}
+    run.approach_prior = float(getattr(config, "v2_arrow_approach_prior", 0.) or 0.)
+    run.approach_overrides = 0
+    run.arrows_reference = run.predictors.get("arrows_reference")
+    run.arrows_variety = float(getattr(config, "v2_arrows_variety", 0.) or 0.) if run.arrows_reference is not None else 0.
+    run.variety_picks = 0
+
+
+def _arrows_inputs(run, candidate):
+    return _inputs("arrows", run.song, run.state, candidate, run.history, run.encoder, run.options)
+
+
+def _arrows_model(run):
+    # Per-event model pick interpolates the resulting statistics exactly;
+    # mixing softmaxes would flatten disagreement and overshoot the tails.
+    model = (run.arrows_reference if run.arrows_variety > 0 and run.rng.random() < run.arrows_variety
+             else run.predictors["arrows"])
+    run.variety_picks += int(model is run.arrows_reference)
+    return model
+
+
+def _arrows_apply(run, candidate, output):
+    """Assign decoded directions to this event's notes and track kinematics."""
+    output = _biased(output, 9, 0 if run.sampling else run.factor, run.rng)
+    pair = [9, 9]
+    for hand in (0, 1):
+        times, track = run.state["_tracks"][hand]
+        location = int(np.searchsorted(times, candidate["time"]))
+        if location < len(track) and track[location]["time"] == candidate["time"]:
+            probabilities = output[("red", "blue")[hand]][0]
+            direction = (_sample_category(probabilities, run.temperature, run.rng)
+                         if run.sampling else int(probabilities.argmax()))
+            prior = _approach_snap(run.kinematics.get(hand), track[location])
+            if prior is not None and float(probabilities.max()) < run.approach_prior:
+                direction = prior
+                run.approach_overrides += 1
+            note = track[location]
+            note["d"] = direction
+            pair[hand] = direction
+            vector = _DIRECTION_VECTORS[direction]
+            run.kinematics[hand] = (note["x"] + vector[0], note["y"] + vector[1],
+                                    direction if direction != 8 else (run.kinematics.get(hand) or (0, 0, 1))[2])
+    _history(run.history, {"time": candidate["time"], "value": pair}, run.length)
+
+
+def _arrows_end(run):
+    run.raw["arrow_approach_overrides"] = run.approach_overrides
+    run.raw["arrow_variety"] = round(run.variety_picks / len(run.candidates), 4) if run.candidates else 0.
+    run.result.stages["arrows"] = {"directed_notes": len(run.state["notes"])}
+    run.raw["arrow_notes"] = len(run.state["notes"])
+    run.state["raw_model_notes"] = np.asarray([[note[key] for key in ("id", "time", "hand", "x", "y", "d")]
+                                               for note in run.state["notes"]], np.float64).reshape(-1, 6)
+    run.result.diagnostics["raw_model_note_columns"] = ["id", "time_seconds", "hand", "x", "y", "direction"]
+    run.state["notes"], diagnostics = run.postprocessors.postprocess_notes(
+        run.state["notes"], [candidate["time"] for candidate in run.candidates], logger=run.logger)
+    if run.recovery_alternatives:
+        if run.playability_mode == "forward":
+            run.result.diagnostics["decoder_recovery"] = {"ran": False}
+        else:
+            for note in run.state["notes"]:
+                alternatives = run.recovery_alternatives.get(tuple(note[k] for k in ("time", "hand", "x", "y")))
+                if alternatives:
+                    note["_recovery_alternatives"] = deepcopy(alternatives)
+    run.result.diagnostics["note_postprocessing"] = diagnostics
+    run.result.stages["arrows"]["elapsed_seconds"] = perf_counter() - run.started
+
+
+def _arrows_stage(run):
+    _arrows_begin(run)
+    for index, candidate in enumerate(run.candidates):
+        inputs = _arrows_inputs(run, candidate)
+        output = _predict(_arrows_model(run), inputs)
+        _arrows_apply(run, candidate, output)
+        _progress(run.logger, "arrows", index, len(run.candidates))
+    _arrows_end(run)
+
+
+def _note_cleanup(run):
+    """Conditional application validators between arrow decode and expansion."""
+    snap_times = getattr(run.postprocessors, "snap_note_times", None)
+    if snap_times is not None and getattr(config, "v2_notes_onset_snap", False) and run.state["notes"]:
+        snap_started = perf_counter()
+        run.result.diagnostics["onset_snap"] = snap_times(run.state["notes"], run.state["chains"],
+                                                          run.audio_path, run.duration, logger=run.logger)
+        run.result.diagnostics["onset_snap"]["elapsed_seconds"] = perf_counter() - snap_started
+    intro_fn = getattr(run.postprocessors, "apply_intro_floor", None)
+    intro_floor = float(getattr(config, "v2_map_intro_no_notes_seconds", 0.) or 0.)
+    # TODO: multiplier expansion copies with a negative dt would land back
+    # inside this note-free zone (no second floor runs after expansion);
+    # design-accepted today — revisit if a fitted vocabulary gains negative
+    # offsets.
+    if intro_fn is not None and intro_floor > 0:
+        run.result.diagnostics["intro_zones"] = {
+            "no_notes_seconds": intro_floor,
+            "notes_dropped": intro_fn(run.state["notes"], intro_floor)}
+    if run.playability_mode == "forward":
+        repair = getattr(run.postprocessors, "repair_notes", None)
+        if repair is not None and run.state["notes"]:
+            run.result.diagnostics["forward_postprocessing"] = repair(
+                run.state["notes"], rng=run.rng, logger=run.logger)
+    fast_dir = getattr(run.postprocessors, "apply_fast_direction_rules", None)
+    if fast_dir is not None and run.state["notes"] \
+            and float(getattr(config, "v2_fast_gap_seconds", .2) or 0.) > 0:
+        run.result.diagnostics["fast_directions"] = fast_dir(run.state["notes"], rng=run.rng,
+                                                             logger=run.logger)
+    diag_fn = getattr(run.postprocessors, "apply_diagonal_cap", None)
+    diag_cap = float(getattr(config, "v2_diagonal_max_fraction", 1.) or 0.)
+    if diag_fn is not None and run.state["notes"] and 0 <= diag_cap < 1:
+        run.result.diagnostics["diagonal_cap"] = diag_fn(run.state["notes"], run.state["chains"], rng=run.rng)
+    run.speed_cap = getattr(run.postprocessors, "apply_speed_cap", None)
+    scale_fn = getattr(run.postprocessors, "speed_cap_scale", None)
+    run.speed_scale = scale_fn() if scale_fn is not None \
+        else float(getattr(config, "v2_speed_cap_scale", 1.) or 0.)
+    run.combined_reach = (getattr(config, "v2_playability_enabled", False)
+                          and (getattr(config, "v2_playability_reach", False)
+                               or getattr(config, "v2_playability_priority", False)))
+    if run.speed_cap is not None and run.state["notes"] and (run.speed_scale > 0 or run.combined_reach):
+        # Primary pass while every note is still mutable; the retained
+        # snapshot below records the capped set.
+        run.result.diagnostics["speed_cap"] = run.speed_cap(run.state["notes"], run.state["chains"],
+                                                            rng=run.rng, logger=run.logger)
+
+
+def _multiplier_begin(run):
+    """Snapshot retained notes and build the expansion anchor index."""
+    run.started = perf_counter()
+    run.retained = deepcopy([note for note in run.state["notes"] if note.get("kind") == "retained"])
+    run.upstream = index_state({**run.state, "notes": run.retained, "chains": []})
+    run.by_time = {}
+    for note in run.retained:
+        run.by_time.setdefault(note["time"], []).append(note)
+    run.multiplier_candidates = [{"time": time, "count": len(notes)} for time, notes in sorted(run.by_time.items())]
+    run.encoder(np.asarray(list(sorted(run.by_time)), np.float64))
+    run.history, run.expansion_rejections = [], {}
+    _log(run.logger, "V2 multiplier")
+
+
+def _multiplier_inputs(run, candidate):
+    return _inputs("multiplier", run.song, run.upstream, candidate, run.history, run.encoder, run.options)
+
+
+def _multiplier_apply(run, candidate, output):
+    """Expand each anchor at this onset and roll back rejected expansions."""
+    pair = [0, 0]
+    for anchor in run.by_time[candidate["time"]]:
+        hand = ("red", "blue")[anchor["hand"]]
+        category = int(_distribution(output[hand], (1, len(run.vocabularies["multiplier"])), "expansion")[0].argmax())
+        run.raw["multiplier_non_none"] += int(category != 0)
+        if getattr(config, "single_notes_only_flag", False):
+            category = 0
+        old_notes, old_chains = list(run.state["notes"]), list(run.state["chains"])
+        accepted = _atomic_expand(run.state, anchor, run.vocabularies["multiplier"][category], run.duration,
+                                  run.result.diagnostics["rejected_expansions"])
+        if accepted and category:
+            proposed = len(run.state["notes"]), len(run.state["chains"])
+            _rejections(run.expansion_rejections, run.postprocessors.validate_expansions(run.state, run.song, logger=None))
+            if (len(run.state["notes"]), len(run.state["chains"])) != proposed:
+                run.state["notes"], run.state["chains"] = old_notes, old_chains
+                run.result.diagnostics["rejected_expansions"].append({"anchor_id": anchor["id"], "reason": "expansion clearance"})
+                accepted = False
+        if accepted:
+            pair[anchor["hand"]] = category
+    _history(run.history, {"time": candidate["time"], "value": pair}, run.length)
+
+
+def _multiplier_end(run):
+    run.result.stages["multiplier"] = {"retained_notes": len(run.retained),
+                                       "added_notes": sum(note.get("kind") == "copy" for note in run.state["notes"]),
+                                       "chains": len(run.state["chains"]),
+                                       "chain_slices": sum(chain["slices"] for chain in run.state["chains"])}
+    run.result.diagnostics["expansion_clearance"] = run.postprocessors.validate_expansions(run.state, run.song, logger=run.logger)
+    _rejections(run.expansion_rejections, run.result.diagnostics["expansion_clearance"])
+    run.result.diagnostics["expansion_clearance"].update(run.expansion_rejections)
+    run.result.stages["multiplier"]["elapsed_seconds"] = perf_counter() - run.started
+
+
+def _multiplier_stage(run):
+    _multiplier_begin(run)
+    for index, candidate in enumerate(run.multiplier_candidates):
+        output = _predict(run.predictors["multiplier"], _multiplier_inputs(run, candidate))
+        _multiplier_apply(run, candidate, output)
+        _progress(run.logger, "multiplier", index, len(run.multiplier_candidates))
+    _multiplier_end(run)
+
+
+def _expansion_cleanup(run):
+    """Post-expansion validators that keep the retained snapshot frozen."""
+    enforce_flow = getattr(run.postprocessors, "enforce_note_flow_and_clearance", None)
+    if enforce_flow is not None:
+        clearance = enforce_flow(run.state["notes"], run.state["chains"])
+        run.result.diagnostics["same_direction_notes_flipped"] = clearance["flow_recuts"]
+        run.result.diagnostics["note_clearance"] = clearance
+    if run.speed_cap is not None and run.state["notes"] and run.speed_scale > 0:
+        # Post-expansion pass: retained notes must stay dict-equal to the
+        # snapshot until the end-of-run check, so only copies and heuristic
+        # notes may still drop or recut.
+        run.result.diagnostics["speed_cap_post_expansion"] = run.speed_cap(
+            run.state["notes"], run.state["chains"], rng=run.rng, logger=run.logger,
+            drop_retained=False)
+    counter_sweep = getattr(run.postprocessors, "apply_fast_counter_sweep", None)
+    if (counter_sweep is not None and run.state["notes"]
+            and getattr(config, "v2_fast_counter_direction", "recut") == "recut"
+            and float(getattr(config, "v2_fast_gap_seconds", .2) or 0.) > 0):
+        # Copies inherit their anchor's cut, so expansion and the speed cap's
+        # deletions can leave fast pairs the pre-snapshot rules never saw:
+        # sweep counter directions over non-retained notes only, keeping the
+        # retained-snapshot invariant verified at the end of generate().
+        run.result.diagnostics["fast_counter_sweep"] = counter_sweep(
+            run.state["notes"], rng=run.rng, logger=run.logger)
+    reach_finalize = getattr(run.postprocessors, "finalize_playability_reach", None)
+    if run.combined_reach and reach_finalize is not None:
+        run.result.diagnostics["reach_post_expansion"] = reach_finalize(
+            run.state["notes"], run.state["chains"], protect_retained=True)
+    emphasis = getattr(run.postprocessors, "apply_note_emphasis", None)
+    if emphasis is not None:
+        emphasis_started = perf_counter()
+        run.result.diagnostics["note_emphasis"] = emphasis(
+            run.state, run.song, rng=run.rng, logger=run.logger)
+        run.result.stages["emphasis"] = {
+            "added_notes": run.result.diagnostics["note_emphasis"].get("added_notes", 0),
+            "elapsed_seconds": perf_counter() - emphasis_started}
+    drop_guard = getattr(run.postprocessors, "drop_guard", None)
+    if run.playability_mode == "forward" and drop_guard is not None:
+        drop_guard(run.state)
+
+
+def _hazards_stage(run):
+    """Heuristic or learned hazard proposals; decode semantics unchanged."""
+    started = perf_counter()
+    index_state(run.state)
+    if getattr(config, "v2_walls_heuristic", False):
+        _log(run.logger, "V2 hazards (heuristic)")
+        proposals = (_heuristic_wall_candidates(run.state["notes"], run.state["event_times"])
+                     if config.add_obstacle_flag else [])
+        bomb_proposals = (_heuristic_bomb_candidates(run.state, run.rng)
+                          if config.add_bombs_flag else [])
+        run.state["walls"], run.state["bombs"] = proposals, bomb_proposals
+        run.raw["wall_proposals"] = len(proposals)
+        run.raw["bomb_proposals"] = len(bomb_proposals)
+        run.result.diagnostics["hazard_clearance"] = run.postprocessors.validate_hazards(run.state, run.song, logger=run.logger)
+        run.result.stages["hazards"] = {"mode": "heuristic", "walls": len(run.state["walls"]),
+                                        "bombs": len(run.state["bombs"]),
+                                        "elapsed_seconds": perf_counter() - started}
+    elif repaired(run.options, "hazards"):
+        from training.pipeline_v2.hazard_sections import rollout
+        report = rollout(run.song, run.state, run.vocabularies, run.options,
+                         lambda inputs: _predict(run.predictors["hazards"], inputs), run.encoder,
+                         progress=lambda index, total: _progress(run.logger, "hazards", index, total))
+        run.raw["wall_proposals"] = report["wall_section_proposals"]
+        run.raw["bomb_proposals"] = report["bomb_proposals"]
+        report["application_filters"] = run.postprocessors.validate_hazards(run.state, run.song, logger=run.logger)
+        run.result.diagnostics["hazard_clearance"] = report
+        run.result.stages["hazards"] = {**report, "walls": len(run.state["walls"]), "bombs": len(run.state["bombs"]),
+                                        "elapsed_seconds": perf_counter() - started}
+    else:
+        queries = hazard_candidates(expansion_occupancy_notes(run.state), run.duration, run.bpm, run.schedule)
+        run.encoder(np.asarray([query["time"] for query in queries], np.float64))
+        run.history, hazard_rejections = [], {}
+        _log(run.logger, "V2 hazards")
+        for index, candidate in enumerate(queries):
+            output = _predict(run.predictors["hazards"], _inputs("hazards", run.song, run.state, candidate, run.history, run.encoder, run.options))
+            wall = int(_distribution(output["wall"], (1, len(run.vocabularies["walls"])), "wall")[0].argmax())
+            bombs = _multilabel(output["bombs"], (1, 12), "bomb")[0] >= run.options["bomb_threshold"]
+            previous_walls, previous_bombs = len(run.state["walls"]), len(run.state["bombs"])
+            if candidate["kind"] == "wall" and wall:
+                run.raw["wall_proposals"] += 1
+                run.state["walls"].append({**deepcopy(run.vocabularies["walls"][wall]), "time": candidate["time"],
+                                           "end_time": candidate["end_time"], "template_id": wall})
+            elif candidate["kind"] == "bomb":
+                run.raw["bomb_proposals"] += int(bombs.sum())
+                run.state["bombs"].extend({"time": candidate["time"], "x": int(cell % 4), "y": int(cell // 4)} for cell in np.flatnonzero(bombs))
+            # Clearance is applied before accepted outputs enter the next history.
+            _rejections(hazard_rejections, run.postprocessors.validate_hazards(run.state, run.song, logger=None))
+            accepted_wall = run.state["walls"][-1]["template_id"] if len(run.state["walls"]) > previous_walls else 0
+            accepted_bombs = np.zeros(12, np.int32)
+            for bomb in run.state["bombs"][previous_bombs:]:
+                accepted_bombs[4 * bomb["y"] + bomb["x"]] = 1
+            for record in run.history:
+                if record["time"] == candidate["time"] and record.get("kind") == "bomb":
+                    record["value"][1:] = [int(any(bomb["time"] == candidate["time"] and 4 * bomb["y"] + bomb["x"] == cell
+                                                    for bomb in run.state["bombs"])) for cell in range(12)]
+            _history(run.history, {"time": candidate["time"], "kind": candidate["kind"],
+                                   "value": [accepted_wall, *accepted_bombs.tolist()]}, run.length)
+            _progress(run.logger, "hazards", index, len(queries))
+        run.result.diagnostics["hazard_clearance"] = run.postprocessors.validate_hazards(run.state, run.song, logger=run.logger)
+        _rejections(hazard_rejections, run.result.diagnostics["hazard_clearance"])
+        run.result.diagnostics["hazard_clearance"].update(hazard_rejections)
+        run.result.stages["hazards"] = {"queries": len(queries), "walls": len(run.state["walls"]), "bombs": len(run.state["bombs"]),
+                                        "elapsed_seconds": perf_counter() - started}
+
+
+def _arcs_stage(run):
+    """Heuristic or learned arc attachments; decode semantics unchanged."""
+    started = perf_counter()
+    if getattr(config, "v2_arcs_heuristic", False):
+        _log(run.logger, "V2 arcs (heuristic)")
+        radius = float(config.slider_radius_multiplier)
+        proposed = _heuristic_arc_candidates(run.state["notes"], radius)
+        run.state["arcs"] = proposed
+        run.raw["arc_attachments"] = len(proposed)
+        run.result.diagnostics["arc_clearance"] = run.postprocessors.validate_arcs(
+            run.state, run.song, logger=run.logger, settings={"stage_policies": {}})
+        run.result.stages["arcs"] = {"mode": "heuristic", "queries": len(proposed),
+                                     "arcs": len(run.state["arcs"]),
+                                     "elapsed_seconds": perf_counter() - started}
+    else:
+        queries = arc_candidates(run.state["notes"], run.options)
+        run.state["_arc_options"] = run.options
+        run.encoder(np.asarray([query["time"] for query in queries], np.float64))
+        run.history, arc_rejections = [], {}
+        _log(run.logger, "V2 arcs")
+        lower, upper = run.options["arc_shape_bounds"]
+        for index, candidate in enumerate(queries):
+            output = _predict(run.predictors["arcs"], _inputs("arcs", run.song, run.state, candidate, run.history, run.encoder, run.options))
+            attach_probabilities = _distribution(output["attach"], (1, 2), "arc attachment")[0]
+            attach = (int(attach_probabilities[1] >= run.options.get("arc_threshold", .5))
+                      if repaired(run.options, "arcs") else int(attach_probabilities.argmax()))
+            run.raw["arc_attachments"] += attach
+            shape = np.asarray(output["shape"], np.float32)
+            if shape.shape != (1, 2) or not np.isfinite(shape).all() or np.any((shape < lower) | (shape > upper)):
+                raise ValueError("Invalid arc controls")
+            anchor = int(_distribution(output["anchor"], (1, 3), "arc anchor")[0].argmax())
+            previous = len(run.state["arcs"])
+            if attach:
+                run.state["arcs"].append({**deepcopy(candidate), "mu": float(shape[0, 0]),
+                                          "tmu": float(shape[0, 1]), "anchor_mode": anchor})
+                _rejections(arc_rejections, run.postprocessors.validate_arcs(run.state, run.song, logger=None))
+            attach = int(len(run.state["arcs"]) > previous)
+            _history(run.history, {"time": candidate["time"],
+                                   "value": history_value({"attach": attach, "shape": shape[0].tolist(),
+                                                           "anchor": anchor})}, run.length)
+            _progress(run.logger, "arcs", index, len(queries))
+        run.result.diagnostics["arc_clearance"] = run.postprocessors.validate_arcs(run.state, run.song, logger=run.logger)
+        _rejections(arc_rejections, run.result.diagnostics["arc_clearance"])
+        run.result.diagnostics["arc_clearance"].update(arc_rejections)
+        run.result.stages["arcs"] = {"mode": "model", "queries": len(queries), "arcs": len(run.state["arcs"]),
+                                     "elapsed_seconds": perf_counter() - started}
+
+
+def _calm_stage(run):
+    """Decorative wall/bomb/lighting pulses inside intentionally note-free gaps."""
+    started = perf_counter()
+    run.calm_pulses = []
+    pulse_fn, place_fn = (getattr(run.postprocessors, "calm_area_pulses", None),
+                          getattr(run.postprocessors, "add_calm_effects", None))
+    if (pulse_fn is not None and place_fn is not None
+            and getattr(config, "v2_calm_effects", False)
+            and any(getattr(config, name, True) for name in
+                    ("v2_calm_effects_walls", "v2_calm_effects_bombs", "v2_calm_effects_lighting"))):
+        # Decorative beat pulses in note-free stretches: edge wall flashes,
+        # bottom-corner bombs and later laser flashes. Notes stay untouched.
+        _log(run.logger, "V2 calm effects")
+        run.calm_pulses, diagnostics = pulse_fn(run.state, run.song)
+        diagnostics.update(place_fn(run.state, run.song, run.calm_pulses))
+        if diagnostics["walls"] or diagnostics["bombs"]:
+            diagnostics["hazard_clearance"] = run.postprocessors.validate_hazards(run.state, run.song, logger=run.logger)
+        run.result.diagnostics["calm_effects"] = diagnostics
+        run.result.stages["calm_effects"] = {"pulses": len(run.calm_pulses),
+                                             "elapsed_seconds": perf_counter() - started}
+
+
+def _lighting_stage(run):
+    """Retained v1 lighting plus optional calm laser flashes."""
+    started = perf_counter()
+    _log(run.logger, "V1 lighting")
+    run.state["lighting"], lighting_report = run.lighting_generator(run.state["event_times"], run.encoder)
+    if run.calm_pulses and getattr(config, "v2_calm_effects_lighting", False) \
+            and getattr(run.postprocessors, "add_calm_lighting", None) is not None:
+        added = run.postprocessors.add_calm_lighting(run.state, run.calm_pulses)
+        run.result.diagnostics["calm_effects"]["lighting_events"] = added
+        run.result.stages["calm_effects"]["lighting_events"] = added
+    run.raw["lighting_commands"] = len(run.state["lighting"])
+    run.result.stages["lighting"] = {**lighting_report, "events": len(run.state["lighting"]),
+                                     "elapsed_seconds": perf_counter() - started}
+
+
+def _finalize(run):
+    """Audit the frozen retained snapshot and finish the diagnostics record."""
+    if [note for note in run.state["notes"] if note.get("kind") == "retained"] != run.retained:
+        raise ValueError("A downstream stage changed retained notes")
+    playability_findings = _validate_state(
+        run.state, run.duration, playability_mode=run.playability_mode)
+    run.result.diagnostics["playability_policy"] = run.playability_mode
+    run.result.diagnostics["playability_strict_validated"] = (
+        run.playability_mode == "search"
+        and getattr(config, "v2_playability_enabled", False)
+        and (getattr(config, "v2_playability_reach", False)
+             or getattr(config, "v2_playability_priority", False)))
+    if run.playability_mode == "forward":
+        run.result.diagnostics["playability_findings"] = playability_findings or {}
+        run.result.diagnostics["hard_direction_validated"] = True
+        run.result.diagnostics["hard_dropped_final"] = (
+            playability_findings or {}).get("hard_dropped_final", 0)
+    run.result.diagnostics["final_counts"] = {
+        "colored_notes": len(run.state["notes"]),
+        "retained_notes": sum(note.get("kind") == "retained" for note in run.state["notes"]),
+        "heuristic_notes": sum(note.get("kind") == "heuristic" for note in run.state["notes"]),
+        "learned_copies": sum(note.get("kind") == "copy" and note.get("source") != "emphasis"
+                              for note in run.state["notes"]),
+        "emphasis_copies": sum(note.get("kind") == "copy" and note.get("source") == "emphasis"
+                               for note in run.state["notes"]),
+        "unique_onsets": len({note["time"] for note in run.state["notes"]}),
+        "chains": len(run.state["chains"]), "chain_slices": sum(chain["slices"] for chain in run.state["chains"]),
+        "walls": len(run.state["walls"]), "bombs": len(run.state["bombs"]),
+        "arcs": len(run.state["arcs"]), "lighting_events": len(run.state["lighting"])}
+    run.state.pop("_arc_options", None)
+    run.state.pop("_tracks", None)
+    run.state.pop("_occupancy", None)
+    run.result.diagnostics.update(export_ready=True, production_validated=True, safety_reviewed=False,
+                                  gameplay_validated=False,
+                                  encoder=getattr(run.encoder, "metadata", {}),
+                                  requested_count_guaranteed=False)
+    return run.result
+
+
 def _validate_state(state, duration, *, playability_mode="search"):
     """Check the final object contract after all mutating postprocessors.
 
@@ -543,493 +1210,18 @@ def generate(song, requested_nps, predictors, encoder, settings, vocabularies, *
              lighting_generator, audio_path=None, logger=None, postprocessors=None, random_factor=None,
              intensity=None, rng=None):
     """Compose seven v2 stages, retained v1 lighting, and application validators."""
-    if isinstance(requested_nps, bool) or not np.isfinite(requested_nps) or requested_nps < 0:
-        raise ValueError("Requested retained NPS must be finite and nonnegative")
-    playability_mode = "search"
-    if postprocessors is None:
-        from . import v2_postprocessing as postprocessors
-        mode = getattr(config, "v2_note_postprocessing_mode", "search")
-        if mode not in ("forward", "search"):
-            raise ValueError(f"Unknown v2_note_postprocessing_mode: {mode}")
-        forward = (mode == "forward"
-                   and not getattr(config, "v2_cleanup_note_heuristics", True)
-                   and getattr(config, "v2_playability_enabled", False)
-                   and (getattr(config, "v2_playability_priority", False)
-                        or getattr(config, "v2_playability_reach", False)))
-        if forward:
-            playability_mode = "forward"
-            from . import v2_forward_postprocessing as forward_core
-            from . import v2_forward_expansion as forward_late
-            base = postprocessors
-            postprocessors = SimpleNamespace(
-                postprocess_timing=base.postprocess_timing,
-                postprocess_notes=forward_core.normalize_notes,
-                repair_notes=forward_core.repair_notes,
-                validate_expansions=forward_late.validate_expansions,
-                drop_guard=forward_late.drop_guard,
-                validate_hazards=base.validate_hazards,
-                validate_arcs=base.validate_arcs,
-                snap_note_times=base.snap_note_times,
-                apply_intro_floor=base.apply_intro_floor,
-                apply_note_emphasis=forward_late.apply_note_emphasis,
-                calm_area_pulses=base.calm_area_pulses,
-                add_calm_effects=base.add_calm_effects,
-                add_calm_lighting=base.add_calm_lighting)
-        elif not getattr(config, "v2_cleanup_note_heuristics", True):
-            # Skip the legacy v1 note mutators; structural dedup, the
-            # same-direction recut and the clearance fixpoint still run.
-            base = postprocessors
-            postprocessors = SimpleNamespace(
-                postprocess_timing=base.postprocess_timing,
-                postprocess_notes=lambda *args, **kwargs: base.postprocess_notes(
-                    *args, skip=base.LEGACY_NOTE_MUTATORS, **kwargs),
-                validate_expansions=base.validate_expansions,
-                validate_hazards=base.validate_hazards,
-                validate_arcs=base.validate_arcs,
-                enforce_note_flow_and_clearance=base.enforce_note_flow_and_clearance,
-                snap_note_times=base.snap_note_times,
-                apply_intro_floor=base.apply_intro_floor,
-                apply_fast_direction_rules=base.apply_fast_direction_rules,
-                apply_fast_counter_sweep=base.apply_fast_counter_sweep,
-                apply_diagonal_cap=base.apply_diagonal_cap,
-                apply_speed_cap=base.apply_speed_cap,
-                speed_cap_scale=base.speed_cap_scale,
-                finalize_playability_reach=base.finalize_playability_reach,
-                apply_note_emphasis=base.apply_note_emphasis,
-                calm_area_pulses=base.calm_area_pulses,
-                add_calm_effects=base.add_calm_effects,
-                add_calm_lighting=base.add_calm_lighting)
-    factor = getattr(config, "random_note_map_factor", 0.) if random_factor is None else random_factor
-    if isinstance(factor, bool) or not np.isfinite(factor) or factor < 0:
-        raise ValueError("Random factor must be finite and nonnegative")
-    factor = min(float(factor), 1.)
-    rng = np.random.default_rng() if rng is None else rng
-    duration, bpm = float(song.metadata["duration"]), float(song.metadata["bpm"])
-    options = deepcopy(settings)
-    temperature = float(options.get("note_sample_temperature", 0.) or 0.)
-    if not np.isfinite(temperature) or temperature < 0:
-        raise ValueError("Note sample temperature must be finite and nonnegative")
-    sampling = temperature > 0
-    options["vocabularies"] = vocabularies
-    schedule = options["schedule"]
-    status = "dummy" if all(getattr(predictor, "status", "trained") == "dummy"
-                            for stage, predictor in predictors.items() if stage != "lighting") else "trained"
-    result = PipelineResult(status, {key: [] for key in ("notes", "chains", "walls", "bombs", "arcs", "lighting")},
-                            diagnostics={"requested_retained_nps": float(requested_nps),
-                                         "duration_seconds": duration, "bpm": bpm,
-                                         "bpm_detected": float(song.metadata.get("bpm_detected", bpm)),
-                                         "rejected_expansions": [], "export_ready": False,
-                                         "random_factor": factor, "note_sample_temperature": temperature,
-                                         "scheduler": deepcopy(schedule)})
-    state = result.state
-    raw = result.diagnostics["raw_decisions"] = {
-        "position_events": 0, "position_notes": 0, "arrow_notes": 0,
-        "multiplier_non_none": 0, "wall_proposals": 0, "bomb_proposals": 0,
-        "arc_attachments": 0, "lighting_commands": 0}
-    _log(logger, "V2 intensity and timing")
-    beats = infer_beats(song, requested_nps, predictors,
-                       getattr(config, "v2_timing_batch_size", 8), intensity=intensity)
-    beat_seconds = beats.pop("_stage_seconds")
-    result.diagnostics["intensity_postprocessing"] = beats.pop("_intensity_postprocessing")
-    state.update(beats, requested_nps=float(requested_nps),
-                 multiplier_classes=len(vocabularies["multiplier"]))
-    cleanup_started = perf_counter()
-    candidates, diagnostics = postprocessors.postprocess_timing(song, beats, audio_path, logger=logger)
-    candidates = _candidates(song, candidates)
-    state.update(raw_event_times=beats["event_times"], raw_event_frames=beats["event_frames"], raw_counts=beats["counts"],
-                 event_times=np.asarray([candidate["time"] for candidate in candidates], np.float64),
-                 event_frames=np.asarray([candidate["frame"] for candidate in candidates], np.int64))
-    state["counts"] = np.zeros_like(beats["counts"])
-    for candidate in candidates:
-        state["counts"][candidate["frame"]] = candidate["count"]
-    result.diagnostics["timing_postprocessing"] = diagnostics
-    result.stages["intensity"] = {"bins": len(beats["intensity"]), "elapsed_seconds": beat_seconds["intensity"]}
-    result.stages["timing"] = {"raw_events": len(beats["event_frames"]), "events": len(candidates),
-                                "raw_retained_notes": int(beats["counts"].sum()),
-                                "elapsed_seconds": beat_seconds["timing"] + perf_counter() - cleanup_started}
-    started = perf_counter()
-    encoder(np.asarray([candidate["time"] for candidate in candidates], np.float64))
-    history, length = [], options["history_length"]
-    last_hand_time = [-np.inf, -np.inf]
-    recovery = config.v2_playability_recovery_ratio if config.v2_playability_enabled else 0.
-    if not np.isfinite(recovery) or not 0 <= recovery <= 1:
-        raise ValueError("v2_playability_recovery_ratio must be in [0, 1]")
-    recovery_swaps = recovery_opportunities = 0
-    recovery_alternatives = {}
-    recovery_balanced = bool(getattr(config, "v2_playability_recovery_balanced", False))
-    for index, candidate in enumerate(candidates):
-        output = _predict(predictors["positions"], _inputs("positions", song, state, candidate, history, encoder, options))
-        if sampling:
-            pair = _decode_positions_sampled(_biased(output, 13, 0, rng), candidate["count"], temperature, rng)
-        else:
-            pair = _decode_positions(_biased(output, 13, factor, rng), candidate["count"])
-        if recovery and candidate["count"] == 1:
-            hand = 0 if pair[0] else 1
-            recovery_opportunities += int(candidate["time"]-last_hand_time[hand] < .25)
-            if recovery_balanced:
-                alternatives = _deferred_recovery_alternatives(pair, output, recovery)
-                if alternatives:
-                    cell = pair[hand]-1
-                    key = candidate["time"], hand, cell % 4, cell // 4
-                    recovery_alternatives[key] = alternatives
-            else:
-                selected = _recover_single_hand(pair, output, last_hand_time, candidate["time"], recovery)
-                if tuple(pair) != tuple(selected):
-                    recovery_swaps += 1
-                pair = selected
-        for hand, category in enumerate(pair):
-            if category:
-                last_hand_time[hand] = candidate["time"]
-                cell = category - 1
-                state["notes"].append({"id": len(state["notes"]), "time": candidate["time"], "hand": hand,
-                                       "x": cell % 4, "y": cell // 4, "kind": "retained"})
-        _history(history, {"time": candidate["time"], "value": pair}, length)
-        _progress(logger, "positions", index, len(candidates))
-    if recovery:
-        raw["recovery_hand_swaps"] = recovery_swaps
-        raw["recovery_policy"] = "deferred-balanced-v2" if recovery_balanced else "legacy"
-        raw["recovery_crowded_single_candidates"] = recovery_opportunities
-        raw["recovery_unresolved_crowded_singles"] = recovery_opportunities-recovery_swaps
-        raw["recovery_deferred_notes"] = len(recovery_alternatives)
-        raw["recovery_deferred_alternatives"] = sum(len(v) for v in recovery_alternatives.values())
-    result.stages["positions"] = {"events": len(candidates), "retained_notes": len(state["notes"]),
-                                   "elapsed_seconds": perf_counter() - started}
-    raw.update(position_events=len(candidates), position_notes=len(state["notes"]))
-    started = perf_counter()
-    index_state(state)
-    history, kinematics = [], {}
-    approach_prior = float(getattr(config, "v2_arrow_approach_prior", 0.) or 0.)
-    approach_overrides = 0
-    arrows_reference = predictors.get("arrows_reference")
-    arrows_variety = float(getattr(config, "v2_arrows_variety", 0.) or 0.) if arrows_reference is not None else 0.
-    variety_picks = 0
-    for index, candidate in enumerate(candidates):
-        inputs = _inputs("arrows", song, state, candidate, history, encoder, options)
-        # Per-event model pick interpolates the resulting statistics exactly;
-        # mixing softmaxes would flatten disagreement and overshoot the tails.
-        model = (arrows_reference if arrows_variety > 0 and rng.random() < arrows_variety
-                 else predictors["arrows"])
-        variety_picks += int(model is arrows_reference)
-        output = _biased(_predict(model, inputs), 9, 0 if sampling else factor, rng)
-        pair = [9, 9]
-        for hand in (0, 1):
-            times, track = state["_tracks"][hand]
-            location = int(np.searchsorted(times, candidate["time"]))
-            if location < len(track) and track[location]["time"] == candidate["time"]:
-                probabilities = output[("red", "blue")[hand]][0]
-                direction = (_sample_category(probabilities, temperature, rng)
-                             if sampling else int(probabilities.argmax()))
-                prior = _approach_snap(kinematics.get(hand), track[location])
-                if prior is not None and float(probabilities.max()) < approach_prior:
-                    direction = prior
-                    approach_overrides += 1
-                note = track[location]
-                note["d"] = direction
-                pair[hand] = direction
-                vector = _DIRECTION_VECTORS[direction]
-                kinematics[hand] = (note["x"] + vector[0], note["y"] + vector[1],
-                                    direction if direction != 8 else (kinematics.get(hand) or (0, 0, 1))[2])
-        _history(history, {"time": candidate["time"], "value": pair}, length)
-        _progress(logger, "arrows", index, len(candidates))
-    raw["arrow_approach_overrides"] = approach_overrides
-    raw["arrow_variety"] = round(variety_picks / len(candidates), 4) if candidates else 0.
-    result.stages["arrows"] = {"directed_notes": len(state["notes"])}
-    raw["arrow_notes"] = len(state["notes"])
-    state["raw_model_notes"] = np.asarray([[note[key] for key in ("id", "time", "hand", "x", "y", "d")]
-                                           for note in state["notes"]], np.float64).reshape(-1, 6)
-    result.diagnostics["raw_model_note_columns"] = ["id", "time_seconds", "hand", "x", "y", "direction"]
-    state["notes"], diagnostics = postprocessors.postprocess_notes(state["notes"],
-                                             [candidate["time"] for candidate in candidates], logger=logger)
-    if recovery_alternatives:
-        if playability_mode == "forward":
-            result.diagnostics["decoder_recovery"] = {"ran": False}
-        else:
-            for note in state["notes"]:
-                alternatives = recovery_alternatives.get(tuple(note[k] for k in ("time", "hand", "x", "y")))
-                if alternatives:
-                    note["_recovery_alternatives"] = deepcopy(alternatives)
-    result.diagnostics["note_postprocessing"] = diagnostics
-    result.stages["arrows"]["elapsed_seconds"] = perf_counter() - started
-    snap_times = getattr(postprocessors, "snap_note_times", None)
-    if snap_times is not None and getattr(config, "v2_notes_onset_snap", False) and state["notes"]:
-        snap_started = perf_counter()
-        result.diagnostics["onset_snap"] = snap_times(state["notes"], state["chains"],
-                                                      audio_path, duration, logger=logger)
-        result.diagnostics["onset_snap"]["elapsed_seconds"] = perf_counter() - snap_started
-    intro_fn = getattr(postprocessors, "apply_intro_floor", None)
-    intro_floor = float(getattr(config, "v2_map_intro_no_notes_seconds", 0.) or 0.)
-    # TODO: multiplier expansion copies with a negative dt would land back
-    # inside this note-free zone (no second floor runs after expansion);
-    # design-accepted today — revisit if a fitted vocabulary gains negative
-    # offsets.
-    if intro_fn is not None and intro_floor > 0:
-        result.diagnostics["intro_zones"] = {
-            "no_notes_seconds": intro_floor,
-            "notes_dropped": intro_fn(state["notes"], intro_floor)}
-    if playability_mode == "forward":
-        repair = getattr(postprocessors, "repair_notes", None)
-        if repair is not None and state["notes"]:
-            result.diagnostics["forward_postprocessing"] = repair(
-                state["notes"], rng=rng, logger=logger)
-    fast_dir = getattr(postprocessors, "apply_fast_direction_rules", None)
-    if fast_dir is not None and state["notes"] \
-            and float(getattr(config, "v2_fast_gap_seconds", .2) or 0.) > 0:
-        result.diagnostics["fast_directions"] = fast_dir(state["notes"], rng=rng,
-                                                         logger=logger)
-    diag_fn = getattr(postprocessors, "apply_diagonal_cap", None)
-    diag_cap = float(getattr(config, "v2_diagonal_max_fraction", 1.) or 0.)
-    if diag_fn is not None and state["notes"] and 0 <= diag_cap < 1:
-        result.diagnostics["diagonal_cap"] = diag_fn(state["notes"], state["chains"], rng=rng)
-    speed_cap = getattr(postprocessors, "apply_speed_cap", None)
-    scale_fn = getattr(postprocessors, "speed_cap_scale", None)
-    speed_scale = scale_fn() if scale_fn is not None \
-        else float(getattr(config, "v2_speed_cap_scale", 1.) or 0.)
-    combined_reach = (getattr(config, "v2_playability_enabled", False)
-                      and (getattr(config, "v2_playability_reach", False)
-                           or getattr(config, "v2_playability_priority", False)))
-    if speed_cap is not None and state["notes"] and (speed_scale > 0 or combined_reach):
-        # Primary pass while every note is still mutable; the retained
-        # snapshot below records the capped set.
-        result.diagnostics["speed_cap"] = speed_cap(state["notes"], state["chains"],
-                                                    rng=rng, logger=logger)
-    started = perf_counter()
-    retained = deepcopy([note for note in state["notes"] if note.get("kind") == "retained"])
-    upstream = index_state({**state, "notes": retained, "chains": []})
-    by_time = {}
-    for note in retained:
-        by_time.setdefault(note["time"], []).append(note)
-    multiplier_candidates = [{"time": time, "count": len(notes)} for time, notes in sorted(by_time.items())]
-    encoder(np.asarray(list(sorted(by_time)), np.float64))
-    history, expansion_rejections = [], {}
-    _log(logger, "V2 multiplier")
-    for index, candidate in enumerate(multiplier_candidates):
-        output = _predict(predictors["multiplier"], _inputs("multiplier", song, upstream, candidate, history, encoder, options))
-        pair = [0, 0]
-        for anchor in by_time[candidate["time"]]:
-            hand = ("red", "blue")[anchor["hand"]]
-            category = int(_distribution(output[hand], (1, len(vocabularies["multiplier"])), "expansion")[0].argmax())
-            raw["multiplier_non_none"] += int(category != 0)
-            if getattr(config, "single_notes_only_flag", False):
-                category = 0
-            old_notes, old_chains = list(state["notes"]), list(state["chains"])
-            accepted = _atomic_expand(state, anchor, vocabularies["multiplier"][category], duration,
-                                      result.diagnostics["rejected_expansions"])
-            if accepted and category:
-                proposed = len(state["notes"]), len(state["chains"])
-                _rejections(expansion_rejections, postprocessors.validate_expansions(state, song, logger=None))
-                if (len(state["notes"]), len(state["chains"])) != proposed:
-                    state["notes"], state["chains"] = old_notes, old_chains
-                    result.diagnostics["rejected_expansions"].append({"anchor_id": anchor["id"], "reason": "expansion clearance"})
-                    accepted = False
-            if accepted:
-                pair[anchor["hand"]] = category
-        _history(history, {"time": candidate["time"], "value": pair}, length)
-        _progress(logger, "multiplier", index, len(multiplier_candidates))
-    result.stages["multiplier"] = {"retained_notes": len(retained), "added_notes": sum(note.get("kind") == "copy" for note in state["notes"]),
-                                    "chains": len(state["chains"]), "chain_slices": sum(chain["slices"] for chain in state["chains"])}
-    result.diagnostics["expansion_clearance"] = postprocessors.validate_expansions(state, song, logger=logger)
-    _rejections(expansion_rejections, result.diagnostics["expansion_clearance"])
-    result.diagnostics["expansion_clearance"].update(expansion_rejections)
-    result.stages["multiplier"]["elapsed_seconds"] = perf_counter() - started
-    enforce_flow = getattr(postprocessors, "enforce_note_flow_and_clearance", None)
-    if enforce_flow is not None:
-        clearance = enforce_flow(state["notes"], state["chains"])
-        result.diagnostics["same_direction_notes_flipped"] = clearance["flow_recuts"]
-        result.diagnostics["note_clearance"] = clearance
-    if speed_cap is not None and state["notes"] and speed_scale > 0:
-        # Post-expansion pass: retained notes must stay dict-equal to the
-        # snapshot until the end-of-run check, so only copies and heuristic
-        # notes may still drop or recut.
-        result.diagnostics["speed_cap_post_expansion"] = speed_cap(
-            state["notes"], state["chains"], rng=rng, logger=logger,
-            drop_retained=False)
-    counter_sweep = getattr(postprocessors, "apply_fast_counter_sweep", None)
-    if (counter_sweep is not None and state["notes"]
-            and getattr(config, "v2_fast_counter_direction", "recut") == "recut"
-            and float(getattr(config, "v2_fast_gap_seconds", .2) or 0.) > 0):
-        # Copies inherit their anchor's cut, so expansion and the speed cap's
-        # deletions can leave fast pairs the pre-snapshot rules never saw:
-        # sweep counter directions over non-retained notes only, keeping the
-        # retained-snapshot invariant verified at the end of generate().
-        result.diagnostics["fast_counter_sweep"] = counter_sweep(
-            state["notes"], rng=rng, logger=logger)
-    reach_finalize = getattr(postprocessors, "finalize_playability_reach", None)
-    if combined_reach and reach_finalize is not None:
-        result.diagnostics["reach_post_expansion"] = reach_finalize(
-            state["notes"], state["chains"], protect_retained=True)
-    emphasis = getattr(postprocessors, "apply_note_emphasis", None)
-    if emphasis is not None:
-        emphasis_started = perf_counter()
-        result.diagnostics["note_emphasis"] = emphasis(
-            state, song, rng=rng, logger=logger)
-        result.stages["emphasis"] = {
-            "added_notes": result.diagnostics["note_emphasis"].get("added_notes", 0),
-            "elapsed_seconds": perf_counter() - emphasis_started}
-    drop_guard = getattr(postprocessors, "drop_guard", None)
-    if playability_mode == "forward" and drop_guard is not None:
-        drop_guard(state)
-    started = perf_counter()
-    index_state(state)
-    if getattr(config, "v2_walls_heuristic", False):
-        _log(logger, "V2 hazards (heuristic)")
-        proposals = (_heuristic_wall_candidates(state["notes"], state["event_times"])
-                     if config.add_obstacle_flag else [])
-        bomb_proposals = (_heuristic_bomb_candidates(state, rng)
-                          if config.add_bombs_flag else [])
-        state["walls"], state["bombs"] = proposals, bomb_proposals
-        raw["wall_proposals"] = len(proposals)
-        raw["bomb_proposals"] = len(bomb_proposals)
-        result.diagnostics["hazard_clearance"] = postprocessors.validate_hazards(state, song, logger=logger)
-        result.stages["hazards"] = {"mode": "heuristic", "walls": len(state["walls"]),
-                                    "bombs": len(state["bombs"]),
-                                    "elapsed_seconds": perf_counter() - started}
-    elif repaired(options, "hazards"):
-        from training.pipeline_v2.hazard_sections import rollout
-        report = rollout(song, state, vocabularies, options,
-                         lambda inputs: _predict(predictors["hazards"], inputs), encoder,
-                         progress=lambda index, total: _progress(logger, "hazards", index, total))
-        raw["wall_proposals"] = report["wall_section_proposals"]
-        raw["bomb_proposals"] = report["bomb_proposals"]
-        report["application_filters"] = postprocessors.validate_hazards(state, song, logger=logger)
-        result.diagnostics["hazard_clearance"] = report
-        result.stages["hazards"] = {**report, "walls": len(state["walls"]), "bombs": len(state["bombs"]),
-                                     "elapsed_seconds": perf_counter() - started}
-    else:
-        queries = hazard_candidates(expansion_occupancy_notes(state), duration, bpm, schedule)
-        encoder(np.asarray([query["time"] for query in queries], np.float64))
-        history, hazard_rejections = [], {}
-        _log(logger, "V2 hazards")
-        for index, candidate in enumerate(queries):
-            output = _predict(predictors["hazards"], _inputs("hazards", song, state, candidate, history, encoder, options))
-            wall = int(_distribution(output["wall"], (1, len(vocabularies["walls"])), "wall")[0].argmax())
-            bombs = _multilabel(output["bombs"], (1, 12), "bomb")[0] >= options["bomb_threshold"]
-            previous_walls, previous_bombs = len(state["walls"]), len(state["bombs"])
-            if candidate["kind"] == "wall" and wall:
-                raw["wall_proposals"] += 1
-                state["walls"].append({**deepcopy(vocabularies["walls"][wall]), "time": candidate["time"],
-                                       "end_time": candidate["end_time"], "template_id": wall})
-            elif candidate["kind"] == "bomb":
-                raw["bomb_proposals"] += int(bombs.sum())
-                state["bombs"].extend({"time": candidate["time"], "x": int(cell % 4), "y": int(cell // 4)} for cell in np.flatnonzero(bombs))
-            # Clearance is applied before accepted outputs enter the next history.
-            _rejections(hazard_rejections, postprocessors.validate_hazards(state, song, logger=None))
-            accepted_wall = state["walls"][-1]["template_id"] if len(state["walls"]) > previous_walls else 0
-            accepted_bombs = np.zeros(12, np.int32)
-            for bomb in state["bombs"][previous_bombs:]:
-                accepted_bombs[4 * bomb["y"] + bomb["x"]] = 1
-            for record in history:
-                if record["time"] == candidate["time"] and record.get("kind") == "bomb":
-                    record["value"][1:] = [int(any(bomb["time"] == candidate["time"] and 4 * bomb["y"] + bomb["x"] == cell
-                                                    for bomb in state["bombs"])) for cell in range(12)]
-            _history(history, {"time": candidate["time"], "kind": candidate["kind"],
-                               "value": [accepted_wall, *accepted_bombs.tolist()]}, length)
-            _progress(logger, "hazards", index, len(queries))
-        result.diagnostics["hazard_clearance"] = postprocessors.validate_hazards(state, song, logger=logger)
-        _rejections(hazard_rejections, result.diagnostics["hazard_clearance"])
-        result.diagnostics["hazard_clearance"].update(hazard_rejections)
-        result.stages["hazards"] = {"queries": len(queries), "walls": len(state["walls"]), "bombs": len(state["bombs"]),
-                                     "elapsed_seconds": perf_counter() - started}
-    started = perf_counter()
-    if getattr(config, "v2_arcs_heuristic", False):
-        _log(logger, "V2 arcs (heuristic)")
-        radius = float(config.slider_radius_multiplier)
-        proposed = _heuristic_arc_candidates(state["notes"], radius)
-        state["arcs"] = proposed
-        raw["arc_attachments"] = len(proposed)
-        result.diagnostics["arc_clearance"] = postprocessors.validate_arcs(
-            state, song, logger=logger, settings={"stage_policies": {}})
-        result.stages["arcs"] = {"mode": "heuristic", "queries": len(proposed),
-                                 "arcs": len(state["arcs"]),
-                                 "elapsed_seconds": perf_counter() - started}
-    else:
-        queries = arc_candidates(state["notes"], options)
-        state["_arc_options"] = options
-        encoder(np.asarray([query["time"] for query in queries], np.float64))
-        history, arc_rejections = [], {}
-        _log(logger, "V2 arcs")
-        lower, upper = options["arc_shape_bounds"]
-        for index, candidate in enumerate(queries):
-            output = _predict(predictors["arcs"], _inputs("arcs", song, state, candidate, history, encoder, options))
-            attach_probabilities = _distribution(output["attach"], (1, 2), "arc attachment")[0]
-            attach = int(attach_probabilities[1] >= options.get("arc_threshold", .5)) if repaired(options, "arcs") else int(attach_probabilities.argmax())
-            raw["arc_attachments"] += attach
-            shape = np.asarray(output["shape"], np.float32)
-            if shape.shape != (1, 2) or not np.isfinite(shape).all() or np.any((shape < lower) | (shape > upper)):
-                raise ValueError("Invalid arc controls")
-            anchor = int(_distribution(output["anchor"], (1, 3), "arc anchor")[0].argmax())
-            previous = len(state["arcs"])
-            if attach:
-                state["arcs"].append({**deepcopy(candidate), "mu": float(shape[0, 0]), "tmu": float(shape[0, 1]), "anchor_mode": anchor})
-                _rejections(arc_rejections, postprocessors.validate_arcs(state, song, logger=None))
-            attach = int(len(state["arcs"]) > previous)
-            _history(history, {"time": candidate["time"], "value": history_value({"attach": attach, "shape": shape[0].tolist(), "anchor": anchor})}, length)
-            _progress(logger, "arcs", index, len(queries))
-        result.diagnostics["arc_clearance"] = postprocessors.validate_arcs(state, song, logger=logger)
-        _rejections(arc_rejections, result.diagnostics["arc_clearance"])
-        result.diagnostics["arc_clearance"].update(arc_rejections)
-        result.stages["arcs"] = {"mode": "model", "queries": len(queries), "arcs": len(state["arcs"]),
-                                 "elapsed_seconds": perf_counter() - started}
-    started = perf_counter()
-    calm_pulses = []
-    pulse_fn, place_fn = (getattr(postprocessors, "calm_area_pulses", None),
-                          getattr(postprocessors, "add_calm_effects", None))
-    if (pulse_fn is not None and place_fn is not None
-            and getattr(config, "v2_calm_effects", False)
-            and any(getattr(config, name, True) for name in
-                    ("v2_calm_effects_walls", "v2_calm_effects_bombs", "v2_calm_effects_lighting"))):
-        # Decorative beat pulses in note-free stretches: edge wall flashes,
-        # bottom-corner bombs and later laser flashes. Notes stay untouched.
-        _log(logger, "V2 calm effects")
-        calm_pulses, diagnostics = pulse_fn(state, song)
-        diagnostics.update(place_fn(state, song, calm_pulses))
-        if diagnostics["walls"] or diagnostics["bombs"]:
-            diagnostics["hazard_clearance"] = postprocessors.validate_hazards(state, song, logger=logger)
-        result.diagnostics["calm_effects"] = diagnostics
-        result.stages["calm_effects"] = {"pulses": len(calm_pulses),
-                                         "elapsed_seconds": perf_counter() - started}
-    started = perf_counter()
-    _log(logger, "V1 lighting")
-    state["lighting"], lighting_report = lighting_generator(state["event_times"], encoder)
-    if calm_pulses and getattr(config, "v2_calm_effects_lighting", False) \
-            and getattr(postprocessors, "add_calm_lighting", None) is not None:
-        added = postprocessors.add_calm_lighting(state, calm_pulses)
-        diagnostics["lighting_events"] = added
-        result.stages["calm_effects"]["lighting_events"] = added
-    raw["lighting_commands"] = len(state["lighting"])
-    result.stages["lighting"] = {**lighting_report, "events": len(state["lighting"]),
-                                 "elapsed_seconds": perf_counter() - started}
-    if [note for note in state["notes"] if note.get("kind") == "retained"] != retained:
-        raise ValueError("A downstream stage changed retained notes")
-    playability_findings = _validate_state(
-        state, duration, playability_mode=playability_mode)
-    result.diagnostics["playability_policy"] = playability_mode
-    result.diagnostics["playability_strict_validated"] = (
-        playability_mode == "search"
-        and getattr(config, "v2_playability_enabled", False)
-        and (getattr(config, "v2_playability_reach", False)
-             or getattr(config, "v2_playability_priority", False)))
-    if playability_mode == "forward":
-        result.diagnostics["playability_findings"] = playability_findings or {}
-        result.diagnostics["hard_direction_validated"] = True
-        result.diagnostics["hard_dropped_final"] = (
-            playability_findings or {}).get("hard_dropped_final", 0)
-    result.diagnostics["final_counts"] = {
-        "colored_notes": len(state["notes"]),
-        "retained_notes": sum(note.get("kind") == "retained" for note in state["notes"]),
-        "heuristic_notes": sum(note.get("kind") == "heuristic" for note in state["notes"]),
-        "learned_copies": sum(note.get("kind") == "copy" and note.get("source") != "emphasis"
-                              for note in state["notes"]),
-        "emphasis_copies": sum(note.get("kind") == "copy" and note.get("source") == "emphasis"
-                               for note in state["notes"]),
-        "unique_onsets": len({note["time"] for note in state["notes"]}),
-        "chains": len(state["chains"]), "chain_slices": sum(chain["slices"] for chain in state["chains"]),
-        "walls": len(state["walls"]), "bombs": len(state["bombs"]),
-        "arcs": len(state["arcs"]), "lighting_events": len(state["lighting"])}
-    state.pop("_arc_options", None)
-    state.pop("_tracks", None)
-    state.pop("_occupancy", None)
-    result.diagnostics.update(export_ready=True, production_validated=True, safety_reviewed=False,
-                               gameplay_validated=False,
-                               encoder=getattr(encoder, "metadata", {}),
-                               requested_count_guaranteed=False)
-    return result
+    run = variant_run(song, requested_nps, predictors, encoder, settings, vocabularies,
+                      lighting_generator=lighting_generator, audio_path=audio_path, logger=logger,
+                      postprocessors=postprocessors, random_factor=random_factor,
+                      intensity=intensity, rng=rng)
+    _beats_stage(run)
+    _positions_stage(run)
+    _arrows_stage(run)
+    _note_cleanup(run)
+    _multiplier_stage(run)
+    _expansion_cleanup(run)
+    _hazards_stage(run)
+    _arcs_stage(run)
+    _calm_stage(run)
+    _lighting_stage(run)
+    return _finalize(run)
