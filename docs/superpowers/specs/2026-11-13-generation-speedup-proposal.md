@@ -1,8 +1,8 @@
 # Generation speedup proposal
 
 Status: Task P2, Task P3 and Task P4 implemented (2026-11-13, commits
-4e36119, fe3de57, 318457d, faaad7b on main_app_dev); P1, P5, P6, P7 remain
-proposed.
+4e36119, fe3de57, 318457d, faaad7b on main_app_dev); Task P1 approved for
+implementation (2026-11-14); P5, P6, P7 remain proposed.
 
 ## Intent
 
@@ -57,6 +57,49 @@ index, `build_inputs` for every live variant, concatenate into one batch, one
   temperature 0 in a regression check, statistical equality otherwise.
 - Expected: the ~8.2 s of model stages → ~2.5-3 s for all five variants;
   per-song generation ~65 s → ~25-30 s on one worker.
+
+#### Task P1a — Per-variant context refactor (preparatory, behavior-identical)
+
+`generate()` is one long function whose decode loops keep per-variant state in
+locals (`history`, `kinematics`, `recovery_*`, `last_hand_time`, candidate
+lists, `state`/`result`). Restructure it so each variant run is a context
+object the stage loops iterate — the prerequisite for lockstep batching.
+
+- Extract the per-variant mutable state into a dedicated structure and give
+  each autoregressive stage (positions, arrows, multiplier) a step-level or
+  loop-level function operating on one context; `generate()` keeps its
+  signature and composes the same sequence for one variant.
+- Behavior must be identical: same call order, same decoded values, same
+  diagnostics/stage records, same `scoped_settings` interplay. Existing tests
+  pass unchanged; no batching yet in this task.
+- Keep hazards/arcs heuristic paths and lighting untouched.
+- Success gate: the existing v2 pipeline tests (postprocessing/generation/
+  sparse-integration) all pass without modification.
+
+#### Task P1b — Lockstep `generate_variants` driver + wiring
+
+Run K variants of one song in lockstep, batching `_predict` across variants
+per event index (≤ ~930 calls of batch-K instead of ~2800 batch-1 calls).
+
+- New `generate_variants(song, requested_nps_list, predictors, encoder,
+  settings_list, vocabularies, *, lighting_generator, audio_path, logger,
+  postprocessors, rngs) -> list[PipelineResult]` in `v2_pipeline.py` using the
+  P1a contexts; per-variant phases that read `config` stay sequential per
+  variant; only `_predict` batches (concat inputs axis 0, split outputs).
+- `v2_arrows_variety`: group the step's rows by chosen model → ≤2 calls/step.
+- Candidate lists differ per variant: iterate to the longest, skip finished
+  variants; union all candidate times into one `encoder(...)` prefetch per
+  stage (shared latent cache is a bonus win).
+- `v2_runtime.py`/`v2_generation.py`: `generate_song` uses
+  `generate_variants` when >1 difficulty; `generate`/`runtime.generate` stay
+  the single-variant path (eval tools, tests). Per-variant `scoped_settings`
+  boundaries must match the old sequential loop exactly.
+- Parity gate: at `v2_note_sample_temperature=0` and `random_note_map_factor=0`
+  a K-variant batch produces outputs within a documented tolerance of the
+  same variants run one-by-one (float-reduction order may differ — justify
+  rtol/atol; identical argmax decisions is the real bar).
+- Success gate: parity test + existing suite pass; stage `elapsed_seconds`
+  for positions/arrows/multiplier drops ~K-fold on a multi-difficulty run.
 
 ### Task P2 — Per-song audio-analysis cache (~1.5-2.5 s/variant)
 
