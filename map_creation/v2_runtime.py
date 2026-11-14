@@ -382,8 +382,12 @@ class V2Runtime:
                 with scopes[index]():
                     # Re-read at call time like generate(): a resident runtime
                     # honors live setting changes under each variant's scope.
-                    settings_list.append({**self.settings, "note_sample_temperature":
-                                          float(getattr(config, "v2_note_sample_temperature", 0.) or 0.)})
+                    # Mutating self.settings keeps the same side effect the
+                    # sequential generate() loop had — it ends on the last
+                    # variant's live temperature.
+                    self.settings["note_sample_temperature"] = \
+                        float(getattr(config, "v2_note_sample_temperature", 0.) or 0.)
+                    settings_list.append({**self.settings})
             results = generate_variants(prepared.song, requested_nps_list, self.predictors,
                                         prepared.encoder, settings_list, self.vocabularies,
                                         audio_path=prepared.audio_path, intensity=prepared.intensity,
@@ -397,7 +401,10 @@ class V2Runtime:
                                                  "bundle_load_seconds": getattr(self, "load_seconds", 0.),
                                                  "runtime_cache_hits": _CACHE_HITS,
                                                  "intensity_cache_reused": reused_intensity or index > 0,
-                                                 "generation_seconds": seconds}
+                                                 # Amortized share of the one
+                                                 # shared call — summed
+                                                 # diagnostics stay <= wall.
+                                                 "generation_seconds": seconds / count}
             return results
 
 

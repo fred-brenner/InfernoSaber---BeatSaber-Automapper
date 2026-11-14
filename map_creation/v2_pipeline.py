@@ -461,6 +461,8 @@ class VariantRun:
     calm_pulses: list = field(default_factory=list)
     scope: object = None       # batched runs: CM factory replaying this variant's settings
     late_turns: bool = False   # batched runs: replay @_scope_playability_flow in that scope
+    late_ready: bool = False   # batched runs: sticky _LATE_TURNS_READY across pieces
+    clock_share: float = 0.    # batched runs: attributed stage seconds for honest elapsed
 
 
 def variant_run(song, requested_nps, predictors, encoder, settings, vocabularies, *,
@@ -1243,10 +1245,27 @@ def _late_turns_phase(enabled):
 
 @contextmanager
 def _variant_scope(run):
-    """Enter a batched variant's settings scope for one per-variant piece."""
+    """Enter a batched variant's settings scope for one per-variant piece.
+
+    Sequential ``generate`` holds one ``playability_generation_phase`` for
+    the whole call, so ``_LATE_TURNS_READY`` stays True once
+    ``apply_speed_cap`` flips it inside ``_note_cleanup``. Re-entering the
+    phase per piece would reset it to False and suppress eligible slow
+    turns in every later validator; the run therefore carries the flag
+    value between pieces instead.
+    """
     scope = run.scope() if callable(run.scope) else (run.scope or nullcontext())
-    with scope, _late_turns_phase(run.late_turns):
-        yield
+    with scope:
+        if run.late_turns:
+            from .v2_postprocessing import _LATE_TURNS_READY, playability_generation_phase
+            with playability_generation_phase():
+                _LATE_TURNS_READY.set(run.late_ready)
+                try:
+                    yield
+                finally:
+                    run.late_ready = _LATE_TURNS_READY.get()
+        else:
+            yield
 
 
 def _batched_inputs(rows):
@@ -1271,6 +1290,9 @@ def _lockstep(runs, name, candidates, inputs_fn, pick_fn, apply_fn):
     rng position as the sequential loop) into at most one batched predict per
     model; rows keep variant order so outputs split back positionally. A
     variant past its own candidate list contributes no row that step.
+    ``run.clock_share`` accumulates each variant's own piece time plus its
+    even share of every shared predict so ``elapsed_seconds`` stays honest
+    instead of every variant bracketing the whole shared loop.
     """
     total = max((len(candidates(run)) for run in runs), default=0)
     for index in range(total):
@@ -1278,16 +1300,22 @@ def _lockstep(runs, name, candidates, inputs_fn, pick_fn, apply_fn):
         for run in runs:
             if index >= len(candidates(run)):
                 continue
+            started = perf_counter()
             with _variant_scope(run):
                 inputs = inputs_fn(run, candidates(run)[index])
                 predictor = pick_fn(run)
+            run.clock_share += perf_counter() - started
             groups.setdefault(predictor, []).append((run, inputs))
         for predictor, rows in groups.items():
+            started = perf_counter()
             output = _predict(predictor, _batched_inputs([inputs for _, inputs in rows]))
+            share = (perf_counter() - started) / len(rows)
             for row, (run, _) in enumerate(rows):
+                started = perf_counter()
                 with _variant_scope(run):
                     apply_fn(run, candidates(run)[index], _batch_row(output, row))
                     _progress(run.logger, name, index, len(candidates(run)))
+                run.clock_share += share + perf_counter() - started
 
 
 def _prefetch_union(encoder, runs, times):
@@ -1335,27 +1363,52 @@ def generate_variants(song, requested_nps_list, predictors, encoder, settings_li
             with _variant_scope(run):
                 function(run)
 
+    def timed_each(function):
+        """Per-variant piece whose own duration feeds the stage's elapsed."""
+        for run in runs:
+            started = perf_counter()
+            with _variant_scope(run):
+                function(run)
+            run.clock_share += perf_counter() - started
+
+    def prefetch(times):
+        # The union prefetch is shared work: split it evenly so per-variant
+        # stage elapsed_seconds still sum to the real wall time.
+        started = perf_counter()
+        _prefetch_union(encoder, runs, times)
+        share = (perf_counter() - started) / len(runs)
+        for run in runs:
+            run.clock_share += share
+
+    def close(function):
+        """End a lockstep stage with the variant's attributed share of it."""
+        for run in runs:
+            run.started = perf_counter() - run.clock_share
+            with _variant_scope(run):
+                function(run)
+            run.clock_share = 0.
+
     for index, run in enumerate(runs):
         # Raw intensity shares from the first variant seed the rest, matching
         # runtime.generate's prepared.intensity reuse across difficulties.
         if index and run.intensity is None:
-            run.intensity = runs[0].state["raw_intensity"]
+            run.intensity = runs[0].state["raw_intensity"].copy()
         with _variant_scope(run):
             _beats_stage(run)
-    each(_positions_begin)
-    _prefetch_union(encoder, runs, lambda run: (candidate["time"] for candidate in run.candidates))
+    timed_each(_positions_begin)
+    prefetch(lambda run: (candidate["time"] for candidate in run.candidates))
     _lockstep(runs, "positions", lambda run: run.candidates, _positions_inputs,
               lambda run: run.predictors["positions"], _positions_apply)
-    each(_positions_end)
-    each(_arrows_begin)
+    close(_positions_end)
+    timed_each(_arrows_begin)
     _lockstep(runs, "arrows", lambda run: run.candidates, _arrows_inputs, _arrows_model, _arrows_apply)
-    each(_arrows_end)
+    close(_arrows_end)
     each(_note_cleanup)
-    each(_multiplier_begin)
-    _prefetch_union(encoder, runs, lambda run: (candidate["time"] for candidate in run.multiplier_candidates))
+    timed_each(_multiplier_begin)
+    prefetch(lambda run: (candidate["time"] for candidate in run.multiplier_candidates))
     _lockstep(runs, "multiplier", lambda run: run.multiplier_candidates, _multiplier_inputs,
               lambda run: run.predictors["multiplier"], _multiplier_apply)
-    each(_multiplier_end)
+    close(_multiplier_end)
     each(_expansion_cleanup)
     each(_hazards_stage)
     each(_arcs_stage)

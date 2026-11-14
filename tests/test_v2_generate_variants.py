@@ -273,6 +273,84 @@ def test_lockstep_variants_replay_late_turns_phase(monkeypatch):
     assert _LATE_TURNS_READY.get() is True  # no phase leaks outside segments
 
 
+def test_lockstep_variants_keep_late_turns_flag_sticky(monkeypatch):
+    # _LATE_TURNS_READY flips True inside apply_speed_cap (_note_cleanup) and
+    # must stay True through every later piece of the same run: sequential
+    # generate holds one playability_generation_phase for the whole call,
+    # while naive per-piece phases would reset it and suppress eligible
+    # slow turns in expansion validators (recut_same_direction_notes et al).
+    from map_creation.v2_postprocessing import _LATE_TURNS_READY, apply_speed_cap
+    for name in ("v2_playability_reach", "v2_playability_priority", "v2_playability_m1",
+                 "v2_playability_m2", "v2_playability_m3", "v2_playability_m4",
+                 "v2_playability_isolated", "v2_playability_dwell",
+                 "v2_playability_recovery_balanced"):
+        monkeypatch.setattr(config, name, False)
+    monkeypatch.setattr(config, "v2_playability_enabled", True)
+    monkeypatch.setattr(config, "v2_playability_late_turns", True)
+    monkeypatch.setattr(config, "add_obstacle_flag", False)
+    song, vocab = audio_song(), vocabulary()
+    predictors = dummy_predictors(vocab)
+    hooks, observed = processors(), []
+
+    def timing(song, beats, audio_path, logger=None):
+        observed.append(("timing", _LATE_TURNS_READY.get()))
+        return [{"time": float(time), "count": int(beats["counts"][frame])}
+                for frame, time in zip(beats["event_frames"], beats["event_times"])], {}
+
+    def expansions(state, song, logger=None, **_ignored):
+        observed.append(("expansions", _LATE_TURNS_READY.get()))
+        return {}
+
+    hooks.postprocess_timing, hooks.validate_expansions = timing, expansions
+    hooks.apply_speed_cap = apply_speed_cap  # real pass: flips the flag
+    nps_list = [4., 8.]
+    sequential = [
+        generate(song, nps, predictors, time_encoder(), settings(), vocab,
+                 lighting_generator=lighting, postprocessors=hooks, random_factor=0,
+                 rng=np.random.default_rng(seed))
+        for nps, seed in zip(nps_list, (11, 22))]
+    sequential_observed = list(observed)
+    observed.clear()
+    batched = generate_variants(song, nps_list, predictors, time_encoder(),
+                                [settings() for _ in nps_list], vocab,
+                                lighting_generator=lighting, postprocessors=hooks,
+                                random_factor=0,
+                                rngs=[np.random.default_rng(seed) for seed in (11, 22)])
+    # Early pieces stay strict; every post-cleanup piece sees the flag True.
+    assert [value for label, value in sequential_observed if label == "timing"] == [False] * 2
+    expansion_marks = [value for label, value in sequential_observed if label == "expansions"]
+    assert expansion_marks and all(expansion_marks)
+    # Same per-variant flag history: beats run first for all batched
+    # variants, so only the global interleaving differs, not the values.
+    from collections import Counter
+    assert Counter(observed) == Counter(sequential_observed)
+    assert _LATE_TURNS_READY.get() is True  # nothing leaks outside pieces
+    for expected, result in zip(sequential, batched):
+        _assert_same(expected.state, result.state, "state")
+        _assert_same(expected.diagnostics, result.diagnostics, "diagnostics")
+
+
+def test_lockstep_variants_attribute_stage_elapsed_honestly(monkeypatch):
+    # Stage elapsed_seconds must attribute the shared loop instead of every
+    # variant bracketing it: sums stay <= the real batched wall time.
+    monkeypatch.setattr(config, "v2_playability_enabled", False)
+    monkeypatch.setattr(config, "add_obstacle_flag", False)
+    import time
+    song, vocab = audio_song(), vocabulary()
+    predictors = dummy_predictors(vocab)
+    nps_list = [4., 8.]
+    started = time.perf_counter()
+    batched = generate_variants(song, nps_list, predictors, time_encoder(),
+                                [settings() for _ in nps_list], vocab,
+                                lighting_generator=lighting, postprocessors=processors(),
+                                random_factor=0)
+    wall = time.perf_counter() - started
+    for stage in ("positions", "arrows", "multiplier"):
+        elapsed = [result.stages[stage]["elapsed_seconds"] for result in batched]
+        assert all(value > 0 for value in elapsed)
+        assert sum(elapsed) <= wall
+
+
 def test_generate_batch_scopes_settings_and_caches_intensity(monkeypatch, tmp_path):
     import threading
     from map_creation import v2_pipeline, v2_runtime
@@ -320,8 +398,14 @@ def test_generate_batch_scopes_settings_and_caches_intensity(monkeypatch, tmp_pa
 
     results = value.generate_batch(prepared, [2., 4.], scopes=[temp_scope(.3), temp_scope(.7)])
     assert seen["nps"] == [2., 4.] and seen["temps"] == [.3, .7]
+    # Same side effect as a sequential generate() loop: the runtime's base
+    # settings end on the last variant's live temperature.
+    assert value.settings["note_sample_temperature"] == .7
     np.testing.assert_allclose(prepared.intensity, [.2, .8])
     assert [result.diagnostics["runtime"]["intensity_cache_reused"] for result in results] == [False, True]
     assert all(result.diagnostics["bundle_path"] == str(tmp_path) for result in results)
+    # Amortized per-variant shares sum to the shared call's wall time.
+    shares = [result.diagnostics["runtime"]["generation_seconds"] for result in results]
+    assert shares[0] == shares[1] >= 0
     with pytest.raises(ValueError, match="variant"):
         value.generate_batch(prepared, [], scopes=[])
