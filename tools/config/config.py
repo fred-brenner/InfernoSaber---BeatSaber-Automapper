@@ -197,17 +197,19 @@ v2_diagonal_max_fraction = 0.10    # cap diagonal cuts (d 4-7) at this fraction 
                                    # (dots counted); excess diagonals are recut to the cheapest
                                    # flow-legal adjacent cardinal, vertical wins ties, a diagonal
                                    # stays when no cardinal is legal; >= 1 disables
-v2_speed_cap_scale = 1.12          # multiplier on the v1 movement-speed cap
+v2_speed_cap_scale = 1.0           # multiplier on the v1 movement-speed cap
                                    # (max_speed * get_factor_from_max_speed distance/s between
                                    # consecutive same-hand notes); <= 0 disables the pass.
                                    # Reference value at add_beat_intensity 100 — the app field
-                                   # scales the effective cap linearly (default 90% -> 1.008x,
-                                   # 100% -> 1.12x, 125% -> 1.4x).
+                                   # scales the effective cap linearly (default 90% -> 0.9x,
+                                   # 100% -> 1.0x, 125% -> 1.25x).
                                    # 2026-11-06: playtested at 2.0 for NPS 5
                                    # 2026-11-10/11: cap reduced to 85%, 70%, then 56% of the
-                                   # original 2.0 reference — Beat Intensity 100 now reproduces
-                                   # the former 56; the dial and its limits are unchanged,
-                                   # density fill keeps reading add_beat_intensity.
+                                   # original 2.0 reference; the dial and its limits are
+                                   # unchanged, density fill keeps reading add_beat_intensity.
+                                   # 2026-11-14: reduced to 1.0 — v2 matches the v1 cap at
+                                   # Beat Intensity 100; kept as a separate knob for future
+                                   # adjustments.
 v2_speed_cap_start_notes = 30      # first N combined chronological note positions ramp
                                    # max_speed in (v1 decr_speed_range); 0 disables the ramp
 v2_speed_cap_start_factor = .35    # max_speed multiplier at the first note position,
