@@ -20,8 +20,8 @@ from tools.config import config, paths
 from bs_shift.export_map import check_music_files, shutil_copy_maps
 from map_creation.v1_generation import V1_MAPPER_SELECTIONS, ensure_v1_bundle
 from map_creation.v2_generation import (apply_snapshot, cap_library_threads, configure_inference,
-                                       effective_inference_threads, generate_song, save_report,
-                                       scoped_settings, settings_snapshot)
+                                       effective_inference_threads, generate_song, generate_song_group,
+                                       save_report, scoped_settings, settings_snapshot)
 from map_creation.v2_runtime import validate_production_bundle
 from map_creation.v2_export import combine_packages
 
@@ -52,23 +52,64 @@ def _worker_log(message, important=False):
         _PROGRESS.put((str(message), bool(important)))
 
 
+def _generate_one(song, difficulty):
+    """One (song, difficulty) attempt as a single completion record."""
+    try:
+        generator = generate_song
+        if config.use_mapper_selection != "v2_expert":
+            # Lazy: the module is TF-free, but keeps the worker contract patchable.
+            from map_creation.v1_generation import generate_song_v1
+            generator = generate_song_v1
+        return generator(song, float(difficulty), logger=_worker_log)
+    except Exception as error:
+        result = {"status": "failed", "song": Path(song).stem,
+                  "internal_difficulty": float(difficulty),
+                  "error": f"{type(error).__name__}: {error}"}
+        _worker_log(f"Failed {result['song']} at {difficulty / 4:g} NPS: {result['error']}", important=True)
+        return result
+
+
 def process_song(song_list_worker, total_runs):
-    """Keep all difficulties of a recording on one resident worker when possible."""
+    """Keep all difficulties of a recording on one resident worker when possible.
+
+    Consecutive same-song v2 entries decode in one ``generate_song_group``
+    batch; a batch-level failure retries the song's difficulties one at a
+    time so per-difficulty failure granularity survives. v1 selections and
+    single-difficulty runs keep the per-pair path.
+    """
     results = []
-    for song, difficulty in song_list_worker:
+    entries = list(song_list_worker)
+    index = 0
+    while index < len(entries):
+        song, difficulty = entries[index]
+        index += 1
+        same_song = [difficulty]
+        while index < len(entries) and entries[index][0] == song:
+            same_song.append(entries[index][1])
+            index += 1
+        if config.use_mapper_selection != "v2_expert" or len(same_song) == 1:
+            # v1 selections and single-difficulty runs keep the per-pair path.
+            for value in same_song:
+                results.append(_generate_one(song, value))
+            continue
         try:
-            generator = generate_song
-            if config.use_mapper_selection != "v2_expert":
-                # Lazy: the module is TF-free, but keeps the worker contract patchable.
-                from map_creation.v1_generation import generate_song_v1
-                generator = generate_song_v1
-            results.append(generator(song, float(difficulty), logger=_worker_log))
+            produced = generate_song_group(song, same_song, logger=_worker_log)
         except Exception as error:
-            result = {"status": "failed", "song": Path(song).stem,
-                      "internal_difficulty": float(difficulty),
-                      "error": f"{type(error).__name__}: {error}"}
-            results.append(result)
-            _worker_log(f"Failed {result['song']} at {difficulty / 4:g} NPS: {result['error']}", important=True)
+            # The shared decode failed as a unit: retry one difficulty at a
+            # time so per-difficulty failure granularity is preserved.
+            _worker_log(f"Batched generation for {Path(song).stem} failed "
+                        f"({type(error).__name__}: {error}); retrying "
+                        f"{len(same_song)} difficulties sequentially", important=True)
+            for value in same_song:
+                results.append(_generate_one(song, value))
+            continue
+        if isinstance(produced, dict):
+            produced = [produced]
+        for record in produced:
+            results.append(record)
+            if record["status"] != "ok":
+                _worker_log(f"Failed {record['song']} at {record['internal_difficulty'] / 4:g} "
+                            f"NPS: {record.get('error', 'unknown error')}", important=True)
     return results
 
 

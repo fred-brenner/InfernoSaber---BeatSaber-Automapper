@@ -404,7 +404,7 @@ def _candidates(song, values):
     return result
 
 
-@dataclass
+@dataclass(eq=False)
 class VariantRun:
     """One generation variant: resolved inputs plus mutable decode state.
 
@@ -1272,6 +1272,8 @@ def _batched_inputs(rows):
     """Concatenate same-key batch-1 input dicts into one batch-K dict."""
     if len(rows) == 1:
         return rows[0]
+    assert all(row.keys() == rows[0].keys() for row in rows), \
+        "Lockstep rows for one model must share the same input keys"
     return {key: np.concatenate([row[key] for row in rows], axis=0) for key in rows[0]}
 
 
@@ -1342,6 +1344,9 @@ def generate_variants(song, requested_nps_list, predictors, encoder, settings_li
     if (len(settings_list) != count or rngs is not None and len(rngs) != count
             or scopes is not None and len(scopes) != count):
         raise ValueError("Variant settings, rngs and scopes must match the requested variants")
+    if scopes is not None and any(not callable(scope) for scope in scopes):
+        raise ValueError("Variant scopes must be callables producing a context manager, "
+                         "not already-entered managers")
     scopes = [nullcontext] * count if scopes is None else scopes
     runs = []
     for index in range(count):

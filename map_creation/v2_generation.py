@@ -4,7 +4,7 @@ Imports are inert. Models belong to a process; mutable generation settings belon
 to one difficulty, and a prepared recording is reused by that process's runtime.
 """
 
-from contextlib import contextmanager
+from contextlib import contextmanager, nullcontext
 from copy import deepcopy
 from datetime import datetime
 import json
@@ -115,6 +115,10 @@ def _difficulty_scope(difficulty):
     added or reassigned attribute on exit, like the snapshot scope does).
     In-place mutation of a non-delta value inside a segment is not undone —
     generation code reassigns config keys wholesale instead.
+
+    The delta freezes at factory creation: keys it captured overwrite any
+    later ambient edits on every entry, so build scopes after the run's
+    bootstrap settings settle rather than reusing them across live changes.
     """
     modules = {"config": config, "paths": paths}
     before = {name: dict(vars(module)) for name, module in modules.items()}
@@ -210,6 +214,51 @@ def save_predictions(state):
     return str(destination)
 
 
+def _song_stem(name):
+    """Validate the public song name convention and return its filename stem."""
+    name = str(name)
+    if name.lower().endswith(".egg"):
+        name = name[:-4]
+    if not name or Path(name).name != name or "\\" in name:
+        raise ValueError("Song name must be a local filename stem")
+    return name
+
+
+def _song_audio(name):
+    """Resolve the recorded input audio for a validated song stem."""
+    audio = Path(paths.songs_pred) / f"{name}.egg"
+    if not audio.is_file():
+        raise FileNotFoundError(f"Input song missing: {audio}")
+    return audio
+
+
+def _valid_difficulty(value):
+    if isinstance(value, bool) or not math.isfinite(float(value)) or float(value) < 0:
+        raise ValueError("Difficulty must be finite and nonnegative")
+    return float(value)
+
+
+def _variant_entry(label, value, scope, result):
+    """Snapshot one variant's package payload under its own difficulty scope."""
+    with scope():
+        return {"difficulty": label, "internal_difficulty": value,
+                "automatic_expert": label == "Expert" and config.general_diff != "Expert",
+                "jump_speed_offset": float(config.jump_speed_offset),
+                "prediction_path": save_predictions(result.state),
+                "state": result.state, "diagnostics": result.diagnostics,
+                "stages": result.stages}
+
+
+def _completion_record(name, difficulty, variants, package, folder, prepared, elapsed):
+    """The per-difficulty completion record process_song/_combine_maps consume."""
+    return {"status": "ok", "song": name, "internal_difficulty": difficulty,
+            "requested_nps": difficulty / 4, "path": str(folder), "package": package,
+            "duration_seconds": float(prepared.song.metadata["duration"]),
+            "bpm": float(prepared.song.metadata["bpm"]), "pid": os.getpid(),
+            "elapsed_seconds": elapsed,
+            "variants": [{k: v for k, v in item.items() if k != "state"} for item in variants]}
+
+
 def generate_song(name, internal_difficulty=None, logger=None, *, debug_beats=False):
     """Generate one complete single-difficulty package (plus optional Expert).
 
@@ -219,18 +268,10 @@ def generate_song(name, internal_difficulty=None, logger=None, *, debug_beats=Fa
     from map_creation.v2_runtime import get_runtime
     from map_creation.v2_export import write_package
 
-    name = str(name)
-    if name.lower().endswith(".egg"):
-        name = name[:-4]
-    if not name or Path(name).name != name or "\\" in name:
-        raise ValueError("Song name must be a local filename stem")
+    name = _song_stem(name)
     difficulty = config.max_speed_orig if internal_difficulty is None else internal_difficulty
-    if isinstance(difficulty, bool) or not math.isfinite(float(difficulty)) or float(difficulty) < 0:
-        raise ValueError("Difficulty must be finite and nonnegative")
-    difficulty = float(difficulty)
-    audio = Path(paths.songs_pred) / f"{name}.egg"
-    if not audio.is_file():
-        raise FileNotFoundError(f"Input song missing: {audio}")
+    difficulty = _valid_difficulty(difficulty)
+    audio = _song_audio(name)
     configure_inference()
     started = time.perf_counter()
     runtime = get_runtime()
@@ -250,13 +291,7 @@ def generate_song(name, internal_difficulty=None, logger=None, *, debug_beats=Fa
         if debug_beats:
             return np.asarray(results[0].state["event_times"], dtype=float)
         for (label, value), scope, result in zip(selections, scopes, results):
-            with scope():
-                variants.append({"difficulty": label, "internal_difficulty": value,
-                                 "automatic_expert": label == "Expert" and config.general_diff != "Expert",
-                                 "jump_speed_offset": float(config.jump_speed_offset),
-                                 "prediction_path": save_predictions(result.state),
-                                 "state": result.state, "diagnostics": result.diagnostics,
-                                 "stages": result.stages})
+            variants.append(_variant_entry(label, value, scope, result))
     else:
         for label, value in selections:
             with scoped_settings():
@@ -265,21 +300,80 @@ def generate_song(name, internal_difficulty=None, logger=None, *, debug_beats=Fa
                 result = runtime.generate(prepared, value / 4, logger=logger)
                 if debug_beats:
                     return np.asarray(result.state["event_times"], dtype=float)
-                variants.append({"difficulty": label, "internal_difficulty": value,
-                                 "automatic_expert": label == "Expert" and config.general_diff != "Expert",
-                                 "jump_speed_offset": float(config.jump_speed_offset),
-                                 "prediction_path": save_predictions(result.state),
-                                 "state": result.state, "diagnostics": result.diagnostics,
-                                 "stages": result.stages})
+                variants.append(_variant_entry(label, value, nullcontext, result))
     folder = Path(paths.new_map_path) / f"1234_{difficulty:.1f}_{name}"
     package = write_package(folder, name, float(prepared.song.metadata["bpm"]), variants,
                             audio, version=config.bs_mapping_version)
-    report = {"status": "ok", "song": name, "internal_difficulty": difficulty,
-              "requested_nps": difficulty / 4, "path": str(folder), "package": package,
-              "duration_seconds": float(prepared.song.metadata["duration"]),
-              "bpm": float(prepared.song.metadata["bpm"]), "pid": os.getpid(),
-              "elapsed_seconds": time.perf_counter() - started,
-              "variants": [{k: v for k, v in item.items() if k != "state"} for item in variants]}
+    report = _completion_record(name, difficulty, variants, package, folder, prepared,
+                                time.perf_counter() - started)
     report["report_path"] = save_report(report)
     _emit(f"Finished {name} at {difficulty / 4:g} NPS in {report['elapsed_seconds']:.1f}s", logger)
     return report
+
+
+def generate_song_group(name, difficulties, logger=None, *, debug_beats=False):
+    """Generate one package per requested difficulty of one song in one pass.
+
+    ``difficulties`` keeps the public four-times-NPS units. All variants share
+    a single ``prepare_audio`` and a single lockstep ``generate_batch``, each
+    running its config-dependent pieces under its own replayed difficulty
+    scope; every difficulty then gets its own ``1234_<d>_<name>`` package and
+    completion record, so a K-difficulty call returns a list of records in
+    exactly the shape ``generate_song`` reports. A single-entry list delegates
+    to ``generate_song`` so ``create_expert_flag`` twin semantics stay intact;
+    true group runs create no Expert twin (matching ``main_multi``'s
+    multi-difficulty semantics). A failed per-difficulty package becomes a
+    failed record — the shared decode already spent the work, so siblings
+    keep their results instead of forcing a whole-song retry.
+    """
+    from map_creation.v2_runtime import get_runtime
+    from map_creation.v2_export import write_package
+
+    name = _song_stem(name)
+    difficulties = [_valid_difficulty(value) for value in difficulties]
+    if not difficulties:
+        raise ValueError("At least one difficulty is required")
+    if len(difficulties) == 1:
+        result = generate_song(name, difficulties[0], logger=logger, debug_beats=debug_beats)
+        return result if debug_beats else [result]
+    if len({f"{value:.1f}" for value in difficulties}) != len(difficulties):
+        raise ValueError("Difficulties must produce distinct output filenames")
+    audio = _song_audio(name)
+    configure_inference()
+    started = time.perf_counter()
+    runtime = get_runtime()
+    prepared = runtime.prepare_audio(audio)
+    selections = [(config.general_diff, value) for value in difficulties]
+    scopes = [_difficulty_scope(value) for _, value in selections]
+    for label, value in selections:
+        _emit(f"{name}: {label}, requested {value / 4:g} retained notes/s", logger)
+    results = runtime.generate_batch(prepared, [value / 4 for _, value in selections],
+                                     logger=logger, scopes=scopes)
+    if debug_beats:
+        return np.asarray(results[0].state["event_times"], dtype=float)
+    records = []
+    for (label, value), scope, result in zip(selections, scopes, results):
+        try:
+            variants = [_variant_entry(label, value, scope, result)]
+            folder = Path(paths.new_map_path) / f"1234_{value:.1f}_{name}"
+            package = write_package(folder, name, float(prepared.song.metadata["bpm"]),
+                                    variants, audio, version=config.bs_mapping_version)
+        except Exception as error:
+            records.append({"status": "failed", "song": name,
+                            "internal_difficulty": value,
+                            "error": f"{type(error).__name__}: {error}"})
+            continue
+        records.append(_completion_record(name, value, variants, package, folder, prepared, 0.))
+    # The decode produced all difficulties in one shared call: attribute each
+    # record an even share of the group wall time — the same convention
+    # generate_batch uses for generation_seconds — so summed record elapsed
+    # stays at or below the real elapsed.
+    share = (time.perf_counter() - started) / len(selections)
+    for record in records:
+        if record["status"] != "ok":
+            continue
+        record["elapsed_seconds"] = share
+        record["report_path"] = save_report(record)
+        _emit(f"Finished {record['song']} at {record['internal_difficulty'] / 4:g} NPS "
+              f"in {share:.1f}s (batched share)", logger)
+    return records

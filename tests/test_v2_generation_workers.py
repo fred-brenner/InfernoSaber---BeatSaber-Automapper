@@ -304,6 +304,164 @@ def test_generation_requests_separate_automatic_expert_pass(tmp_path, monkeypatc
     assert report['status'] == 'ok'
 
 
+def _group_recording_setup(tmp_path, monkeypatch):
+    """Shared fakes for generate_song_group: prepared audio plus observed calls."""
+    from types import SimpleNamespace
+    from map_creation import v2_runtime, v2_export
+    monkeypatch.setattr(paths, 'songs_pred', str(tmp_path) + '/')
+    monkeypatch.setattr(paths, 'temp_path', str(tmp_path / 'temp'))
+    monkeypatch.setattr(paths, 'new_map_path', str(tmp_path / 'output'))
+    monkeypatch.setattr(config, 'general_diff', 'ExpertPlus')
+    (tmp_path / 'song.egg').write_bytes(b'dummy-decoder-input')
+    prepared = SimpleNamespace(song=SimpleNamespace(metadata={'duration': 1., 'bpm': 120.}))
+    requests, packages = [], []
+
+    def generate_batch(audio, densities, logger=None, scopes=None):
+        assert audio is prepared
+        requests.append(list(densities))
+        assert len(scopes) == len(densities)
+        return [SimpleNamespace(state={'notes': []}, diagnostics={}, stages={})
+                for _ in densities]
+
+    monkeypatch.setattr(v2_runtime, 'get_runtime', lambda: SimpleNamespace(
+        prepare_audio=lambda path: prepared, generate_batch=generate_batch,
+        generate=lambda *args, **kwargs: pytest.fail('group runs share one batch call')))
+    monkeypatch.setattr(v2_export, 'write_package',
+                        lambda folder, name, bpm, variants, audio, version:
+                        packages.append((Path(folder).name, list(variants))) or {'path': str(folder)})
+    return requests, packages
+
+
+def test_generate_song_group_batches_difficulties_into_separate_packages(tmp_path, monkeypatch):
+    requests, packages = _group_recording_setup(tmp_path, monkeypatch)
+    records = v2_generation.generate_song_group('song', [12., 20.])
+    assert requests == [[3., 5.]]  # one shared lockstep decode, no twins
+    assert [(name, [v['internal_difficulty'] for v in variants])
+            for name, variants in packages] == [('1234_12.0_song', [12.]), ('1234_20.0_song', [20.])]
+    assert [record['internal_difficulty'] for record in records] == [12., 20.]
+    assert [record['status'] for record in records] == ['ok', 'ok']
+    assert [Path(record['path']).name for record in records] == ['1234_12.0_song', '1234_20.0_song']
+    assert all(record['report_path'] and record['elapsed_seconds'] > 0 for record in records)
+    # Amortized shares of the shared call: sums stay at or below its wall time.
+    assert records[0]['elapsed_seconds'] == records[1]['elapsed_seconds']
+
+
+def test_generate_song_group_creates_no_expert_twin(tmp_path, monkeypatch):
+    # create_expert_flag governs single-difficulty runs only; the group must
+    # not re-add a twin (main_multi disables it for multi-difficulty anyway).
+    monkeypatch.setattr(config, 'create_expert_flag', True)
+    requests, packages = _group_recording_setup(tmp_path, monkeypatch)
+    records = v2_generation.generate_song_group('song', [12., 20.])
+    assert requests == [[3., 5.]]
+    assert [variant['difficulty'] for _, variants in packages for variant in variants] == ['ExpertPlus'] * 2
+    assert all(not variant['automatic_expert'] for _, variants in packages for variant in variants)
+
+
+def test_generate_song_group_single_difficulty_delegates_to_generate_song(monkeypatch):
+    seen = []
+    monkeypatch.setattr(v2_generation, 'generate_song',
+                        lambda name, difficulty=None, logger=None, **kwargs:
+                        seen.append((name, difficulty, kwargs)) or {'status': 'ok'})
+    records = v2_generation.generate_song_group('song.egg', [20])
+    assert seen == [('song', 20, {'debug_beats': False})]
+    assert records == [{'status': 'ok'}]
+
+
+def test_generate_song_group_package_failure_keeps_sibling_records(tmp_path, monkeypatch):
+    requests, packages = _group_recording_setup(tmp_path, monkeypatch)
+
+    def package(folder, name, bpm, variants, audio, version):
+        if variants[0]['internal_difficulty'] == 20.:
+            raise OSError('read-only output')
+        return packages.append((Path(folder).name, list(variants))) or {'path': str(folder)}
+
+    from map_creation import v2_export
+    monkeypatch.setattr(v2_export, 'write_package', package)
+    records = v2_generation.generate_song_group('song', [12., 20.])
+    assert [record['status'] for record in records] == ['ok', 'failed']
+    assert Path(records[0]['path']).name == '1234_12.0_song'
+    assert records[1]['internal_difficulty'] == 20. and 'read-only output' in records[1]['error']
+
+
+@pytest.mark.parametrize('difficulties', [[], [20., 20.04], [12., -1.], [float('nan'), 12.], [True, 12.]])
+def test_generate_song_group_validates_difficulties(difficulties):
+    with pytest.raises(ValueError):
+        v2_generation.generate_song_group('missing', difficulties)
+
+
+def test_process_song_batches_consecutive_same_song_difficulties(monkeypatch):
+    """v2 selections coalesce one song's difficulties into one group call."""
+    monkeypatch.setattr(config, 'use_mapper_selection', 'v2_expert')
+    batches, singles = [], []
+
+    def group(name, difficulties, logger=None):
+        batches.append((name, list(difficulties)))
+        return [{'status': 'ok', 'song': Path(name).stem, 'internal_difficulty': value}
+                for value in difficulties]
+
+    monkeypatch.setattr(main_multi, 'generate_song_group', group)
+    monkeypatch.setattr(main_multi, 'generate_song',
+                        lambda name, difficulty, logger=None:
+                        singles.append((name, difficulty)) or
+                        {'status': 'ok', 'song': Path(name).stem, 'internal_difficulty': difficulty})
+    entries = [('one.egg', 12.), ('one.egg', 20.), ('two.egg', 8.), ('two.egg', 16.), ('three.egg', 4.)]
+    results = main_multi.process_song(entries, len(entries))
+    assert batches == [('one.egg', [12., 20.]), ('two.egg', [8., 16.])]
+    assert singles == [('three.egg', 4.)]  # single-difficulty runs keep generate_song
+    assert [record['internal_difficulty'] for record in results] == [12., 20., 8., 16., 4.]
+
+
+def test_process_song_never_batches_v1_runs(monkeypatch):
+    from types import SimpleNamespace
+    monkeypatch.setattr(config, 'use_mapper_selection', 'fav_15')
+    calls = []
+    monkeypatch.setattr(main_multi, 'generate_song_group',
+                        lambda *args, **kwargs: pytest.fail('v1 selections stay per-pair'))
+    monkeypatch.setitem(sys.modules, 'map_creation.v1_generation',
+                        SimpleNamespace(generate_song_v1=lambda n, d, logger=None: calls.append((n, d)) or {'status': 'ok', 'song': n, 'internal_difficulty': d, 'path': 'p'}))
+    records = main_multi.process_song([('song.egg', 12.), ('song.egg', 20.)], 2)
+    assert calls == [('song.egg', 12.), ('song.egg', 20.)]
+    assert [record['status'] for record in records] == ['ok', 'ok']
+
+
+def test_process_song_falls_back_to_sequential_on_batch_failure(monkeypatch):
+    """A failed group call retries each difficulty alone to keep granularity."""
+    monkeypatch.setattr(config, 'use_mapper_selection', 'v2_expert')
+    messages = []
+    monkeypatch.setattr(main_multi, '_worker_log',
+                        lambda message, important=False: messages.append((message, important)))
+
+    def group(name, difficulties, logger=None):
+        raise RuntimeError('batched decode exploded')
+
+    def single(name, difficulty, logger=None):
+        if difficulty == 20.:
+            raise ValueError('hard variant failed')
+        return {'status': 'ok', 'song': Path(name).stem, 'internal_difficulty': difficulty}
+
+    monkeypatch.setattr(main_multi, 'generate_song_group', group)
+    monkeypatch.setattr(main_multi, 'generate_song', single)
+    results = main_multi.process_song([('one.egg', 12.), ('one.egg', 20.)], 2)
+    assert [(record['status'], record['internal_difficulty']) for record in results] == \
+        [('ok', 12.), ('failed', 20.)]
+    assert 'hard variant failed' in results[1]['error']
+    assert any('batched decode exploded' in message and important for message, important in messages)
+
+
+def test_process_song_logs_group_partial_failures(monkeypatch):
+    """Failed records returned by a group call surface like sequential failures."""
+    monkeypatch.setattr(config, 'use_mapper_selection', 'v2_expert')
+    messages = []
+    monkeypatch.setattr(main_multi, '_worker_log',
+                        lambda message, important=False: messages.append((message, important)))
+    produced = [{'status': 'ok', 'song': 'one', 'internal_difficulty': 12.},
+                {'status': 'failed', 'song': 'one', 'internal_difficulty': 20., 'error': 'OSError: disk full'}]
+    monkeypatch.setattr(main_multi, 'generate_song_group', lambda *args, **kwargs: produced)
+    results = main_multi.process_song([('one.egg', 12.), ('one.egg', 20.)], 2)
+    assert results == produced
+    assert any('disk full' in message and important for message, important in messages)
+
+
 def test_emit_keeps_full_cli_log_but_filters_app(capsys, monkeypatch):
     app = []
     monkeypatch.setattr(config, 'verbose_level', 1)

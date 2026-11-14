@@ -91,6 +91,10 @@ history and indexed note lookups. Model calls use reusable TensorFlow graphs.
 
 A song's difficulties share a worker when there are enough songs. With fewer
 songs than workers, difficulty groups split to use the requested parallelism.
+Within a worker, a v2 song's consecutive difficulties decode in one lockstep
+pass — shared audio preparation and concatenated predicts — then package and
+record each difficulty separately; a batch failure retries them sequentially.
+Single-difficulty runs keep `generate_song` with its optional Expert twin.
 Different workers intentionally have separate model and song caches. Memory use
 therefore grows with worker count, especially for the retained large lighting
 network. Settings in `config.py` are `v2_inference_threads` (0 = auto:

@@ -2556,3 +2556,13 @@ checks establish the artifact's validity, not player approval.
 · [Setting guide](../../Data/training/evaluate_beats/results/final-repeat-maps-20261109/final-maps/README.md)
 · [Audit summary](../../Data/training/evaluate_beats/results/final-repeat-maps-20261109/final-audit-summary.json)
 · [Regeneration ledger](../.superpowers/sdd/2026-11-09-regenerate-final-maps/progress.md)
+
+## 2026-11-13 — batched multi-difficulty decode timing attribution
+
+Multi-difficulty v2 generation now shares one prepared recording and one
+lockstep decode per song (`generate_song_group`, driven by `process_song`).
+Per-record `elapsed_seconds`, per-variant runtime `generation_seconds`, and
+per-stage `elapsed_seconds` in batched runs are amortized even shares of the
+shared call — they sum to at most the real wall time rather than each variant
+bracketing the whole loop. Interpret future profiling comparisons against
+pre-batching runs accordingly.

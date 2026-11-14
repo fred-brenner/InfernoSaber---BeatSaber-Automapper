@@ -409,3 +409,36 @@ def test_generate_batch_scopes_settings_and_caches_intensity(monkeypatch, tmp_pa
     assert shares[0] == shares[1] >= 0
     with pytest.raises(ValueError, match="variant"):
         value.generate_batch(prepared, [], scopes=[])
+
+
+def test_batched_inputs_rejects_mismatched_row_keys():
+    # Silent key drops would misalign one model's batched inputs; fail loudly.
+    from map_creation.v2_pipeline import _batched_inputs
+    with pytest.raises(AssertionError):
+        _batched_inputs([{"audio": np.zeros((1, 2), np.float32)},
+                         {"other": np.zeros((1, 2), np.float32)}])
+    merged = _batched_inputs([{"audio": np.zeros((1, 2), np.float32)},
+                              {"audio": np.ones((1, 2), np.float32)}])
+    np.testing.assert_array_equal(merged["audio"], [[0., 0.], [1., 1.]])
+
+
+def test_generate_variants_rejects_scope_managers_instead_of_factories():
+    # scopes entries are entered repeatedly, so an already-created context
+    # manager must fail fast instead of silently running ambient.
+    from contextlib import nullcontext
+    song, vocab = audio_song(), vocabulary()
+    predictors = dummy_predictors(vocab)
+    with pytest.raises(ValueError, match="callable"):
+        generate_variants(song, [4.], predictors, time_encoder(), [settings()], vocab,
+                          lighting_generator=lighting, postprocessors=processors(),
+                          random_factor=0, scopes=[nullcontext()])
+
+
+def test_variant_run_equality_stays_identity():
+    # eq=False keeps numpy fields out of __eq__: runs compare by identity.
+    from map_creation.v2_pipeline import variant_run
+    left = variant_run(audio_song(), 4., {}, None, settings(), vocabulary(),
+                       lighting_generator=lighting, postprocessors=processors())
+    right = variant_run(audio_song(), 4., {}, None, settings(), vocabulary(),
+                        lighting_generator=lighting, postprocessors=processors())
+    assert left == left and left != right
