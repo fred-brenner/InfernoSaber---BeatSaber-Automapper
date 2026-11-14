@@ -1,5 +1,6 @@
 """Explicit, cached CPU loading and audio preparation for the v2 generator."""
 
+from contextlib import nullcontext
 from copy import deepcopy
 from dataclasses import dataclass, field
 import json
@@ -355,6 +356,49 @@ class V2Runtime:
                                               "intensity_cache_reused": reused_intensity,
                                               "generation_seconds": perf_counter() - started}
             return result
+
+    def generate_batch(self, prepared, requested_nps_list, logger=None, scopes=None):
+        """Generate several difficulties of one prepared song in a single lockstep pass.
+
+        ``scopes`` carries one context-manager factory per variant; each
+        variant's config-dependent pieces then run under its own settings
+        exactly like the per-difficulty ``scoped_settings`` loop did.
+        """
+        from .v2_pipeline import generate_variants
+        with self._lock:
+            started = perf_counter()
+            _validate_audio_song(prepared.song)
+            if prepared.song.metadata.get("normalization_sha256") != statistics_hash(self.statistics):
+                raise ValueError("Prepared audio belongs to a different normalization contract")
+            if prepared.encoder.metadata.get("encoder_fingerprint") != self.encoder_fingerprint:
+                raise ValueError("Prepared audio belongs to a different retained encoder")
+            count = len(requested_nps_list)
+            if not count or scopes is not None and len(scopes) != count:
+                raise ValueError("At least one variant is required and scopes must match it")
+            scopes = [nullcontext] * count if scopes is None else scopes
+            reused_intensity = prepared.intensity is not None
+            settings_list = []
+            for index in range(count):
+                with scopes[index]():
+                    # Re-read at call time like generate(): a resident runtime
+                    # honors live setting changes under each variant's scope.
+                    settings_list.append({**self.settings, "note_sample_temperature":
+                                          float(getattr(config, "v2_note_sample_temperature", 0.) or 0.)})
+            results = generate_variants(prepared.song, requested_nps_list, self.predictors,
+                                        prepared.encoder, settings_list, self.vocabularies,
+                                        audio_path=prepared.audio_path, intensity=prepared.intensity,
+                                        logger=logger, lighting_generator=self.lighting, scopes=scopes)
+            prepared.intensity = results[0].state["raw_intensity"].copy()
+            seconds = perf_counter() - started
+            for index, result in enumerate(results):
+                result.diagnostics["bundle_path"] = str(self.root)
+                self._cache_metrics["generation_calls"] += 1
+                result.diagnostics["runtime"] = {**self._cache_metrics, **prepared.diagnostics,
+                                                 "bundle_load_seconds": getattr(self, "load_seconds", 0.),
+                                                 "runtime_cache_hits": _CACHE_HITS,
+                                                 "intensity_cache_reused": reused_intensity or index > 0,
+                                                 "generation_seconds": seconds}
+            return results
 
 
 def get_runtime(bundle_path=None):

@@ -285,18 +285,21 @@ def test_generation_requests_separate_automatic_expert_pass(tmp_path, monkeypatc
     (tmp_path / 'song.egg').write_bytes(b'dummy-decoder-input')
     prepared = SimpleNamespace(song=SimpleNamespace(metadata={'duration': 1., 'bpm': 120.}))
     requests, packages = [], []
-    def generate(audio, density, logger):
+    def generate_batch(audio, densities, logger=None, scopes=None):
         assert audio is prepared
-        requests.append(density)
-        return SimpleNamespace(state={'notes': []}, diagnostics={}, stages={})
+        requests.append(list(densities))
+        assert len(scopes) == len(densities)
+        return [SimpleNamespace(state={'notes': []}, diagnostics={}, stages={})
+                for _ in densities]
     monkeypatch.setattr(v2_runtime, 'get_runtime', lambda: SimpleNamespace(
-        prepare_audio=lambda path: prepared, generate=generate))
+        prepare_audio=lambda path: prepared, generate_batch=generate_batch,
+        generate=lambda *args, **kwargs: pytest.fail('multi-difficulty runs batch')))
     def package(folder, name, bpm, variants, audio, version):
         packages.extend(variants)
         return {'path': str(folder)}
     monkeypatch.setattr(v2_export, 'write_package', package)
     report = v2_generation.generate_song('song', 20.)
-    assert requests == [5., 3.15]
+    assert requests == [[5., 3.15]]
     assert [(v['difficulty'], v['automatic_expert']) for v in packages] == [('ExpertPlus', False), ('Expert', True)]
     assert report['status'] == 'ok'
 

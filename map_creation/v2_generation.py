@@ -105,6 +105,45 @@ def cap_library_threads(threads=None):
     os.environ.setdefault("OMP_WAIT_POLICY", "PASSIVE")
 
 
+def _difficulty_scope(difficulty):
+    """Reusable scope replaying only this difficulty's config delta.
+
+    The lockstep driver enters a variant's scope per pipeline piece, so a
+    full ``scoped_settings`` snapshot per entry would cost more than the
+    predicts it protects. This factory resolves ``_difficulty_settings``
+    once, then each entry applies just the keys it changed (restoring any
+    added or reassigned attribute on exit, like the snapshot scope does).
+    In-place mutation of a non-delta value inside a segment is not undone —
+    generation code reassigns config keys wholesale instead.
+    """
+    modules = {"config": config, "paths": paths}
+    before = {name: dict(vars(module)) for name, module in modules.items()}
+    with scoped_settings():
+        _difficulty_settings(difficulty)
+        delta = {name: {key: value for key, value in vars(module).items()
+                        if key not in before[name] or before[name][key] is not value}
+                 for name, module in modules.items()}
+
+    @contextmanager
+    def scope():
+        saved = {module: dict(vars(module)) for module in modules.values()}
+        for name, changes in delta.items():
+            for key, value in changes.items():
+                setattr(modules[name], key, deepcopy(value))
+        try:
+            yield
+        finally:
+            for module, previous in saved.items():
+                current = vars(module)
+                for key in set(current) - set(previous):
+                    delattr(module, key)
+                for key, value in previous.items():
+                    if key not in current or current[key] is not value:
+                        setattr(module, key, value)
+
+    return scope
+
+
 def _difficulty_settings(difficulty):
     """Apply the legacy difficulty adjustments afresh for this one variant."""
     from tools.utils.numpy_shorts import get_factor_from_max_speed
@@ -200,19 +239,38 @@ def generate_song(name, internal_difficulty=None, logger=None, *, debug_beats=Fa
     selections = [(config.general_diff, difficulty)]
     if config.create_expert_flag and config.general_diff != "Expert":
         selections.append(("Expert", difficulty * config.expert_fact))
-    for label, value in selections:
-        with scoped_settings():
-            _difficulty_settings(value)
+    if len(selections) > 1:
+        # Batched lockstep decode: each variant still runs its config-dependent
+        # pieces under its own replayed difficulty scope.
+        scopes = [_difficulty_scope(value) for _, value in selections]
+        for label, value in selections:
             _emit(f"{name}: {label}, requested {value / 4:g} retained notes/s", logger)
-            result = runtime.generate(prepared, value / 4, logger=logger)
-            if debug_beats:
-                return np.asarray(result.state["event_times"], dtype=float)
-            variants.append({"difficulty": label, "internal_difficulty": value,
-                             "automatic_expert": label == "Expert" and config.general_diff != "Expert",
-                             "jump_speed_offset": float(config.jump_speed_offset),
-                             "prediction_path": save_predictions(result.state),
-                             "state": result.state, "diagnostics": result.diagnostics,
-                             "stages": result.stages})
+        results = runtime.generate_batch(prepared, [value / 4 for _, value in selections],
+                                         logger=logger, scopes=scopes)
+        if debug_beats:
+            return np.asarray(results[0].state["event_times"], dtype=float)
+        for (label, value), scope, result in zip(selections, scopes, results):
+            with scope():
+                variants.append({"difficulty": label, "internal_difficulty": value,
+                                 "automatic_expert": label == "Expert" and config.general_diff != "Expert",
+                                 "jump_speed_offset": float(config.jump_speed_offset),
+                                 "prediction_path": save_predictions(result.state),
+                                 "state": result.state, "diagnostics": result.diagnostics,
+                                 "stages": result.stages})
+    else:
+        for label, value in selections:
+            with scoped_settings():
+                _difficulty_settings(value)
+                _emit(f"{name}: {label}, requested {value / 4:g} retained notes/s", logger)
+                result = runtime.generate(prepared, value / 4, logger=logger)
+                if debug_beats:
+                    return np.asarray(result.state["event_times"], dtype=float)
+                variants.append({"difficulty": label, "internal_difficulty": value,
+                                 "automatic_expert": label == "Expert" and config.general_diff != "Expert",
+                                 "jump_speed_offset": float(config.jump_speed_offset),
+                                 "prediction_path": save_predictions(result.state),
+                                 "state": result.state, "diagnostics": result.diagnostics,
+                                 "stages": result.stages})
     folder = Path(paths.new_map_path) / f"1234_{difficulty:.1f}_{name}"
     package = write_package(folder, name, float(prepared.song.metadata["bpm"]), variants,
                             audio, version=config.bs_mapping_version)

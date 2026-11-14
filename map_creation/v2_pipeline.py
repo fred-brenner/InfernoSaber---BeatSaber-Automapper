@@ -4,6 +4,7 @@ Training targets and source beatmaps are never inputs. The concept command keeps
 its independent review stops; this path uses concrete application postprocessors.
 """
 
+from contextlib import contextmanager, nullcontext
 from functools import wraps
 from copy import deepcopy
 from dataclasses import dataclass, field
@@ -458,6 +459,8 @@ class VariantRun:
     multiplier_candidates: list = field(default_factory=list)
     expansion_rejections: dict = field(default_factory=dict)
     calm_pulses: list = field(default_factory=list)
+    scope: object = None       # batched runs: CM factory replaying this variant's settings
+    late_turns: bool = False   # batched runs: replay @_scope_playability_flow in that scope
 
 
 def variant_run(song, requested_nps, predictors, encoder, settings, vocabularies, *,
@@ -581,9 +584,8 @@ def _beats_stage(run):
 
 
 def _positions_begin(run):
-    """Prefetch event encodings and reset positions decode state."""
+    """Reset positions decode state; event encodings are prefetched by the stage."""
     run.started = perf_counter()
-    run.encoder(np.asarray([candidate["time"] for candidate in run.candidates], np.float64))
     run.history, run.length = [], run.options["history_length"]
     run.last_hand_time = [-np.inf, -np.inf]
     run.recovery = config.v2_playability_recovery_ratio if config.v2_playability_enabled else 0.
@@ -643,6 +645,7 @@ def _positions_end(run):
 
 def _positions_stage(run):
     _positions_begin(run)
+    run.encoder(np.asarray([candidate["time"] for candidate in run.candidates], np.float64))
     for index, candidate in enumerate(run.candidates):
         output = _predict(run.predictors["positions"], _positions_inputs(run, candidate))
         _positions_apply(run, candidate, output)
@@ -786,7 +789,6 @@ def _multiplier_begin(run):
     for note in run.retained:
         run.by_time.setdefault(note["time"], []).append(note)
     run.multiplier_candidates = [{"time": time, "count": len(notes)} for time, notes in sorted(run.by_time.items())]
-    run.encoder(np.asarray(list(sorted(run.by_time)), np.float64))
     run.history, run.expansion_rejections = [], {}
     _log(run.logger, "V2 multiplier")
 
@@ -832,6 +834,7 @@ def _multiplier_end(run):
 
 def _multiplier_stage(run):
     _multiplier_begin(run)
+    run.encoder(np.asarray(list(sorted(run.by_time)), np.float64))
     for index, candidate in enumerate(run.multiplier_candidates):
         output = _predict(run.predictors["multiplier"], _multiplier_inputs(run, candidate))
         _multiplier_apply(run, candidate, output)
@@ -1225,3 +1228,139 @@ def generate(song, requested_nps, predictors, encoder, settings, vocabularies, *
     _calm_stage(run)
     _lighting_stage(run)
     return _finalize(run)
+
+
+@contextmanager
+def _late_turns_phase(enabled):
+    """Replay ``@_scope_playability_flow`` for one batched variant's own pieces."""
+    if enabled:
+        from .v2_postprocessing import playability_generation_phase
+        with playability_generation_phase():
+            yield
+    else:
+        yield
+
+
+@contextmanager
+def _variant_scope(run):
+    """Enter a batched variant's settings scope for one per-variant piece."""
+    scope = run.scope() if callable(run.scope) else (run.scope or nullcontext())
+    with scope, _late_turns_phase(run.late_turns):
+        yield
+
+
+def _batched_inputs(rows):
+    """Concatenate same-key batch-1 input dicts into one batch-K dict."""
+    if len(rows) == 1:
+        return rows[0]
+    return {key: np.concatenate([row[key] for row in rows], axis=0) for key in rows[0]}
+
+
+def _batch_row(output, row):
+    """Slice one batch-1 output back out of a batched predict result."""
+    if isinstance(output, dict):
+        return {key: value[row:row + 1] for key, value in output.items()}
+    return output[row:row + 1]
+
+
+def _lockstep(runs, name, candidates, inputs_fn, pick_fn, apply_fn):
+    """Advance live variants through one autoregressive stage, batching predicts.
+
+    Per step every live variant builds its inputs inside its own scope, then
+    rows group by chosen model (the arrows variety draw happens at the same
+    rng position as the sequential loop) into at most one batched predict per
+    model; rows keep variant order so outputs split back positionally. A
+    variant past its own candidate list contributes no row that step.
+    """
+    total = max((len(candidates(run)) for run in runs), default=0)
+    for index in range(total):
+        groups = {}
+        for run in runs:
+            if index >= len(candidates(run)):
+                continue
+            with _variant_scope(run):
+                inputs = inputs_fn(run, candidates(run)[index])
+                predictor = pick_fn(run)
+            groups.setdefault(predictor, []).append((run, inputs))
+        for predictor, rows in groups.items():
+            output = _predict(predictor, _batched_inputs([inputs for _, inputs in rows]))
+            for row, (run, _) in enumerate(rows):
+                with _variant_scope(run):
+                    apply_fn(run, candidates(run)[index], _batch_row(output, row))
+                    _progress(run.logger, name, index, len(candidates(run)))
+
+
+def _prefetch_union(encoder, runs, times):
+    """Warm the shared latent cache once for all live variants of a stage."""
+    queries = [np.asarray(list(times(run)), np.float64) for run in runs]
+    queries = [query for query in queries if len(query)]
+    if queries:
+        encoder(np.unique(np.concatenate(queries)))
+
+
+def generate_variants(song, requested_nps_list, predictors, encoder, settings_list, vocabularies, *,
+                      lighting_generator, audio_path=None, logger=None, postprocessors=None,
+                      random_factor=None, intensity=None, rngs=None, scopes=None):
+    """Compose ``generate`` for several variants, batching the three decode loops.
+
+    Stage order matches the sequential composition exactly; per-variant
+    begin/apply/validator pieces run inside that variant's ``scopes`` entry
+    (callables producing a fresh context manager, e.g. a replayed
+    difficulty-settings delta) so config reads keep their program points —
+    only the concatenated ``_predict`` is shared. ``scopes`` default to the
+    ambient config, making K=1 equivalent to ``generate``.
+    """
+    count = len(requested_nps_list)
+    if (len(settings_list) != count or rngs is not None and len(rngs) != count
+            or scopes is not None and len(scopes) != count):
+        raise ValueError("Variant settings, rngs and scopes must match the requested variants")
+    scopes = [nullcontext] * count if scopes is None else scopes
+    runs = []
+    for index in range(count):
+        with scopes[index]():
+            # The @_scope_playability_flow flag is read at generate entry, so
+            # evaluate it under this variant's scope and replay it per piece.
+            late_turns = bool(getattr(config, "v2_playability_enabled", False)
+                              and getattr(config, "v2_playability_late_turns", False))
+            with _late_turns_phase(late_turns):
+                run = variant_run(song, requested_nps_list[index], predictors, encoder,
+                                  settings_list[index], vocabularies, lighting_generator=lighting_generator,
+                                  audio_path=audio_path, logger=logger, postprocessors=postprocessors,
+                                  random_factor=random_factor, intensity=intensity,
+                                  rng=None if rngs is None else rngs[index])
+            run.scope, run.late_turns = scopes[index], late_turns
+            runs.append(run)
+    def each(function):
+        for run in runs:
+            with _variant_scope(run):
+                function(run)
+
+    for index, run in enumerate(runs):
+        # Raw intensity shares from the first variant seed the rest, matching
+        # runtime.generate's prepared.intensity reuse across difficulties.
+        if index and run.intensity is None:
+            run.intensity = runs[0].state["raw_intensity"]
+        with _variant_scope(run):
+            _beats_stage(run)
+    each(_positions_begin)
+    _prefetch_union(encoder, runs, lambda run: (candidate["time"] for candidate in run.candidates))
+    _lockstep(runs, "positions", lambda run: run.candidates, _positions_inputs,
+              lambda run: run.predictors["positions"], _positions_apply)
+    each(_positions_end)
+    each(_arrows_begin)
+    _lockstep(runs, "arrows", lambda run: run.candidates, _arrows_inputs, _arrows_model, _arrows_apply)
+    each(_arrows_end)
+    each(_note_cleanup)
+    each(_multiplier_begin)
+    _prefetch_union(encoder, runs, lambda run: (candidate["time"] for candidate in run.multiplier_candidates))
+    _lockstep(runs, "multiplier", lambda run: run.multiplier_candidates, _multiplier_inputs,
+              lambda run: run.predictors["multiplier"], _multiplier_apply)
+    each(_multiplier_end)
+    each(_expansion_cleanup)
+    each(_hazards_stage)
+    each(_arcs_stage)
+    each(_calm_stage)
+    each(_lighting_stage)
+    results = []
+    each(lambda run: results.append(_finalize(run)))
+    return results
