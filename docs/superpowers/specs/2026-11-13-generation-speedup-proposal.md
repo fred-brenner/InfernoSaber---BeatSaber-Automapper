@@ -101,6 +101,38 @@ per event index (≤ ~930 calls of batch-K instead of ~2800 batch-1 calls).
 - Success gate: parity test + existing suite pass; stage `elapsed_seconds`
   for positions/arrows/multiplier drops ~K-fold on a multi-difficulty run.
 
+#### Task P1c — Process-level orchestration: batch the song's difficulty run
+
+P1b ships the driver, but `process_song` calls `generate_song` once per
+(song, difficulty), so the standard multi-difficulty app run issues K
+single-variant calls and lockstep never engages (only the single-difficulty
+auto-Expert twin reaches K=2). This task wires the orchestration that
+realizes the headline win.
+
+- Add a group generation entry (e.g. `generate_song_group(name,
+  difficulties, logger)` in `v2_generation.py`): one `prepare_audio`, one
+  `runtime.generate_batch` over all requested difficulties — then per
+  difficulty its own `write_package` into `1234_{d}_{name}` and its own
+  completion record (`internal_difficulty`, `path`, `status`, elapsed),
+  identical record shape to `generate_song`'s so `_combine_maps`/
+  `combine_packages` and package semantics are untouched.
+- `process_song` in `main_multi.py`: coalesce consecutive same-song
+  (song, difficulty) entries in its work list into one group call (groups
+  already keep a song's difficulties adjacent); v1 selection path and
+  single-difficulty runs keep today's calls.
+- Failure granularity: on a batched-call exception, fall back to the
+  existing per-difficulty sequential loop for that song (log the fallback);
+  preserves today's per-difficulty failure semantics — one bad variant must
+  not silently kill its siblings.
+- Preserve the `create_expert_flag` twin semantics for single-difficulty
+  runs; group runs (K>1) create no twins, matching `main_multi`'s
+  `create_expert_flag=False` for multi-difficulty.
+- No `_groups` changes in this task (splitting reduces batch width — the P5
+  tension stays documented).
+- Success gate: a 3-difficulty app-style run engages lockstep (batch
+  predict call counts verifiable in tests), records/records flow identical,
+  per-difficulty failure fallback covered by test, existing suite green.
+
 ### Task P2 — Per-song audio-analysis cache (~1.5-2.5 s/variant)
 
 Each variant currently re-decodes audio ~3x and recomputes the onset envelope
