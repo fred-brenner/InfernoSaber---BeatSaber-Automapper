@@ -1,8 +1,9 @@
 # Generation speedup proposal
 
-Status: Task P2, Task P3 and Task P4 implemented (2026-11-13, commits
-4e36119, fe3de57, 318457d, faaad7b on main_app_dev); Task P1 approved for
-implementation (2026-11-14); P5, P6, P7 remain proposed.
+Status: Tasks P1, P2, P3, P4 implemented (commits 4e36119, fe3de57, 318457d,
+faaad7b, 989970c, 81e91a4, a174eac, cf873bd on main_app_dev); P5, P6, P7
+remain proposed. Measured on 8 songs x 3 difficulties (WSL, 8 cores):
+wall-clock vs baseline -32% (1w), -30% (4w), -29% (8w).
 
 ## Intent
 
