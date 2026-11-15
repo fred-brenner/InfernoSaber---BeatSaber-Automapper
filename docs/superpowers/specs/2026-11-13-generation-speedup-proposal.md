@@ -230,6 +230,11 @@ batch-1 and ~3.2x at batch 3-5 vs the P6a ConcreteFunction.
 - Parity gate: focused TF-vs-ORT output test on a small dict-input model;
   existing temp-0/factor-0 lockstep parity test must pass with the flag on;
   real-song benchmark.
+- Windows fix (commit 6dd0b0f, shipped silently on v2.0.2.app3): the ONNX
+  stack is preloaded at the top of `V2Runtime.__init__` because
+  `validate_production_bundle` unpickles the v1 lighting OneHotEncoder via
+  joblib, importing sklearn first — and sklearn-before-onnx breaks
+  `onnx_cpp2py_export` DLL init on Windows (reverse order works).
 
 ### Task P7 — Pre-work and startup amortization
 
