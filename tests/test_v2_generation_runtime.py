@@ -255,6 +255,7 @@ def test_runtime_loads_v1_lighting_once_and_never_loads_v2_lighting(tmp_path, mo
     root = bundle_fixture(tmp_path / "bundle")
     shutil.rmtree(root / "lighting")
     monkeypatch.setattr(config, "v2_compile_inference", False)
+    monkeypatch.setattr(config, "v2_onnx_inference", False)
     monkeypatch.setattr(runtime, "_CACHE", None)
     monkeypatch.setattr(beat_pair, "BeatPair", lambda *args, **kwargs: SimpleNamespace(
         predictors={"intensity": object(), "timing": object()}))
@@ -286,6 +287,7 @@ def test_concrete_function_predictors_match_eager_calls_across_batches(tmp_path,
     root = bundle_fixture(tmp_path / "bundle")
     shutil.rmtree(root / "lighting")
     monkeypatch.setattr(config, "v2_compile_inference", True)
+    monkeypatch.setattr(config, "v2_onnx_inference", False)  # isolate the ConcreteFunction path
     monkeypatch.setattr(config, "v2_arrows_variety", 0.)
     monkeypatch.setattr(beat_pair, "BeatPair", lambda *args, **kwargs: SimpleNamespace(
         predictors={"intensity": object(), "timing": object()}))
@@ -339,6 +341,140 @@ def test_concrete_function_predictors_match_eager_calls_across_batches(tmp_path,
                  rng.random((batch, 16, 2), dtype=np.float32)]
         np.testing.assert_allclose(np.asarray(value.lighting.predict(feeds)),
                                    np.asarray(lighting_model(feeds, training=False)))
+
+
+def _tiny_dict_stage_model(tf, bool_input=False):
+    """Small dict-input/dict-output model exercising the ONNX decode contract."""
+    inputs = {"audio": tf.keras.Input((16,), name="audio"),
+              "history": tf.keras.Input((4, 3), name="history")}
+    blocks = [inputs["audio"], tf.keras.layers.Flatten()(inputs["history"])]
+    if bool_input:
+        inputs["flag"] = tf.keras.Input((), dtype=tf.bool, name="flag")
+        blocks.append(tf.cast(inputs["flag"], tf.float32)[:, None])
+    merged = tf.keras.layers.Concatenate()(blocks)
+    return tf.keras.Model(inputs, {"classes": tf.keras.layers.Dense(5)(merged)})
+
+
+def _stage_runtime(tmp_path, monkeypatch, production_assets, stage_model, *, variety_bundle=None):
+    """V2Runtime with injected tiny stage/encoder/lighting models (no real checkpoints)."""
+    import tensorflow as tf
+    from evaluation import beat_pair
+    from lighting_prediction import v1_lighting
+    from training.pipeline_v2 import runner
+
+    root = bundle_fixture(tmp_path / "bundle")
+    shutil.rmtree(root / "lighting")
+    monkeypatch.setattr(beat_pair, "BeatPair", lambda *args, **kwargs: SimpleNamespace(
+        predictors={"intensity": object(), "timing": object()}))
+    monkeypatch.setattr(runner, "load_stage_artifact", lambda path, stage: (stage_model, {}))
+    patches = tf.keras.Input((24, 20, 1), name="patches")
+    encoder = tf.keras.Model(patches, tf.keras.layers.Dense(16)(tf.keras.layers.Flatten()(patches)))
+    monkeypatch.setattr(tf.keras.models, "load_model", lambda path, **kwargs: encoder)
+    blocks = [tf.keras.Input(shape, name=name) for name, shape in
+              (("latents", (16, 16, 1)), ("gaps", (16, 1)), ("history", (16, 2)))]
+    merged = tf.keras.layers.Concatenate()([tf.keras.layers.Flatten()(block) for block in blocks])
+    lighting_model = tf.keras.Model(blocks, tf.keras.layers.Reshape((16, 2))(tf.keras.layers.Dense(32)(merged)))
+    monkeypatch.setattr(v1_lighting, "load_lighting", lambda assets, factory: SimpleNamespace(
+        model=lighting_model, predict=factory(lighting_model)))
+    monkeypatch.setattr(config, "v2_arrows_variety", .5 if variety_bundle is not None else 0.)
+    if variety_bundle is not None:
+        monkeypatch.setattr(config, "v2_arrows_reference_bundle", str(variety_bundle))
+    return runtime.V2Runtime(root)
+
+
+def test_onnx_predictors_match_eager_calls_and_keep_other_stages_on_tensorflow(
+        tmp_path, monkeypatch, production_assets):
+    """v2_onnx_inference sessions must match model(inputs, training=False) at batch 1..3."""
+    tf = pytest.importorskip("tensorflow")
+    onnxruntime = pytest.importorskip("onnxruntime")
+    pytest.importorskip("tf2onnx")
+    from tools.config import paths
+
+    monkeypatch.setattr(paths, "temp_path", str(tmp_path / "temp") + "/")
+    monkeypatch.setattr(config, "v2_onnx_inference", True)
+    monkeypatch.setattr(config, "v2_compile_inference", True)
+    stage_model = _tiny_dict_stage_model(tf, bool_input=True)
+    reference = bundle_fixture(tmp_path / "reference")
+    value = _stage_runtime(tmp_path, monkeypatch, production_assets, stage_model,
+                           variety_bundle=reference)
+    for stage in ("positions", "arrows", "multiplier", "arrows_reference"):
+        assert isinstance(value.predictors[stage].session, onnxruntime.InferenceSession)
+    for stage in ("hazards", "arcs"):
+        assert isinstance(value.predictors[stage].graph, tf.Graph)
+    assert isinstance(value._encode.graph, tf.Graph)
+    assert isinstance(value.lighting.predict.graph, tf.Graph)
+    rng = np.random.default_rng(0)
+    predict = value.predictors["positions"]
+    for batch in (1, 3):
+        feeds = {"audio": rng.random((batch, 16), dtype=np.float32),
+                 "history": rng.random((batch, 4, 3), dtype=np.float32),
+                 "flag": rng.random(batch) > .5}
+        expected = stage_model(feeds, training=False)
+        actual = predict(feeds)
+        assert set(actual) == set(expected)
+        for key, tensor in expected.items():
+            np.testing.assert_allclose(np.asarray(actual[key]), np.asarray(tensor),
+                                       rtol=1e-5, atol=1e-6)
+            np.testing.assert_array_equal(np.asarray(actual[key]).argmax(-1),
+                                          np.asarray(tensor).argmax(-1))
+    with pytest.raises(KeyError):
+        predict({"audio": feeds["audio"], "history": feeds["history"]})
+
+
+def test_onnx_failure_falls_back_to_tensorflow_predictors(tmp_path, monkeypatch, production_assets, capsys):
+    """A broken ONNX path falls back per model at load, warning once per runtime."""
+    tf = pytest.importorskip("tensorflow")
+    stage_model = _tiny_dict_stage_model(tf)
+    attempts = []
+
+    def broken(model, source, threads):
+        attempts.append(model)
+        raise RuntimeError("forced ONNX failure")
+
+    monkeypatch.setattr(runtime, "_onnx_predictor", broken)
+    monkeypatch.setattr(config, "v2_onnx_inference", True)
+    value = _stage_runtime(tmp_path, monkeypatch, production_assets, stage_model)
+    assert attempts == [stage_model] * 3  # positions, arrows, multiplier only
+    for stage in runtime.PRODUCTION_STAGES:
+        assert isinstance(value.predictors[stage].graph, tf.Graph)
+    feeds = {"audio": np.ones((1, 16), np.float32), "history": np.ones((1, 4, 3), np.float32)}
+    np.testing.assert_allclose(np.asarray(value.predictors["positions"](feeds)["classes"]),
+                               np.asarray(stage_model(feeds, training=False)["classes"]))
+    assert capsys.readouterr().out.count("v2_onnx_inference") == 1
+
+
+def test_onnx_conversion_cache_roundtrips_and_detects_corruption(tmp_path, monkeypatch):
+    tf = pytest.importorskip("tensorflow")
+    tf2onnx = pytest.importorskip("tf2onnx")
+    pytest.importorskip("onnxruntime")
+    from tools.config import paths
+
+    monkeypatch.setattr(paths, "temp_path", str(tmp_path / "temp") + "/")
+    model = _tiny_dict_stage_model(tf)
+    source = tmp_path / "best.keras"
+    source.write_bytes(b"stage artifact bytes")
+    conversions = []
+    original = tf2onnx.convert.from_function
+
+    def spy(*args, **kwargs):
+        conversions.append(True)
+        return original(*args, **kwargs)
+
+    monkeypatch.setattr(tf2onnx.convert, "from_function", spy)
+    first = runtime._onnx_predictor(model, source, 1)
+    cached = list((tmp_path / "temp" / "onnx-cache").glob("*-opset15-tf2onnx*.onnx"))
+    assert len(cached) == 1 and len(conversions) == 1
+    second = runtime._onnx_predictor(model, source, 1)
+    assert len(conversions) == 1  # the second load read the serialized cache bytes
+    feeds = {"audio": np.ones((2, 16), np.float32), "history": np.ones((2, 4, 3), np.float32)}
+    expected = model(feeds, training=False)
+    for predict in (first, second):
+        for key, tensor in expected.items():
+            np.testing.assert_allclose(np.asarray(predict(feeds)[key]), np.asarray(tensor),
+                                       rtol=1e-5, atol=1e-6)
+    cached[0].write_bytes(b"corrupted cache entry")
+    with pytest.raises(Exception):
+        runtime._onnx_predictor(model, source, 1)
 
 
 def test_runtime_cache_is_per_pid_and_explicit_bundle(monkeypatch, tmp_path):
