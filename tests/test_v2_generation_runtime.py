@@ -276,6 +276,71 @@ def test_runtime_loads_v1_lighting_once_and_never_loads_v2_lighting(tmp_path, mo
     assert "lighting" not in first.predictors
 
 
+def test_concrete_function_predictors_match_eager_calls_across_batches(tmp_path, monkeypatch, production_assets):
+    """v2_compile_inference predictors must match model(inputs, training=False) at batch 1..3."""
+    import tensorflow as tf
+    from evaluation import beat_pair
+    from lighting_prediction import v1_lighting
+    from training.pipeline_v2 import runner
+
+    root = bundle_fixture(tmp_path / "bundle")
+    shutil.rmtree(root / "lighting")
+    monkeypatch.setattr(config, "v2_compile_inference", True)
+    monkeypatch.setattr(config, "v2_arrows_variety", 0.)
+    monkeypatch.setattr(beat_pair, "BeatPair", lambda *args, **kwargs: SimpleNamespace(
+        predictors={"intensity": object(), "timing": object()}))
+    inputs = {"audio": tf.keras.Input((16,), name="audio"),
+              "history": tf.keras.Input((4, 3), name="history")}
+    merged = tf.keras.layers.Concatenate()([inputs["audio"], tf.keras.layers.Flatten()(inputs["history"])])
+    stage_model = tf.keras.Model(inputs, {"classes": tf.keras.layers.Dense(5)(merged)})
+    monkeypatch.setattr(runner, "load_stage_artifact", lambda path, stage: (stage_model, {}))
+    patches = tf.keras.Input((24, 20, 1), name="patches")
+    encoder = tf.keras.Model(patches, tf.keras.layers.Dense(16)(tf.keras.layers.Flatten()(patches)))
+    monkeypatch.setattr(tf.keras.models, "load_model", lambda path, **kwargs: encoder)
+    blocks = [tf.keras.Input(shape, name=name) for name, shape in
+              (("latents", (16, 16, 1)), ("gaps", (16, 1)), ("history", (16, 2)))]
+    merged = tf.keras.layers.Concatenate()([tf.keras.layers.Flatten()(block) for block in blocks])
+    lighting_model = tf.keras.Model(blocks, tf.keras.layers.Reshape((16, 2))(tf.keras.layers.Dense(32)(merged)))
+    monkeypatch.setattr(v1_lighting, "load_lighting", lambda assets, factory: SimpleNamespace(
+        model=lighting_model, predict=factory(lighting_model)))
+    value = runtime.V2Runtime(root)
+    rng = np.random.default_rng(0)
+
+    for stage in runtime.PRODUCTION_STAGES:
+        assert isinstance(value.predictors[stage].graph, tf.Graph)
+    predict = value.predictors["positions"]
+    signature, = predict.structured_input_signature[0]
+    assert set(signature) == {"audio", "history"}
+    assert all(tuple(spec.shape)[0] is None for spec in signature.values())
+    for batch in (1, 3):
+        feeds = {"audio": rng.random((batch, 16), dtype=np.float32),
+                 "history": rng.random((batch, 4, 3), dtype=np.float32)}
+        expected = stage_model(feeds, training=False)
+        actual = predict(feeds)
+        assert set(actual) == set(expected)
+        for key, tensor in expected.items():
+            assert np.shape(actual[key]) == np.shape(tensor)
+            np.testing.assert_allclose(np.asarray(actual[key]), np.asarray(tensor))
+    with pytest.raises((TypeError, ValueError)):
+        predict({"audio": feeds["audio"]})
+
+    spec, = value._encode.structured_input_signature[0]
+    assert tuple(spec.shape) == (None, 24, 20, 1) and spec.dtype == tf.float32
+    for batch in (1, 3):
+        feeds = rng.random((batch, 24, 20, 1), dtype=np.float32)
+        np.testing.assert_allclose(np.asarray(value._encode(feeds)),
+                                   np.asarray(encoder(feeds, training=False)))
+
+    specs, = value.lighting.predict.structured_input_signature[0]
+    assert [tuple(spec.shape) for spec in specs] == [(None, 16, 16, 1), (None, 16, 1), (None, 16, 2)]
+    for batch in (1, 3):
+        feeds = [rng.random((batch, 16, 16, 1), dtype=np.float32),
+                 rng.random((batch, 16, 1), dtype=np.float32),
+                 rng.random((batch, 16, 2), dtype=np.float32)]
+        np.testing.assert_allclose(np.asarray(value.lighting.predict(feeds)),
+                                   np.asarray(lighting_model(feeds, training=False)))
+
+
 def test_runtime_cache_is_per_pid_and_explicit_bundle(monkeypatch, tmp_path):
     made = []
 

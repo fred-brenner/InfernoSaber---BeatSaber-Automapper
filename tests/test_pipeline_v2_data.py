@@ -216,6 +216,8 @@ def test_preresolved_options_keep_the_same_validation_errors(dataset):
     settings = preparation_settings()
     settings["history_length"] = 0
     with pytest.raises(ValueError, match="positive integer"):
+        preparation_defaults(settings)
+    with pytest.raises(ValueError, match="positive integer"):
         build_inputs("positions", song, {"notes": []}, {"time": .5, "count": 1}, [], settings=settings)
     with pytest.raises(ValueError, match="positive integer"):
         build_inputs("positions", song, {"notes": []}, {"time": .5, "count": 1}, [],
