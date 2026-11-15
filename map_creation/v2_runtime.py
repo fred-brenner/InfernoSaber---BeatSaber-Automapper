@@ -28,6 +28,64 @@ _CACHE = None
 _CACHE_HITS = 0
 _CACHE_LOCK = threading.Lock()
 PRODUCTION_STAGES = tuple(stage for stage in STAGES if stage != "lighting")
+# ONNX Runtime dispatch targets the hot autoregressive decode stages only;
+# intensity/timing, the retained encoder and v1 lighting stay on TensorFlow.
+_ONNX_STAGES = frozenset({"positions", "arrows", "multiplier", "arrows_reference"})
+_ONNX_OPSET = 15
+
+
+def _onnx_predictor(model, source, threads):
+    """Return an ORT-backed callable for one dict-input stage model.
+
+    The conversion result is content-addressed under ``temp_path/onnx-cache``
+    so workers convert each artifact once; imports stay lazy so environments
+    without the optional ONNX dependencies never touch them.
+    """
+    import onnxruntime
+    import tensorflow as tf
+    import tf2onnx
+    from tools.config import paths
+
+    if not isinstance(model.input, dict):
+        raise TypeError("ONNX inference requires dict-input models")
+    cache = (Path(paths.temp_path) / "onnx-cache" /
+             f"{file_hash(source)[:16]}-opset{_ONNX_OPSET}-tf2onnx{tf2onnx.__version__}.onnx")
+    if cache.is_file():
+        blob = cache.read_bytes()
+    else:
+        signature = {name: tf.TensorSpec((None,) + tuple(tensor.shape[1:]), tensor.dtype, name=name)
+                     for name, tensor in model.input.items()}
+        converted, _ = tf2onnx.convert.from_function(
+            tf.function(lambda inputs: model(inputs, training=False), autograph=False),
+            input_signature=[signature], opset=_ONNX_OPSET)
+        blob = converted.SerializeToString()
+        cache.parent.mkdir(parents=True, exist_ok=True)
+        # Unique temp name + rename: concurrent workers either see the old
+        # complete file or the new one, never a partial write.
+        temporary = cache.with_name(f"{cache.name}.{os.getpid()}.tmp")
+        try:
+            temporary.write_bytes(blob)
+            os.replace(temporary, cache)
+        finally:
+            temporary.unlink(missing_ok=True)
+    options = onnxruntime.SessionOptions()
+    options.intra_op_num_threads = threads
+    options.inter_op_num_threads = threads
+    session = onnxruntime.InferenceSession(blob, options, providers=["CPUExecutionProvider"])
+    # ORT names match the Keras input/output dict keys but not their order;
+    # feed and rebuild strictly by name.
+    input_names = [item.name for item in session.get_inputs()]
+    output_names = [item.name for item in session.get_outputs()]
+    returns_dict = isinstance(model.output, dict)
+
+    def predict(inputs):
+        outputs = session.run(output_names, {name: np.asarray(inputs[name]) for name in input_names})
+        if returns_dict:
+            return dict(zip(output_names, outputs))
+        return outputs[0] if len(outputs) == 1 else outputs
+
+    predict.session = session
+    return predict
 
 
 def _bundle_path(path):
@@ -257,6 +315,25 @@ class V2Runtime:
             # the signature keeps batch dims dynamic like reduce_retracing.
             return tf.function(call, input_signature=_input_signature(model)).get_concrete_function()
 
+        onnx_stages = _ONNX_STAGES if getattr(config, "v2_onnx_inference", True) else frozenset()
+        onnx_warned = []
+
+        def stage_predictor(stage, model, source):
+            """Dispatch one stage's calls through ONNX Runtime when enabled.
+
+            The fallback decision is made once here at load — the per-call path
+            never pays a dispatch or exception cost.
+            """
+            if stage in onnx_stages:
+                try:
+                    return _onnx_predictor(model, source, threads)
+                except Exception as error:
+                    if not onnx_warned:
+                        onnx_warned.append(stage)
+                        print(f"Warning: v2_onnx_inference falling back to TensorFlow "
+                              f"predictors ({stage}: {type(error).__name__}: {error})")
+            return predictor(model)
+
         def beat_loader(checkpoint, stage, manifest):
             from training.beat_models import models
             with zipfile.ZipFile(checkpoint) as archive:
@@ -277,17 +354,21 @@ class V2Runtime:
         self.predictors = dict(self.pair.predictors)
         with tf.device("/CPU:0"):
             for stage in PRODUCTION_STAGES:
-                model, _ = load_stage_artifact(self.root / paths[stage], stage)
+                model, manifest = load_stage_artifact(self.root / paths[stage], stage)
                 self.models[stage] = model
-                self.predictors[stage] = predictor(model)
+                checkpoint = (manifest or {}).get("checkpoint", "best.keras")
+                self.predictors[stage] = stage_predictor(stage, model,
+                                                         self.root / paths[stage] / checkpoint)
             # Optional second arrows opinion blended at decode by v2_arrows_variety.
             if "arrows" in self.predictors and 0 < float(getattr(config, "v2_arrows_variety", 0.) or 0.):
                 reference = _validate_bundle(getattr(config, "v2_arrows_reference_bundle",
                                                      "../Data/model/v2_expert"), production=True)
-                model, _ = load_stage_artifact(reference["root"] / reference["bundle"]["model_stages"]["arrows"],
-                                               "arrows")
+                stage_dir = reference["root"] / reference["bundle"]["model_stages"]["arrows"]
+                model, manifest = load_stage_artifact(stage_dir, "arrows")
                 self.models["arrows_reference"] = model
-                self.predictors["arrows_reference"] = predictor(model)
+                checkpoint = (manifest or {}).get("checkpoint", "best.keras")
+                self.predictors["arrows_reference"] = stage_predictor(
+                    "arrows_reference", model, stage_dir / checkpoint)
             self.encoder_model = tf.keras.models.load_model(str(self.root / self.bundle["encoder"]), compile=False)
             if tuple(self.encoder_model.input_shape[1:]) != (24, 20, 1) or tuple(self.encoder_model.output_shape[1:]) != (16,):
                 raise ValueError("The retained encoder must accept [24,20,1] and return [16]")

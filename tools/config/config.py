@@ -39,6 +39,11 @@ v1_lighting_vocabulary_path = "../Data/model/v2_expert/v1_lighting/onehot_encode
 v2_inference_threads = 0
 v2_timing_batch_size = 8
 v2_compile_inference = True
+# Dispatch positions/arrows/multiplier (and the arrows_reference blend model)
+# through ONNX Runtime sessions converted at worker load and cached under
+# temp_path; any conversion/session failure falls back per model to the
+# ConcreteFunction predictor with one warning. Requires onnxruntime+tf2onnx.
+v2_onnx_inference = True
 # Experimental: mask hazard decisions to feasible placements before argmax/threshold.
 v2_hazard_feasibility_decode = False
 # With feasibility decode on: sample among legal options at this temperature (0 = argmax).

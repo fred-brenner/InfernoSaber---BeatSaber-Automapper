@@ -18,3 +18,8 @@ gradio~=5.29.1
 yt-dlp
 mutagen
 imageio-ffmpeg~=0.8.1
+# v2_onnx_inference: ORT dispatch for the hot v2 decode stages (optional at
+# runtime; every model falls back to the TensorFlow predictor without them)
+onnxruntime==1.20.1
+tf2onnx==1.16.1
+onnx==1.17.0

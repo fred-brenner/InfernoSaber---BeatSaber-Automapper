@@ -101,8 +101,16 @@ network. Settings in `config.py` are `v2_inference_threads` (0 = auto:
 `max(1, min(2, cores // workers))` per worker — total TF threads stay at or
 below the core count; pin a positive integer to override — with
 `OMP_NUM_THREADS`/`MKL_NUM_THREADS`/`OPENBLAS_NUM_THREADS` capped to the same
-value in spawned workers), `v2_timing_batch_size` (8), and
-`v2_compile_inference` (True).
+value in spawned workers), `v2_timing_batch_size` (8),
+`v2_compile_inference` (True), and `v2_onnx_inference` (True). With ONNX
+inference on, the positions/arrows/multiplier stage predictors — and the
+optional `arrows_reference` blend model — run as ONNX Runtime CPU sessions
+converted once per worker at load and cached under `temp_path/onnx-cache`
+keyed by artifact hash, opset, and tf2onnx version; session threads follow the
+same resolved `v2_inference_threads` count. Any missing dependency or
+conversion/session failure falls back per model to the TensorFlow
+ConcreteFunction predictor with one warning. Intensity/timing, the retained
+encoder, and v1 lighting always stay on TensorFlow.
 
 `main_multi_par` returns explicit `results`, `packages`, and `failures`. Only
 successful variants from that call may be combined. A failed requested variant
