@@ -1,8 +1,8 @@
 # Generation speedup proposal
 
-Status: Tasks P1, P2, P3, P4 implemented (commits 4e36119, fe3de57, 318457d,
-faaad7b, 989970c, 81e91a4, a174eac, cf873bd on main_app_dev); P5, P6, P7
-remain proposed. Measured on 8 songs x 3 difficulties (WSL, 8 cores):
+Status: Tasks P1, P2, P3, P4, P6a implemented (commits 4e36119, fe3de57,
+318457d, faaad7b, 989970c, 81e91a4, a174eac, cf873bd, 36c55df, d7e51df on
+main_app_dev); P5, P6b (ONNX, needs design approval), P7 remain proposed. Measured on 8 songs x 3 difficulties (WSL, 8 cores):
 wall-clock vs baseline -32% (1w), -30% (4w), -29% (8w).
 
 ## Intent
@@ -189,11 +189,22 @@ no split occurs and one worker takes two songs (~100 s vs ~55 s).
   when it improves makespan; with lockstep, same-song-single-worker is near
   optimal and splitting mainly fixes today's quantization.
 
-### Task P6 — Cut per-call dispatch overhead (~1.3-1.6x residual; more if ONNX)
+### Task P6a — Cut per-call dispatch overhead, cheap tier (approved)
 
-- Concrete `tf.function`s with fixed `input_signature` per stage.
 - Hoist `preparation_defaults(settings)` out of `build_inputs` (re-validated
-  per candidate, ~2800x/variant) — pass the precomputed options through.
+  per candidate, ~2800x/variant) — resolve the options once per variant/stage
+  and pass them through; `build_inputs` keeps an optional `options=None`
+  fallback so training/hazard callers stay source-compatible.
+- Evaluate concrete `tf.function`s with fixed `input_signature` per stage
+  (batch dim `None`) — keep only if a microbenchmark shows a real gain over
+  `reduce_retracing=True`; document the measurement either way.
+- Profile the remaining per-candidate `build_inputs` Python work (history
+  scan, dict assembly) and slim it only where the measurement justifies it.
+- Parity gate: identical stage outputs on the existing temp-0/factor-0 parity
+  harness plus the focused suite.
+
+### P6b — ONNX Runtime dispatch (deferred — separate design approval)
+
 - Optional later discussion: ONNX Runtime sessions for the hot stages
   (~5-10x on dispatch) — requires conversion tooling, parity validation, and
   bundle packaging changes; needs its own design approval per project rules.
