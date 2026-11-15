@@ -440,13 +440,15 @@ def test_onnx_failure_falls_back_to_tensorflow_predictors(tmp_path, monkeypatch,
     feeds = {"audio": np.ones((1, 16), np.float32), "history": np.ones((1, 4, 3), np.float32)}
     np.testing.assert_allclose(np.asarray(value.predictors["positions"](feeds)["classes"]),
                                np.asarray(stage_model(feeds, training=False)["classes"]))
-    assert capsys.readouterr().out.count("v2_onnx_inference") == 1
+    warning = capsys.readouterr().out
+    assert warning.count("v2_onnx_inference") == 1
+    assert "positions" in warning and "remaining models" in warning
 
 
-def test_onnx_conversion_cache_roundtrips_and_detects_corruption(tmp_path, monkeypatch):
+def test_onnx_conversion_cache_roundtrips_and_self_heals_corruption(tmp_path, monkeypatch):
     tf = pytest.importorskip("tensorflow")
     tf2onnx = pytest.importorskip("tf2onnx")
-    pytest.importorskip("onnxruntime")
+    onnxruntime = pytest.importorskip("onnxruntime")
     from tools.config import paths
 
     monkeypatch.setattr(paths, "temp_path", str(tmp_path / "temp") + "/")
@@ -464,6 +466,8 @@ def test_onnx_conversion_cache_roundtrips_and_detects_corruption(tmp_path, monke
     first = runtime._onnx_predictor(model, source, 1)
     cached = list((tmp_path / "temp" / "onnx-cache").glob("*-opset15-tf2onnx*.onnx"))
     assert len(cached) == 1 and len(conversions) == 1
+    assert cached[0].name.startswith(f"{file_hash(source)[:16]}-")
+    assert len(cached[0].name.split("-")[1]) == 8  # input-signature fingerprint
     second = runtime._onnx_predictor(model, source, 1)
     assert len(conversions) == 1  # the second load read the serialized cache bytes
     feeds = {"audio": np.ones((2, 16), np.float32), "history": np.ones((2, 4, 3), np.float32)}
@@ -473,8 +477,43 @@ def test_onnx_conversion_cache_roundtrips_and_detects_corruption(tmp_path, monke
             np.testing.assert_allclose(np.asarray(predict(feeds)[key]), np.asarray(tensor),
                                        rtol=1e-5, atol=1e-6)
     cached[0].write_bytes(b"corrupted cache entry")
-    with pytest.raises(Exception):
-        runtime._onnx_predictor(model, source, 1)
+    healed = runtime._onnx_predictor(model, source, 1)
+    assert isinstance(healed.session, onnxruntime.InferenceSession)
+    assert len(conversions) == 2  # the corrupt entry was dropped and rebuilt once
+    assert cached[0].read_bytes() != b"corrupted cache entry"
+    for key, tensor in expected.items():
+        np.testing.assert_allclose(np.asarray(healed(feeds)[key]), np.asarray(tensor),
+                                   rtol=1e-5, atol=1e-6)
+    runtime._onnx_predictor(model, source, 1)
+    assert len(conversions) == 2  # the healed bytes round-trip again
+    runtime._onnx_predictor(_tiny_dict_stage_model(tf, bool_input=True), source, 1)
+    assert len(conversions) == 3  # a different input signature misses the entry
+    assert len(list((tmp_path / "temp" / "onnx-cache").glob("*.onnx"))) == 2
+
+
+def test_onnx_cache_write_failure_keeps_the_converted_session(tmp_path, monkeypatch):
+    """A failed cache write still serves the converted in-memory blob."""
+    tf = pytest.importorskip("tensorflow")
+    pytest.importorskip("tf2onnx")
+    onnxruntime = pytest.importorskip("onnxruntime")
+    from tools.config import paths
+
+    monkeypatch.setattr(paths, "temp_path", str(tmp_path / "temp") + "/")
+    model = _tiny_dict_stage_model(tf)
+    source = tmp_path / "best.keras"
+    source.write_bytes(b"stage artifact bytes")
+
+    def broken(*args, **kwargs):
+        raise OSError("read-only cache directory")
+
+    monkeypatch.setattr(runtime.os, "replace", broken)
+    predict = runtime._onnx_predictor(model, source, 1)
+    assert isinstance(predict.session, onnxruntime.InferenceSession)
+    feeds = {"audio": np.ones((1, 16), np.float32), "history": np.ones((1, 4, 3), np.float32)}
+    expected = model(feeds, training=False)
+    np.testing.assert_allclose(np.asarray(predict(feeds)["classes"]),
+                               np.asarray(expected["classes"]), rtol=1e-5, atol=1e-6)
+    assert not list((tmp_path / "temp" / "onnx-cache").glob("*.onnx"))
 
 
 def test_runtime_cache_is_per_pid_and_explicit_bundle(monkeypatch, tmp_path):

@@ -3,11 +3,13 @@
 from contextlib import nullcontext
 from copy import deepcopy
 from dataclasses import dataclass, field
+import hashlib
 import json
 import os
 from pathlib import Path
 import threading
 from time import perf_counter
+import uuid
 import zipfile
 
 import numpy as np
@@ -38,7 +40,7 @@ def _onnx_predictor(model, source, threads):
     """Return an ORT-backed callable for one dict-input stage model.
 
     The conversion result is content-addressed under ``temp_path/onnx-cache``
-    so workers convert each artifact once; imports stay lazy so environments
+    so processes convert each artifact once; imports stay lazy so environments
     without the optional ONNX dependencies never touch them.
     """
     import onnxruntime
@@ -48,30 +50,52 @@ def _onnx_predictor(model, source, threads):
 
     if not isinstance(model.input, dict):
         raise TypeError("ONNX inference requires dict-input models")
+    signature = {name: tf.TensorSpec((None,) + tuple(tensor.shape[1:]), tensor.dtype, name=name)
+                 for name, tensor in model.input.items()}
+    # The names/shapes/dtypes fingerprint keeps a graph converted against a
+    # different input contract from loading stale bytes.
+    fingerprint = hashlib.sha256(repr(sorted(
+        (name, tuple(spec.shape), spec.dtype.name)
+        for name, spec in signature.items())).encode("utf-8")).hexdigest()[:8]
     cache = (Path(paths.temp_path) / "onnx-cache" /
-             f"{file_hash(source)[:16]}-opset{_ONNX_OPSET}-tf2onnx{tf2onnx.__version__}.onnx")
-    if cache.is_file():
-        blob = cache.read_bytes()
-    else:
-        signature = {name: tf.TensorSpec((None,) + tuple(tensor.shape[1:]), tensor.dtype, name=name)
-                     for name, tensor in model.input.items()}
+             f"{file_hash(source)[:16]}-{fingerprint}-opset{_ONNX_OPSET}-tf2onnx{tf2onnx.__version__}.onnx")
+    options = onnxruntime.SessionOptions()
+    options.intra_op_num_threads = threads
+    options.inter_op_num_threads = threads
+
+    def create_session(blob):
+        return onnxruntime.InferenceSession(blob, options, providers=["CPUExecutionProvider"])
+
+    try:
+        blob = cache.read_bytes() if cache.is_file() else None
+    except OSError:
+        blob = None  # Unreadable entries degrade to a fresh conversion.
+    if blob is not None:
+        try:
+            session = create_session(blob)
+        except Exception:
+            # A stale or corrupt entry self-heals once: drop it and fall
+            # through to a fresh conversion below.
+            cache.unlink(missing_ok=True)
+            blob = None
+    if blob is None:
         converted, _ = tf2onnx.convert.from_function(
             tf.function(lambda inputs: model(inputs, training=False), autograph=False),
             input_signature=[signature], opset=_ONNX_OPSET)
         blob = converted.SerializeToString()
-        cache.parent.mkdir(parents=True, exist_ok=True)
         # Unique temp name + rename: concurrent workers either see the old
-        # complete file or the new one, never a partial write.
-        temporary = cache.with_name(f"{cache.name}.{os.getpid()}.tmp")
+        # complete file or the new one, never a partial write. A failed
+        # write is tolerated — it never costs the converted blob.
+        temporary = cache.with_name(f"{cache.name}.{os.getpid()}.{uuid.uuid4().hex}.tmp")
         try:
+            cache.parent.mkdir(parents=True, exist_ok=True)
             temporary.write_bytes(blob)
             os.replace(temporary, cache)
+        except OSError:
+            pass
         finally:
             temporary.unlink(missing_ok=True)
-    options = onnxruntime.SessionOptions()
-    options.intra_op_num_threads = threads
-    options.inter_op_num_threads = threads
-    session = onnxruntime.InferenceSession(blob, options, providers=["CPUExecutionProvider"])
+        session = create_session(blob)
     # ORT names match the Keras input/output dict keys but not their order;
     # feed and rebuild strictly by name.
     input_names = [item.name for item in session.get_inputs()]
@@ -330,8 +354,9 @@ class V2Runtime:
                 except Exception as error:
                     if not onnx_warned:
                         onnx_warned.append(stage)
-                        print(f"Warning: v2_onnx_inference falling back to TensorFlow "
-                              f"predictors ({stage}: {type(error).__name__}: {error})")
+                        print(f"Warning: v2_onnx_inference falling back to the TensorFlow "
+                              f"predictor for {stage} ({type(error).__name__}: {error}); "
+                              f"remaining models may also fall back")
             return predictor(model)
 
         def beat_loader(checkpoint, stage, manifest):

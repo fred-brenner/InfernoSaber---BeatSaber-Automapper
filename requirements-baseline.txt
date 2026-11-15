@@ -1,4 +1,4 @@
-# Verified WSL/Linux CPU baseline, 2026-10-14.
+# Verified WSL/Linux CPU baseline, 2026-10-14; ONNX/protobuf pins verified 2026-11-15.
 # Python 3.10.19; startup, model forward passes, and one-song generation checked.
 # Install NumPy and build tools first; see docs/development.md.
 # This lock does not establish native Windows or training compatibility.
