@@ -1,12 +1,12 @@
 # Generation speedup proposal
 
-Status: Tasks P1, P2, P3, P4, P6a implemented (commits 4e36119, fe3de57,
-318457d, faaad7b, 989970c, 81e91a4, a174eac, cf873bd, 36c55df, d7e51df on
-main_app_dev); P5, P6b (ONNX, needs design approval), P7 remain proposed. Measured on 8 songs x 3 difficulties (WSL, 8 cores):
-wall-clock vs baseline -41% (1w), -38% (4w), -35% (8w) after P6a
-(P1-era was -32%/-30%/-29%; P6a removed a further ~9-12% — ConcreteFunction
-dispatch + input-builder slimming cut the batched positions/arrows/multiplier
-stage shares ~15-29%).
+Status: Tasks P1, P2, P3, P4, P6a, P6b implemented (commits 4e36119,
+fe3de57, 318457d, faaad7b, 989970c, 81e91a4, a174eac, cf873bd, 36c55df,
+d7e51df, b3e951a, 58e6359, 1d4fc6d on main_app_dev); P5 and P7 remain
+proposed. Measured on 8 songs x 3 difficulties (WSL, 8 cores):
+wall-clock vs baseline -59% (1w), -56% (4w), -49% (8w) through P6b
+(381/155/122 s -> 156/68.5/62.6 s; ONNX cut the batched
+positions/arrows/multiplier shares a further ~40-55% vs P6a).
 
 ## Intent
 
@@ -206,11 +206,30 @@ no split occurs and one worker takes two songs (~100 s vs ~55 s).
 - Parity gate: identical stage outputs on the existing temp-0/factor-0 parity
   harness plus the focused suite.
 
-### P6b — ONNX Runtime dispatch (deferred — separate design approval)
+### Task P6b — ONNX Runtime dispatch (approved — spike validated)
 
-- Optional later discussion: ONNX Runtime sessions for the hot stages
-  (~5-10x on dispatch) — requires conversion tooling, parity validation, and
-  bundle packaging changes; needs its own design approval per project rules.
+Spike results (real `v2_expert` bundle, TF 2.15.1, onnxruntime 1.20.1,
+tf2onnx 1.16.1, opset 15): all hot stages convert via
+`tf2onnx.convert.from_function` on the dict `input_signature`; ORT input and
+output names equal the Keras names (feed and result dicts map by name);
+max_abs_diff <= 1e-6 with identical argmax decisions; ~4.4x per-call at
+batch-1 and ~3.2x at batch 3-5 vs the P6a ConcreteFunction.
+
+- `v2_onnx_inference` config flag (default on); per-model graceful fallback
+  to the existing ConcreteFunction predictor, warning logged once, when
+  onnxruntime/tf2onnx is missing or conversion/session creation fails.
+- Convert at worker load, cache serialized ONNX under the temp/cache dir
+  keyed by source-artifact sha256 + opset + tf2onnx version — bundles and
+  manifests unchanged.
+- Scope: positions, arrows, multiplier, arrows_reference. Intensity/timing
+  (few calls), encoder prefetch, and v1 lighting stay on TF.
+- SessionOptions intra/inter-op threads follow the resolved
+  `v2_inference_threads` (P4).
+- Deps: pin onnxruntime + tf2onnx + onnx in requirements.txt and
+  requirements-baseline.txt (>=7-day-old releases only).
+- Parity gate: focused TF-vs-ORT output test on a small dict-input model;
+  existing temp-0/factor-0 lockstep parity test must pass with the flag on;
+  real-song benchmark.
 
 ### Task P7 — Pre-work and startup amortization
 
