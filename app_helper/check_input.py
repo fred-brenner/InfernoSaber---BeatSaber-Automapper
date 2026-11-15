@@ -1,3 +1,4 @@
+import math
 import os
 
 from tools.config import paths, config
@@ -5,6 +6,21 @@ from tools.config import paths, config
 
 bs_folder_name = "Beat Saber_Data/CustomLevels"
 bs_folder_name2 = "SharedMaps/CustomLevels"
+
+ESTIMATED_STARTUP_SECONDS = 20
+ESTIMATED_SECONDS_PER_RUN = 15
+
+
+def format_time_estimate(total_seconds):
+    """Format seconds as 'N s', 'N.N min' or 'N.N h' with at most one decimal."""
+    if total_seconds >= 3600:
+        value, unit = total_seconds / 3600, "h"
+    elif total_seconds >= 60:
+        value, unit = total_seconds / 60, "min"
+    else:
+        value, unit = total_seconds, "s"
+    text = f"{value:.1f}".rstrip("0").rstrip(".")
+    return f"{text} {unit}"
 
 
 def check_int_input(inp, start=1, end=10):
@@ -101,7 +117,15 @@ def get_summary(diff1=config.difficulty_1, diff2 = config.difficulty_2, diff3 = 
             diff_count += 1
             diff_count_values.append(diff5)
     diff_count_values = [str(diff_float) for diff_float in diff_count_values]
+    total_runs = diff_count * len(song_list)
     log.append(f"Info: Generating {diff_count} difficulties for each song: [{', '.join(diff_count_values)}]. "
-               f"Total runs: {diff_count * len(song_list)}")
+               f"Total runs: {total_runs}")
+    if total_runs > 0:
+        workers = max(int(config.num_workers), 1)
+        est_seconds = ESTIMATED_STARTUP_SECONDS + math.ceil(
+            ESTIMATED_SECONDS_PER_RUN * total_runs / workers)
+        log.append(f"Info: Estimated time: ~{format_time_estimate(est_seconds)} "
+                   f"({ESTIMATED_SECONDS_PER_RUN} s per run + {ESTIMATED_STARTUP_SECONDS} s startup, "
+                   f"{workers} worker(s))")
 
     return "\n".join(log)
