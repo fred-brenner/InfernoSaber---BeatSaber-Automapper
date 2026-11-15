@@ -442,7 +442,8 @@ def rollout(song, state, vocab, options, predict, encoder=None, progress=None, r
             if options.get("hazard_bomb_rate_decode") and options.get("hazard_bombs_enabled", True) else None)
     rng = np.random.default_rng() if rng is None else rng
     mask_redirects, cells_masked = 0, 0
-    feasibility_inputs = bool(preparation_defaults(options).get("hazard_feasibility_input"))
+    resolved = preparation_defaults(options)
+    feasibility_inputs = bool(resolved.get("hazard_feasibility_input"))
     for index, query in enumerate(queries):
         candidate = query
         if feasibility_inputs:
@@ -450,7 +451,8 @@ def rollout(song, state, vocab, options, predict, encoder=None, progress=None, r
             candidate["_feasible_wall"] = (decoder.feasible_wall_classes(query) if query["kind"] == "wall"
                                            else np.r_[True, np.zeros(len(vocab["walls"]) - 1, bool)])
             candidate["_feasible_bombs"] = decoder.eligible_bomb_cells(float(query["time"]))
-        output = predict(build_inputs("hazards", song, state, candidate, decoder.history, encoder, options))
+        output = predict(build_inputs("hazards", song, state, candidate, decoder.history, encoder,
+                                      options=resolved))
         wall, bombs = np.asarray(output["wall"]).copy(), np.asarray(output["bombs"]).copy()
         if (wall.shape != (1, len(vocab["walls"])) or bombs.shape != (1, 12)
                 or not np.isfinite(wall).all() or not np.isfinite(bombs).all()
@@ -603,7 +605,8 @@ def build_examples(song, state, vocab, options, encoder=None):
             exclude(record, source_family(record), "ignored_source_object")
     inputs, walls, bombs, ww, bw = [], [], [], [], []
     supported_wall_sections, supported_bombs = {}, set()
-    feasibility_inputs = bool(preparation_defaults(options).get("hazard_feasibility_input"))
+    resolved = preparation_defaults(options)
+    feasibility_inputs = bool(resolved.get("hazard_feasibility_input"))
     for query in queries:
         index = query["section_index"]
         candidate = query
@@ -612,7 +615,8 @@ def build_examples(song, state, vocab, options, encoder=None):
             candidate["_feasible_wall"] = (decoder.feasible_wall_classes(query) if query["kind"] == "wall"
                                            else np.r_[True, np.zeros(len(vocab["walls"]) - 1, bool)])
             candidate["_feasible_bombs"] = decoder.eligible_bomb_cells(query["time"])
-        inputs.append(build_inputs("hazards", song, state, candidate, decoder.history, encoder, options))
+        inputs.append(build_inputs("hazards", song, state, candidate, decoder.history, encoder,
+                                   options=resolved))
         wall, cells, wall_weight, bomb_weight = 0, np.zeros(12, np.float32), 0., np.zeros(12, np.float32)
         if query["kind"] == "wall":
             wall_weight = wall_masks[index]

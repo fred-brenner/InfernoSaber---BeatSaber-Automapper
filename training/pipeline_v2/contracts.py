@@ -128,16 +128,18 @@ def index_state(state):
     return state
 
 
-def build_inputs(stage, song, state, candidate, own_history, encoder=None, settings=None):
+def build_inputs(stage, song, state, candidate, own_history, encoder=None, settings=None, options=None):
     """One input path for both training and composition, without target leakage.
 
     State contains upstream notes {id,time,hand,x,y,d} and optional chains. Each
     history record contains time and the stage's output keys (or ``value``).
     Only records strictly before the candidate/block start enter history.
+    ``options`` is ``preparation_defaults(settings)`` resolved by the caller;
+    decode loops resolve it once instead of revalidating it per candidate.
     """
     if stage not in NEW_STAGES:
         raise ValueError(f"Unknown v2 stage: {stage}")
-    options = preparation_defaults(settings)
+    options = options if options is not None else preparation_defaults(settings)
     base = _base(song)
     now = float(candidate["time"])
     if not np.isfinite(now) or not 0 <= now < base.metadata["duration"]:
@@ -176,21 +178,32 @@ def build_inputs(stage, song, state, candidate, own_history, encoder=None, setti
         history_mask = np.zeros((1, length), bool)
         previous = histories[-length:]
         if previous:
-            history[0, -len(previous):] = [_history_value(stage, item, classes) for item in previous]
+            if all("value" in item for item in previous):
+                history[0, -len(previous):] = np.asarray(
+                    [item["value"] for item in previous]).reshape(len(previous), classes)
+            else:
+                history[0, -len(previous):] = [_history_value(stage, item, classes) for item in previous]
             history_mask[0, -len(previous):] = True
         return {"audio": audio, "gaps": gaps, "history": history, "history_mask": history_mask, "mask": mask}
     length = options["history_length"]
     width = 13 if stage == "hazards" else 4 if stage == "arcs" else 2
     categorical = stage in ("positions", "arrows", "multiplier")
-    history = np.zeros((1, length, width), np.int32 if categorical else np.float32)
     if categorical:
         start = 13 if stage == "positions" else 10 if stage == "arrows" else int(state.get("multiplier_classes", 1))
-        history.fill(start + 1)
+        history = np.full((1, length, width), start + 1, np.int32)
+    else:
+        history = np.zeros((1, length, width), np.float32)
     age = np.zeros((1, length, 1), np.float32)
     mask = np.zeros((1, length), bool)
     preceding = histories[-length:]
     if preceding:
-        history[0, :len(preceding)] = [_history_value(stage, item, width) for item in preceding]
+        # Records carrying a stored "value" vector convert in one batch; the
+        # per-record path remains for keyed records and arcs' flagged values.
+        if stage != "arcs" and all("value" in item for item in preceding):
+            history[0, :len(preceding)] = np.asarray(
+                [item["value"] for item in preceding]).reshape(len(preceding), width)
+        else:
+            history[0, :len(preceding)] = [_history_value(stage, item, width) for item in preceding]
         age[0, :len(preceding), 0] = [now - item["time"] for item in preceding]
         mask[0, :len(preceding)] = True
     elif categorical:
@@ -199,19 +212,19 @@ def build_inputs(stage, song, state, candidate, own_history, encoder=None, setti
     shares = state.get("shares", state.get("intensity"))
     if shares is None:
         shares = base.arrays.get("intensity", np.zeros_like(base.arrays["bin_durations"]))
-    if not np.sum(shares):
+    if not np.any(shares):
         shares = base.arrays["bin_durations"] / base.metadata["duration"]
     density = float(state.get("conditioning_nps",
                               state.get("requested_nps", base.metadata.get("difficulty_nps", 0.))))
     frame = min(int(np.floor(now / FRAME_SECONDS + .5)), len(base.arrays["frame_times"]) - 1)
     bin_index = min(int(base.arrays["frame_times"][frame]), len(shares) - 1)
     relative = float(shares[bin_index]) * base.metadata["duration"] / float(base.arrays["bin_durations"][bin_index])
-    conditions = np.asarray([relative, density / 10, relative * density / 10, base.metadata["bpm"] / 120], np.float32)
     gap = now - histories[-1]["time"] if histories else now
-    count = candidate.get("count", 0)
     out = {"audio": np.asarray(get_audio([now]), np.float32).reshape(1, 16), "history": history,
            "history_age": age, "history_mask": mask,
-           "conditions": np.r_[gap, count, conditions][None].astype(np.float32)}
+           "conditions": np.asarray([gap, candidate.get("count", 0), relative, density / 10,
+                                     relative * density / 10, base.metadata["bpm"] / 120],
+                                    np.float32)[None]}
     notes = state.get("notes", [])
     tracks = state.get("_tracks")
     if stage not in ("arrows", "multiplier"):

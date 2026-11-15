@@ -6,9 +6,10 @@ import json
 import numpy as np
 import pytest
 
-from training.pipeline_v2.contracts import NEW_STAGES, build_inputs, validate
+from training.pipeline_v2.contracts import NEW_STAGES, build_inputs, preparation_defaults, validate
 from training.pipeline_v2.data import make_dummy_dataset, prepare_dataset, read_objects
 from training.pipeline_v2.fixtures import make_dummy_songs
+from training.pipeline_v2.settings import preparation_settings
 
 
 @pytest.fixture(scope="module")
@@ -174,3 +175,48 @@ def test_lighting_partial_current_mask_preserves_preceding_history(dataset):
     assert inputs["history_mask"].sum() == 9
     assert inputs["history"][0, -1, 0] == 1
     assert not inputs["audio"][0, 2:].any()
+
+
+def _assert_same_inputs(resolved, per_call):
+    assert set(resolved) == set(per_call)
+    for key in resolved:
+        np.testing.assert_array_equal(resolved[key], per_call[key], err_msg=key)
+
+
+def test_preresolved_options_produce_identical_inputs(dataset):
+    """build_inputs(options=preparation_defaults(settings)) equals per-call resolution."""
+    song = dataset.songs[0]
+    settings = preparation_settings()
+    settings["hazard_feasibility_input"] = False
+    resolved = preparation_defaults(settings)
+    valued = [{"time": .1 * index, "value": [index % 3, (index + 1) % 4]} for index in range(1, 8)]
+    keyed = [{"time": .1 * index, "red": index % 3, "blue": (index + 1) % 4} for index in range(1, 8)]
+    state = {"notes": [{"id": 0, "time": .5, "hand": 0, "x": 1, "y": 1, "d": 2},
+                       {"id": 1, "time": .6, "hand": 1, "x": 2, "y": 0, "d": 0}],
+             "chains": [], "multiplier_classes": 3, "light_classes": 2}
+    cases = [("positions", state, {"time": .7, "count": 1}, valued),
+             ("positions", state, {"time": .7, "count": 1}, keyed),
+             ("positions", state, {"time": .7, "count": 1}, []),
+             ("arrows", state, {"time": .5, "count": 1}, valued),
+             ("multiplier", state, {"time": .5, "count": 1}, valued),
+             ("hazards", state, {"time": .7, "end_time": .9}, [{"time": .1, "value": [1] + [0] * 12}]),
+             ("hazards", state, {"time": .7, "end_time": .9}, [{"time": .1, "wall": 2, "bombs": [1] + [0] * 11}]),
+             ("arcs", state, {"time": .7, "endpoint_ids": [0, 1]}, [{"time": .1, "value": [1., .5, .5, 0.]}]),
+             ("lighting", state, {"time": .7, "times": [.7, .95]}, [{"time": .1, "value": [1., 0.]}]),
+             ("lighting", state, {"time": .7, "times": [.7, .95]}, [{"time": .1, "events": [1., 0.]}])]
+    for stage, current, candidate, history in cases:
+        per_call = build_inputs(stage, song, current, candidate, history, settings=settings)
+        resolved_inputs = build_inputs(stage, song, current, candidate, history,
+                                       settings=settings, options=resolved)
+        _assert_same_inputs(resolved_inputs, per_call)
+
+
+def test_preresolved_options_keep_the_same_validation_errors(dataset):
+    song = dataset.songs[0]
+    settings = preparation_settings()
+    settings["history_length"] = 0
+    with pytest.raises(ValueError, match="positive integer"):
+        build_inputs("positions", song, {"notes": []}, {"time": .5, "count": 1}, [], settings=settings)
+    with pytest.raises(ValueError, match="positive integer"):
+        build_inputs("positions", song, {"notes": []}, {"time": .5, "count": 1}, [],
+                     settings=settings, options=preparation_defaults(settings))

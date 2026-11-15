@@ -81,7 +81,7 @@ def test_multiplier_inputs_keep_retained_context_after_earlier_expansions(dummy_
         original_expand(state, anchor, template, duration, rejected)
         seen["copy_added"] |= any(note["kind"] == "copy" for note in state["notes"])
 
-    def build(stage, song, state, candidate, own_history, encoder=None, settings=None):
+    def build(stage, song, state, candidate, own_history, encoder=None, settings=None, options=None):
         if stage == "multiplier":
             assert all(note["kind"] == "retained" for note in state["notes"])
             assert state["chains"] == []
@@ -91,7 +91,8 @@ def test_multiplier_inputs_keep_retained_context_after_earlier_expansions(dummy_
             assert identities == seen["retained_ids"]
             if seen["copy_added"]:
                 seen["queries_after_copy"] += 1
-        return original_build(stage, song, state, candidate, own_history, encoder=encoder, settings=settings)
+        return original_build(stage, song, state, candidate, own_history, encoder=encoder,
+                              settings=settings, options=options)
 
     monkeypatch.setattr(pipeline, "_expand", expand)
     monkeypatch.setattr(contracts, "build_inputs", build)
@@ -110,10 +111,11 @@ def test_encoder_is_queried_independently_and_history_precedes_current_query(dum
         queries.append(np.asarray(times).copy())
         return np.zeros((len(times), 16), dtype=np.float32)
 
-    def build(stage, song, state, candidate, own_history, encoder=None, settings=None):
+    def build(stage, song, state, candidate, own_history, encoder=None, settings=None, options=None):
         assert all(record["time"] < candidate["time"] for record in own_history)
         observed.append(stage)
-        return original(stage, song, state, candidate, own_history, encoder=encoder, settings=settings)
+        return original(stage, song, state, candidate, own_history, encoder=encoder,
+                        settings=settings, options=options)
 
     monkeypatch.setattr(contracts, "build_inputs", build)
     result = generate(dummy_dataset.songs[0], 2., settings=_settings(), contract_mode=True,
@@ -143,8 +145,9 @@ def test_lighting_uses_configured_block_length_and_retains_partial_tail(dummy_da
     original = contracts.build_inputs
     masks = []
 
-    def build(stage, song, state, candidate, own_history, encoder=None, settings=None):
-        inputs = original(stage, song, state, candidate, own_history, encoder=encoder, settings=settings)
+    def build(stage, song, state, candidate, own_history, encoder=None, settings=None, options=None):
+        inputs = original(stage, song, state, candidate, own_history, encoder=encoder,
+                          settings=settings, options=options)
         if stage == "lighting":
             assert inputs["audio"].shape[1] == 8
             assert inputs["history"].shape[1] == 8

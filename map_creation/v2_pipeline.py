@@ -16,7 +16,8 @@ import numpy as np
 
 from tools.config import config
 from training.beat_models.contracts import CORE, FRAME_SECONDS, frame_conditions, intensity_inputs, timing_window
-from training.pipeline_v2.contracts import build_inputs, expansion_occupancy_notes, index_state
+from training.pipeline_v2.contracts import (build_inputs, expansion_occupancy_notes, index_state,
+                                            preparation_defaults)
 from training.pipeline_v2.pipeline import (PipelineResult, _decode_positions, _distribution,
                                            _expand, _multilabel, _output, _predict)
 from training.pipeline_v2.scheduling import hazard_candidates
@@ -213,10 +214,12 @@ def _deferred_recovery_alternatives(pair, outputs, support_ratio):
     return sorted(alternatives, key=lambda n:(-n['support'], n['x'], n['y']))[:3]
 
 
-def _inputs(stage, song, state, candidate, history, encoder, settings):
-    length = max(settings["history_length"], settings["lighting_block_length"])
+def _inputs(stage, song, state, candidate, history, encoder, settings, options=None):
+    resolved = settings if options is None else options
+    length = max(resolved["history_length"], resolved["lighting_block_length"])
     prior = [record for record in history if record["time"] < candidate["time"]][-length:]
-    return build_inputs(stage, song, state, candidate, prior, encoder=encoder, settings=settings)
+    return build_inputs(stage, song, state, candidate, prior, encoder=encoder, settings=settings,
+                        options=options)
 
 
 def _history(history, record, length):
@@ -417,6 +420,7 @@ class VariantRun:
     predictors: dict
     encoder: object
     options: dict
+    prepared: dict          # preparation_defaults(options), resolved once per variant
     vocabularies: dict
     lighting_generator: object
     audio_path: object = None
@@ -537,6 +541,10 @@ def variant_run(song, requested_nps, predictors, encoder, settings, vocabularies
         raise ValueError("Note sample temperature must be finite and nonnegative")
     sampling = temperature > 0
     options["vocabularies"] = vocabularies
+    # Resolved once per variant here inside the caller's scoped settings rather
+    # than per candidate inside build_inputs; an invalid setting now raises at
+    # variant setup instead of mid-decode.
+    prepared = preparation_defaults(options)
     schedule = options["schedule"]
     status = "dummy" if all(getattr(predictor, "status", "trained") == "dummy"
                             for stage, predictor in predictors.items() if stage != "lighting") else "trained"
@@ -551,7 +559,7 @@ def variant_run(song, requested_nps, predictors, encoder, settings, vocabularies
         "position_events": 0, "position_notes": 0, "arrow_notes": 0,
         "multiplier_non_none": 0, "wall_proposals": 0, "bomb_proposals": 0,
         "arc_attachments": 0, "lighting_commands": 0}
-    return VariantRun(song, requested_nps, predictors, encoder, options, vocabularies,
+    return VariantRun(song, requested_nps, predictors, encoder, options, prepared, vocabularies,
                       lighting_generator, audio_path=audio_path, logger=logger, intensity=intensity,
                       postprocessors=postprocessors, playability_mode=playability_mode, factor=factor,
                       rng=rng, duration=duration, bpm=bpm, temperature=temperature, sampling=sampling,
@@ -599,7 +607,8 @@ def _positions_begin(run):
 
 
 def _positions_inputs(run, candidate):
-    return _inputs("positions", run.song, run.state, candidate, run.history, run.encoder, run.options)
+    return _inputs("positions", run.song, run.state, candidate, run.history, run.encoder, run.options,
+                   options=run.prepared)
 
 
 def _positions_apply(run, candidate, output):
@@ -668,7 +677,8 @@ def _arrows_begin(run):
 
 
 def _arrows_inputs(run, candidate):
-    return _inputs("arrows", run.song, run.state, candidate, run.history, run.encoder, run.options)
+    return _inputs("arrows", run.song, run.state, candidate, run.history, run.encoder, run.options,
+                   options=run.prepared)
 
 
 def _arrows_model(run):
@@ -796,7 +806,8 @@ def _multiplier_begin(run):
 
 
 def _multiplier_inputs(run, candidate):
-    return _inputs("multiplier", run.song, run.upstream, candidate, run.history, run.encoder, run.options)
+    return _inputs("multiplier", run.song, run.upstream, candidate, run.history, run.encoder, run.options,
+                   options=run.prepared)
 
 
 def _multiplier_apply(run, candidate, output):
@@ -919,7 +930,9 @@ def _hazards_stage(run):
         run.history, hazard_rejections = [], {}
         _log(run.logger, "V2 hazards")
         for index, candidate in enumerate(queries):
-            output = _predict(run.predictors["hazards"], _inputs("hazards", run.song, run.state, candidate, run.history, run.encoder, run.options))
+            output = _predict(run.predictors["hazards"],
+                              _inputs("hazards", run.song, run.state, candidate, run.history, run.encoder,
+                                      run.options, options=run.prepared))
             wall = int(_distribution(output["wall"], (1, len(run.vocabularies["walls"])), "wall")[0].argmax())
             bombs = _multilabel(output["bombs"], (1, 12), "bomb")[0] >= run.options["bomb_threshold"]
             previous_walls, previous_bombs = len(run.state["walls"]), len(run.state["bombs"])
@@ -972,7 +985,9 @@ def _arcs_stage(run):
         _log(run.logger, "V2 arcs")
         lower, upper = run.options["arc_shape_bounds"]
         for index, candidate in enumerate(queries):
-            output = _predict(run.predictors["arcs"], _inputs("arcs", run.song, run.state, candidate, run.history, run.encoder, run.options))
+            output = _predict(run.predictors["arcs"],
+                              _inputs("arcs", run.song, run.state, candidate, run.history, run.encoder,
+                                      run.options, options=run.prepared))
             attach_probabilities = _distribution(output["attach"], (1, 2), "arc attachment")[0]
             attach = (int(attach_probabilities[1] >= run.options.get("arc_threshold", .5))
                       if repaired(run.options, "arcs") else int(attach_probabilities.argmax()))

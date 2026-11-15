@@ -174,7 +174,9 @@ def _review(result, boundary, bypass):
 def _inputs(stage, song, state, candidate, history, encoder, settings):
     from .contracts import build_inputs
     prior = [record for record in history if record["time"] < candidate["time"]]
-    return build_inputs(stage, song, state, candidate, prior, encoder=encoder, settings=settings)
+    # ``settings`` is generate()'s already-resolved preparation options.
+    return build_inputs(stage, song, state, candidate, prior, encoder=encoder, settings=settings,
+                        options=settings)
 
 
 def _decode_positions(outputs, count):

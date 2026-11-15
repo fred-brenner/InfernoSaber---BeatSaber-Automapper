@@ -236,10 +236,26 @@ class V2Runtime:
         self.models = {}
         compile_calls = getattr(config, "v2_compile_inference", True)
 
+        def _input_signature(model):
+            """Batch-agnostic specs matching the model's own input structure."""
+            def spec(tensor):
+                return tf.TensorSpec((None,) + tuple(tensor.shape[1:]), tensor.dtype)
+            nested = model.input
+            if isinstance(nested, dict):
+                return [{key: spec(tensor) for key, tensor in nested.items()}]
+            if isinstance(nested, (list, tuple)):
+                return [[spec(tensor) for tensor in nested]]
+            return [spec(nested)]
+
         def predictor(model):
             def call(inputs):
                 return model(inputs, training=False)
-            return tf.function(call, reduce_retracing=True) if compile_calls else call
+            if not compile_calls:
+                return call
+            # Microbenchmarked: calling the traced ConcreteFunction directly
+            # skips the tf.function dispatch (~100-200us/call on dict inputs);
+            # the signature keeps batch dims dynamic like reduce_retracing.
+            return tf.function(call, input_signature=_input_signature(model)).get_concrete_function()
 
         def beat_loader(checkpoint, stage, manifest):
             from training.beat_models import models
