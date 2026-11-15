@@ -3,7 +3,10 @@
 Status: Tasks P1, P2, P3, P4, P6a implemented (commits 4e36119, fe3de57,
 318457d, faaad7b, 989970c, 81e91a4, a174eac, cf873bd, 36c55df, d7e51df on
 main_app_dev); P5, P6b (ONNX, needs design approval), P7 remain proposed. Measured on 8 songs x 3 difficulties (WSL, 8 cores):
-wall-clock vs baseline -32% (1w), -30% (4w), -29% (8w).
+wall-clock vs baseline -41% (1w), -38% (4w), -35% (8w) after P6a
+(P1-era was -32%/-30%/-29%; P6a removed a further ~9-12% — ConcreteFunction
+dispatch + input-builder slimming cut the batched positions/arrows/multiplier
+stage shares ~15-29%).
 
 ## Intent
 
