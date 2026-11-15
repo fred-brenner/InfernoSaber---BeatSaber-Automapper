@@ -35,7 +35,7 @@ def test_summary_reports_estimated_time(monkeypatch, tmp_path):
     _setup_songs(monkeypatch, tmp_path, count=4, workers=3)
     summary = get_summary(5, 7, 0, 0, 0)
     assert "Total runs: 8" in summary
-    assert "Info: Estimated time: ~1 min (15 s per run + 20 s startup, 3 worker(s))" in summary
+    assert "Info: Estimated time: ~1 min (3 worker(s))" in summary
 
 
 def test_summary_estimate_scales_with_workers(monkeypatch, tmp_path):

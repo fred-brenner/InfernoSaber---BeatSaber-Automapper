@@ -125,7 +125,6 @@ def get_summary(diff1=config.difficulty_1, diff2 = config.difficulty_2, diff3 = 
         est_seconds = ESTIMATED_STARTUP_SECONDS + math.ceil(
             ESTIMATED_SECONDS_PER_RUN * total_runs / workers)
         log.append(f"Info: Estimated time: ~{format_time_estimate(est_seconds)} "
-                   f"({ESTIMATED_SECONDS_PER_RUN} s per run + {ESTIMATED_STARTUP_SECONDS} s startup, "
-                   f"{workers} worker(s))")
+                   f"({workers} worker(s))")
 
     return "\n".join(log)
