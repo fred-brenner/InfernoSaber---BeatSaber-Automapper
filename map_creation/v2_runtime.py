@@ -280,6 +280,17 @@ class V2Runtime:
 
     def __init__(self, bundle_path=None):
         started = perf_counter()
+        # The ONNX stack must finish loading before joblib unpickles the
+        # lighting OneHotEncoder during validation — sklearn's DLLs break
+        # onnx_cpp2py_export init on Windows when loaded first. A missing
+        # dep is left for stage_predictor's per-model fallback.
+        if getattr(config, "v2_onnx_inference", True):
+            try:
+                import onnx  # noqa: F401
+                import onnxruntime  # noqa: F401
+                import tf2onnx  # noqa: F401
+            except ImportError:
+                pass
         validated = validate_production_bundle(bundle_path)
         self.root, self.bundle = validated["root"], validated["bundle"]
         self.statistics, self.vocabularies = validated["normalization"], validated["vocabularies"]
