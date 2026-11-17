@@ -4,6 +4,7 @@ import numpy as np
 
 from tools.config import config
 from map_creation import v2_forward_flow as flow
+from map_creation import v2_forward_lanes as lanes
 
 _TOL = flow._TOL
 
@@ -190,7 +191,7 @@ def _check_chunk(context, index, cap, notes, pre, saved, strict, report=None,
                        for n, (ox, oy, _d) in zip(notes, saved))
     deviation = sum(post._step_distance(n["d"], od) if od != 8 else 0
                     for n, (_ox, _oy, od) in zip(notes, saved))
-    return (*agg, displacement, deviation)
+    return (*agg, lanes.repetition_cost(context, notes), displacement, deviation)
 
 
 def _lane_attempt(context, index, cap, hand, notes, report):
@@ -301,11 +302,12 @@ def _phrase_candidates(notes, hand, regular):
     low, high = flow._bounds(hand)
     shift = -1 if hand == 0 else 1
     translated = tuple((x + shift, y, d) for x, y, d in saved)
-    outer = tuple((low if hand == 0 else high, y, d) for _, y, d in saved)
+    lowered = tuple((x, 0 if x in (1, 2) and y == 1 else y, d)
+                    for x, y, d in saved)
     candidates = []
     if all(low <= x <= high for x, _, _ in translated):
         candidates.append(("translate", translated))
-    candidates.append(("outer", outer))
+    candidates.append(("lower_center", lowered))
     if regular:
         for name, cycle in _PHRASE_CYCLES:
             if hand == 1:
@@ -356,6 +358,7 @@ def _phrase_hand(context, index, cap, hand, report):
                 continue
             pre = _prepare(context, index, notes)
             saved = [(n["x"], n["y"], n["d"]) for n in notes]
+            before_repetition = lanes.repetition_cost(context, notes)
             best = None
             for order, (name, geometry) in enumerate(candidates[:_PHRASE_TRIALS]):
                 report["phrase_proposals"] += 1
@@ -365,6 +368,8 @@ def _phrase_hand(context, index, cap, hand, report):
                         note["x"], note["y"], note["d"] = x, y, d
                     key = _check_chunk(context, index, cap, notes, pre, saved,
                                        strict=True, report=report, family="phrase")
+                    if key is not None and key[4] > before_repetition:
+                        key = _reject(report, "phrase", "lane_repetition", notes)
                 finally:
                     for note, (x, y, d) in zip(notes, saved):
                         note["x"], note["y"], note["d"] = x, y, d
@@ -400,6 +405,8 @@ def _repair_note(context, index, cap, note, group, base, report):
                        and float(note["time"]) - float(previous["time"]) < fast))
     arrows = range(8) if d0 != 8 else (8,)
     ranked = []
+    repetition_by_x = {x: lanes.repetition_cost(context, [dict(note, x=x)])
+                       for x in range(low, high + 1)}
     for x in range(low, high + 1):
         for y in range(3):
             for d in arrows:
@@ -433,8 +440,8 @@ def _repair_note(context, index, cap, note, group, base, report):
                     continue
                 deviation = (post._step_distance(d, d0)
                              if d != 8 and d0 != 8 else 0)
-                ranked.append((cost, abs(x - x0) + abs(y - y0), deviation,
-                               x, y, d))
+                ranked.append((cost, repetition_by_x[x], abs(x - x0) + abs(y - y0),
+                               deviation, abs(x - x0), x, y, d))
     ranked.sort()
     if not ranked:
         _reject(report, "local", "no_candidate", [note])
@@ -453,7 +460,7 @@ def _repair_note(context, index, cap, note, group, base, report):
                     if following is not None else None)
     baseline = index.conflict_ids(note)
     ignore = getattr(index, "_dropped", frozenset())
-    for cost, _disp, _dev, x, y, d in ranked[:flow._MAX_CANDIDATES]:
+    for cost, _rep, _disp, _dev, _dx, x, y, d in ranked[:flow._MAX_CANDIDATES]:
         report["proposals"] += 1
         accepted = False
         try:
@@ -532,6 +539,8 @@ def repair_patterns(notes, index, cap):
               "wave_proposals": 0, "wave_applied": 0, "wave_notes": 0,
               "phrase_windows": 0, "phrase_proposals": 0, "phrase_applied": 0,
               "phrase_notes": 0, "phrase_motifs": {},
+              "lateral_windows": 0, "lateral_proposals": 0, "lateral_applied": 0,
+              "lateral_notes": 0, "lateral_motifs": {},
               "rejections": {}, "rejection_examples": {},
               "residual": {}, "seconds": 0.}
     if not flow.enabled() or not notes:
@@ -544,6 +553,7 @@ def repair_patterns(notes, index, cap):
     for hand in (0, 1):
         _phrase_hand(context, index, cap, hand, report)
     _local_repair(context, index, cap, report)
+    lanes.repair_lanes(context, index, cap, report)
     report["residual"] = flow.audit_patterns(notes)
     report["seconds"] = clock.monotonic() - start
     return report
