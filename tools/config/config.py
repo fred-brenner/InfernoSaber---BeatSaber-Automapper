@@ -262,6 +262,7 @@ v2_note_postprocessing_mode = "forward"  # "forward" bounded best-effort passes 
                                         # reach/path findings stay diagnostics.
                                         # "search" restores the strict optimizer.
 v2_pattern_flow = True
+v2_pattern_obstacles = True
 v2_hard_direction_policy = "repair"  # "repair" recuts/moves flagged notes; "drop" removes them directly
 v2_notes_onset_snap = True          # snap each note onto its nearest detected onset peak after
                                    # structural cleanup; bounded per note/hand, no model

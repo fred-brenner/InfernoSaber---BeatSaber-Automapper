@@ -209,6 +209,178 @@ def test_validate_hazards_rejects_walls_overlapping_note_swings():
     assert len(state["walls"]) == 1
 
 
+@pytest.fixture
+def pattern_wall_settings(monkeypatch):
+    settings = {
+        "v2_pattern_obstacles": True, "v2_pattern_flow": True,
+        "v2_note_postprocessing_mode": "forward", "v2_playability_enabled": True,
+        "v2_playability_priority": True, "v2_playability_reach": True,
+        "v2_cleanup_note_heuristics": False, "v2_walls_heuristic": True,
+        "add_obstacle_flag": True, "add_bombs_flag": False,
+        "min_time_diff": .02, "obstacle_time_gap": [.3, .8],
+        "obstacle_min_duration": .1, "sporty_obstacles": False,
+        "v2_map_intro_no_hazards_seconds": 1.,
+    }
+    for key, value in settings.items():
+        monkeypatch.setattr(config, key, value, raising=False)
+
+
+def _pattern_wall_notes(count=8, start=2.):
+    return [{"id": i, "time": start + .15 * i, "hand": i % 2, "x": 1,
+             "y": 0, "d": 8, "kind": "retained"} for i in range(count)]
+
+
+def test_pattern_walls_two_regular_pulses_and_anchored_groups(pattern_wall_settings):
+    from map_creation.v2_forward_obstacles import pattern_wall_candidates
+    notes = _pattern_wall_notes()
+    notes.append(dict(notes[0], id=20, hand=1, time=2.015))
+    before = deepcopy(notes)
+    walls, diag = pattern_wall_candidates(list(reversed(notes)))
+    assert diag == {"windows": 1, "proposed": 2}
+    assert walls == [
+        dict(kind="wall", pattern="flow_edge_accent", x=lane, y=2, width=1,
+             height=1, time=time, end_time=time + .125)
+        for lane, time in ((0, 2.), (3, 2.6))]
+    assert notes == before
+
+
+def test_pattern_walls_short_and_irregular_streams(pattern_wall_settings):
+    from map_creation.v2_forward_obstacles import pattern_wall_candidates
+    assert pattern_wall_candidates(_pattern_wall_notes(7)) == (
+        [], {"windows": 0, "proposed": 0})
+    notes = _pattern_wall_notes()
+    notes[4]["time"] += .08
+    assert pattern_wall_candidates(notes) == ([], {"windows": 0, "proposed": 0})
+
+
+def test_pattern_wall_groups_are_anchored_not_transitive(pattern_wall_settings):
+    from map_creation.v2_forward_obstacles import pattern_wall_candidates
+    notes = _pattern_wall_notes()
+    notes.extend([dict(notes[0], id=20, time=2.015),
+                  dict(notes[0], id=21, time=2.03)])
+    assert pattern_wall_candidates(notes) == ([], {"windows": 0, "proposed": 0})
+
+
+def test_pattern_wall_duration_respects_configured_minimum(pattern_wall_settings, monkeypatch):
+    from map_creation.v2_forward_obstacles import pattern_wall_candidates
+    monkeypatch.setattr(config, "obstacle_min_duration", .3)
+    walls, diag = pattern_wall_candidates(_pattern_wall_notes())
+    assert diag["proposed"] == 2
+    assert all(wall["end_time"] - wall["time"] == pytest.approx(.300001)
+               for wall in walls)
+
+
+def test_pattern_wall_cooldown_allows_exact_four_seconds(pattern_wall_settings):
+    from map_creation.v2_forward_obstacles import pattern_wall_candidates
+    notes = _pattern_wall_notes()
+    notes += [dict(note, id=note["id"] + 10, time=note["time"] + 4.)
+              for note in notes]
+    walls, diag = pattern_wall_candidates(notes)
+    assert diag == {"windows": 2, "proposed": 4}
+    assert [wall["time"] for wall in walls] == pytest.approx([2., 2.6, 6., 6.6])
+
+
+@pytest.mark.parametrize("blocked_lane", [0, 3])
+def test_pattern_walls_select_clear_mirrored_side(pattern_wall_settings, blocked_lane):
+    from map_creation.v2_forward_obstacles import pattern_wall_candidates
+    notes = _pattern_wall_notes()
+    pulse = 0 if blocked_lane == 0 else 4
+    notes.append(dict(notes[pulse], id=99, x=blocked_lane, y=2))
+    walls, diag = pattern_wall_candidates(notes)
+    wall = next(wall for wall in walls if wall["time"] == notes[pulse]["time"])
+    assert wall["x"] == 3 - blocked_lane
+    assert diag["proposed"] == len(walls)
+
+
+def test_pattern_wall_clearance_includes_whole_swing(pattern_wall_settings):
+    from map_creation.v2_forward_obstacles import pattern_wall_candidates
+    from map_creation.v2_postprocessing import _swing_cells, _wall_contains
+    notes = _pattern_wall_notes()
+    swing = dict(notes[0], id=99, x=1, y=2, d=2)
+    notes.append(swing)
+    walls, _ = pattern_wall_candidates(notes)
+    first = next(wall for wall in walls if wall["time"] == 2.)
+    probe = dict(first, x=0)
+    assert not _wall_contains(probe, swing)
+    assert any(_wall_contains(probe, cell) for cell in _swing_cells(swing))
+    assert first["x"] == 3
+
+
+def test_pattern_wall_cooldown_counts_blocked_windows(pattern_wall_settings):
+    from map_creation.v2_forward_obstacles import pattern_wall_candidates
+    notes = _pattern_wall_notes(40)
+    notes.extend([dict(notes[pulse], id=100 + 4 * pulse + x, x=x, y=2)
+                  for pulse in (0, 4) for x in (0, 3)])
+    before = deepcopy(notes)
+    walls, diag = pattern_wall_candidates(notes)
+    assert diag == {"windows": 2, "proposed": 2}
+    assert [w["time"] for w in walls] == pytest.approx([6.8, 7.4])
+    assert notes == before
+
+
+@pytest.mark.parametrize(("key", "value"), [
+    ("v2_pattern_obstacles", False), ("v2_pattern_flow", False),
+    ("v2_note_postprocessing_mode", "search"), ("v2_playability_enabled", False),
+    ("v2_walls_heuristic", False), ("add_obstacle_flag", False),
+])
+def test_pattern_walls_flags_off(pattern_wall_settings, monkeypatch, key, value):
+    from map_creation.v2_forward_obstacles import pattern_wall_candidates
+    monkeypatch.setattr(config, key, value)
+    assert pattern_wall_candidates(_pattern_wall_notes()) == (
+        [], {"windows": 0, "proposed": 0})
+
+
+def test_pattern_wall_final_validation_chain_and_serialization(pattern_wall_settings):
+    from map_creation.v2_forward_obstacles import pattern_wall_candidates
+    from map_creation.v2_export import serialize_beatmap
+    from map_creation.v2_postprocessing import validate_hazards
+    notes = _pattern_wall_notes()
+    before = deepcopy(notes)
+    walls, _ = pattern_wall_candidates(notes)
+    chain = {"id": 50, "anchor_id": 0, "time": 2., "end_time": 2.4,
+             "hand": 0, "x": 1, "y": 0, "tx": 0, "ty": 2, "d": 8, "slices": 4}
+    state = {"notes": notes, "chains": [chain], "walls": walls, "bombs": []}
+    findings = validate_hazards(state, audio_song())
+    assert findings["rejected_walls"] == 1
+    assert [wall["x"] for wall in state["walls"]] == [3]
+    assert notes == before
+    serialized, _ = serialize_beatmap(dict(state, chains=[]), bpm=120.)
+    assert serialized["obstacles"] == [
+        {"b": 5.2, "d": .25, "x": 3, "y": 2, "w": 1, "h": 1}]
+
+
+def test_pattern_wall_hazard_stage_reports_raw_and_accepted(pattern_wall_settings, monkeypatch):
+    from map_creation import v2_postprocessing
+    from map_creation.v2_pipeline import _hazards_stage, _heuristic_wall_candidates
+    notes = _pattern_wall_notes()
+    before = deepcopy(notes)
+    times = np.array([note["time"] for note in notes])
+    legacy = _heuristic_wall_candidates(notes, times)
+    state = {"notes": notes, "chains": [], "walls": [], "bombs": [],
+             "event_times": times}
+    result = SimpleNamespace(diagnostics={}, stages={})
+    run = SimpleNamespace(state=state, song=audio_song(), logger=None,
+                          rng=np.random.default_rng(0), raw={}, result=result,
+                          postprocessors=v2_postprocessing)
+    _hazards_stage(run)
+    diag = result.diagnostics["pattern_obstacles"]
+    assert diag["windows"] == 1 and diag["proposed"] == 2
+    assert run.raw["wall_proposals"] == len(legacy) + diag["proposed"]
+    assert diag["accepted"] == sum(
+        wall.get("pattern") == "flow_edge_accent" for wall in state["walls"])
+    assert diag["accepted"] == 2
+    assert notes == before
+    monkeypatch.setattr(config, "v2_pattern_obstacles", False)
+    run.state = {"notes": deepcopy(notes), "chains": [], "walls": [], "bombs": [],
+                 "event_times": times}
+    run.raw = {}
+    run.result = SimpleNamespace(diagnostics={}, stages={})
+    _hazards_stage(run)
+    assert run.result.diagnostics["pattern_obstacles"] == {
+        "windows": 0, "proposed": 0, "accepted": 0}
+    assert run.raw["wall_proposals"] == len(legacy)
+
+
 def test_heuristic_walls_bypass_the_hazards_predictor(monkeypatch):
     monkeypatch.setattr(config, "v2_walls_heuristic", True)
     monkeypatch.setattr(config, "v2_bombs_prob", 0.)  # no bomb proposals

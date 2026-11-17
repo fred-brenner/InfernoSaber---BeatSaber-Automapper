@@ -14,6 +14,7 @@ from types import SimpleNamespace
 
 import numpy as np
 
+from .v2_forward_obstacles import pattern_wall_candidates
 from tools.config import config
 from training.beat_models.contracts import CORE, FRAME_SECONDS, frame_conditions, intensity_inputs, timing_window
 from training.pipeline_v2.contracts import (build_inputs, expansion_occupancy_notes, index_state,
@@ -904,12 +905,17 @@ def _hazards_stage(run):
         _log(run.logger, "V2 hazards (heuristic)")
         proposals = (_heuristic_wall_candidates(run.state["notes"], run.state["event_times"])
                      if config.add_obstacle_flag else [])
+        accents, pattern_obstacles = pattern_wall_candidates(run.state["notes"])
+        proposals.extend(accents)
         bomb_proposals = (_heuristic_bomb_candidates(run.state, run.rng)
                           if config.add_bombs_flag else [])
         run.state["walls"], run.state["bombs"] = proposals, bomb_proposals
         run.raw["wall_proposals"] = len(proposals)
         run.raw["bomb_proposals"] = len(bomb_proposals)
         run.result.diagnostics["hazard_clearance"] = run.postprocessors.validate_hazards(run.state, run.song, logger=run.logger)
+        pattern_obstacles["accepted"] = sum(
+            wall.get("pattern") == "flow_edge_accent" for wall in run.state["walls"])
+        run.result.diagnostics["pattern_obstacles"] = pattern_obstacles
         run.result.stages["hazards"] = {"mode": "heuristic", "walls": len(run.state["walls"]),
                                         "bombs": len(run.state["bombs"]),
                                         "elapsed_seconds": perf_counter() - started}
