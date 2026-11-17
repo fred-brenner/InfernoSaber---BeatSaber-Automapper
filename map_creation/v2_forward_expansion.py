@@ -65,7 +65,10 @@ def validate_expansions(state, song, logger=None):
               and (getattr(config, "v2_playability_priority", False)
                    or getattr(config, "v2_playability_reach", False)))
     banned = strict and any(_forbidden(note) for note in batch)
-    clear = (anchored and not banned
+    from map_creation import v2_forward_flow as flow
+    center_chain = (flow.enabled()
+                    and any(flow._center_crossing(chain) for chain in new_chains))
+    clear = (anchored and not banned and not center_chain
              and guard["index"].accepts_many([*batch, *samples])
              and guard["direction"].check(batch) is None)
     if not clear:
@@ -155,8 +158,10 @@ class _ForwardGate:
                      or getattr(config, "v2_playability_reach", False))
                 and any(_forbidden(note) for note in proposed)):
             return "forbidden_cut"
+        from map_creation import v2_forward_flow as flow
+        pattern = flow.enabled()
         threshold = float(getattr(config, "v2_fast_gap_seconds", .2) or 0.)
-        if (threshold > 0
+        if (not pattern and threshold > 0
                 and getattr(config, "v2_fast_counter_direction", "recut") == "recut"):
             from map_creation.v2_postprocessing import _counter_direction
             if any(self._fast_pair(note) and _counter_direction(note)
@@ -167,10 +172,11 @@ class _ForwardGate:
         reason = self.direction.check(proposed)
         if reason is not None:
             return reason
-        diagonals = sum(note["d"] in (4, 5, 6, 7) for note in self.notes) \
-            + sum(note["d"] in (4, 5, 6, 7) for note in proposed)
-        if diagonals / (len(self.notes) + len(proposed)) > self.diagonal_bound + _TOL:
-            return "diagonal_fraction"
+        if not pattern:
+            diagonals = sum(note["d"] in (4, 5, 6, 7) for note in self.notes) \
+                + sum(note["d"] in (4, 5, 6, 7) for note in proposed)
+            if diagonals / (len(self.notes) + len(proposed)) > self.diagonal_bound + _TOL:
+                return "diagonal_fraction"
         return None
 
     def _fast_pair(self, note):

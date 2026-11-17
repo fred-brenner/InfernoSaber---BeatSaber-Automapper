@@ -1211,6 +1211,11 @@ def _validate_state(state, duration, *, playability_mode="search"):
                     "fast-counter or same-cell overlap violations")
         from .v2_postprocessing import clearance_violations
         findings["clearance"] = clearance_violations(state["notes"])
+        from . import v2_forward_flow as flow
+        if flow.enabled():
+            findings["pattern_flow"] = flow.audit_patterns(state["notes"])
+            findings["pattern_flow"]["chains_center"] = sum(
+                flow._center_crossing(chain) for chain in state["chains"])
     return findings
 
 

@@ -91,6 +91,7 @@ def emphasis_defaults(monkeypatch):
     monkeypatch.setattr(config, "v2_cleanup_swing_window", .15)
     monkeypatch.setattr(config, "v2_diagonal_max_fraction", .1)
     monkeypatch.setattr(config, "v2_flow_min_turn_steps", 3)
+    monkeypatch.setattr(config, "v2_pattern_flow", False)
 
 
 def added(state):

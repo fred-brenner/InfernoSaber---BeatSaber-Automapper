@@ -42,7 +42,8 @@ def expansion_defaults(monkeypatch):
                        "emphasize_beats_quantile": .5,
                        "max_speed": 20., "reaction_time": 1.15,
                        "reaction_time_fact": .013, "cdf": 1.2, "cdf_lr": 1.15,
-                       "v2_speed_cap_scale": 0.}.items():
+                       "v2_speed_cap_scale": 0.,
+                       "v2_pattern_flow": False}.items():
         monkeypatch.setattr(config, key, value)
     yield
 
@@ -215,7 +216,8 @@ def _run_generate(monkeypatch, force_expansion=False, **flags):
                        "v2_cleanup_note_heuristics": False,
                        "v2_notes_onset_snap": False,
                        "emphasize_beats_flag": False,
-                       "v2_note_postprocessing_mode": "forward"}.items():
+                       "v2_note_postprocessing_mode": "forward",
+                       "v2_pattern_flow": False}.items():
         monkeypatch.setattr(config, key, value)
     for key, value in flags.items():
         monkeypatch.setattr(config, key, value)

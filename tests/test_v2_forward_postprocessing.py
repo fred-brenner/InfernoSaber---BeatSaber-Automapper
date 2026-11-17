@@ -42,7 +42,8 @@ def forward_defaults(monkeypatch):
                        "reaction_time_fact": .013, "cdf": 1.2, "cdf_lr": 1.15,
                        "v2_speed_cap_scale": 2., "v2_speed_cap_start_notes": 0,
                        "v2_speed_cap_start_factor": .35,
-                       "v2_playability_priority": True}.items():
+                       "v2_playability_priority": True,
+                       "v2_pattern_flow": False}.items():
         monkeypatch.setattr(config, key, value)
     yield
 

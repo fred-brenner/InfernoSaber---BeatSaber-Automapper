@@ -187,13 +187,18 @@ def _arrival(previous_group, notes, candidate):
 
 
 def _reach_cost(note, previous_group, notes, cap, scale):
+    from map_creation import v2_forward_flow as flow
     from map_creation.v2_playability_reach import forbidden_cut
     step = metrics.STEP.get(note["d"], (0, 0))
     low, high = _bounds(note["hand"])
     dx = max(low - (note["x"] + step[0]), note["x"] + step[0] - high, 0)
     dy = max(-(note["y"] + step[1]), note["y"] + step[1] - 2, 0)
     over = max(0., _arrival(previous_group, notes, note) - cap(note)) if scale > 0 else 0.
-    return (int(forbidden_cut(note) or max(dx, dy) >= 2), over, max(dx, dy))
+    excursion = max(dx, dy)
+    if excursion > 0 and flow.enabled() and any(
+            flow.prepared_rebound(note, notes[p]) for p in previous_group):
+        excursion = 0.
+    return (int(forbidden_cut(note) or max(dx, dy) >= 2), over, excursion)
 
 
 def _reach_pass(notes, index, cap):
@@ -379,14 +384,22 @@ def repair_notes(notes, *, rng=None, cap=None, logger=None):
     cap = _default_cap(notes) if cap is None else cap
     report = {}
     start = clock.monotonic()
+    from map_creation import v2_forward_flow as flow
     with post.playability_generation_phase():
-        report["direction"] = _direction_pass(view, index)
-        report["reach"] = _reach_pass(view, index, cap)
-        report["collision"] = _collision_pass(view, index)
-        report["repeated"] = _repeated_pass(view, index, rng)
-        report["visibility"] = _visibility_pass(view, index)
-        report["center"] = clear_center_view(notes, rng=rng, index=index)
-        report["hard_overlap"] = enforce_overlaps(notes, index)
-        report["hard_direction"] = enforce_directions(notes, index)
+        if flow.enabled():
+            report["reach"] = _reach_pass(view, index, cap)
+            report["collision"] = _collision_pass(view, index)
+            report["hard_overlap"] = enforce_overlaps(notes, index)
+            report["hard_direction"] = enforce_directions(notes, index)
+            report["pattern_flow"] = flow.repair_patterns(notes, index, cap)
+        else:
+            report["direction"] = _direction_pass(view, index)
+            report["reach"] = _reach_pass(view, index, cap)
+            report["collision"] = _collision_pass(view, index)
+            report["repeated"] = _repeated_pass(view, index, rng)
+            report["visibility"] = _visibility_pass(view, index)
+            report["center"] = clear_center_view(notes, rng=rng, index=index)
+            report["hard_overlap"] = enforce_overlaps(notes, index)
+            report["hard_direction"] = enforce_directions(notes, index)
     report["seconds"] = clock.monotonic() - start
     return report

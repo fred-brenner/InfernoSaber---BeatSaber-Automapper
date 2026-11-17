@@ -80,6 +80,13 @@ def _fast_ids(ordered, eps, fast):
     return ids
 
 
+def _prepared_exempt(note, previous):
+    from map_creation import v2_forward_flow as flow
+    if previous is None or not flow.enabled():
+        return False
+    return flow.prepared_rebound(note, flow._tuple_note(previous, note["hand"]))
+
+
 def _findings(ordered, eps, flow_on, gap, fast, counter_on):
     """Enabled (flow, fast-counter) violation ids on a sorted same-context list."""
     from map_creation import v2_postprocessing as post
@@ -91,7 +98,8 @@ def _findings(ordered, eps, flow_on, gap, fast, counter_on):
                                      note["x"], note["y"], note["time"], gap)]
     counter = [note["id"] for note in ordered
                if counter_on and note["id"] in fast_ids
-               and post._counter_direction(note)]
+               and post._counter_direction(note)
+               and not _prepared_exempt(note, pred.get(note["id"]))]
     return flow, counter
 
 
@@ -110,11 +118,13 @@ def _detect(notes):
     of the strict core and overlap is deliberately left to ``_overlap_scan``.
     """
     from map_creation import v2_postprocessing as post
+    from map_creation import v2_forward_flow as flow
     eps, flow_on, _, fast, counter_on, _, _, _ = _gates()
     flagged = {"flow": set(), "counter": set()}
     if not notes or not (flow_on or counter_on):
         return flagged
     ordered = _ordered(notes)
+    pattern = flow.enabled()
     configured = getattr(config, "v2_flow_min_turn_steps", None)
     min_turn = 3 if configured is None else int(configured)
     angle = np.asarray([post._DIRECTION_ANGLE[d] for d in range(8)] + [0])
@@ -165,7 +175,19 @@ def _detect(notes):
             counter = (near
                        & (((ys == 0) & np.isin(ds, (0, 4, 5)))
                           | ((ys == 2) & np.isin(ds, (1, 6, 7)))))
-            flagged["counter"].update(ids[i] for i in np.flatnonzero(counter))
+            indices = np.flatnonzero(counter)
+            if pattern and len(indices):
+                indices = [i for i in indices
+                           if not (int(before[i]) >= 0
+                                   and int(effective[int(before[i])]) >= 0
+                                   and flow.prepared_rebound(
+                                       members[i],
+                                       {"time": float(times[int(before[i])]),
+                                        "x": float(xs[int(before[i])]),
+                                        "y": float(ys[int(before[i])]),
+                                        "d": int(effective[int(before[i])]),
+                                        "hand": hand}))]
+            flagged["counter"].update(ids[i] for i in indices)
     return flagged
 
 
@@ -309,12 +331,14 @@ def enforce_directions(notes, index):
     repair breaking its successor is caught inside this call.
     """
     from map_creation import v2_postprocessing as post
+    from map_creation import v2_forward_flow as flow
     from map_creation.v2_playability_reach import forbidden_cut
     eps, flow_on, _, fast, counter_on, reach_on, same_hand, cross = _gates()
     stats = {"attempted": 0, "proposals": 0, "changed": 0, "relocated": 0,
              "dropped": 0, "dropped_notes": []}
     if not notes or not (flow_on or counter_on):
         return stats
+    pattern = flow.enabled()
     view = _ordered(notes)
     detected = _detect(view)
     fast_ids = _fast_ids(view, eps, fast)
@@ -370,7 +394,8 @@ def enforce_directions(notes, index):
                     and not post._flow_legal(note["d"], pred, note["x"],
                                              note["y"], note["time"], eps))
         counter_bad = (counter_on and note["id"] in fast_ids
-                       and post._counter_direction(note))
+                       and post._counter_direction(note)
+                       and not _prepared_exempt(note, pred))
         return flow_bad, counter_bad
 
     def recheck_successors(hand, p):
@@ -444,7 +469,7 @@ def enforce_directions(notes, index):
                 if tried >= _MAX_PROPOSALS:
                     break
                 arrows = _arrow_order(note, pred)
-                if diagonals[0] > total * fraction + _TOL:
+                if not pattern and diagonals[0] > total * fraction + _TOL:
                     arrows = ([d for d in arrows if d not in (4, 5, 6, 7)]
                               + [d for d in arrows if d in (4, 5, 6, 7)])
                 for d in arrows:
@@ -459,7 +484,8 @@ def enforce_directions(notes, index):
                                                      note["time"], eps)):
                         continue
                     if (counter_on and note["id"] in fast_ids
-                            and post._counter_direction(trial)):
+                            and post._counter_direction(trial)
+                            and not _prepared_exempt(trial, pred)):
                         continue
                     if reach_on and forbidden_cut(trial):
                         continue
@@ -569,14 +595,21 @@ class DirectionGuard:
     def check(self, proposed):
         (eps, flow_on, _, fast, counter_on, _,
          same_hand, cross) = _gates()
-        if not proposed or not (flow_on or counter_on):
+        if not proposed:
             return None
-        expand = max(eps, fast)
+        from map_creation import v2_forward_flow as flow
+        pattern = flow.enabled()
+        if not (flow_on or counter_on or pattern):
+            return None
+        expand = (max(eps, fast, flow._RECOVERY_GAP)
+                  if pattern else max(eps, fast))
+        windows = []
         for hand in {n["hand"] for n in proposed}:
             batch = [n for n in proposed if n["hand"] == hand]
             lo = min(n["time"] for n in batch) - expand
             hi = max(n["time"] for n in batch) + expand
             window = self._window(hand, lo, hi, eps)
+            windows.append((window, batch))
             merged = sorted([*window, *batch], key=lambda n: (n["time"], n["id"]))
             old_flow, old_counter = _findings(window, eps, flow_on, eps,
                                               fast, counter_on)
@@ -587,4 +620,8 @@ class DirectionGuard:
         if any(self._overlap_blocked(note, proposed, same_hand, cross)
                for note in proposed):
             return "overlap"
+        if pattern:
+            for window, batch in windows:
+                if flow.check_additions(window, batch) is not None:
+                    return "pattern_flow"
         return None
