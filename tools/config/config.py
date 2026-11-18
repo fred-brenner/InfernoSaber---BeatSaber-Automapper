@@ -221,6 +221,13 @@ v2_speed_cap_start_factor = .35    # max_speed multiplier at the first note posi
                                    # rising linearly to 1 (v1 decr_speed_val); the cap's
                                    # get_factor_from_max_speed is evaluated on the ramped
                                    # value, like v1
+v2_speed_cap_gap_factors = (4.0, 3.5, 1.8, 1.0, 0.7)
+                                   # per-gap-band multipliers on the repair-time speed
+                                   # cap: bound = cap(note)*factor(dt) for same-hand
+                                   # gaps in the bands (<.1, <.2, <=.4, <=.6, >.6
+                                   # seconds), calibrated to ~p90 of the human
+                                   # reference transitions; empty/None restores the
+                                   # legacy flat cap
 v2_fast_gap_seconds = .2           # same-hand gap below which consecutive notes form a
                                    # fast run: each note's direction is restricted to
                                    # its predecessor's, the 180° reverse and (admitted

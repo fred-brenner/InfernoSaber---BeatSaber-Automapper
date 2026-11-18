@@ -135,28 +135,28 @@ def test_terminal_aligned_stack_is_exempt():
 def test_non_aligned_stacks_are_not_exempt():
     notes = [_note(0, .85, 1, 1, 0, 1),
              _note(1, 1., 1, 2, 1, 0), _note(2, 1., 1, 3, 2, 0),
-             _note(3, 1.675, 1, 2, 0, 1)]
+             _note(3, 1.3, 1, 2, 0, 1)]
     before = [dict(n) for n in notes]
     out = _repair(notes)
     assert notes == before
     assert out["residual"]["center_middle"] >= 1
     notes = [_note(0, .85, 1, 1, 0, 1),
              _note(1, 1., 1, 2, 1, 0), _note(2, 1., 1, 2, 2, 1),
-             _note(3, 1.675, 1, 2, 0, 1)]
+             _note(3, 1.3, 1, 2, 0, 1)]
     before = [dict(n) for n in notes]
     out = _repair(notes)
     assert notes == before
     assert out["residual"]["center_middle"] >= 1
 
 
-def test_intervening_note_invalidates_accent_recovery():
+def test_fast_follower_invalidates_terminal_exemption():
     from map_creation.v2_forward_directions import DirectionGuard
     incumbents = [_note(0, .85, 1, 1, 0, 1),
                   _note(1, 1., 1, 2, 1, 0), _note(2, 1., 1, 2, 2, 0),
                   _note(3, 1.675, 1, 2, 0, 1)]
     guard = DirectionGuard(incumbents)
     extra = _note(4, 1., 1, 3, 1, 5, kind="copy", anchor_id=1)
-    assert guard.check([extra]) == "pattern_flow"
+    assert guard.check([extra]) is None
     intervening = _note(6, 1.3, 1, 3, 1, 8, kind="copy", anchor_id=1)
     assert guard.check([intervening]) is not None
 
@@ -169,7 +169,8 @@ def test_aligned_accent_copy_allowed_and_illegal_center_rejected():
     guard = DirectionGuard(incumbents)
     aligned = _note(4, 1., 1, 2, 0, 0, kind="copy", anchor_id=1)
     assert guard.check([aligned]) is None
-    incumbents = [_note(0, 0., 0, 0, 1, 0), _note(1, .2, 0, 0, 1, 1)]
+    incumbents = [_note(0, 0., 0, 0, 1, 0), _note(1, .2, 0, 0, 1, 1),
+                  _note(3, .5, 0, 0, 0, 1)]
     guard = DirectionGuard(incumbents)
     center = _note(2, .4, 0, 1, 1, 0, kind="copy", anchor_id=1)
     assert guard.check([center]) == "pattern_flow"
@@ -196,7 +197,7 @@ def test_fully_blocked_index_returns_unchanged_and_bounded():
         return {1000 + calls["conflict_ids"]}
 
     index.conflict_ids = spy_ids.__get__(index, LocalNoteIndex)
-    notes = [_note(0, .0, 0, 0, 1, 0), _note(1, .5, 0, 1, 1, 1)]
+    notes = [_note(0, .0, 0, 0, 1, 0), _note(1, .5, 0, 1, 1, 2)]
     from map_creation.v2_forward_flow import repair_patterns
     out = repair_patterns(notes, index, lambda n: 9.)
     assert out["changed"] == 0 and notes[1]["x"] == 1
@@ -237,7 +238,10 @@ def test_wave_applies_canonical_template():
     assert audit_directions(notes) == {"flow": [], "fast_counter": []}
 
 
-def test_wave_skips_vertical_irregular_pause_and_stacks():
+def test_wave_skips_vertical_irregular_pause_and_stacks(monkeypatch):
+    # Flat cap: under the default gap-band factors the .15s streams admit a
+    # lateral overlay — the band widening this task adds is tested separately.
+    monkeypatch.setattr(config, "v2_speed_cap_gap_factors", ())
     vertical = [_note(i, .15 * i, 0, 0, 1, i % 2) for i in range(8)]
     before = [dict(n) for n in vertical]
     out = _repair(vertical)
@@ -313,10 +317,11 @@ def test_expansion_rejects_center_copy_via_shared_reason():
     from map_creation.v2_forward_expansion import validate_expansions
     state = {"notes": [_note(0, 0., 0, 0, 1, 0, kind="retained"),
                        _note(1, .2, 0, 0, 1, 1, kind="retained"),
+                       _note(3, .5, 0, 0, 0, 1, kind="retained"),
                        _note(5, .4, 0, 1, 1, 0, kind="copy", anchor_id=1)],
              "chains": []}
     out = validate_expansions(state, None)
-    assert out["rejected_copies"] == 1 and len(state["notes"]) == 2
+    assert out["rejected_copies"] == 1 and len(state["notes"]) == 3
 
 
 def test_chain_center_tail_rejected_only_when_enabled(monkeypatch):
@@ -356,7 +361,7 @@ def test_bounded_blocked_candidate_counters():
         return real(self, note, ignore_ids)
 
     index.conflict_ids = spy_ids.__get__(index, LocalNoteIndex)
-    notes = [_note(0, .0, 0, 0, 1, 0), _note(1, .5, 0, 1, 1, 1)]
+    notes = [_note(0, .0, 0, 0, 1, 0), _note(1, .5, 0, 1, 1, 2)]
     from map_creation.v2_forward_flow import repair_patterns
     out = repair_patterns(notes, index, lambda n: 9.)
     assert out["attempted"] == 1 and out["proposals"] <= 12
@@ -706,14 +711,15 @@ def test_chunk_upper_down_rejects_center_improvement():
     from map_creation import v2_forward_flow as flow
     from map_creation import v2_forward_patterns as patterns
     from map_creation.v2_forward_clearance import LocalNoteIndex
-    notes = [_note(0, 0., 0, 1, 1, 1)]
+    notes = [_note(0, 0., 0, 1, 1, 1), _note(1, .3, 0, 0, 0, 4)]
     index = LocalNoteIndex(notes)
     context = flow.FlowContext(notes)
-    pre = patterns._prepare(context, index, notes)
+    chunk = notes[:1]
+    pre = patterns._prepare(context, index, chunk)
     saved = [(1, 1, 1)]
-    notes[0]["y"] = 2
+    chunk[0]["y"] = 2
     report = {}
-    assert patterns._check_chunk(context, index, lambda n: 99., notes, pre,
+    assert patterns._check_chunk(context, index, lambda n: 99., chunk, pre,
                                  saved, True, report, "phrase") is None
     assert report["rejections"] == {"phrase:upper_down": 1}
 
@@ -723,7 +729,7 @@ def test_short_phrase_chunks_and_upper_down_guard(length):
     from map_creation.v2_forward_patterns import _upper_down
     notes = [_note(i, .15 * i, 0, x, y, d)
              for i, (x, y, d) in enumerate(
-                 ((0, 0, 1), (1, 1, 0), (1, 1, 1))[:length])]
+                 ((0, 0, 1), (1, 1, 2), (1, 1, 1))[:length])]
     before = sum(_upper_down(n) for n in notes)
     report = _phrase_only(notes)
     assert report["phrase_windows"] == 1
@@ -791,8 +797,8 @@ def _lateral_only(notes, cap=lambda n: 99.):
     from map_creation.v2_forward_flow import FlowContext
     from map_creation.v2_forward_lanes import repair_lanes
     report = {"lateral_windows": 0, "lateral_proposals": 0, "lateral_applied": 0,
-              "lateral_notes": 0, "lateral_motifs": {}, "rejections": {},
-              "rejection_examples": {}}
+              "lateral_notes": 0, "lateral_motifs": {}, "lateral_sweeps": 0,
+              "rejections": {}, "rejection_examples": {}}
     repair_lanes(FlowContext(notes), LocalNoteIndex(notes), cap, report)
     return report
 
@@ -854,7 +860,7 @@ def test_equal_style_chunk_ranks_repetition_and_keeps_collision_guard():
         note["x"] = i % 2
     alternating = patterns._check_chunk(context, index, lambda n: 99., notes, pre,
                                         saved, False)
-    assert incumbent[:4] == alternating[:4] and alternating[4] < incumbent[4]
+    assert incumbent[:5] == alternating[:5] and alternating[5] < incumbent[5]
     assert alternating < incumbent
     for note, (x, y, d) in zip(notes, saved):
         note["x"], note["y"], note["d"] = x, y, d
@@ -1009,10 +1015,14 @@ def test_lateral_runs_as_final_pattern_pass_and_obeys_flag(monkeypatch):
     assert notes == before
 
 
-def test_lateral_compact_bottom_preserves_endpoints_and_mirrors():
+def test_lateral_compact_bottom_preserves_endpoints_and_mirrors(monkeypatch):
     from map_creation.v2_forward_directions import audit_directions, audit_overlaps
     from map_creation.v2_forward_flow import FlowContext
     from map_creation.v2_forward_lanes import repetition_cost
+    # Flat cap: with the default band factors the .2s window's 1.8x bound
+    # (27) also admits adjacent_lanes (arrival ~18.9), which outranks the
+    # compact_bottom motif this fixture isolates.
+    monkeypatch.setattr(config, "v2_speed_cap_gap_factors", ())
     red = [_note(i, .2 * i, 0, 0, y, d, kind="retained", source="fixture")
            for i, (y, d) in enumerate(((0, 1), (1, 0), (0, 1), (1, 0)))]
     blue = [dict(n, hand=1, x=3) for n in red]
@@ -1090,8 +1100,11 @@ def test_lateral_does_not_recut_or_cross_internal_ambiguous_groups(kind):
 
 def test_lateral_opposite_hand_blocker_rejects_atomically():
     notes = _lateral_notes()
-    blockers = [_note(100 + x * 3 + y, .2, 1, x, y, 8)
-                for x in range(3) for y in range(3)]
+    # Cover every stream onset: the cross-hand overlap window is shorter
+    # than the .2s gaps, so a single blocked time would leave the offset
+    # sweep's window (notes at .4s and later) free to apply.
+    blockers = [_note(100 + slot * 9 + x * 3 + y, .2 * slot, 1, x, y, 8)
+                for slot in range(8) for x in range(3) for y in range(3)]
     all_notes = notes + blockers
     before = [dict(n) for n in all_notes]
     report = _lateral_only(all_notes)
@@ -1138,3 +1151,342 @@ def test_lateral_long_stream_is_bounded():
     assert report["lateral_windows"] == 15
     assert report["lateral_proposals"] <= 10 * report["lateral_windows"]
     assert all(len(examples) <= 3 for examples in report["rejection_examples"].values())
+
+
+def test_lateral_offset_sweep_repairs_stream_blocked_at_run_start(monkeypatch):
+    # The leading dot makes the sweep-1 window's entry context ambiguous;
+    # the +2 partition starts inside the run and repairs it anyway.
+    from map_creation import v2_forward_lanes as lanes
+    from map_creation.v2_forward_flow import FlowContext
+    from map_creation.v2_forward_lanes import repetition_cost
+    from map_creation.v2_forward_patterns import _MIRROR_D
+    attempts = []
+    real = lanes._attempt
+
+    def spy(context, index, cap, notes, chunk, hand, report, patterns):
+        attempts.append([n["id"] for n in notes])
+        return real(context, index, cap, notes, chunk, hand, report,
+                    patterns)
+
+    monkeypatch.setattr(lanes, "_attempt", spy)
+    red = [_note(50, -.2, 0, 0, 0, 8)] + _lateral_notes()
+    blue = [dict(n, hand=1, x=3 - n["x"]) for n in red]
+    before = repetition_cost(FlowContext(red), red)
+    red_report, blue_report = _lateral_only(red), _lateral_only(blue)
+    assert attempts == [[2, 3, 4, 5, 6, 7]] * 2
+    assert red_report == blue_report
+    assert red_report["lateral_sweeps"] == 2
+    assert red_report["lateral_windows"] == 2
+    assert red_report["lateral_applied"] == 1
+    assert red_report["rejections"]["lateral:skipped_context"] == 1
+    assert [n["x"] for n in red[1:3]] == [0, 0]
+    assert repetition_cost(FlowContext(red), red) == 0 < before
+    assert [(n["x"], n["y"], n["d"]) for n in blue] == [
+        (3 - n["x"], n["y"], _MIRROR_D.get(n["d"], n["d"])) for n in red]
+
+
+def test_lateral_second_sweep_bounded_and_never_raises_repetition(monkeypatch):
+    from map_creation import v2_forward_lanes as lanes
+    from map_creation.v2_forward_lanes import repetition_cost
+    notes = [_note(50, -.2, 0, 0, 0, 8)] + _lateral_notes(24)
+    checks = []
+    real = lanes._attempt
+
+    def spy(context, index, cap, window, chunk, hand, report, patterns):
+        members = context._members[hand]
+        rep_before = repetition_cost(context, members)
+        proposals_before = report["lateral_proposals"]
+        real(context, index, cap, window, chunk, hand, report, patterns)
+        checks.append((rep_before,
+                       repetition_cost(context, members),
+                       report["lateral_proposals"] - proposals_before))
+
+    monkeypatch.setattr(lanes, "_attempt", spy)
+    report = _lateral_only(notes)
+    assert report["lateral_sweeps"] <= 2
+    assert len(checks) >= 3     # both sweeps attempted at least one window
+    assert all(after <= before for before, after, _ in checks)
+    assert all(delta <= 10 for _, _, delta in checks)
+    assert report["lateral_proposals"] <= 10 * report["lateral_windows"]
+
+
+def test_lateral_offset_sweep_rederives_runs_from_current_positions():
+    from map_creation import v2_forward_lanes as lanes
+    from map_creation.v2_forward_flow import FlowContext
+    from map_creation.v2_forward_lanes import repetition_cost
+    from map_creation.v2_forward_clearance import LocalNoteIndex
+    notes = _lateral_notes()
+    context, index = FlowContext(notes), LocalNoteIndex(notes)
+    report = {"lateral_windows": 0, "lateral_proposals": 0,
+              "lateral_applied": 0, "lateral_notes": 0,
+              "lateral_motifs": {}, "rejections": {},
+              "rejection_examples": {}}
+    lanes._sweep(context, index, lambda n: 99., 0, report)
+    first = repetition_cost(context, notes)
+    windows_first = report["lateral_windows"]
+    assert first == 0 and report["lateral_applied"] == 1
+    lanes._sweep(context, index, lambda n: 99., 2, report)
+    assert repetition_cost(context, notes) <= first
+    # Sweep 1 alternated every lane, so the re-scan finds no same-x run:
+    # re-derived boundaries, not a cached partition of the stale stream.
+    assert report["lateral_windows"] == windows_first
+
+
+def _style(notes, index=0):
+    from map_creation.v2_forward_flow import FlowContext, style_cost
+    context = FlowContext(notes)
+    note = notes[index]
+    return style_cost(note, context.previous(note),
+                      context.following(note), context.group(note))
+
+
+def test_center_penalizes_inner_middle_fast_follower_only():
+    fast = _style([_note(0, 0., 0, 1, 1, 0), _note(1, .3, 0, 0, 0, 0)])
+    assert len(fast) == 5 and fast[0] == 12.
+    edge = _style([_note(0, 0., 0, 1, 1, 0), _note(1, .4, 0, 0, 0, 0)])
+    assert edge[0] == 12.
+    slow = _style([_note(0, 0., 0, 1, 1, 0), _note(1, .5, 0, 0, 0, 0)])
+    assert slow[0] == 0.
+    terminal = _style([_note(0, 0., 0, 1, 1, 0)])
+    assert terminal[0] == 0.
+    preceded = _style([_note(0, 0., 0, 0, 0, 0), _note(1, .3, 0, 1, 1, 0)], 1)
+    assert preceded[0] == 0.
+    inner_top = _style([_note(0, 0., 0, 1, 2, 0), _note(1, .3, 0, 0, 0, 0)])
+    assert inner_top[0] == 0.
+
+
+def test_top_horizontal_penalizes_top_row_horizontal_fast_follower():
+    fast = _style([_note(0, 0., 0, 0, 2, 2), _note(1, .3, 0, 0, 0, 0)])
+    assert fast[4] == 6.
+    slow = _style([_note(0, 0., 0, 0, 2, 2), _note(1, .5, 0, 0, 0, 0)])
+    assert slow[4] == 0.
+    mid_row = _style([_note(0, 0., 0, 0, 1, 2), _note(1, .3, 0, 0, 0, 0)])
+    assert mid_row[4] == 0. and mid_row[1] == 6.
+    inner_top = _style([_note(0, 0., 0, 2, 2, 3), _note(1, .3, 0, 0, 0, 0)])
+    assert inner_top[4] == 6.
+
+
+def test_check_chunk_returns_five_style_components_then_repetition():
+    from map_creation import v2_forward_flow as flow, v2_forward_patterns as patterns
+    from map_creation.v2_forward_clearance import LocalNoteIndex
+    from map_creation.v2_forward_lanes import repetition_cost
+    notes = _lateral_notes()
+    context, index = flow.FlowContext(notes), LocalNoteIndex(notes)
+    pre = patterns._prepare(context, index, notes)
+    saved = [(n["x"], n["y"], n["d"]) for n in notes]
+    key = patterns._check_chunk(context, index, lambda n: 99., notes, pre,
+                                saved, False)
+    assert len(key) == 8
+    assert key[:5] == patterns._aggregate(context, notes)
+    assert key[5] == repetition_cost(context, notes)
+    assert key[6:] == (0, 0)
+
+
+def test_check_chunk_rejects_geometry_creating_inner_middle_fast():
+    from map_creation import v2_forward_flow as flow, v2_forward_patterns as patterns
+    from map_creation.v2_forward_clearance import LocalNoteIndex
+    notes = _lateral_notes(4)
+    context, index = flow.FlowContext(notes), LocalNoteIndex(notes)
+    pre = patterns._prepare(context, index, notes)
+    saved = [(n["x"], n["y"], n["d"]) for n in notes]
+    report = {}
+    try:
+        for note in notes:
+            note["x"] = 1
+        assert patterns._check_chunk(context, index, lambda n: 99., notes, pre,
+                                     saved, False, report, "lateral") is None
+    finally:
+        for note, (x, y, d) in zip(notes, saved):
+            note["x"], note["y"], note["d"] = x, y, d
+    assert report["rejections"] == {"lateral:style": 1}
+
+
+def test_lateral_attempt_rejects_equal_repetition_at_index_five(monkeypatch):
+    from map_creation import v2_forward_flow as flow
+    from map_creation import v2_forward_lanes as lanes
+    from map_creation import v2_forward_patterns as patterns
+    from map_creation.v2_forward_clearance import LocalNoteIndex
+    notes = [_note(i, .2 * i, 0, 1, 1, i % 2) for i in range(4)]
+    context, index = flow.FlowContext(notes), LocalNoteIndex(notes)
+    chunk = [[note] for note in notes]
+    geometry = tuple((1, 0, n["d"]) for n in notes)
+    monkeypatch.setattr(lanes, "_candidates",
+                        lambda *args: iter((("same_x", geometry),)))
+    report = {"lateral_proposals": 0, "lateral_applied": 0, "lateral_notes": 0,
+              "lateral_motifs": {}, "rejections": {}, "rejection_examples": {}}
+    lanes._attempt(context, index, lambda n: 99., notes, chunk, 0, report,
+                   patterns)
+    assert report["rejections"] == {"lateral:lane_repetition": 1}
+    assert report["lateral_applied"] == 0
+    assert [(n["x"], n["y"], n["d"]) for n in notes] == [
+        (1, 1, i % 2) for i in range(4)]
+
+
+def _check_one(notes, note, x, cap):
+    """Mutate a single-note chunk's ``x`` and run the chunk guard once."""
+    from map_creation import v2_forward_flow as flow
+    from map_creation import v2_forward_patterns as patterns
+    from map_creation.v2_forward_clearance import LocalNoteIndex
+    context, index = flow.FlowContext(notes), LocalNoteIndex(notes)
+    pre = patterns._prepare(context, index, [note])
+    saved = [(note["x"], note["y"], note["d"])]
+    report = {}
+    try:
+        note["x"] = x
+        key = patterns._check_chunk(context, index, cap, [note], pre,
+                                    saved, False, report, "lateral")
+    finally:
+        note["x"], note["y"], note["d"] = saved[0]
+    return key, report
+
+
+def test_cap_factor_pins_bands_and_empty_restores_flat(monkeypatch):
+    from map_creation.v2_forward_patterns import _cap_factor
+    monkeypatch.setattr(config, "v2_speed_cap_gap_factors",
+                        (4., 3.5, 1.8, 1., .7))
+    dts = (.05, .1, .15, .2, .3, .4, .5, .6, .61, 2.)
+    assert [_cap_factor(dt) for dt in dts] == [
+        4., 3.5, 3.5, 1.8, 1.8, 1.8, 1., 1., .7, .7]
+    monkeypatch.setattr(config, "v2_speed_cap_gap_factors", ())
+    assert [_cap_factor(dt) for dt in (.05, .2, .5, 2.)] == [1.] * 4
+    monkeypatch.setattr(config, "v2_speed_cap_gap_factors", None)
+    assert _cap_factor(.2) == 1.
+
+
+def test_cap_factor_malformed_entries_fall_back_to_flat(monkeypatch):
+    from map_creation.v2_forward_patterns import _cap_factor
+    monkeypatch.setattr(config, "v2_speed_cap_gap_factors",
+                        (4., float("nan"), "x", 1., .7))
+    assert _cap_factor(.05) == 4.
+    assert _cap_factor(.15) == 1.   # NaN member would auto-accept via NaN bound
+    assert _cap_factor(.3) == 1.    # non-numeric member
+    assert _cap_factor(.5) == 1.
+    assert _cap_factor(.61) == .7
+    monkeypatch.setattr(config, "v2_speed_cap_gap_factors", 4.0)
+    assert _cap_factor(.05) == 1.   # scalar, not a tuple
+    monkeypatch.setattr(config, "v2_speed_cap_gap_factors", (2., 2.))
+    assert _cap_factor(.05) == 1.   # too few entries
+
+
+def test_speed_cap_band_accepts_candidate_over_flat_cap(monkeypatch):
+    # .3s predecessor edge: the move raises arrival to 16.4 — over flat
+    # cap 10 but inside the .2-.4 band bound of 1.8*10 = 18.
+    monkeypatch.setattr(config, "v2_speed_cap_gap_factors",
+                        (4., 3.5, 1.8, 1., .7))
+    notes = [_note(0, 0., 0, 0, 0, 1), _note(1, .3, 0, 0, 1, 0)]
+    key, report = _check_one(notes, notes[1], 2, lambda n: 10.)
+    assert key is not None and not report.get("rejections")
+    # A tighter band bound still rejects: 1.8*9 = 16.2 < 16.4.
+    notes = [_note(0, 0., 0, 0, 0, 1), _note(1, .3, 0, 0, 1, 0)]
+    key, report = _check_one(notes, notes[1], 2, lambda n: 9.)
+    assert key is None and report["rejections"] == {"lateral:speed": 1}
+    # Kill switch: empty factor tuple restores the flat-cap rejection.
+    notes = [_note(0, 0., 0, 0, 0, 1), _note(1, .3, 0, 0, 1, 0)]
+    monkeypatch.setattr(config, "v2_speed_cap_gap_factors", ())
+    key, report = _check_one(notes, notes[1], 2, lambda n: 10.)
+    assert key is None and report["rejections"] == {"lateral:speed": 1}
+
+
+def test_speed_cap_fast_band_accepts_candidate_over_flat_cap(monkeypatch):
+    # .15s predecessor edge sits in the <.2 band: the move raises arrival
+    # to 32.8 — over flat cap 10 but inside the 3.5x band bound of 35.
+    monkeypatch.setattr(config, "v2_speed_cap_gap_factors",
+                        (4., 3.5, 1.8, 1., .7))
+    notes = [_note(0, 0., 0, 0, 0, 1), _note(1, .15, 0, 0, 1, 0)]
+    key, report = _check_one(notes, notes[1], 2, lambda n: 10.)
+    assert key is not None and not report.get("rejections")
+    # The band bound still rejects: 3.5*9 = 31.5 < 32.8.
+    notes = [_note(0, 0., 0, 0, 0, 1), _note(1, .15, 0, 0, 1, 0)]
+    key, report = _check_one(notes, notes[1], 2, lambda n: 9.)
+    assert key is None and report["rejections"] == {"lateral:speed": 1}
+    # Empty factor tuple restores the flat-cap rejection.
+    notes = [_note(0, 0., 0, 0, 0, 1), _note(1, .15, 0, 0, 1, 0)]
+    monkeypatch.setattr(config, "v2_speed_cap_gap_factors", ())
+    key, report = _check_one(notes, notes[1], 2, lambda n: 10.)
+    assert key is None and report["rejections"] == {"lateral:speed": 1}
+
+
+def test_speed_cap_gap_band_accepts_lateral_motif(monkeypatch):
+    # Flat cap 9 rejects every surviving lateral motif's >9.2 edges; the
+    # .2-.4 band's 1.8x bound (16.2) admits them.
+    fixture = lambda: [_note(i, .3 * i, 0, 0, 1 if i % 2 == 0 else 0, i % 2,
+                             kind="retained", source="fixture")
+                       for i in range(4)]
+    monkeypatch.setattr(config, "v2_speed_cap_gap_factors", ())
+    report = _lateral_only(fixture(), cap=lambda n: 9.)
+    assert report["lateral_applied"] == 0
+    assert report["rejections"]["lateral:speed"] > 0
+    monkeypatch.setattr(config, "v2_speed_cap_gap_factors",
+                        (4., 3.5, 1.8, 1., .7))
+    notes = fixture()
+    report = _lateral_only(notes, cap=lambda n: 9.)
+    assert report["lateral_applied"] == 1
+    assert len({n["x"] for n in notes}) == 2
+
+
+def test_speed_cap_slow_band_tightens_above_point_six(monkeypatch):
+    # Sole edge is the .7s successor gap: the move raises its arrival to
+    # 6.7 — flat cap 8 accepts, the .7x band bound (5.6) rejects.
+    monkeypatch.setattr(config, "v2_speed_cap_gap_factors", ())
+    notes = [_note(0, .3, 0, 0, 1, 0), _note(1, 1., 0, 0, 0, 1)]
+    key, report = _check_one(notes, notes[0], 2, lambda n: 8.)
+    assert key is not None and not report.get("rejections")
+    monkeypatch.setattr(config, "v2_speed_cap_gap_factors",
+                        (4., 3.5, 1.8, 1., .7))
+    notes = [_note(0, .3, 0, 0, 1, 0), _note(1, 1., 0, 0, 0, 1)]
+    key, report = _check_one(notes, notes[0], 2, lambda n: 8.)
+    assert key is None and report["rejections"] == {"lateral:speed": 1}
+    # The same edge needs ~1.2x the flat cap to pass at cap 5.6 — rejected.
+    notes = [_note(0, .3, 0, 0, 1, 0), _note(1, 1., 0, 0, 0, 1)]
+    key, report = _check_one(notes, notes[0], 2, lambda n: 5.6)
+    assert key is None and report["rejections"] == {"lateral:speed": 1}
+
+
+def test_reach_tiebreak_prefers_off_lane_position():
+    from map_creation.v2_forward_postprocessing import _reach_pass
+    from map_creation.v2_forward_clearance import LocalNoteIndex
+    # Cost-equal feasibles (0,1) and (1,1): the proposal-order pick would
+    # complete a same-x triple; the tie-break moves off the lane instead.
+    notes = [_note(0, 0., 0, 0, 1, 0), _note(1, .3, 0, 0, 1, 0),
+             _note(2, .6, 0, 0, 2, 1)]
+    out = _reach_pass(notes, LocalNoteIndex(notes), lambda n: 99.)
+    assert (notes[2]["x"], notes[2]["y"]) == (1, 1)
+    assert out["attempted"] == 1 and out["changed"] == 1
+    assert out["lane_varied"] == 1
+
+
+def test_reach_tiebreak_single_feasible_keeps_incumbent():
+    from map_creation.v2_forward_postprocessing import _reach_pass
+    from map_creation.v2_forward_clearance import LocalNoteIndex
+    notes = [_note(0, 0., 0, 0, 1, 0), _note(1, .3, 0, 0, 1, 0),
+             _note(2, .6, 0, 2, 1, 2)]
+    out = _reach_pass(notes, LocalNoteIndex(notes), lambda n: 99.)
+    assert (notes[2]["x"], notes[2]["y"]) == (1, 1)
+    assert out["changed"] == 1 and out["lane_varied"] == 0
+
+
+def test_reach_tiebreak_disabled_keeps_proposal_order(monkeypatch):
+    from map_creation.v2_forward_postprocessing import _reach_pass
+    from map_creation.v2_forward_clearance import LocalNoteIndex
+    monkeypatch.setattr(config, "v2_pattern_flow", False)
+    notes = [_note(0, 0., 0, 0, 1, 0), _note(1, .3, 0, 0, 1, 0),
+             _note(2, .6, 0, 0, 2, 1)]
+    out = _reach_pass(notes, LocalNoteIndex(notes), lambda n: 99.)
+    assert (notes[2]["x"], notes[2]["y"]) == (0, 1)
+    assert out["changed"] == 1 and out["lane_varied"] == 0
+
+
+def test_accepts_added_triple_and_inner_middle_fast():
+    from map_creation import v2_forward_flow as flow
+    members = [_note(0, 0., 0, 0, 1, 1), _note(1, .3, 0, 0, 1, 1)]
+    added = _note(2, .6, 0, 0, 1, 0)
+    context = flow.FlowContext([*members, added])
+    assert not flow.accepts_added(context, added)
+    members = [_note(0, .3, 0, 0, 1, 1)]
+    added = _note(1, 0., 0, 1, 1, 0)
+    context = flow.FlowContext([*members, added])
+    assert not flow.accepts_added(context, added)
+    members = [_note(0, .5, 0, 0, 1, 1)]
+    added = _note(1, 0., 0, 1, 1, 0)
+    context = flow.FlowContext([*members, added])
+    assert flow.accepts_added(context, added)

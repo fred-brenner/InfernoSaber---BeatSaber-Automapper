@@ -64,34 +64,6 @@ def prepared_rebound(note, previous):
     return (entry_x - exit_x) ** 2 + (entry_y - exit_y) ** 2 <= 1 + _TOL
 
 
-def _terminal_accent(note, following, group):
-    from map_creation import v2_playability_priority_metrics as metrics
-    if (following is not None
-            and float(following["time"]) - float(note["time"]) < _RECOVERY_GAP - _TOL):
-        return False
-    if (len(group) not in (2, 3)
-            or note["id"] not in {member["id"] for member in group}):
-        return False
-    if any(member["hand"] != note["hand"] or member["d"] != note["d"]
-           for member in group) or note["d"] not in range(8):
-        return False
-    cells = sorted({(member["x"], member["y"]) for member in group})
-    if len(cells) != len(group):
-        return False
-    sx, sy = metrics.STEP[note["d"]]
-    if sx == 0:
-        cells.sort(key=lambda cell: cell[1])
-        return all(b[0] == a[0] and b[1] - a[1] == 1
-                   for a, b in zip(cells, cells[1:]))
-    if sy == 0:
-        cells.sort(key=lambda cell: cell[0])
-        return all(b[0] - a[0] == 1 and b[1] == a[1]
-                   for a, b in zip(cells, cells[1:]))
-    cells.sort(key=lambda cell: cell[0] * sx + cell[1] * sy)
-    return all(b[0] - a[0] == sx and b[1] - a[1] == sy
-               for a, b in zip(cells, cells[1:]))
-
-
 def style_cost(note, previous, following, group=()):
     from map_creation import v2_playability_priority_metrics as metrics
     incoming = (math.inf if previous is None
@@ -99,10 +71,10 @@ def style_cost(note, previous, following, group=()):
     outgoing = (math.inf if following is None
                 else float(following["time"]) - float(note["time"]))
     fastest = min(incoming, outgoing)
+    fast_follower = outgoing <= _RUN_GAP + _TOL
     center = 0.
-    if (note["x"] in (1, 2) and note["y"] == 1
-            and not _terminal_accent(note, following, group)):
-        center = 12. if fastest < .4 else 6.
+    if note["x"] in (1, 2) and note["y"] == 1 and fast_follower:
+        center = 12.
     horizontal = 0.
     if note["d"] in (2, 3):
         horizontal = 6. if fastest < .4 else 1.
@@ -119,7 +91,10 @@ def style_cost(note, previous, following, group=()):
     if (note["x"] in (1, 2) and note["y"] == 2 and note["d"] in (1, 2, 3, 6, 7)
             and not rebound):
         upper = 1.
-    return (center, horizontal, boundary, upper)
+    top_horizontal = 0.
+    if note["y"] == 2 and note["d"] in (2, 3) and fast_follower:
+        top_horizontal = 6.
+    return (center, horizontal, boundary, upper, top_horizontal)
 
 
 class _MemberView(Sequence):
@@ -291,12 +266,28 @@ def check_additions(before, proposed):
     return None
 
 
+def accepts_added(context, note):
+    """Hard rule for a newly appended note already inside ``context``:
+    reject when its cell completes a same-x triple touching it (invisible
+    to ``style_cost``) or leaves it inner-middle with a fast same-hand
+    follower. Terminal inner-middle notes stay exempt."""
+    from map_creation import v2_forward_lanes as lanes
+    if lanes.repetition_cost(context, [note]):
+        return False
+    following = context.following(note)
+    fast = (following is not None
+            and float(following["time"]) - float(note["time"])
+            <= _RUN_GAP + _TOL)
+    return not (note["x"] in (1, 2) and note["y"] == 1 and fast)
+
+
 def audit_patterns(notes):
     context = FlowContext(notes)
     counts = {"eligible": 0, "center_middle": 0, "horizontal": 0,
-              "unprepared_boundary": 0, "upper_center_down": 0}
+              "unprepared_boundary": 0, "upper_center_down": 0,
+              "top_horizontal": 0}
     keys = ("center_middle", "horizontal", "unprepared_boundary",
-            "upper_center_down")
+            "upper_center_down", "top_horizontal")
     for note in notes:
         if note.get("kind") == "chain_sample":
             continue

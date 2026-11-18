@@ -66,9 +66,17 @@ def validate_expansions(state, song, logger=None):
                    or getattr(config, "v2_playability_reach", False)))
     banned = strict and any(_forbidden(note) for note in batch)
     from map_creation import v2_forward_flow as flow
-    center_chain = (flow.enabled()
+    pattern = flow.enabled()
+    center_chain = (pattern
                     and any(flow._center_crossing(chain) for chain in new_chains))
-    clear = (anchored and not banned and not center_chain
+    flow_skipped = 0
+    if pattern and batch:
+        # Copies sit in ``notes`` already; the merged context makes each
+        # added note's touched-triple/fast-follower check visible at once.
+        context = flow.FlowContext(notes)
+        flow_skipped = sum(not flow.accepts_added(context, note)
+                           for note in batch)
+    clear = (anchored and not banned and not center_chain and not flow_skipped
              and guard["index"].accepts_many([*batch, *samples])
              and guard["direction"].check(batch) is None)
     if not clear:
@@ -77,7 +85,8 @@ def validate_expansions(state, song, logger=None):
         state["notes"] = [note for note in notes if note["id"] not in drop]
         state["chains"] = [chain for chain in chains if chain["id"] not in drop_chains]
         return {"rejected_copies": len(batch),
-                "rejected_chains": len(new_chains)}
+                "rejected_chains": len(new_chains),
+                "flow_skipped": flow_skipped}
     if batch:
         guard["index"].add_many(batch)
         guard["direction"].add_many(batch)
@@ -86,7 +95,8 @@ def validate_expansions(state, song, logger=None):
         guard["accepted_chains"].add(chain["id"])
     if samples:
         guard["index"].add_many(samples)
-    return {"rejected_copies": 0, "rejected_chains": 0}
+    return {"rejected_copies": 0, "rejected_chains": 0,
+            "flow_skipped": flow_skipped}
 
 
 def drop_guard(state):

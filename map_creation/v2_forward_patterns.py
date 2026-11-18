@@ -1,3 +1,4 @@
+import math
 import time as clock
 
 import numpy as np
@@ -85,7 +86,7 @@ def _mixed(chunk):
 
 
 def _aggregate(context, notes):
-    total = [0., 0., 0., 0.]
+    total = [0., 0., 0., 0., 0.]
     for note in notes:
         cost = flow.style_cost(note, context.previous(note),
                                context.following(note), context.group(note))
@@ -94,9 +95,40 @@ def _aggregate(context, notes):
     return tuple(total)
 
 
+def _cap_factor(dt):
+    """Gap-band multiplier on the speed cap for a same-hand gap of ``dt``.
+
+    Bands mirror ``v2_flow_signature.band_index``: <.1, [.1,.2), [.2,.4],
+    (.4,.6], >.6 seconds. An empty/None ``v2_speed_cap_gap_factors`` — or
+    any malformed entry — returns 1: the bound degenerates to the legacy
+    flat ``cap(note)`` rather than crashing or going NaN-permissive.
+    """
+    factors = getattr(config, "v2_speed_cap_gap_factors", None) or ()
+    if dt < .1 - _TOL:
+        index = 0
+    elif dt < .2 - _TOL:
+        index = 1
+    elif dt <= .4 + _TOL:
+        index = 2
+    elif dt <= .6 + _TOL:
+        index = 3
+    else:
+        index = 4
+    try:
+        factor = float(factors[index]) if len(factors) >= 5 else 1.
+    except (TypeError, ValueError, KeyError, IndexError):
+        return 1.
+    return factor if math.isfinite(factor) else 1.
+
+
 def _speed_ok(edges, cap):
     for previous_members, note, incumbent in edges:
-        if flow._arrival(previous_members, note) > max(cap(note), incumbent) + _TOL:
+        # Band on the onset gap to the previous group's anchor (earliest
+        # member), like the signature's gap histograms.
+        dt = (float(note["time"]) - float(previous_members[0]["time"])
+              if previous_members else 0.)
+        if (flow._arrival(previous_members, note)
+                > max(cap(note) * _cap_factor(dt), incumbent) + _TOL):
             return False
     return True
 
@@ -368,7 +400,7 @@ def _phrase_hand(context, index, cap, hand, report):
                         note["x"], note["y"], note["d"] = x, y, d
                     key = _check_chunk(context, index, cap, notes, pre, saved,
                                        strict=True, report=report, family="phrase")
-                    if key is not None and key[4] > before_repetition:
+                    if key is not None and key[5] > before_repetition:
                         key = _reject(report, "phrase", "lane_repetition", notes)
                 finally:
                     for note, (x, y, d) in zip(notes, saved):
@@ -540,7 +572,7 @@ def repair_patterns(notes, index, cap):
               "phrase_windows": 0, "phrase_proposals": 0, "phrase_applied": 0,
               "phrase_notes": 0, "phrase_motifs": {},
               "lateral_windows": 0, "lateral_proposals": 0, "lateral_applied": 0,
-              "lateral_notes": 0, "lateral_motifs": {},
+              "lateral_notes": 0, "lateral_motifs": {}, "lateral_sweeps": 0,
               "rejections": {}, "rejection_examples": {},
               "residual": {}, "seconds": 0.}
     if not flow.enabled() or not notes:

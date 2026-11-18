@@ -1,0 +1,82 @@
+{
+  "generated_with": "working tree after Task 5, uncommitted (2b524f2 + Task 1-5 changes)",
+  "config": "paired lanes-final production defaults at requested_nps 8 (see test module _PAIRED_RUN_CONFIG)",
+  "tolerances": {
+    "distance_epsilon": 0.5,
+    "count_tolerance": 0,
+    "protected_counts": ["bottom_down_fast", "inner_y2_fast"],
+    "protected_floor_fraction": 0.8
+  },
+  "fixtures": {
+    "astronomia": {
+      "distance": 6.967098144524861,
+      "counts": {
+        "notes": 569,
+        "inner_y1_fast": 9,
+        "inner_y1_terminal": 5,
+        "inner_y2_fast": 76,
+        "inner_y2_terminal": 3,
+        "top_horizontal": 12,
+        "top_horizontal_fast": 12,
+        "top_horizontal_terminal": 0,
+        "mid_horizontal_fast": 21,
+        "inner_top_horizontal_fast": 1,
+        "bottom_down_fast": 91,
+        "same_x_triples": 99
+      },
+      "audits": {
+        "directions": {
+          "flow": [],
+          "fast_counter": []
+        },
+        "overlaps": {
+          "overlap": []
+        }
+      },
+      "pattern_audit": {
+        "eligible": 569,
+        "center_middle": 9,
+        "horizontal": 51,
+        "unprepared_boundary": 17,
+        "upper_center_down": 1,
+        "top_horizontal": 12
+      },
+      "notes_out": 569
+    },
+    "heeartbeeat": {
+      "distance": 5.427066460689499,
+      "counts": {
+        "notes": 494,
+        "inner_y1_fast": 5,
+        "inner_y1_terminal": 7,
+        "inner_y2_fast": 56,
+        "inner_y2_terminal": 1,
+        "top_horizontal": 7,
+        "top_horizontal_fast": 7,
+        "top_horizontal_terminal": 0,
+        "mid_horizontal_fast": 16,
+        "inner_top_horizontal_fast": 2,
+        "bottom_down_fast": 84,
+        "same_x_triples": 71
+      },
+      "audits": {
+        "directions": {
+          "flow": [],
+          "fast_counter": []
+        },
+        "overlaps": {
+          "overlap": []
+        }
+      },
+      "pattern_audit": {
+        "eligible": 494,
+        "center_middle": 5,
+        "horizontal": 35,
+        "unprepared_boundary": 9,
+        "upper_center_down": 1,
+        "top_horizontal": 7
+      },
+      "notes_out": 494
+    }
+  }
+}

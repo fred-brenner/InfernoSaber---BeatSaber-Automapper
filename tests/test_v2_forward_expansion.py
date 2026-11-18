@@ -584,3 +584,68 @@ def test_guard_accepts_same_time_different_cell_stacks():
     assert guard.check([copy]) is None
     cross = _note(2, 1., 1, 2, 1, 3, kind="copy", anchor_id=0)
     assert guard.check([copy, cross]) is None
+
+
+def _enable_flow(monkeypatch):
+    for key, value in {"v2_pattern_flow": True,
+                       "v2_note_postprocessing_mode": "forward",
+                       "v2_cleanup_note_heuristics": False,
+                       "v2_cleanup_same_dir_recut": .5,
+                       "v2_cleanup_same_dir_gap": .1}.items():
+        monkeypatch.setattr(config, key, value)
+
+
+def test_expansion_rejects_copy_creating_same_x_triple(monkeypatch):
+    from map_creation.v2_forward_expansion import validate_expansions
+    _enable_flow(monkeypatch)
+    state = {"notes": [_retained(0, 0., 0, 0, 1, 1),
+                       _retained(1, .3, 0, 0, 1, 1),
+                       _note(2, .6, 0, 0, 1, 0, kind="copy", anchor_id=0)],
+             "chains": []}
+    out = validate_expansions(state, None)
+    assert out["rejected_copies"] == 1 and out["flow_skipped"] == 1
+    assert [n["id"] for n in state["notes"]] == [0, 1]
+
+
+def test_expansion_rejects_inner_middle_fast_copy(monkeypatch):
+    from map_creation.v2_forward_expansion import validate_expansions
+    _enable_flow(monkeypatch)
+    state = {"notes": [_retained(0, 0., 0, 0, 1, 1),
+                       _retained(1, .9, 0, 0, 1, 1),
+                       _note(2, .6, 0, 1, 1, 0, kind="copy", anchor_id=0)],
+             "chains": []}
+    out = validate_expansions(state, None)
+    assert out["rejected_copies"] == 1 and out["flow_skipped"] == 1
+
+
+def test_expansion_allows_inner_middle_copy_with_slow_follower(monkeypatch):
+    from map_creation.v2_forward_expansion import validate_expansions
+    _enable_flow(monkeypatch)
+    state = {"notes": [_retained(0, 0., 0, 0, 1, 1),
+                       _retained(1, 1.1, 0, 0, 1, 1),
+                       _note(2, .6, 0, 1, 1, 0, kind="copy", anchor_id=0)],
+             "chains": []}
+    out = validate_expansions(state, None)
+    assert out["rejected_copies"] == 0 and out["flow_skipped"] == 0
+    assert len(state["notes"]) == 3
+
+
+def test_forward_emphasis_skips_inner_middle_fast_copy(monkeypatch):
+    from map_creation.v2_forward_expansion import apply_note_emphasis
+    _enable_flow(monkeypatch)
+    notes = [_retained(i, float(i), 1, 3, 1, 1) for i in range(4)]
+    notes += [_retained(4, 5., 0, 1, 0, 0), _retained(5, 5.3, 0, 2, 0, 1)]
+    state = {"notes": notes, "chains": []}
+    out = apply_note_emphasis(state, None, rng=_ScriptedDraws(.95))
+    assert out["applied"] and out["added_notes"] == 0
+    assert out["rejected"].get("flow_skipped") == 1
+
+
+def test_forward_emphasis_allows_inner_middle_slow_copy(monkeypatch):
+    from map_creation.v2_forward_expansion import apply_note_emphasis
+    _enable_flow(monkeypatch)
+    notes = [_retained(i, float(i), 1, 3, 1, 1) for i in range(4)]
+    notes += [_retained(4, 5., 0, 1, 0, 0), _retained(5, 5.5, 0, 2, 0, 1)]
+    state = {"notes": notes, "chains": []}
+    out = apply_note_emphasis(state, None, rng=_ScriptedDraws(.95))
+    assert out["applied"] and out["added_notes"] == 2 and out["triples"] == 1

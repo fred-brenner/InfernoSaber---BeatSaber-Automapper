@@ -201,13 +201,38 @@ def _reach_cost(note, previous_group, notes, cap, scale):
     return (int(forbidden_cut(note) or max(dx, dy) >= 2), over, excursion)
 
 
+def _lane_varied_pick(note, pool, context):
+    """Flow-aware pick over reach-cost-tied feasible cells: fewest touched
+    same-x triples, no inner-middle-fast landing, then least displacement.
+    The context shares live dictionaries, so earlier pass moves show."""
+    from map_creation import v2_forward_flow as flow
+    from map_creation import v2_forward_lanes as lanes
+    best = min(cost for _x, _y, cost in pool)
+    tied = [(x, y) for x, y, cost in pool
+            if all(c <= b + _TOL for c, b in zip(cost, best))]
+    following = context.following(note)
+    fast = (following is not None
+            and float(following["time"]) - float(note["time"])
+            <= flow._RUN_GAP + _TOL)
+
+    def rank(cell):
+        tx, ty = cell
+        return (lanes.repetition_cost(context, [dict(note, x=tx, y=ty)]),
+                int(tx in (1, 2) and ty == 1 and fast),
+                abs(tx - note["x"]) + abs(ty - note["y"]))
+    return min(tied, key=rank)
+
+
 def _reach_pass(notes, index, cap):
     from map_creation.v2_playability_policy import SpeedGroups
     from map_creation import v2_postprocessing as post
-    stats = {"attempted": 0, "changed": 0, "blocked": 0, "unresolved": 0}
+    stats = {"attempted": 0, "changed": 0, "blocked": 0, "unresolved": 0,
+             "lane_varied": 0}
     if not (getattr(config, "v2_playability_priority", False)
             or getattr(config, "v2_playability_reach", False)):
         return stats
+    from map_creation import v2_forward_flow as flow
+    context = flow.FlowContext(notes) if flow.enabled() else None
     groups = SpeedGroups(notes, cap, _eps())
     scale = post.speed_cap_scale()
     for i, note in enumerate(notes):
@@ -232,21 +257,30 @@ def _reach_pass(notes, index, cap):
                      (note["x"] + int(np.sign(center - note["x"])), note["y"]),
                      (note["x"], note["y"] + int(np.sign(1 - note["y"]))),
                      (center, 1)]
-        seen, accepted = set(), False
+        seen, pool = set(), []
         for x, y in proposals[:_MAX_PROPOSALS]:
             if (x, y) in seen or not (low <= x <= high and 0 <= y <= 2):
                 continue
             seen.add((x, y))
             trial = _clone(note, x=x, y=y)
-            if _reach_cost(trial, group, notes, cap, scale) >= base_cost:
+            cost = _reach_cost(trial, group, notes, cap, scale)
+            if cost >= base_cost:
                 continue
             if not index.accepts(trial):
                 stats["blocked"] += 1
                 continue
-            note["x"], note["y"] = x, y
-            accepted = True
-            break
-        stats["changed" if accepted else "unresolved"] += 1
+            pool.append((x, y, cost))
+            if context is None:
+                # Without the flow tie-break the first feasible wins as before.
+                break
+        if pool:
+            if context is None or len(pool) == 1:
+                pick = pool[0][:2]
+            else:
+                pick = _lane_varied_pick(note, pool, context)
+                stats["lane_varied"] += int(pick != pool[0][:2])
+            note["x"], note["y"] = pick
+        stats["changed" if pool else "unresolved"] += 1
     return stats
 
 

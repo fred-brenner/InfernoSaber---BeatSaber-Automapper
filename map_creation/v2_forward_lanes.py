@@ -5,6 +5,7 @@ _LATERAL_CYCLES = (
     ("adjacent_rebound", ((0, 0, 1), (1, 0, 0))),
     ("adjacent_rocker", ((0, 1, 4), (1, 0, 1))),
 )
+_SWEEP_OFFSETS = (0, 2)
 
 
 def repetition_cost(context, notes):
@@ -85,16 +86,16 @@ def _attempt(context, index, cap, notes, chunk, hand, report, patterns):
                 note["x"], note["y"], note["d"] = x, y, d
             key = patterns._check_chunk(context, index, cap, notes, pre, saved,
                                         strict=False, report=report, family="lateral")
-            if key is not None and key[4] >= before:
+            if key is not None and key[5] >= before:
                 key = patterns._reject(report, "lateral", "lane_repetition", notes)
             if key is not None and any(
-                    new > old + flow._TOL for new, old in zip(key[:4], pre["agg_before"])):
+                    new > old + flow._TOL for new, old in zip(key[:5], pre["agg_before"])):
                 key = patterns._reject(report, "lateral", "style_regression", notes)
         finally:
             for note, (x, y, d) in zip(notes, saved):
                 note["x"], note["y"], note["d"] = x, y, d
         if key is not None:
-            rank = (key[4], *key, order)
+            rank = (key[5], *key, order)
             if best is None or rank < best[0]:
                 best = (rank, name, geometry)
     if best is None:
@@ -108,37 +109,56 @@ def _attempt(context, index, cap, notes, chunk, hand, report, patterns):
     motifs[name] = motifs.get(name, 0) + 1
 
 
-def repair_lanes(context, index, cap, report):
+def _sweep_hand(context, index, cap, hand, offset, report, patterns):
+    groups = patterns._hand_groups(context, hand)
+    i = 0
+    while i < len(groups):
+        if (not patterns._single(groups[i])
+                or len(context.group(groups[i][0])) != 1):
+            i += 1
+            continue
+        j = i + 1
+        while (j < len(groups) and patterns._single(groups[j])
+               and len(context.group(groups[j][0])) == 1
+               and groups[j][0]["x"] == groups[i][0]["x"]
+               and .1 - flow._TOL <= patterns._group_gap(groups[j - 1], groups[j])
+               <= flow._RUN_GAP + flow._TOL):
+            j += 1
+        start = i + offset
+        while j - start >= 4:
+            chunk = groups[start:min(start + 8, j)]
+            if len(chunk) > 4 and not patterns._regular(chunk):
+                chunk = chunk[:4]
+            start += len(chunk)
+            notes = [group[0] for group in chunk]
+            report["lateral_windows"] += 1
+            previous, following = context.previous(notes[0]), context.following(notes[-1])
+            if any(edge is not None
+                   and (edge["d"] == 8 or len(context.group(edge)) != 1)
+                   for edge in (previous, following)):
+                patterns._reject(report, "lateral", "skipped_context", notes)
+                continue
+            _attempt(context, index, cap, notes, chunk, hand, report, patterns)
+        i = j
+
+
+def _sweep(context, index, cap, offset, report):
     from map_creation import v2_forward_patterns as patterns
 
     for hand in (0, 1):
-        groups = patterns._hand_groups(context, hand)
-        i = 0
-        while i < len(groups):
-            if (not patterns._single(groups[i])
-                    or len(context.group(groups[i][0])) != 1):
-                i += 1
-                continue
-            j = i + 1
-            while (j < len(groups) and patterns._single(groups[j])
-                   and len(context.group(groups[j][0])) == 1
-                   and groups[j][0]["x"] == groups[i][0]["x"]
-                   and .1 - flow._TOL <= patterns._group_gap(groups[j - 1], groups[j])
-                   <= flow._RUN_GAP + flow._TOL):
-                j += 1
-            start = i
-            while j - start >= 4:
-                chunk = groups[start:min(start + 8, j)]
-                if len(chunk) > 4 and not patterns._regular(chunk):
-                    chunk = chunk[:4]
-                start += len(chunk)
-                notes = [group[0] for group in chunk]
-                report["lateral_windows"] += 1
-                previous, following = context.previous(notes[0]), context.following(notes[-1])
-                if any(edge is not None
-                       and (edge["d"] == 8 or len(context.group(edge)) != 1)
-                       for edge in (previous, following)):
-                    patterns._reject(report, "lateral", "skipped_context", notes)
-                    continue
-                _attempt(context, index, cap, notes, chunk, hand, report, patterns)
-            i = j
+        _sweep_hand(context, index, cap, hand, offset, report, patterns)
+
+
+def repair_lanes(context, index, cap, report):
+    # Each sweep re-derives the same-x runs from current note positions:
+    # an earlier sweep may have moved notes into or out of a run. The
+    # offset sweep partitions each run from group i+2, catching windows
+    # that straddle the first sweep's chunk boundaries (the two leading
+    # groups stay unwindowed — typically already handled or not
+    # repairable alone). Acceptance still requires a strict repetition
+    # drop with no style-component increase, so a later window can never
+    # undo an earlier gain and two sweeps suffice — no convergence loop.
+    report.setdefault("lateral_sweeps", 0)
+    for offset in _SWEEP_OFFSETS:
+        report["lateral_sweeps"] += 1
+        _sweep(context, index, cap, offset, report)

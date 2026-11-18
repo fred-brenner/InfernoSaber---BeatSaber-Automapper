@@ -290,6 +290,8 @@ def apply_note_emphasis(state, song, *, rng=None, logger=None, gate_factory=None
     wait = float(np.quantile(gaps, float(getattr(config, "emphasize_beats_quantile", .65)))) + .05
     gate = (gate_factory(state, song, eps) if gate_factory is not None
             else _EmphasisGate(state, song, eps))
+    from map_creation import v2_forward_flow as flow
+    pattern = flow.enabled()
     diagnostics["applied"] = True
     next_id = max([note["id"] for note in notes]
                   + [chain["id"] for chain in state.get("chains", [])], default=-1) + 1
@@ -308,7 +310,16 @@ def apply_note_emphasis(state, song, *, rng=None, logger=None, gate_factory=None
             for cells in _stack_cells(anchor, target):
                 proposed = [gate.copy(anchor, cell, next_id + offset)
                             for offset, cell in enumerate(cells)]
-                reason = gate.check(proposed)
+                reason = None
+                if pattern:
+                    # Touched same-x triples are invisible to the gate's
+                    # style deltas, so additions get their own hard rule.
+                    context = flow.FlowContext([*notes, *proposed])
+                    if any(not flow.accepts_added(context, note)
+                           for note in proposed):
+                        reason = "flow_skipped"
+                if reason is None:
+                    reason = gate.check(proposed)
                 if reason is None:
                     notes.extend(proposed)
                     next_id += len(proposed)
