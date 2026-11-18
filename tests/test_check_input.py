@@ -31,20 +31,21 @@ def test_format_time_estimate_hours():
 
 
 def test_summary_reports_estimated_time(monkeypatch, tmp_path):
-    # 4 songs x 2 difficulties = 8 runs; 8 * 15 s / 3 workers + 20 s = 60 s
+    # 4 songs x 2 difficulties = 8 runs
+    # 20 s + 4 * 1 s song startup + ceil(8 * 15 s * 1.5 / 3 workers) = 24 + 60 = 84 s
     _setup_songs(monkeypatch, tmp_path, count=4, workers=3)
     summary = get_summary(5, 7, 0, 0, 0)
     assert "Total runs: 8" in summary
-    assert "Info: Estimated time: ~1 min (3 worker(s))" in summary
+    assert "Info: Estimated time: ~1.4 min (3 worker(s))" in summary
 
 
 def test_summary_estimate_scales_with_workers(monkeypatch, tmp_path):
-    # 2 runs; 2 * 15 s / 1 worker + 20 s = 50 s
+    # 2 songs, 2 runs; 20 s + 2 * 1 s + ceil(2 * 15 s * 1.5 / 1) = 22 + 45 = 67 s
     _setup_songs(monkeypatch, tmp_path, count=2, workers=1)
-    assert "~50 s" in get_summary(5, 0, 0, 0, 0)
-    # 2 * 15 s / 4 workers -> ceil(7.5) = 8; 20 + 8 = 28 s
+    assert "~1.1 min" in get_summary(5, 0, 0, 0, 0)
+    # 20 s + 2 * 1 s + ceil(2 * 15 s * 1.5 / 4) = 22 + 12 = 34 s
     _setup_songs(monkeypatch, tmp_path, count=2, workers=4)
-    assert "~28 s" in get_summary(5, 0, 0, 0, 0)
+    assert "~34 s" in get_summary(5, 0, 0, 0, 0)
 
 
 def test_summary_omits_estimate_without_runs(monkeypatch, tmp_path):

@@ -8,7 +8,9 @@ bs_folder_name = "Beat Saber_Data/CustomLevels"
 bs_folder_name2 = "SharedMaps/CustomLevels"
 
 ESTIMATED_STARTUP_SECONDS = 20
+ESTIMATED_SECONDS_PER_SONG = 1
 ESTIMATED_SECONDS_PER_RUN = 15
+ESTIMATED_RUN_FACTOR = 1.5
 
 
 def format_time_estimate(total_seconds):
@@ -122,8 +124,10 @@ def get_summary(diff1=config.difficulty_1, diff2 = config.difficulty_2, diff3 = 
                f"Total runs: {total_runs}")
     if total_runs > 0:
         workers = max(int(config.num_workers), 1)
-        est_seconds = ESTIMATED_STARTUP_SECONDS + math.ceil(
-            ESTIMATED_SECONDS_PER_RUN * total_runs / workers)
+        est_seconds = (ESTIMATED_STARTUP_SECONDS
+                       + ESTIMATED_SECONDS_PER_SONG * len(song_list)
+                       + math.ceil(ESTIMATED_SECONDS_PER_RUN * ESTIMATED_RUN_FACTOR
+                                   * total_runs / workers))
         log.append(f"Info: Estimated time: ~{format_time_estimate(est_seconds)} "
                    f"({workers} worker(s))")
 
