@@ -28,7 +28,10 @@ The five v1 presets remain selectable legacy options in the app and CLI
 (`fav_15`, `pp3_15`, `easy_15`, `hard_15`, `expert_15`); a v1 selection
 downloads its model folder on demand and runs the unchanged legacy pipeline
 to per-difficulty `1234_*` folders, which combine into `12345_*` packages
-(folder + ZIP) like the v2 path.
+(folder + ZIP) like the v2 path. Each song's `12345_*` package is assembled
+and exported to the Beat Saber library (when the export flag/path is set) as
+soon as all of that song's difficulties complete, without waiting for the
+rest of the run.
 WSL/Linux is the primary development environment; preserve Windows app
 compatibility. Complete the requested task, including small supporting 
 refactors when they simplify the change. Keep unrelated cleanup separate. 

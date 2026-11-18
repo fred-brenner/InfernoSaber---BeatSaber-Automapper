@@ -180,7 +180,7 @@ def _combine_v1_packages(song_list_potential, song_list_run, diff_list,
         report["song"] = name
         packages.append(report)
         if export_results_to_bs and shutil_copy_maps(name, index="12345_"):
-            _emit("Copied map(s) to BeatSaber directory.", logger)
+            _emit(f"Copied {name} map(s) to BeatSaber directory.", logger, important=True)
         for difficulty in diff_list:
             shutil.rmtree(by_difficulty[difficulty]["path"])
         _emit(f"Packaged {name}: {folder.name} ({len(variants)} v1 map(s))",
@@ -226,10 +226,13 @@ def _combine_maps(song_list_potential, song_list_run, diff_list, export_results_
             report["library_exported"] = bool(library and Path(library).is_dir())
             if report["library_exported"]:
                 shutil.copytree(folder, Path(library) / folder.name, dirs_exist_ok=True)
+                _emit(f"Copied {name} map(s) to BeatSaber directory.", logger, important=True)
             else:
                 _emit("Warning: Beatsaber folder not found, automatic export disabled.")
         for record in records:
             shutil.rmtree(record["path"])
+        _emit(f"Packaged {name}: {folder.name} ({len(variants)} map(s))",
+              logger, important=True)
         if run_config["auto_move_song_afterwards"]:
             done = Path(run_paths["songs_pred"]) / "y_done"
             done.mkdir(exist_ok=True)
@@ -279,6 +282,36 @@ def _run(n_workers, diff_list, export_results_to_bs, logger_callback, parallel, 
         _emit(f"### ETA: {(total_variants - len(records)) * per_variant / 60:.1f} minutes. "
               f"Time per song: {per_variant:.0f} s ###", logger_callback, important=True)
 
+    # Every (song, difficulty) pair yields exactly one completion record, so a
+    # song can be packaged and exported as soon as all of its pairs returned —
+    # the rest of the run does not have to finish first.
+    songs_by_stem, pending, combined = {}, {}, set()
+    for group in groups:
+        for song, _ in group:
+            stem = Path(song).stem
+            songs_by_stem.setdefault(stem, song)
+            pending[stem] = pending.get(stem, 0) + 1
+
+    def _combine_song(song_file):
+        try:
+            packages.extend(_combine_maps([song_file], records, difficulties,
+                                          export_results_to_bs, snapshot,
+                                          logger=logger_callback))
+        except Exception as error:
+            failures.append({"status": "failed", "song": Path(song_file).stem,
+                             "error": f"Package failed: {type(error).__name__}: {error}"})
+
+    def _drain_ready(new_records):
+        for record in new_records:
+            stem = record["song"]
+            if stem not in pending:
+                continue
+            pending[stem] -= 1
+            if pending[stem] > 0 or stem in combined:
+                continue
+            combined.add(stem)
+            _combine_song(songs_by_stem[stem])
+
     if groups and parallel:
         context = mp.get_context("spawn")
         progress = context.Queue()
@@ -294,10 +327,12 @@ def _run(n_workers, diff_list, export_results_to_bs, logger_callback, parallel, 
                             break
                         _emit(message, logger_callback, important=important)
                     try:
-                        records.extend(results.next(timeout=.2))
+                        chunk = results.next(timeout=.2)
                     except mp.TimeoutError:
                         continue
+                    records.extend(chunk)
                     finished += 1
+                    _drain_ready(chunk)
                     _eta()
                     _emit(f"Completed {finished}/{len(groups)} work groups in {time.perf_counter() - started:.1f}s", logger_callback)
                 while True:
@@ -313,17 +348,16 @@ def _run(n_workers, diff_list, export_results_to_bs, logger_callback, parallel, 
         with scoped_settings(snapshot):
             configure_inference()
             for group in groups:
-                records.extend(process_song(group, len(groups)))
+                chunk = process_song(group, len(groups))
+                records.extend(chunk)
+                _drain_ready(chunk)
                 _eta()
     failures.extend(record for record in records if record["status"] != "ok")
     # Handle packaging failures individually and keep completed variants for retry.
     for song in songs:
-        try:
-            packages.extend(_combine_maps([song], records, difficulties, export_results_to_bs,
-                                          snapshot, logger=logger_callback))
-        except Exception as error:
-            failures.append({"status": "failed", "song": Path(song).stem,
-                             "error": f"Package failed: {type(error).__name__}: {error}"})
+        if Path(song).stem in combined:
+            continue
+        _combine_song(song)
     report = {"status": "failed" if failures else "ok", "results": records,
               "packages": packages, "failures": failures, "workers": workers,
               "elapsed_seconds": time.perf_counter() - started}

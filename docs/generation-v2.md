@@ -118,7 +118,12 @@ encoder, and v1 lighting always stay on TensorFlow.
 successful variants from that call may be combined. A failed requested variant
 prevents publication of a new combined package for that song. Previously complete
 outputs remain intact, but never count as a successful current result. The app
-reports failures instead of displaying unconditional success.
+reports failures instead of displaying unconditional success. Each song is
+combined as soon as all of its requested difficulties reported back — a finished
+`12345_*` package (folder + ZIP) is copied to the configured Beat Saber library
+immediately when `export_results_to_bs` is set, without waiting for the rest of
+the run; `auto_move_song_afterwards` also moves that song's input file at that
+point.
 
 Run messages always print to the CLI/Pinokio console in full. The app progress
 box only receives milestone lines — setup, `### ETA: ... Time per song: ... ###`
